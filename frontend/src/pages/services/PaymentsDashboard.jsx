@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
-import { DollarSign, Search, Plus, Edit2, Trash2, X, Save, Building2, Calendar, FileText } from 'lucide-react';
+import { DollarSign, Search, Plus, Edit2, Trash2, X, Save, Building2, Calendar, FileText, FileCheck, CheckSquare, Square } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import DateInput from '../../components/common/DateInput';
 
@@ -12,6 +12,7 @@ const PaymentsDashboard = () => {
     const [showForm, setShowForm] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [editingId, setEditingId] = useState(null);
+    const [selectedIds, setSelectedIds] = useState(new Set());
 
     // Initial state for form
     const initialFormState = {
@@ -38,6 +39,7 @@ const PaymentsDashboard = () => {
             setPayments(payRes.data);
             setServices(servRes.data);
             setEstablishments(estRes.data);
+            setSelectedIds(new Set()); // Reset selection on refresh
         } catch (error) {
             console.error("Error fetching data:", error);
         } finally {
@@ -81,6 +83,62 @@ const PaymentsDashboard = () => {
         }
     };
 
+    // Selection Logic
+    const toggleSelection = (id) => {
+        const newSet = new Set(selectedIds);
+        if (newSet.has(id)) {
+            newSet.delete(id);
+        } else {
+            newSet.add(id);
+        }
+        setSelectedIds(newSet);
+    };
+
+    // Generate RC
+    const handleGenerateRC = async () => {
+        if (selectedIds.size === 0) return;
+
+        const selectedPayments = payments.filter(p => selectedIds.has(p.id));
+
+        // Validation 1: Same Provider
+        // Note: 'servicio' object is not fully populated in payment list unless nested or using IDs.
+        // The API returns 'servicio' as ID by default unless customized.
+        // Fortunately, we can check basic consistency.
+        // Wait, payment serializer has `servicio` as ID usually. 
+        // We need to look up the service or check consistency if we have the data.
+        // Actually, `RegistroPagoSerializer` usually returns IDs for FKs unless depth is set.
+        // But we have `services` list loaded.
+
+        const firstPayment = selectedPayments[0];
+        const firstService = services.find(s => s.id === firstPayment.servicio);
+        if (!firstService) {
+            alert("Error: No se pudo identificar el servicio.");
+            return;
+        }
+        const providerId = firstService.proveedor;
+
+        for (let p of selectedPayments) {
+            const s = services.find(srv => srv.id === p.servicio);
+            if (!s || s.proveedor !== providerId) {
+                alert("Error: Todos los pagos seleccionados deben pertenecer al mismo proveedor.");
+                return;
+            }
+        }
+
+        if (!window.confirm(`¿Generar Recepción Conforme para ${selectedIds.size} pagos?`)) return;
+
+        try {
+            await api.post('recepciones-conformes/', {
+                proveedor: providerId,
+                registros_ids: Array.from(selectedIds)
+            });
+            alert("Recepción Conforme generada exitosamente.");
+            fetchData();
+        } catch (error) {
+            console.error(error);
+            alert("Error al generar RC: " + (error.response?.data?.detail || error.message));
+        }
+    };
 
 
     const handleSubmit = async (e) => {
@@ -137,6 +195,17 @@ const PaymentsDashboard = () => {
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
+
+                    {selectedIds.size > 0 && (
+                        <button
+                            onClick={handleGenerateRC}
+                            className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 font-medium whitespace-nowrap animate-in fade-in slide-in-from-right-4"
+                        >
+                            <FileCheck className="w-5 h-5" />
+                            <span>Generar RC ({selectedIds.size})</span>
+                        </button>
+                    )}
+
                     <button
                         onClick={handleNew}
                         className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
@@ -257,17 +326,8 @@ const PaymentsDashboard = () => {
                                                 />
 
                                                 <div className="space-y-1">
-                                                    {/* We can use DateInput here too but let's keep the style consistent or customize it */}
-                                                    {/* Special styling for PAGO date? Let's use DateInput but pass class if needed. 
-                                                         But DateInput handles standard styling. Let's just wrap it. */}
                                                     <label className="text-xs font-bold text-blue-600 uppercase">Envío a Pago</label>
                                                     <div className="relative">
-                                                        {/* Re-implementing essentially DateInput for this specific field to keep the blue border style OR just use DateInput with className */}
-                                                        {/* Let's be clean and use DateInput, but we lose the specific Blue border unless we add props. 
-                                                             I'll just inject the custom blue style into a custom version locally or accept simpler style. 
-                                                             Actually, consistency is better. I will use DateInput. 
-                                                             Wait, the user liked the "Montos" section styling. 
-                                                             Let's stick to DateInput standard style for consistency across the form. */}
                                                         <DateInput
                                                             value={formData.fecha_pago}
                                                             onChange={e => setFormData({ ...formData, fecha_pago: e.target.value })}
@@ -342,6 +402,9 @@ const PaymentsDashboard = () => {
                 <table className="w-full text-left">
                     <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
+                            <th className="p-3 w-10">
+                                {/* Optional Select All? Slightly complex with pagination/filters logic. Skipping for now. */}
+                            </th>
                             <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha Pago</th>
                             <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Documento</th>
                             <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Servicio</th>
@@ -353,6 +416,22 @@ const PaymentsDashboard = () => {
                     <tbody className="divide-y divide-slate-100">
                         {filteredData.map(item => (
                             <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="p-3 text-center">
+                                    {!item.recepcion_conforme ? (
+                                        <button
+                                            onClick={() => toggleSelection(item.id)}
+                                            className="text-slate-400 hover:text-blue-600 transition-colors"
+                                        >
+                                            {selectedIds.has(item.id) ? (
+                                                <CheckSquare className="w-5 h-5 text-blue-600" />
+                                            ) : (
+                                                <Square className="w-5 h-5" />
+                                            )}
+                                        </button>
+                                    ) : (
+                                        <div className="w-5 h-5 mx-auto" />
+                                    )}
+                                </td>
                                 <td className="p-3">
                                     <div className="flex items-center gap-2 text-sm text-slate-700 font-medium">
                                         <Calendar className="w-4 h-4 text-slate-400" />
@@ -361,6 +440,11 @@ const PaymentsDashboard = () => {
                                 </td>
                                 <td className="p-3">
                                     <div className="font-mono text-sm font-semibold text-slate-800">{item.nro_documento}</div>
+                                    {item.recepcion_conforme_folio && (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 border-green-200 border mt-1">
+                                            RC: {item.recepcion_conforme_folio}
+                                        </span>
+                                    )}
                                 </td>
                                 <td className="p-3">
                                     <div className="text-sm font-medium text-blue-700">{item.servicio_detalle}</div>
@@ -378,12 +462,21 @@ const PaymentsDashboard = () => {
                                 </td>
                                 <td className="p-3 text-right">
                                     <div className="flex justify-end gap-2">
-                                        <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
-                                            <Edit2 className="w-4 h-4" />
-                                        </button>
-                                        <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                        {!item.recepcion_conforme && (
+                                            <>
+                                                <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+                                                    <Edit2 className="w-4 h-4" />
+                                                </button>
+                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </>
+                                        )}
+                                        {item.recepcion_conforme && (
+                                            <button className="p-2 text-slate-300 cursor-not-allowed">
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
+                                        )}
                                     </div>
                                 </td>
                             </tr>

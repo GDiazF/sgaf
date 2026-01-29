@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Key, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign } from 'lucide-react';
+import { Key, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 
@@ -139,6 +139,13 @@ const Layout = () => {
                                     <DollarSign className="w-4 h-4" />
                                     Pagos
                                 </Link>
+                                <Link
+                                    to="/services/rc"
+                                    className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors ${isActive('/services/rc') ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
+                                >
+                                    <FileText className="w-4 h-4" />
+                                    Recepciones Conf.
+                                </Link>
                             </div>
                         )}
                     </div>
@@ -169,7 +176,8 @@ const Layout = () => {
                                         isActive('/loans/new') ? 'Nuevo Préstamo' :
                                             isActive('/history') ? 'Historial de Préstamos' :
                                                 isActive('/applicants') ? 'Gestión de Solicitantes' :
-                                                    isActive('/keys') ? 'Inventario de Llaves' : 'Sistema de Llaves'}
+                                                    isActive('/keys') ? 'Inventario de Llaves' :
+                                                        isActive('/services/rc') ? 'Recepciones Conformes' : 'Sistema de Llaves'}
                         </h2>
                         <p className="text-sm text-slate-500">Bienvenido al sistema de control.</p>
                     </div>
