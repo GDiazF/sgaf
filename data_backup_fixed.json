@@ -1,0 +1,118 @@
+[
+  {
+    "model": "prestamo_llaves.establecimiento",
+    "pk": 1,
+    "fields": {
+      "rbd": 123,
+      "nombre": "COLEGIO ESPA\u00d0A",
+      "tipo": "escuela",
+      "director": "CLAUDIO CABEZAS MILLA",
+      "direccion": "FRANCISCO VERGARA 2630",
+      "email": "espana@slepiquique.cl",
+      "activo": true
+    }
+  },
+  {
+    "model": "prestamo_llaves.establecimiento",
+    "pk": 2,
+    "fields": {
+      "rbd": 125,
+      "nombre": "ESCUELA MANUEL CASTRO RAMOS",
+      "tipo": "escuela",
+      "director": "GILBERTO MI\u00d0OS",
+      "direccion": "CASTRO RAMOS 1520",
+      "email": "ecastroramos@slepiquique.cl",
+      "activo": true
+    }
+  },
+  {
+    "model": "prestamo_llaves.solicitante",
+    "pk": 1,
+    "fields": {
+      "rut": "18372148-8",
+      "nombre": "GUILLERMO",
+      "apellido": "DIAZ",
+      "telefono": "",
+      "email": "guillermo.diaz@slepiquique.cl"
+    }
+  },
+  {
+    "model": "prestamo_llaves.solicitante",
+    "pk": 2,
+    "fields": {
+      "rut": "17523645-3",
+      "nombre": "JORGE",
+      "apellido": "CUBILLOS",
+      "telefono": "",
+      "email": "jorge.cubillo@slepiquique.cl"
+    }
+  },
+  {
+    "model": "prestamo_llaves.solicitante",
+    "pk": 3,
+    "fields": {
+      "rut": "13867529-7",
+      "nombre": "CLAUDIO",
+      "apellido": "CABEZAS",
+      "telefono": "",
+      "email": ""
+    }
+  },
+  {
+    "model": "prestamo_llaves.llave",
+    "pk": 1,
+    "fields": {
+      "nombre": "ESPA\u00d0A",
+      "establecimiento": 1,
+      "ubicacion": ""
+    }
+  },
+  {
+    "model": "prestamo_llaves.llave",
+    "pk": 2,
+    "fields": {
+      "nombre": "MANUEL CASTRO RAMOS",
+      "establecimiento": 2,
+      "ubicacion": ""
+    }
+  },
+  {
+    "model": "prestamo_llaves.prestamo",
+    "pk": 1,
+    "fields": {
+      "llave": 1,
+      "solicitante": 1,
+      "fecha_prestamo": "2026-01-28T18:12:47.416Z",
+      "fecha_devolucion": "2026-01-28T18:14:20.867Z",
+      "observacion": "",
+      "usuario_entrega": null,
+      "usuario_recepcion": null
+    }
+  },
+  {
+    "model": "prestamo_llaves.prestamo",
+    "pk": 2,
+    "fields": {
+      "llave": 2,
+      "solicitante": 1,
+      "fecha_prestamo": "2026-01-28T18:24:46.890Z",
+      "fecha_devolucion": null,
+      "observacion": "",
+      "usuario_entrega": null,
+      "usuario_recepcion": null
+    }
+  },
+  {
+    "model": "prestamo_llaves.prestamo",
+    "pk": 3,
+    "fields": {
+      "llave": 1,
+      "solicitante": 3,
+      "fecha_prestamo": "2026-01-28T18:39:14.083Z",
+      "fecha_devolucion": "2026-01-28T19:50:23.973Z",
+      "observacion": "",
+      "usuario_entrega": null,
+      "usuario_recepcion": null
+    }
+  }
+]
