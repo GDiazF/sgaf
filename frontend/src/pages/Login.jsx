@@ -44,7 +44,7 @@ const Login = () => {
                         className="relative z-10 flex flex-col items-center"
                     >
                         {/* Modified for wide logo */}
-                        <div className="bg-white rounded-2xl mb-6 shadow-xl p-4 w-64 h-32 flex items-center justify-center">
+                        <div className="mb-6 p-2 w-72 h-36 flex items-center justify-center">
                             <img src="/logo.png" alt="SLEP Logo" className="w-full h-full object-contain" />
                         </div>
                         <h1 className="text-2xl font-bold text-white">Bienvenido</h1>

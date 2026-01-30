@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Proveedor, TipoDocumento, Servicio, TipoProveedor, RegistroPago, RecepcionConforme, HistorialRecepcionConforme
+from .models import Proveedor, TipoDocumento, Servicio, TipoProveedor, RegistroPago, RecepcionConforme, HistorialRecepcionConforme, CDP
 from establecimientos.serializers import EstablecimientoSerializer
 
 class TipoProveedorSerializer(serializers.ModelSerializer):
@@ -164,3 +164,9 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
                  )
              
         return rc
+
+class CDPSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CDP
+        fields = '__all__'
+        read_only_fields = ['fecha_subida']

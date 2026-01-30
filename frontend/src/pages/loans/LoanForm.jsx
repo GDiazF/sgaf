@@ -28,7 +28,10 @@ const LoanForm = () => {
     const [observacion, setObservacion] = useState('');
 
     useEffect(() => {
-        api.get('establecimientos/').then(res => setEstablishments(res.data));
+        api.get('establecimientos/').then(res => {
+            // Handle pagination for dropdown (might need fetching all if > 10, but MVP fix for crash)
+            setEstablishments(res.data.results || res.data);
+        });
     }, []);
 
     // Search keys when term changes or establishment changes
@@ -41,7 +44,7 @@ const LoanForm = () => {
             // Only search if we have an establishment selected OR a search term > 1 char
             if (selectedEst || keySearchTerm.length > 1) {
                 api.get(query)
-                    .then(res => setFoundKeys(res.data))
+                    .then(res => setFoundKeys(res.data.results || res.data || []))
                     .catch(console.error);
             } else {
                 setFoundKeys([]);
@@ -64,8 +67,10 @@ const LoanForm = () => {
         if (!rutSearch) return;
         try {
             const res = await api.get(`solicitantes/?search=${rutSearch}`);
-            if (res.data.length > 0) {
-                const match = res.data.find(a => a.rut === rutSearch) || res.data[0];
+            const results = res.data.results || res.data || [];
+
+            if (results.length > 0) {
+                const match = results.find(a => a.rut === rutSearch) || results[0];
                 setApplicant(match);
                 setIsCreatingApplicant(false);
             } else {

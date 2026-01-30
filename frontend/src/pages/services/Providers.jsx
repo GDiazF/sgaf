@@ -2,13 +2,24 @@ import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import { Truck, Search, Plus, Edit2, Trash2, X, Save, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Pagination from '../../components/common/Pagination';
+import FilterBar from '../../components/common/FilterBar';
+import SortableHeader from '../../components/common/SortableHeader';
 
 const Providers = () => {
     const [providers, setProviders] = useState([]);
     const [providerTypes, setProviderTypes] = useState([]);
+
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+
+    // Pagination & Search
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [ordering, setOrdering] = useState('nombre');
+
     const [editingId, setEditingId] = useState(null);
 
     const [formData, setFormData] = useState({
@@ -19,25 +30,53 @@ const Providers = () => {
         tipo_proveedor: ''
     });
 
-    const fetchData = async () => {
+    const fetchData = async (page = 1, search = '', order = ordering) => {
         setLoading(true);
         try {
+            const params = {
+                page,
+                search,
+                ordering: order
+            };
+
             const [provRes, typesRes] = await Promise.all([
-                api.get('proveedores/'),
+                api.get('proveedores/', { params }),
                 api.get('tipos-proveedores/')
             ]);
-            setProviders(provRes.data);
-            setProviderTypes(typesRes.data);
+
+            // Handle Pagination
+            setProviders(provRes.data.results || []);
+            setTotalCount(provRes.data.count || 0);
+            setTotalPages(Math.ceil((provRes.data.count || 0) / 10));
+
+            setProviderTypes(typesRes.data.results || typesRes.data);
+
         } catch (error) {
             console.error("Error fetching data:", error);
+            setProviders([]);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchData();
-    }, []);
+        fetchData(currentPage, searchQuery, ordering);
+    }, [currentPage, ordering]);
+
+    const handleSearch = (query) => {
+        setSearchQuery(query);
+        setCurrentPage(1);
+        fetchData(1, query);
+    };
+
+    const handlePageChange = (page) => {
+        setCurrentPage(page);
+    };
+
+    const handleSort = (newOrdering) => {
+        setOrdering(newOrdering);
+        setCurrentPage(1);
+    };
 
     const handleEdit = (item) => {
         setFormData({
@@ -67,7 +106,7 @@ const Providers = () => {
         if (!window.confirm("¿Seguro que desea eliminar este proveedor?")) return;
         try {
             await api.delete(`proveedores/${id}/`);
-            fetchData();
+            fetchData(currentPage, searchQuery);
         } catch (error) {
             console.error(error);
             alert("Error al eliminar.");
@@ -83,18 +122,15 @@ const Providers = () => {
                 await api.post('proveedores/', formData);
             }
             setShowForm(false);
-            fetchData();
+            fetchData(currentPage, searchQuery);
         } catch (error) {
             console.error(error);
             alert("Error al guardar.");
         }
     };
 
-    const filteredData = providers.filter(item =>
-        item.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.rut?.includes(searchTerm) ||
-        item.acronimo?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // No client-side filtering
+    const filteredData = providers;
 
     return (
         <div>
@@ -106,16 +142,7 @@ const Providers = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder="Buscar proveedor..."
-                            className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full md:w-64"
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                        />
-                    </div>
+                    <FilterBar onSearch={handleSearch} placeholder="Buscar proveedor..." />
                     <button
                         onClick={handleNew}
                         className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
@@ -237,9 +264,9 @@ const Providers = () => {
                 <table className="w-full text-left">
                     <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
-                            <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Proveedor</th>
-                            <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Tipo</th>
-                            <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">RUT</th>
+                            <SortableHeader label="Proveedor" sortKey="nombre" currentOrdering={ordering} onSort={handleSort} />
+                            <SortableHeader label="Tipo" sortKey="tipo_proveedor__nombre" currentOrdering={ordering} onSort={handleSort} />
+                            <SortableHeader label="RUT" sortKey="rut" currentOrdering={ordering} onSort={handleSort} />
                             <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Contacto</th>
                             <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
                         </tr>
@@ -287,6 +314,12 @@ const Providers = () => {
                         <p>No se encontraron proveedores.</p>
                     </div>
                 )}
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
+                    totalCount={totalCount}
+                />
             </div>
         </div>
     );

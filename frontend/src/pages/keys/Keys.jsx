@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import { Key, Search, Plus, Edit2, Trash2, X, Save, Building, Lock, Unlock, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Pagination from '../../components/common/Pagination';
+import FilterBar from '../../components/common/FilterBar';
+import SortableHeader from '../../components/common/SortableHeader';
 
 const Keys = () => {
     const navigate = useNavigate();
@@ -10,7 +13,14 @@ const Keys = () => {
     const [establishments, setEstablishments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+
+    // Pagination & Search
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [ordering, setOrdering] = useState('nombre');
+
     const [editingId, setEditingId] = useState(null);
 
     const [formData, setFormData] = useState({
@@ -19,25 +29,53 @@ const Keys = () => {
         ubicacion: ''
     });
 
-    const fetchData = async () => {
+    const fetchData = async (page = 1, search = '', order = ordering) => {
         setLoading(true);
         try {
+            const params = {
+                page,
+                search,
+                ordering: order
+            };
+
             const [keysRes, estRes] = await Promise.all([
-                api.get('llaves/'),
-                api.get('establecimientos/')
+                api.get('llaves/', { params }),
+                api.get('establecimientos/') // Assuming this dropdown doesn't need pagination yet or we fetch all for Select
             ]);
-            setKeys(keysRes.data);
-            setEstablishments(estRes.data);
+
+            // Handle Pagination
+            setKeys(keysRes.data.results || []);
+            setTotalCount(keysRes.data.count || 0);
+            setTotalPages(Math.ceil((keysRes.data.count || 0) / 10));
+
+            setEstablishments(estRes.data.results || estRes.data);
+
         } catch (error) {
             console.error("Error fetching data:", error);
+            setKeys([]);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchData();
-    }, []);
+        fetchData(currentPage, searchQuery, ordering);
+    }, [currentPage, ordering]);
+
+    const handleSearch = (query) => {
+        setSearchQuery(query);
+        setCurrentPage(1);
+        fetchData(1, query);
+    };
+
+    const handlePageChange = (page) => {
+        setCurrentPage(page);
+    };
+
+    const handleSort = (newOrdering) => {
+        setOrdering(newOrdering);
+        setCurrentPage(1);
+    };
 
     const handleEdit = (key) => {
         setFormData({
@@ -59,7 +97,7 @@ const Keys = () => {
         if (!window.confirm("¿Seguro que desea eliminar esta llave?")) return;
         try {
             await api.delete(`llaves/${id}/`);
-            fetchData();
+            fetchData(currentPage, searchQuery);
         } catch (error) {
             console.error(error);
             alert("Error al eliminar. Puede que esté asociada a préstamos históricos.");
@@ -75,17 +113,15 @@ const Keys = () => {
                 await api.post('llaves/', formData);
             }
             setShowForm(false);
-            fetchData();
+            fetchData(currentPage, searchQuery);
         } catch (error) {
             console.error(error);
             alert("Error al guardar llave.");
         }
     };
 
-    const filteredKeys = keys.filter(k =>
-        k.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        k.establecimiento_nombre?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // No client-side filtering
+    const filteredKeys = keys;
 
     return (
         <div>
@@ -104,16 +140,7 @@ const Keys = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder="Buscar llave..."
-                            className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full md:w-64"
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                        />
-                    </div>
+                    <FilterBar onSearch={handleSearch} placeholder="Buscar llave..." />
                     <button
                         onClick={handleNew}
                         className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium"
@@ -217,8 +244,8 @@ const Keys = () => {
                     <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
                             <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
-                            <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre Llave</th>
-                            <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Establecimiento</th>
+                            <SortableHeader label="Nombre Llave" sortKey="nombre" currentOrdering={ordering} onSort={handleSort} />
+                            <SortableHeader label="Establecimiento" sortKey="establecimiento__nombre" currentOrdering={ordering} onSort={handleSort} />
                             <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Ubicación</th>
                             <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
                         </tr>
@@ -260,6 +287,12 @@ const Keys = () => {
                         <p>No se encontraron llaves.</p>
                     </div>
                 )}
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
+                    totalCount={totalCount}
+                />
             </div>
         </div>
     );

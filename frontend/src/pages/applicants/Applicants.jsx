@@ -2,12 +2,20 @@ import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import { UserPlus, Search, Edit2, Trash2, X, Save } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Pagination from '../../components/common/Pagination';
+import FilterBar from '../../components/common/FilterBar';
 
 const Applicants = () => {
     const [applicants, setApplicants] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+
+    // Pagination & Search
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
+    const [searchQuery, setSearchQuery] = useState('');
+
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
         rut: '',
@@ -17,20 +25,38 @@ const Applicants = () => {
         email: ''
     });
 
-    const fetchApplicants = async () => {
+    const fetchApplicants = async (page = 1, search = '') => {
+        setLoading(true);
         try {
-            const response = await api.get('solicitantes/');
-            setApplicants(response.data);
+            const params = { page, search };
+            const response = await api.get('solicitantes/', { params });
+
+            // Handle Pagination
+            setApplicants(response.data.results || []);
+            setTotalCount(response.data.count || 0);
+            setTotalPages(Math.ceil((response.data.count || 0) / 10));
+
         } catch (error) {
             console.error("Error fetching applicants:", error);
+            setApplicants([]);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchApplicants();
-    }, []);
+        fetchApplicants(currentPage, searchQuery);
+    }, [currentPage]);
+
+    const handleSearch = (query) => {
+        setSearchQuery(query);
+        setCurrentPage(1);
+        fetchApplicants(1, query);
+    };
+
+    const handlePageChange = (page) => {
+        setCurrentPage(page);
+    };
 
     const handleEdit = (app) => {
         setFormData({
@@ -59,18 +85,15 @@ const Applicants = () => {
                 await api.post('solicitantes/', formData);
             }
             setShowForm(false);
-            fetchApplicants();
+            fetchApplicants(currentPage, searchQuery);
         } catch (error) {
             console.error(error);
             alert("Error al guardar solicitante. Verifique los datos.");
         }
     };
 
-    const filteredApplicants = applicants.filter(app =>
-        app.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        app.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        app.rut.includes(searchTerm)
-    );
+    // No client-side filtering
+    const filteredApplicants = applicants;
 
     return (
         <div>
@@ -82,16 +105,7 @@ const Applicants = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder="Buscar solicitante..."
-                            className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full md:w-64"
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                        />
-                    </div>
+                    <FilterBar onSearch={handleSearch} placeholder="Buscar solicitante..." />
                     <button
                         onClick={handleNew}
                         className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium"
@@ -263,6 +277,12 @@ const Applicants = () => {
                         <p>No se encontraron resultados.</p>
                     </div>
                 )}
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
+                    totalCount={totalCount}
+                />
             </div>
         </div>
     );

@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
-import { FileText, Calendar, Building2, Download, Eye, Search, Edit2, X, Save, Trash2, DollarSign, Clock, User, ChevronRight, PlusCircle } from 'lucide-react';
+import { FileText, Calendar, Building2, Download, Edit2, X, Save, Trash2, Clock, User, PlusCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Pagination from '../../components/common/Pagination';
+import FilterBar from '../../components/common/FilterBar';
+import SortableHeader from '../../components/common/SortableHeader';
 
 const RecepcionConformeList = () => {
     const [rcs, setRcs] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [ordering, setOrdering] = useState('-fecha_emision');
 
     // Edit Modal State
     const [editingRC, setEditingRC] = useState(null);
@@ -18,28 +25,62 @@ const RecepcionConformeList = () => {
     // History Modal State
     const [historyRC, setHistoryRC] = useState(null);
 
-    const fetchData = async () => {
+    const fetchData = async (page = 1, search = '', order = ordering) => {
         setLoading(true);
         try {
-            const response = await api.get('recepciones-conformes/');
-            setRcs(response.data);
+            const params = {
+                page: page,
+                search: search,
+                ordering: order
+            };
+            const response = await api.get('recepciones-conformes/', { params });
+
+            // Handle paginated response
+            setRcs(response.data.results);
+            setTotalCount(response.data.count);
+            // Calculate total pages (assuming page_size=10 from default settings)
+            setTotalPages(Math.ceil(response.data.count / 10));
+
         } catch (error) {
             console.error("Error fetching RCs:", error);
+            setRcs([]);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchData();
-    }, []);
+        fetchData(currentPage, searchQuery, ordering);
+    }, [currentPage, ordering]);
+
+    const handleSearch = (query) => {
+        setSearchQuery(query);
+        setCurrentPage(1); // Reset to page 1 on search
+        fetchData(1, query);
+    };
+
+    const handlePageChange = (page) => {
+        setCurrentPage(page);
+    };
+
+    const handleSort = (newOrdering) => {
+        setOrdering(newOrdering);
+        setCurrentPage(1);
+    };
 
     const fetchAvailablePayments = async (providerId) => {
         setLoadingAvailable(true);
         try {
+            // Note: Payments list is also paginated now! We need a specific endpoint or params to get ALL available for dropdown/modal
+            // For now, let's assume we fetch a reasonable amount or use a specialized endpoint if needed.
+            // Best approach for valid dropdowns is search-as-you-type or dedicated non-paginated endpoints for "options".
+            // However, for available payments list, scrolling/paginating inside modal is ideal.
+            // For this step, I'll fetch the first page of results that match criteria.
             const response = await api.get(`registros-pagos/?servicio__proveedor=${providerId}`);
-            // Client-side filter for null RC since backend exact filter might require explicit null handling or custom filter
-            const available = response.data.filter(p => !p.recepcion_conforme);
+            // If response is paginated:
+            const data = response.data.results || response.data;
+
+            const available = data.filter(p => !p.recepcion_conforme);
             setAvailablePayments(available);
         } catch (error) {
             console.error("Error fetching available payments:", error);
@@ -100,7 +141,7 @@ const RecepcionConformeList = () => {
         try {
             await api.patch(`recepciones-conformes/${editingRC.id}/`, editForm);
             setEditingRC(null);
-            fetchData();
+            fetchData(currentPage, searchQuery); // Refresh list
             alert("Cambios guardados exitosamente.");
         } catch (error) {
             console.error(error);
@@ -115,7 +156,7 @@ const RecepcionConformeList = () => {
 
         try {
             await api.post(`recepciones-conformes/${rc.id}/anular/`);
-            fetchData();
+            fetchData(currentPage, searchQuery);
             alert("RC anulada exitosamente.");
         } catch (error) {
             console.error(error);
@@ -123,10 +164,8 @@ const RecepcionConformeList = () => {
         }
     };
 
-    const filteredData = rcs.filter(item =>
-        item.folio.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.proveedor_nombre.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // No client-side filtering anymore
+    const filteredData = rcs;
 
     const formatDate = (dateString) => {
         if (!dateString) return '-';
@@ -154,116 +193,115 @@ const RecepcionConformeList = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder="Buscar RC..."
-                            className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full md:w-64"
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                        />
-                    </div>
+                    <FilterBar onSearch={handleSearch} placeholder="Buscar por folio, proveedor..." />
                 </div>
             </div>
 
             {/* List */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <table className="w-full text-left">
-                    <thead className="bg-slate-50 border-b border-slate-200">
-                        <tr>
-                            <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Folio</th>
-                            <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha Emisión</th>
-                            <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Proveedor</th>
-                            <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Pagos</th>
-                            <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {filteredData.map(item => (
-                            <tr key={item.id} className={`transition-colors ${item.estado === 'ANULADA' ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-slate-50'}`}>
-                                <td className="p-4">
-                                    <div className="flex flex-col">
-                                        <div className="font-mono text-sm font-bold text-slate-800 flex items-center gap-2">
-                                            <FileText className={`w-4 h-4 ${item.estado === 'ANULADA' ? 'text-red-400' : 'text-slate-400'}`} />
-                                            <span className={item.estado === 'ANULADA' ? 'line-through text-slate-500' : ''}>{item.folio}</span>
-                                        </div>
-                                        {item.estado === 'ANULADA' && (
-                                            <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider mt-1">ANULADA</span>
-                                        )}
-                                    </div>
-                                </td>
-                                <td className="p-4">
-                                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                                        <Calendar className="w-4 h-4 text-slate-400" />
-                                        {formatDate(item.fecha_emision)}
-                                    </div>
-                                </td>
-                                <td className="p-4">
-                                    <div className="flex flex-col">
-                                        <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
-                                            <Building2 className="w-4 h-4 text-slate-400" />
-                                            {item.proveedor_nombre}
-                                        </div>
-                                        {item.tipo_proveedor_nombre && (
-                                            <div className="text-xs text-slate-500 ml-6 mt-0.5">
-                                                {item.tipo_proveedor_nombre}
-                                            </div>
-                                        )}
-                                    </div>
-                                </td>
-                                <td className="p-4 text-center">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.estado === 'ANULADA' ? 'bg-slate-200 text-slate-600' : 'bg-blue-100 text-blue-800'}`}>
-                                        {item.registros?.length || 0}
-                                    </span>
-                                </td>
-                                <td className="p-4 text-right">
-                                    <div className="flex justify-end gap-2">
-                                        <button
-                                            onClick={() => handleViewHistory(item)}
-                                            className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
-                                            title="Ver Historial"
-                                        >
-                                            <Clock className="w-4 h-4" />
-                                        </button>
-
-                                        {item.estado !== 'ANULADA' && (
-                                            <>
-                                                <button
-                                                    onClick={() => handleDownloadPDF(item.id)}
-                                                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                                    title="Descargar PDF"
-                                                >
-                                                    <Download className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleEdit(item)}
-                                                    className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
-                                                    title="Editar Contenido"
-                                                >
-                                                    <Edit2 className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleAnulate(item)}
-                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                                    title="Anular RC"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                </td>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left whitespace-nowrap">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                                <SortableHeader label="Folio" sortKey="folio" currentOrdering={ordering} onSort={handleSort} />
+                                <SortableHeader label="Fecha Emisión" sortKey="fecha_emision" currentOrdering={ordering} onSort={handleSort} />
+                                <SortableHeader label="Proveedor" sortKey="proveedor__nombre" currentOrdering={ordering} onSort={handleSort} />
+                                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Pagos</th>
+                                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {filteredData.map(item => (
+                                <tr key={item.id} className={`transition-colors ${item.estado === 'ANULADA' ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-slate-50'}`}>
+                                    <td className="p-4">
+                                        <div className="flex flex-col">
+                                            <div className="font-mono text-sm font-bold text-slate-800 flex items-center gap-2">
+                                                <FileText className={`w-4 h-4 ${item.estado === 'ANULADA' ? 'text-red-400' : 'text-slate-400'}`} />
+                                                <span className={item.estado === 'ANULADA' ? 'line-through text-slate-500' : ''}>{item.folio}</span>
+                                            </div>
+                                            {item.estado === 'ANULADA' && (
+                                                <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider mt-1">ANULADA</span>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                                            <Calendar className="w-4 h-4 text-slate-400" />
+                                            {formatDate(item.fecha_emision)}
+                                        </div>
+                                    </td>
+                                    <td className="p-4">
+                                        <div className="flex flex-col">
+                                            <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
+                                                <Building2 className="w-4 h-4 text-slate-400" />
+                                                {item.proveedor_nombre}
+                                            </div>
+                                            {item.tipo_proveedor_nombre && (
+                                                <div className="text-xs text-slate-500 ml-6 mt-0.5">
+                                                    {item.tipo_proveedor_nombre}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="p-4 text-center">
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.estado === 'ANULADA' ? 'bg-slate-200 text-slate-600' : 'bg-blue-100 text-blue-800'}`}>
+                                            {item.registros?.length || 0}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        <div className="flex justify-end gap-2">
+                                            <button
+                                                onClick={() => handleViewHistory(item)}
+                                                className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                                                title="Ver Historial"
+                                            >
+                                                <Clock className="w-4 h-4" />
+                                            </button>
+
+                                            {item.estado !== 'ANULADA' && (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleDownloadPDF(item.id)}
+                                                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                        title="Descargar PDF"
+                                                    >
+                                                        <Download className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleEdit(item)}
+                                                        className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
+                                                        title="Editar Contenido"
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleAnulate(item)}
+                                                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                        title="Anular RC"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
                 {filteredData.length === 0 && !loading && (
                     <div className="p-12 text-center text-slate-400">
                         <FileText className="w-12 h-12 mx-auto mb-3 opacity-20" />
                         <p>No se encontraron recepciones conformes.</p>
                     </div>
                 )}
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
+                    totalCount={totalCount}
+                />
             </div>
 
             {/* History Modal */}

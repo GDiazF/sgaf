@@ -1,26 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import { Search, Calendar, FileText, CheckCircle, Clock } from 'lucide-react';
+import Pagination from '../../components/common/Pagination';
+import FilterBar from '../../components/common/FilterBar';
 
 const LoanHistory = () => {
     const [loans, setLoans] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
+
+    // Pagination & Search
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all'); // all, active, returned
+
+    const fetchLoans = async (page = 1, search = '', status = 'all') => {
+        setLoading(true);
+        try {
+            const params = { page, search };
+
+            // Map status filter to API params
+            if (status === 'active') {
+                params.fecha_devolucion__isnull = 'true';
+            } else if (status === 'returned') {
+                params.fecha_devolucion__isnull = 'false';
+            }
+
+            const response = await api.get('prestamos/', { params });
+
+            setLoans(response.data.results || []);
+            setTotalCount(response.data.count || 0);
+            setTotalPages(Math.ceil((response.data.count || 0) / 10));
+        } catch (error) {
+            console.error("Error fetching history:", error);
+            setLoans([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        // Fetch all loans (no active filter)
-        api.get('prestamos/')
-            .then(res => setLoans(res.data))
-            .catch(console.error)
-            .finally(() => setLoading(false));
-    }, []);
+        fetchLoans(currentPage, searchQuery, statusFilter);
+    }, [currentPage, statusFilter]);
 
-    const filteredLoans = loans.filter(loan =>
-        loan.llave_obj?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        loan.solicitante_obj?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        loan.solicitante_obj?.apellido?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        loan.llave_obj?.establecimiento_nombre?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const handleSearch = (query) => {
+        setSearchQuery(query);
+        setCurrentPage(1);
+        fetchLoans(1, query, statusFilter);
+    };
+
+    const handleStatusChange = (e) => {
+        setStatusFilter(e.target.value);
+        setCurrentPage(1);
+    };
+
+    const handlePageChange = (page) => {
+        setCurrentPage(page);
+    };
+
+    const filteredLoans = loans; // Filtering is now server-side
 
     const formatDate = (dateString) => {
         if (!dateString) return '-';
@@ -36,15 +75,19 @@ const LoanHistory = () => {
                     <p className="text-slate-500">Registro completo de movimientos de llaves.</p>
                 </div>
 
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Buscar por llave, solicitante..."
-                        className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full md:w-64"
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                    />
+                <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+                    <select
+                        value={statusFilter}
+                        onChange={handleStatusChange}
+                        className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm"
+                    >
+                        <option value="all">Todos los estados</option>
+                        <option value="active">Activos (Prestados)</option>
+                        <option value="returned">Devueltos</option>
+                    </select>
+                    <div className="w-full md:w-64">
+                        <FilterBar onSearch={handleSearch} placeholder="Buscar por llave, solicitante..." />
+                    </div>
                 </div>
             </div>
 
@@ -97,6 +140,12 @@ const LoanHistory = () => {
                         <p>No se encontraron registros.</p>
                     </div>
                 )}
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
+                    totalCount={totalCount}
+                />
             </div>
         </div>
     );

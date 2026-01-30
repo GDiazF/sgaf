@@ -13,6 +13,7 @@ import ServicesDashboard from './pages/services/ServicesDashboard';
 import Providers from './pages/services/Providers';
 import PaymentsDashboard from './pages/services/PaymentsDashboard';
 import RecepcionConformeList from './pages/services/RecepcionConformeList';
+import CDPManager from './pages/services/CDPManager';
 import Login from './pages/Login';
 
 // Private Route Wrapper
@@ -45,6 +46,7 @@ function App() {
               <Route path="services/providers" element={<Providers />} />
               <Route path="services/payments" element={<PaymentsDashboard />} />
               <Route path="services/rc" element={<RecepcionConformeList />} />
+              <Route path="services/cdp" element={<CDPManager />} />
             </Route>
           </Route>
         </Routes>
