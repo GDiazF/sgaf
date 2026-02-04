@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/', include('prestamo_llaves.urls')),
     path('api/', include('establecimientos.urls')),
     path('api/', include('servicios.urls')),
+    path('api/contratos/', include('contratos.urls')),
 ]
 
 from django.conf import settings

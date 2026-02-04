@@ -106,7 +106,7 @@ const LoanHistory = () => {
                 <table className="w-full text-left">
                     <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
-                            <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+                            <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
                             <SortableHeader label="Llave / Establecimiento" sortKey="llave__nombre" currentOrdering={ordering} onSort={handleSort} />
                             <SortableHeader label="Solicitante" sortKey="solicitante__nombre" currentOrdering={ordering} onSort={handleSort} />
                             <SortableHeader label="Fecha Préstamo" sortKey="fecha_prestamo" currentOrdering={ordering} onSort={handleSort} />
@@ -115,30 +115,30 @@ const LoanHistory = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {filteredLoans.map(loan => (
-                            <tr key={loan.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="p-3">
+                            <tr key={loan.id} className="hover:bg-slate-50 transition-colors text-xs">
+                                <td className="p-2.5">
                                     {loan.fecha_devolucion ? (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800">
                                             <CheckCircle className="w-3 h-3" /> Devuelto
                                         </span>
                                     ) : (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
                                             <Clock className="w-3 h-3" /> Activo
                                         </span>
                                     )}
                                 </td>
-                                <td className="p-5">
+                                <td className="p-2.5">
                                     <div className="font-semibold text-slate-900">{loan.llave_obj?.nombre}</div>
-                                    <div className="text-xs text-slate-500">{loan.llave_obj?.establecimiento_nombre}</div>
+                                    <div className="text-[10px] text-slate-500">{loan.llave_obj?.establecimiento_nombre}</div>
                                 </td>
-                                <td className="p-5">
+                                <td className="p-2.5">
                                     <div className="text-slate-900">{loan.solicitante_obj?.nombre} {loan.solicitante_obj?.apellido}</div>
-                                    <div className="text-xs text-slate-500">{loan.solicitante_obj?.rut}</div>
+                                    <div className="text-[10px] text-slate-500">{loan.solicitante_obj?.rut}</div>
                                 </td>
-                                <td className="p-5 text-sm text-slate-600">
+                                <td className="p-2.5 text-slate-600">
                                     {formatDate(loan.fecha_prestamo)}
                                 </td>
-                                <td className="p-5 text-sm text-slate-600">
+                                <td className="p-2.5 text-slate-600">
                                     {formatDate(loan.fecha_devolucion)}
                                 </td>
                             </tr>

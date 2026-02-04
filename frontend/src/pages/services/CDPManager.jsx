@@ -139,8 +139,8 @@ const CDPManager = () => {
                     >
                         <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
-                                <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-                                    <FileText className="w-6 h-6" />
+                                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                                    <FileText className="w-5 h-5" />
                                 </div>
                                 <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold font-mono">
                                     {cdp.anio}
@@ -152,19 +152,19 @@ const CDPManager = () => {
                                     className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                                     title="Ver Documento"
                                 >
-                                    <Eye className="w-4 h-4" />
+                                    <Eye className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                     onClick={() => handleEdit(cdp)}
-                                    className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                    className="p-1.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                                 >
-                                    <Edit2 className="w-4 h-4" />
+                                    <Edit2 className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                     onClick={() => handleDelete(cdp.id)}
-                                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                 >
-                                    <Trash2 className="w-4 h-4" />
+                                    <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                             </div>
                         </div>
@@ -182,7 +182,7 @@ const CDPManager = () => {
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
                             >
-                                <Download className="w-4 h-4" />
+                                <Download className="w-3.5 h-3.5" />
                                 Descargar
                             </a>
                         </div>

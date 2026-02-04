@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '../../components/common/Pagination';
 import FilterBar from '../../components/common/FilterBar';
 import SortableHeader from '../../components/common/SortableHeader';
+import KeyModal from '../../components/keys/KeyModal';
 
 const Keys = () => {
     const navigate = useNavigate();
@@ -104,13 +105,12 @@ const Keys = () => {
         }
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSave = async (dataToSubmit) => {
         try {
             if (editingId) {
-                await api.put(`llaves/${editingId}/`, formData);
+                await api.put(`llaves/${editingId}/`, dataToSubmit);
             } else {
-                await api.post('llaves/', formData);
+                await api.post('llaves/', dataToSubmit);
             }
             setShowForm(false);
             fetchData(currentPage, searchQuery);
@@ -152,128 +152,51 @@ const Keys = () => {
             </div>
 
             {/* Modal Form */}
-            <AnimatePresence>
-                {showForm && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-                            onClick={() => setShowForm(false)}
-                        />
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                            transition={{ type: "spring", duration: 0.5 }}
-                            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden relative z-10"
-                        >
-                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                                <h3 className="text-lg font-bold text-slate-800">
-                                    {editingId ? 'Editar Llave' : 'Registrar Nueva Llave'}
-                                </h3>
-                                <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                                    <X className="w-6 h-6" />
-                                </button>
-                            </div>
-                            <form onSubmit={handleSubmit} className="p-8 space-y-6">
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-semibold text-slate-700">Nombre de la Llave</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
-                                            value={formData.nombre}
-                                            onChange={e => setFormData({ ...formData, nombre: e.target.value })}
-                                            placeholder="Ej. Portón Principal"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-semibold text-slate-700">Establecimiento</label>
-                                        <select
-                                            required
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none appearance-none"
-                                            value={formData.establecimiento}
-                                            onChange={e => setFormData({ ...formData, establecimiento: e.target.value })}
-                                        >
-                                            <option value="">Seleccione...</option>
-                                            {establishments.map(est => (
-                                                <option key={est.id} value={est.id}>{est.nombre}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-semibold text-slate-700">Ubicación Física (Opcional)</label>
-                                        <input
-                                            type="text"
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
-                                            value={formData.ubicacion}
-                                            onChange={e => setFormData({ ...formData, ubicacion: e.target.value })}
-                                            placeholder="Ej. Caja fuerte, Tablero 1..."
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="pt-4 flex justify-end gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowForm(false)}
-                                        className="px-6 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-colors"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2"
-                                    >
-                                        <Save className="w-4 h-4" />
-                                        Guardar Llave
-                                    </button>
-                                </div>
-                            </form>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+            <KeyModal
+                isOpen={showForm}
+                onClose={() => setShowForm(false)}
+                onSave={handleSave}
+                editingId={editingId}
+                initialData={formData}
+                lookups={{ establishments }}
+            />
 
             {/* Table List */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <table className="w-full text-left">
                     <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
-                            <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+                            <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
                             <SortableHeader label="Nombre Llave" sortKey="nombre" currentOrdering={ordering} onSort={handleSort} />
                             <SortableHeader label="Establecimiento" sortKey="establecimiento__nombre" currentOrdering={ordering} onSort={handleSort} />
-                            <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Ubicación</th>
-                            <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
+                            <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Ubicación</th>
+                            <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {filteredKeys.map(key => (
-                            <tr key={key.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="p-3">
+                            <tr key={key.id} className="hover:bg-slate-50 transition-colors text-xs">
+                                <td className="p-2.5">
                                     {key.disponible ? (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-800">
                                             <Unlock className="w-3 h-3" /> Disponible
                                         </span>
                                     ) : (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-800">
                                             <Lock className="w-3 h-3" /> En Préstamo
                                         </span>
                                     )}
                                 </td>
-                                <td className="p-3 font-semibold text-slate-900">{key.nombre}</td>
-                                <td className="p-3 text-slate-600">{key.establecimiento_nombre}</td>
-                                <td className="p-3 text-sm text-slate-500">{key.ubicacion || '-'}</td>
-                                <td className="p-3 text-right">
+                                <td className="p-2.5 font-semibold text-slate-900">{key.nombre}</td>
+                                <td className="p-2.5 text-slate-600">{key.establecimiento_nombre}</td>
+                                <td className="p-2.5 text-slate-500">{key.ubicacion || '-'}</td>
+                                <td className="p-2.5 text-right">
                                     <div className="flex justify-end gap-2">
-                                        <button onClick={() => handleEdit(key)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
-                                            <Edit2 className="w-4 h-4" />
+                                        <button onClick={() => handleEdit(key)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+                                            <Edit2 className="w-3.5 h-3.5" />
                                         </button>
-                                        <button onClick={() => handleDelete(key.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                                            <Trash2 className="w-4 h-4" />
+                                        <button onClick={() => handleDelete(key.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+                                            <Trash2 className="w-3.5 h-3.5" />
                                         </button>
                                     </div>
                                 </td>

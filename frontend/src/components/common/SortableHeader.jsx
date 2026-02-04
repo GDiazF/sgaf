@@ -17,7 +17,7 @@ const SortableHeader = ({ label, sortKey, currentOrdering, onSort, className = "
 
     return (
         <th
-            className={`p-4 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group ${className}`}
+            className={`p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group ${className}`}
             onClick={handleSort}
         >
             <div className="flex items-center gap-1">

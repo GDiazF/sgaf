@@ -84,6 +84,34 @@ const Layout = () => {
                         </motion.span>
                     </Link>
 
+                    <Link
+                        to="/services/providers"
+                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/services/providers') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                    >
+                        <Users className="w-5 h-5 flex-shrink-0" />
+                        <motion.span
+                            initial={false}
+                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                            className="font-medium whitespace-nowrap"
+                        >
+                            Proveedores
+                        </motion.span>
+                    </Link>
+
+                    <Link
+                        to="/contracts"
+                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/contracts') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                    >
+                        <FileText className="w-5 h-5 flex-shrink-0" />
+                        <motion.span
+                            initial={false}
+                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                            className="font-medium whitespace-nowrap"
+                        >
+                            Contratos / Licitaciones
+                        </motion.span>
+                    </Link>
+
                     <div className="py-1 px-4">
                         <div className="border-t border-slate-500/50" />
                     </div>
@@ -160,7 +188,7 @@ const Layout = () => {
                                 setServicesMenuOpen(!isServicesMenuOpen);
                                 if (!isServicesMenuOpen) setLoanMenuOpen(false);
                             }}
-                            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${!isServicesMenuOpen && (isActive('/services') || isActive('/services/providers')) ? 'bg-slate-800 text-white' : ''}`}
+                            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${!isServicesMenuOpen && (isActive('/services') || isActive('/services/payments') || isActive('/services/rc') || isActive('/services/cdp')) ? 'bg-slate-800 text-white' : ''}`}
                         >
                             <div className="flex items-center gap-3">
                                 <ClipboardList className="w-5 h-5 flex-shrink-0" />
@@ -188,13 +216,6 @@ const Layout = () => {
                                 >
                                     <Home className="w-4 h-4" />
                                     Panel Servicios
-                                </Link>
-                                <Link
-                                    to="/services/providers"
-                                    className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors ${isActive('/services/providers') ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
-                                >
-                                    <Users className="w-4 h-4" />
-                                    Proveedores
                                 </Link>
                                 <Link
                                     to="/services/payments"
@@ -266,7 +287,8 @@ const Layout = () => {
                                                 isActive('/history') ? 'Historial' :
                                                     isActive('/applicants') ? 'Solicitantes' :
                                                         isActive('/keys') ? 'Llaves' :
-                                                            isActive('/services/rc') ? 'Recepciones Conformes' : 'Sistema'}
+                                                            isActive('/contracts') ? 'Contratos / Licitaciones' :
+                                                                isActive('/services/rc') ? 'Recepciones Conformes' : 'Sistema'}
                             </h2>
                             <p className="text-xs md:text-sm text-slate-500 hidden md:block">Sistema de Gestión.</p>
                         </div>

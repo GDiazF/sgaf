@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '../../components/common/Pagination';
 import FilterBar from '../../components/common/FilterBar';
 import SortableHeader from '../../components/common/SortableHeader';
+import ServiceModal from '../../components/services/ServiceModal';
 
 const ServicesDashboard = () => {
     const [services, setServices] = useState([]);
@@ -119,14 +120,12 @@ const ServicesDashboard = () => {
         }
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSave = async (dataToSubmit) => {
         try {
-            const payload = { ...formData };
             if (editingId) {
-                await api.put(`servicios/${editingId}/`, payload);
+                await api.put(`servicios/${editingId}/`, dataToSubmit);
             } else {
-                await api.post('servicios/', payload);
+                await api.post('servicios/', dataToSubmit);
             }
             setShowForm(false);
             fetchData(currentPage, searchQuery);
@@ -161,125 +160,18 @@ const ServicesDashboard = () => {
             </div>
 
             {/* Modal Form */}
-            <AnimatePresence>
-                {showForm && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-                            onClick={() => setShowForm(false)}
-                        />
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                            transition={{ type: "spring", duration: 0.5 }}
-                            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden relative z-10"
-                        >
-                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                                <h3 className="text-lg font-bold text-slate-800">
-                                    {editingId ? 'Editar Servicio' : 'Nuevo Servicio'}
-                                </h3>
-                                <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                                    <X className="w-6 h-6" />
-                                </button>
-                            </div>
-                            <form onSubmit={handleSubmit} className="p-8 space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2 md:col-span-2">
-                                        <label className="text-sm font-semibold text-slate-700">Proveedor</label>
-                                        <select
-                                            required
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none appearance-none"
-                                            value={formData.proveedor}
-                                            onChange={e => setFormData({ ...formData, proveedor: e.target.value })}
-                                        >
-                                            <option value="">Seleccione Proveedor...</option>
-                                            {providers.map(p => (
-                                                <option key={p.id} value={p.id}>{p.nombre} {p.rut ? `(${p.rut})` : ''}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div className="space-y-2 md:col-span-2">
-                                        <label className="text-sm font-semibold text-slate-700">Establecimiento</label>
-                                        <select
-                                            required
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none appearance-none"
-                                            value={formData.establecimiento}
-                                            onChange={e => setFormData({ ...formData, establecimiento: e.target.value })}
-                                        >
-                                            <option value="">Seleccione Establecimiento...</option>
-                                            {establishments.map(e => (
-                                                <option key={e.id} value={e.id}>{e.nombre}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-semibold text-slate-700">Número de Cliente (ID)</label>
-                                        <div className="relative">
-                                            <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                            <input
-                                                type="text"
-                                                required
-                                                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
-                                                value={formData.numero_cliente}
-                                                onChange={e => setFormData({ ...formData, numero_cliente: e.target.value })}
-                                                placeholder="Ej. 12345678"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-semibold text-slate-700">Número de Servicio (Op.)</label>
-                                        <input
-                                            type="text"
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
-                                            value={formData.numero_servicio}
-                                            onChange={e => setFormData({ ...formData, numero_servicio: e.target.value })}
-                                            placeholder="Opcional"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2 md:col-span-2">
-                                        <label className="text-sm font-semibold text-slate-700">Tipo Documento Habitual</label>
-                                        <select
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none appearance-none"
-                                            value={formData.tipo_documento}
-                                            onChange={e => setFormData({ ...formData, tipo_documento: e.target.value })}
-                                        >
-                                            <option value="">Seleccione Tipo...</option>
-                                            {docTypes.map(t => (
-                                                <option key={t.id} value={t.id}>{t.nombre}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowForm(false)}
-                                        className="px-6 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-colors"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2"
-                                    >
-                                        <Save className="w-4 h-4" />
-                                        Guardar
-                                    </button>
-                                </div>
-                            </form>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+            <ServiceModal
+                isOpen={showForm}
+                onClose={() => setShowForm(false)}
+                onSave={handleSave}
+                editingId={editingId}
+                initialData={formData}
+                lookups={{
+                    providers,
+                    establishments,
+                    documentTypes: docTypes.map(d => ({ value: d.id, label: d.nombre }))
+                }}
+            />
 
             {/* Table List */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -290,41 +182,41 @@ const ServicesDashboard = () => {
                                 <SortableHeader label="Establecimiento" sortKey="establecimiento__nombre" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="Proveedor / Servicio" sortKey="proveedor__nombre" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="N° Cliente (ID)" sortKey="numero_cliente" currentOrdering={ordering} onSort={handleSort} />
-                                <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Tipo Doc.</th>
-                                <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
+                                <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Tipo Doc.</th>
+                                <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filteredData.map(item => (
-                                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-3">
+                                <tr key={item.id} className="hover:bg-slate-50 transition-colors text-xs">
+                                    <td className="p-2.5">
                                         <div className="flex items-center gap-2 font-medium text-slate-900">
-                                            <Building2 className="w-4 h-4 text-slate-400" />
+                                            <Building2 className="w-3.5 h-3.5 text-slate-400" />
                                             {item.establecimiento_nombre}
                                         </div>
                                     </td>
-                                    <td className="p-3">
+                                    <td className="p-2.5">
                                         <div className="font-semibold text-blue-700">{item.proveedor_nombre}</div>
-                                        {item.numero_servicio && <div className="text-xs text-slate-500">Serv: {item.numero_servicio}</div>}
+                                        {item.numero_servicio && <div className="text-[10px] text-slate-500">Serv: {item.numero_servicio}</div>}
                                     </td>
-                                    <td className="p-3 font-mono text-sm text-slate-700 bg-slate-50/50 w-fit">
+                                    <td className="p-2.5 font-mono text-slate-700 bg-slate-50/50 w-fit">
                                         #{item.numero_cliente}
                                     </td>
-                                    <td className="p-3">
+                                    <td className="p-2.5">
                                         {item.tipo_documento_nombre ? (
-                                            <span className="flex items-center gap-1 text-xs font-medium text-slate-600">
+                                            <span className="flex items-center gap-1 text-[10px] font-medium text-slate-600">
                                                 <FileText className="w-3 h-3" />
                                                 {item.tipo_documento_nombre}
                                             </span>
                                         ) : '-'}
                                     </td>
-                                    <td className="p-3 text-right">
+                                    <td className="p-2.5 text-right">
                                         <div className="flex justify-end gap-2">
-                                            <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
-                                                <Edit2 className="w-4 h-4" />
+                                            <button onClick={() => handleEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+                                                <Edit2 className="w-3.5 h-3.5" />
                                             </button>
-                                            <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                                                <Trash2 className="w-4 h-4" />
+                                            <button onClick={() => handleDelete(item.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+                                                <Trash2 className="w-3.5 h-3.5" />
                                             </button>
                                         </div>
                                     </td>

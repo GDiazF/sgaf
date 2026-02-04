@@ -206,17 +206,17 @@ const RecepcionConformeList = () => {
                                 <SortableHeader label="Folio" sortKey="folio" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="Fecha Emisión" sortKey="fecha_emision" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="Proveedor" sortKey="proveedor__nombre" currentOrdering={ordering} onSort={handleSort} />
-                                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Pagos</th>
-                                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
+                                <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Pagos</th>
+                                <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filteredData.map(item => (
-                                <tr key={item.id} className={`transition-colors ${item.estado === 'ANULADA' ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-slate-50'}`}>
-                                    <td className="p-4">
+                                <tr key={item.id} className={`transition-colors text-xs ${item.estado === 'ANULADA' ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-slate-50'}`}>
+                                    <td className="p-2.5">
                                         <div className="flex flex-col">
-                                            <div className="font-mono text-sm font-bold text-slate-800 flex items-center gap-2">
-                                                <FileText className={`w-4 h-4 ${item.estado === 'ANULADA' ? 'text-red-400' : 'text-slate-400'}`} />
+                                            <div className="font-mono text-xs font-bold text-slate-800 flex items-center gap-2">
+                                                <FileText className={`w-3.5 h-3.5 ${item.estado === 'ANULADA' ? 'text-red-400' : 'text-slate-400'}`} />
                                                 <span className={item.estado === 'ANULADA' ? 'line-through text-slate-500' : ''}>{item.folio}</span>
                                             </div>
                                             {item.estado === 'ANULADA' && (
@@ -224,62 +224,62 @@ const RecepcionConformeList = () => {
                                             )}
                                         </div>
                                     </td>
-                                    <td className="p-4">
-                                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                                            <Calendar className="w-4 h-4 text-slate-400" />
+                                    <td className="p-2.5">
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
                                             {formatDate(item.fecha_emision)}
                                         </div>
                                     </td>
-                                    <td className="p-4">
+                                    <td className="p-2.5">
                                         <div className="flex flex-col">
-                                            <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
-                                                <Building2 className="w-4 h-4 text-slate-400" />
+                                            <div className="flex items-center gap-2 font-medium text-slate-800">
+                                                <Building2 className="w-3.5 h-3.5 text-slate-400" />
                                                 {item.proveedor_nombre}
                                             </div>
                                             {item.tipo_proveedor_nombre && (
-                                                <div className="text-xs text-slate-500 ml-6 mt-0.5">
+                                                <div className="text-[10px] text-slate-500 ml-5.5 mt-0.5">
                                                     {item.tipo_proveedor_nombre}
                                                 </div>
                                             )}
                                         </div>
                                     </td>
-                                    <td className="p-4 text-center">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.estado === 'ANULADA' ? 'bg-slate-200 text-slate-600' : 'bg-blue-100 text-blue-800'}`}>
+                                    <td className="p-2.5 text-center">
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-medium ${item.estado === 'ANULADA' ? 'bg-slate-200 text-slate-600' : 'bg-blue-100 text-blue-800'}`}>
                                             {item.registros?.length || 0}
                                         </span>
                                     </td>
-                                    <td className="p-4 text-right">
+                                    <td className="p-2.5 text-right">
                                         <div className="flex justify-end gap-2">
                                             <button
                                                 onClick={() => handleViewHistory(item)}
-                                                className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                                                className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
                                                 title="Ver Historial"
                                             >
-                                                <Clock className="w-4 h-4" />
+                                                <Clock className="w-3.5 h-3.5" />
                                             </button>
 
                                             {item.estado !== 'ANULADA' && (
                                                 <>
                                                     <button
                                                         onClick={() => handleDownloadPDF(item.id)}
-                                                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
                                                         title="Descargar PDF"
                                                     >
-                                                        <Download className="w-4 h-4" />
+                                                        <Download className="w-3.5 h-3.5" />
                                                     </button>
                                                     <button
                                                         onClick={() => handleEdit(item)}
-                                                        className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
+                                                        className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
                                                         title="Editar Contenido"
                                                     >
-                                                        <Edit2 className="w-4 h-4" />
+                                                        <Edit2 className="w-3.5 h-3.5" />
                                                     </button>
                                                     <button
                                                         onClick={() => handleAnulate(item)}
-                                                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                                                         title="Anular RC"
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
+                                                        <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
                                                 </>
                                             )}

@@ -5,10 +5,13 @@ import { Clock, User, Key as KeyIcon, CheckCircle, Search, AlertCircle } from 'l
 import Pagination from '../../components/common/Pagination';
 import SortableHeader from '../../components/common/SortableHeader';
 import FilterBar from '../../components/common/FilterBar';
+import ReturnLoanModal from '../../components/loans/ReturnLoanModal';
 
 const Dashboard = () => {
     const [loans, setLoans] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedLoan, setSelectedLoan] = useState(null);
+    const [showReturnModal, setShowReturnModal] = useState(false);
 
     // Pagination & Search
     const [currentPage, setCurrentPage] = useState(1);
@@ -59,11 +62,16 @@ const Dashboard = () => {
         setCurrentPage(1);
     };
 
-    const handleReturn = async (id) => {
-        if (!window.confirm("¿Confirmar devolución de la llave?")) return;
+    const handleReturnClick = (loan) => {
+        setSelectedLoan(loan);
+        setShowReturnModal(true);
+    };
+
+    const handleConfirmReturn = async (id) => {
         try {
             await api.post(`prestamos/${id}/devolver/`);
-            fetchData(currentPage, ordering); // Refresh list using fetchData
+            setShowReturnModal(false);
+            fetchData(currentPage, ordering);
         } catch (error) {
             alert("Error al devolver la llave");
             console.error(error);
@@ -140,6 +148,12 @@ const Dashboard = () => {
                 </div>
             ) : (
                 <>
+                    <ReturnLoanModal
+                        isOpen={showReturnModal}
+                        onClose={() => setShowReturnModal(false)}
+                        onConfirm={handleConfirmReturn}
+                        loanData={selectedLoan}
+                    />
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-8">
                         {loans.map((loan) => (
                             <div key={loan.id} className="group bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-blue-100 transition-all duration-300 flex flex-col justify-between overflow-hidden">
@@ -187,7 +201,7 @@ const Dashboard = () => {
 
                                 <div className="p-4 bg-slate-50 border-t border-slate-100 group-hover:bg-blue-50/30 transition-colors">
                                     <button
-                                        onClick={() => handleReturn(loan.id)}
+                                        onClick={() => handleReturnClick(loan)}
                                         className="w-full py-2.5 bg-white text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-800 hover:text-white hover:border-slate-800 transition-all font-medium text-sm flex items-center justify-center gap-2 shadow-sm"
                                     >
                                         <CheckCircle className="w-4 h-4" />
