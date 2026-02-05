@@ -12,6 +12,10 @@ import Establishments from './pages/establishments/Establishments';
 import ServicesDashboard from './pages/services/ServicesDashboard';
 import Providers from './pages/services/Providers';
 import PaymentsDashboard from './pages/services/PaymentsDashboard';
+import RecepcionConformeList from './pages/services/RecepcionConformeList';
+import CDPManager from './pages/services/CDPManager';
+import Contracts from './pages/contracts/Contracts';
+import ContractDetail from './pages/contracts/ContractDetail';
 import Login from './pages/Login';
 
 // Private Route Wrapper
@@ -40,9 +44,13 @@ function App() {
               <Route path="applicants" element={<Applicants />} />
               <Route path="keys" element={<Keys />} />
               <Route path="establishments" element={<Establishments />} />
+              <Route path="contracts" element={<Contracts />} />
+              <Route path="contracts/:id" element={<ContractDetail />} />
               <Route path="services" element={<ServicesDashboard />} />
               <Route path="services/providers" element={<Providers />} />
               <Route path="services/payments" element={<PaymentsDashboard />} />
+              <Route path="services/rc" element={<RecepcionConformeList />} />
+              <Route path="services/cdp" element={<CDPManager />} />
             </Route>
           </Route>
         </Routes>

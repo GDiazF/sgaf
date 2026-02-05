@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import { Save, Search, Plus, X, Key, UserPlus, Check, Building } from 'lucide-react';
+import ApplicantModal from '../../components/applicants/ApplicantModal';
 
 const LoanForm = () => {
     const navigate = useNavigate();
@@ -16,19 +17,15 @@ const LoanForm = () => {
     // Applicant Selection State
     const [rutSearch, setRutSearch] = useState('');
     const [applicant, setApplicant] = useState(null);
-    const [isCreatingApplicant, setIsCreatingApplicant] = useState(false);
-    const [newApplicantData, setNewApplicantData] = useState({
-        rut: '',
-        nombre: '',
-        apellido: '',
-        telefono: '',
-        email: ''
-    });
+    const [newApplicantData, setNewApplicantData] = useState(null);
 
     const [observacion, setObservacion] = useState('');
 
     useEffect(() => {
-        api.get('establecimientos/').then(res => setEstablishments(res.data));
+        api.get('establecimientos/').then(res => {
+            // Handle pagination for dropdown (might need fetching all if > 10, but MVP fix for crash)
+            setEstablishments(res.data.results || res.data);
+        });
     }, []);
 
     // Search keys when term changes or establishment changes
@@ -41,7 +38,7 @@ const LoanForm = () => {
             // Only search if we have an establishment selected OR a search term > 1 char
             if (selectedEst || keySearchTerm.length > 1) {
                 api.get(query)
-                    .then(res => setFoundKeys(res.data))
+                    .then(res => setFoundKeys(res.data.results || res.data || []))
                     .catch(console.error);
             } else {
                 setFoundKeys([]);
@@ -64,17 +61,15 @@ const LoanForm = () => {
         if (!rutSearch) return;
         try {
             const res = await api.get(`solicitantes/?search=${rutSearch}`);
-            if (res.data.length > 0) {
-                const match = res.data.find(a => a.rut === rutSearch) || res.data[0];
+            const results = res.data.results || res.data || [];
+
+            if (results.length > 0) {
+                const match = results.find(a => a.rut === rutSearch) || results[0];
                 setApplicant(match);
-                setIsCreatingApplicant(false);
+                setNewApplicantData(null);
             } else {
                 setApplicant(null);
-                const confirmCreate = window.confirm("Solicitante no encontrado. ¿Desea registrarlo ahora?");
-                if (confirmCreate) {
-                    setIsCreatingApplicant(true);
-                    setNewApplicantData(prev => ({ ...prev, rut: rutSearch }));
-                }
+                setNewApplicantData({ rut: rutSearch, nombre: '', apellido: '', telefono: '', email: '' });
             }
         } catch (error) {
             console.error(error);
@@ -82,12 +77,11 @@ const LoanForm = () => {
         }
     };
 
-    const handleCreateApplicant = async (e) => {
-        e.preventDefault();
+    const handleSaveApplicant = async (data) => {
         try {
-            const res = await api.post('solicitantes/', newApplicantData);
+            const res = await api.post('solicitantes/', data);
             setApplicant(res.data);
-            setIsCreatingApplicant(false);
+            setNewApplicantData(null);
             setRutSearch(res.data.rut);
         } catch (error) {
             console.error(error);
@@ -244,7 +238,13 @@ const LoanForm = () => {
                         </div>
 
                         <div className="p-6">
-                            {!applicant && !isCreatingApplicant ? (
+                            <ApplicantModal
+                                isOpen={!!newApplicantData}
+                                onClose={() => setNewApplicantData(null)}
+                                onSave={handleSaveApplicant}
+                                initialData={newApplicantData}
+                            />
+                            {!applicant ? (
                                 <div className="flex gap-2">
                                     <div className="relative flex-1">
                                         <input
@@ -264,20 +264,6 @@ const LoanForm = () => {
                                         Buscar
                                     </button>
                                 </div>
-                            ) : isCreatingApplicant ? (
-                                <form onSubmit={handleCreateApplicant} className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200 animate-fade-in-up">
-                                    <h3 className="text-sm font-bold text-slate-700 mb-2">Nuevo Solicitante</h3>
-                                    <input type="text" placeholder="RUT" required value={newApplicantData.rut} onChange={e => setNewApplicantData({ ...newApplicantData, rut: e.target.value })} className="w-full p-2 rounded-lg border border-slate-200" />
-                                    <div className="flex gap-2">
-                                        <input type="text" placeholder="Nombre" required value={newApplicantData.nombre} onChange={e => setNewApplicantData({ ...newApplicantData, nombre: e.target.value })} className="w-full p-2 rounded-lg border border-slate-200" />
-                                        <input type="text" placeholder="Apellido" required value={newApplicantData.apellido} onChange={e => setNewApplicantData({ ...newApplicantData, apellido: e.target.value })} className="w-full p-2 rounded-lg border border-slate-200" />
-                                    </div>
-                                    <input type="text" placeholder="Teléfono" value={newApplicantData.telefono} onChange={e => setNewApplicantData({ ...newApplicantData, telefono: e.target.value })} className="w-full p-2 rounded-lg border border-slate-200" />
-                                    <div className="flex justify-end gap-2 mt-2">
-                                        <button type="button" onClick={() => setIsCreatingApplicant(false)} className="text-slate-500 text-sm hover:text-slate-800">Cancelar</button>
-                                        <button type="submit" className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-700">Guardar</button>
-                                    </div>
-                                </form>
                             ) : (
                                 <div className="bg-green-50 border border-green-200 p-4 rounded-xl flex justify-between items-center animate-fade-in-up">
                                     <div>

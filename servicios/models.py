@@ -11,6 +11,7 @@ class TipoProveedor(models.Model):
     class Meta:
         verbose_name = "Tipo de Proveedor"
         verbose_name_plural = "Tipos de Proveedores"
+        ordering = ['nombre']
 
 class Proveedor(models.Model):
     nombre = models.CharField(max_length=255)
@@ -25,6 +26,7 @@ class Proveedor(models.Model):
 
     class Meta:
         verbose_name_plural = "Proveedores"
+        ordering = ['nombre']
 
 class TipoDocumento(models.Model):
     nombre = models.CharField(max_length=100) # e.g. Factura, Boleta
@@ -35,6 +37,7 @@ class TipoDocumento(models.Model):
     class Meta:
         verbose_name = "Tipo de Documento"
         verbose_name_plural = "Tipos de Documento"
+        ordering = ['nombre']
 
 class Servicio(models.Model):
     proveedor = models.ForeignKey(Proveedor, on_delete=models.CASCADE, related_name='servicios')
@@ -52,6 +55,47 @@ class Servicio(models.Model):
     class Meta:
         verbose_name = "Servicio"
         verbose_name_plural = "Servicios"
+        ordering = ['-fecha_creacion']
+
+class RecepcionConforme(models.Model):
+    ESTADO_CHOICES = [
+        ('EMITIDA', 'Emitida'),
+        ('ANULADA', 'Anulada'),
+    ]
+    proveedor = models.ForeignKey(Proveedor, on_delete=models.PROTECT, related_name='recepciones')
+    folio = models.CharField(max_length=50, unique=True, blank=True)
+    fecha_emision = models.DateField(auto_now_add=True)
+    observaciones = models.TextField(blank=True, null=True)
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='EMITIDA')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.folio and self.proveedor.tipo_proveedor and self.proveedor.tipo_proveedor.acronimo_nemotecnico:
+            prefix = self.proveedor.tipo_proveedor.acronimo_nemotecnico
+            last_rc = RecepcionConforme.objects.filter(folio__startswith=prefix).order_by('folio').last()
+            
+            if last_rc:
+                try:
+                    last_seq_str = last_rc.folio.rsplit('-', 1)[-1]
+                    last_seq = int(last_seq_str)
+                    new_seq = last_seq + 1
+                except ValueError:
+                    new_seq = 1
+            else:
+                new_seq = 1
+            
+            self.folio = f"{prefix}-{new_seq:04d}"
+        
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"RC {self.folio} - {self.proveedor.nombre}"
+
+    class Meta:
+        verbose_name = "Recepción Conforme"
+        verbose_name_plural = "Recepciones Conformes"
+        ordering = ['-created_at']
 
 class RegistroPago(models.Model):
     servicio = models.ForeignKey(Servicio, on_delete=models.PROTECT, related_name='pagos')
@@ -62,6 +106,7 @@ class RegistroPago(models.Model):
     nro_documento = models.CharField(max_length=100)
     monto_interes = models.IntegerField(default=0)
     monto_total = models.IntegerField()
+    recepcion_conforme = models.ForeignKey(RecepcionConforme, on_delete=models.SET_NULL, null=True, blank=True, related_name='registros')
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -70,3 +115,37 @@ class RegistroPago(models.Model):
     class Meta:
         verbose_name = "Registro de Pago"
         verbose_name_plural = "Registros de Pagos"
+        ordering = ['-fecha_pago']
+
+class HistorialRecepcionConforme(models.Model):
+    recepcion_conforme = models.ForeignKey(RecepcionConforme, on_delete=models.CASCADE, related_name='historial')
+    fecha = models.DateTimeField(auto_now_add=True)
+    accion = models.CharField(max_length=100) # e.g., 'CREACION', 'MODIFICACION', 'ELIMINACION_PAGO'
+    detalle = models.TextField(blank=True, null=True)
+    usuario = models.CharField(max_length=150, blank=True, null=True) # Storing username as string for simplicity or FK
+
+    def __str__(self):
+        return f"{self.recepcion_conforme.folio} - {self.accion} - {self.fecha}"
+
+    class Meta:
+        ordering = ['-fecha']
+        verbose_name = "Historial RC"
+        verbose_name_plural = "Historial RCs"
+
+class CDP(models.Model):
+    nombre = models.CharField(max_length=255, verbose_name="Nombre CDP") # e.g., CDP Agua 2024
+    archivo = models.FileField(upload_to='cdps/%Y/', verbose_name="Archivo PDF")
+    anio = models.IntegerField(verbose_name="Año", default=2026)
+    descripcion = models.TextField(blank=True, verbose_name="Descripción/Observaciones")
+    fecha_subida = models.DateTimeField(auto_now_add=True)
+    
+    # Optional: Link to Type of Provider if it's "by service type"
+    # tipo_proveedor = models.ForeignKey(TipoProveedor, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = "CDP (Certificado Disp. Presupuestaria)"
+        verbose_name_plural = "Repositorio CDPs"
+        ordering = ['-fecha_subida']

@@ -16,20 +16,30 @@ from establecimientos.views import EstablecimientoViewSet
 class SolicitanteViewSet(viewsets.ModelViewSet):
     queryset = Solicitante.objects.all()
     serializer_class = SolicitanteSerializer
-    filter_backends = [filters.SearchFilter]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    ordering_fields = ['rut', 'nombre', 'apellido']
     search_fields = ['rut', 'nombre', 'apellido']
 
 class LlaveViewSet(viewsets.ModelViewSet):
     queryset = Llave.objects.all()
     serializer_class = LlaveSerializer
     filterset_fields = ['establecimiento']
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['establecimiento']
+    ordering_fields = ['nombre', 'establecimiento__nombre']
     search_fields = ['nombre', 'establecimiento__nombre']
 
 class PrestamoViewSet(viewsets.ModelViewSet):
     queryset = Prestamo.objects.all()
     serializer_class = PrestamoSerializer
-    filterset_fields = ['llave', 'solicitante']
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = {
+        'llave': ['exact'],
+        'solicitante': ['exact'],
+        'fecha_prestamo': ['date', 'gte', 'lte'],
+        'fecha_devolucion': ['isnull']
+    }
+    ordering_fields = ['fecha_prestamo', 'fecha_devolucion', 'llave__nombre', 'solicitante__nombre']
 
     def get_queryset(self):
         qs = super().get_queryset()

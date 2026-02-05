@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Calendar } from 'lucide-react';
 
 const DateInput = ({ label, value, onChange, required = false, className = "" }) => {
-    // Value coming in is YYYY-MM-DD (standard)
+    // Value coming in is YYYY-MM-DD (standard ISO)
     // We want to display DD/MM/YYYY text input
 
     const [inputValue, setInputValue] = useState('');
@@ -40,47 +40,47 @@ const DateInput = ({ label, value, onChange, required = false, className = "" })
             // Simple validation check
             const d = new Date(isoDate);
             if (!isNaN(d.getTime())) {
-                onChange({ target: { value: isoDate } });
+                onChange(isoDate); // Return string directly
             }
         } else if (text === '') {
-            onChange({ target: { value: '' } });
+            onChange(''); // Return empty string directly
         }
     };
 
     const handleBlur = () => {
-        // validate on blur, reset if invalid?
-        // For now, if invalid, we could revert or leave as is. 
-        // Let's revert to prop value if invalid to prevent stale state
         if (value) {
             const [year, month, day] = value.split('-');
-            if (inputValue !== `${day}/${month}/${year}`) {
-                // The text doesn't match the valid date, so reset it (unless user cleared it)
-                if (inputValue === '') {
-                    onChange({ target: { value: '' } });
-                } else {
-                    setInputValue(`${day}/${month}/${year}`);
-                }
+            const displayVal = `${day}/${month}/${year}`;
+            if (inputValue !== displayVal && inputValue !== '') {
+                setInputValue(displayVal);
+            }
+        } else if (inputValue !== '') {
+            // If it's not a valid 10-char date and field is not empty, reset it
+            if (inputValue.length < 10) {
+                setInputValue('');
             }
         }
     };
 
     const handleDateIconClick = () => {
-        dateInputRef.current?.showPicker();
+        if (dateInputRef.current && 'showPicker' in dateInputRef.current) {
+            dateInputRef.current.showPicker();
+        }
     };
 
     const handleNativeDateChange = (e) => {
         // e.target.value is YYYY-MM-DD
-        onChange(e);
+        onChange(e.target.value);
     };
 
     return (
-        <div className={`space-y-1 ${className}`}>
-            {label && <label className="text-xs font-semibold text-slate-500 uppercase">{label}</label>}
-            <div className="relative">
+        <div className={`space-y-1.5 ${className}`}>
+            {label && <label className="text-xs font-bold text-slate-600 ml-1">{label}</label>}
+            <div className="relative group">
                 <input
                     type="text"
                     required={required}
-                    className="w-full p-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm pr-10"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium font-mono h-[46px]"
                     value={inputValue}
                     onChange={handleTextChange}
                     onBlur={handleBlur}
@@ -88,16 +88,19 @@ const DateInput = ({ label, value, onChange, required = false, className = "" })
                 />
 
                 {/* Calendar Icon Button */}
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer text-slate-400 hover:text-blue-600 p-1" onClick={handleDateIconClick}>
-                    <Calendar className="w-4 h-4" />
-                </div>
+                <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-blue-500 transition-colors p-1"
+                    onClick={handleDateIconClick}
+                >
+                    <Calendar className="w-5 h-5" />
+                </button>
 
                 {/* Hidden Native Date Input */}
                 <input
                     ref={dateInputRef}
                     type="date"
-                    className="absolute inset-0 opacity-0 pointer-events-none"
-                    style={{ visibility: 'hidden' }} // We use showPicker API
+                    className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
                     onChange={handleNativeDateChange}
                     tabIndex={-1}
                 />

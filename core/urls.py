@@ -28,4 +28,11 @@ urlpatterns = [
     path('api/', include('prestamo_llaves.urls')),
     path('api/', include('establecimientos.urls')),
     path('api/', include('servicios.urls')),
+    path('api/contratos/', include('contratos.urls')),
 ]
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
