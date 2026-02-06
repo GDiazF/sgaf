@@ -16,6 +16,15 @@ import RecepcionConformeList from './pages/services/RecepcionConformeList';
 import CDPManager from './pages/services/CDPManager';
 import Contracts from './pages/contracts/Contracts';
 import ContractDetail from './pages/contracts/ContractDetail';
+// Funcionarios
+import FuncionariosDashboard from './pages/funcionarios/FuncionariosDashboard';
+import FuncionariosList from './pages/funcionarios/FuncionariosList';
+import FuncionarioForm from './pages/funcionarios/FuncionarioForm';
+import Subdirecciones from './pages/funcionarios/Subdirecciones';
+import Departamentos from './pages/funcionarios/Departamentos';
+import Unidades from './pages/funcionarios/Unidades';
+import AnexosDashboard from './pages/telecomunicaciones/AnexosDashboard';
+import ImpresorasDashboard from './pages/impresoras/ImpresorasDashboard';
 import Login from './pages/Login';
 
 // Private Route Wrapper
@@ -51,6 +60,19 @@ function App() {
               <Route path="services/payments" element={<PaymentsDashboard />} />
               <Route path="services/rc" element={<RecepcionConformeList />} />
               <Route path="services/cdp" element={<CDPManager />} />
+
+              {/* Funcionarios */}
+              <Route path="funcionarios" element={<FuncionariosDashboard />} />
+              <Route path="funcionarios/list" element={<FuncionariosList />} />
+              <Route path="funcionarios/new" element={<FuncionarioForm />} />
+              <Route path="funcionarios/edit/:id" element={<FuncionarioForm />} />
+              <Route path="funcionarios/subdirecciones" element={<Subdirecciones />} />
+              <Route path="funcionarios/departamentos" element={<Departamentos />} />
+              <Route path="funcionarios/unidades" element={<Unidades />} />
+              {/* Telecomunicaciones */}
+              <Route path="telecomunicaciones" element={<AnexosDashboard />} />
+              {/* Impresoras */}
+              <Route path="impresoras" element={<ImpresorasDashboard />} />
             </Route>
           </Route>
         </Routes>
