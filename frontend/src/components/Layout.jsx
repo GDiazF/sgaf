@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Key, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText } from 'lucide-react';
+import { Key, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 
@@ -109,6 +109,62 @@ const Layout = () => {
                             className="font-medium whitespace-nowrap"
                         >
                             Contratos / Licitaciones
+                        </motion.span>
+                    </Link>
+
+                    <Link
+                        to="/funcionarios"
+                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/funcionarios') || isActive('/funcionarios/list') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                    >
+                        <Users className="w-5 h-5 flex-shrink-0" />
+                        <motion.span
+                            initial={false}
+                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                            className="font-medium whitespace-nowrap"
+                        >
+                            Personal / Funcionarios
+                        </motion.span>
+                    </Link>
+
+                    <Link
+                        to="/telecomunicaciones"
+                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/telecomunicaciones') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                    >
+                        <Phone className="w-5 h-5 flex-shrink-0" />
+                        <motion.span
+                            initial={false}
+                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                            className="font-medium whitespace-nowrap"
+                        >
+                            Telecomunicaciones
+                        </motion.span>
+                    </Link>
+
+                    <Link
+                        to="/impresoras"
+                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/impresoras') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                    >
+                        <Printer className="w-5 h-5 flex-shrink-0" />
+                        <motion.span
+                            initial={false}
+                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                            className="font-medium whitespace-nowrap"
+                        >
+                            Impresoras
+                        </motion.span>
+                    </Link>
+
+                    <Link
+                        to="/vehiculos"
+                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/vehiculos') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                    >
+                        <Truck className="w-5 h-5 flex-shrink-0" />
+                        <motion.span
+                            initial={false}
+                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                            className="font-medium whitespace-nowrap"
+                        >
+                            Flota / Vehículos
                         </motion.span>
                     </Link>
 
@@ -288,7 +344,8 @@ const Layout = () => {
                                                     isActive('/applicants') ? 'Solicitantes' :
                                                         isActive('/keys') ? 'Llaves' :
                                                             isActive('/contracts') ? 'Contratos / Licitaciones' :
-                                                                isActive('/services/rc') ? 'Recepciones Conformes' : 'Sistema'}
+                                                                isActive('/vehiculos') ? 'Gestión de Flota' :
+                                                                    isActive('/services/rc') ? 'Recepciones Conformes' : 'Sistema'}
                             </h2>
                             <p className="text-xs md:text-sm text-slate-500 hidden md:block">Sistema de Gestión.</p>
                         </div>

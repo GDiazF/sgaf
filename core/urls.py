@@ -29,6 +29,9 @@ urlpatterns = [
     path('api/', include('establecimientos.urls')),
     path('api/', include('servicios.urls')),
     path('api/contratos/', include('contratos.urls')),
+    path('api/', include('funcionarios.urls')),
+    path('api/', include('impresoras.urls')),
+    path('api/', include('vehiculos.urls')),
 ]
 
 from django.conf import settings
