@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'contratos',
     'funcionarios',
     'impresoras',
+    'vehiculos',
 ]
 
 REST_FRAMEWORK = {

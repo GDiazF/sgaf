@@ -25,6 +25,8 @@ import Departamentos from './pages/funcionarios/Departamentos';
 import Unidades from './pages/funcionarios/Unidades';
 import AnexosDashboard from './pages/telecomunicaciones/AnexosDashboard';
 import ImpresorasDashboard from './pages/impresoras/ImpresorasDashboard';
+// Vehiculos
+import VehiculosDashboard from './pages/vehiculos/VehiculosDashboard';
 import Login from './pages/Login';
 
 // Private Route Wrapper
@@ -73,6 +75,8 @@ function App() {
               <Route path="telecomunicaciones" element={<AnexosDashboard />} />
               {/* Impresoras */}
               <Route path="impresoras" element={<ImpresorasDashboard />} />
+              {/* Vehiculos */}
+              <Route path="vehiculos" element={<VehiculosDashboard />} />
             </Route>
           </Route>
         </Routes>

@@ -31,6 +31,7 @@ urlpatterns = [
     path('api/contratos/', include('contratos.urls')),
     path('api/', include('funcionarios.urls')),
     path('api/', include('impresoras.urls')),
+    path('api/', include('vehiculos.urls')),
 ]
 
 from django.conf import settings
