@@ -198,104 +198,217 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import inch
+        from reportlab.lib.enums import TA_CENTER
+        from reportlab.lib.colors import HexColor
+        from django.conf import settings
+        from reportlab.lib.utils import ImageReader
+        import os
+
+        # Spanish Month Names
+        MESES = {
+            1: "enero", 2: "febrero", 3: "marzo", 4: "abril",
+            5: "mayo", 6: "junio", 7: "julio", 8: "agosto",
+            9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
+        }
 
         rc = self.get_object()
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter)
-        elements = []
-        styles = getSampleStyleSheet()
-
-        # Custom Styles
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=16,
-            alignment=1, # Center
-            spaceAfter=20
-        )
-        normal_style = styles['Normal']
-
-        # Header (Logo placeholder + Title)
-        # Assuming logo is at a static path or skipped if not found.
-        # elements.append(Image('path/to/logo.png', width=2*inch, height=1*inch))
-        elements.append(Paragraph("SERVICIO LOCAL DE EDUCACIÓN PÚBLICA IQUIQUE", styles['Heading3']))
-        elements.append(Paragraph("DEPARTAMENTO DE ADMINISTRACIÓN Y FINANZAS", styles['Normal']))
-        elements.append(Spacer(1, 0.2 * inch))
         
-        elements.append(Paragraph(f"RECEPCIÓN CONFORME N° {rc.folio}", title_style))
-        elements.append(Spacer(1, 0.2 * inch))
+        # Standardized margins from reference code (50 points)
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=50,
+            leftMargin=50,
+            topMargin=50,
+            bottomMargin=50
+        )
 
-        # Metadata Table
-        data_meta = [
-            ["Fecha Emisión:", rc.fecha_emision.strftime('%d/%m/%Y')],
-            ["Proveedor:", rc.proveedor.nombre],
-            ["RUT:", rc.proveedor.rut or "-"],
-            ["Tipo:", rc.proveedor.tipo_proveedor.nombre if rc.proveedor.tipo_proveedor else "-"]
-        ]
-        t_meta = Table(data_meta, colWidths=[1.5*inch, 4*inch])
-        t_meta.setStyle(TableStyle([
-            ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
-            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        # Container for elements
+        elements = []
+        
+        # Styles from reference code
+        styles = getSampleStyleSheet()
+        
+        # Corporate Colors
+        azul_oscuro = HexColor('#1F4970')
+        gris_claro = HexColor('#F5F5F5')
+        gris_lineas = HexColor('#CCCCCC')
+
+        styles.add(ParagraphStyle(
+            name='MainTitle',
+            parent=styles['Heading1'],
+            alignment=TA_CENTER,
+            fontSize=12,
+            spaceAfter=15,
+            spaceBefore=15,
+            fontName='Helvetica-Bold'
+        ))
+        
+        styles.add(ParagraphStyle(
+            name='SignatureTitle',
+            parent=styles['Heading1'],
+            alignment=TA_CENTER,
+            fontSize=10,
+            spaceAfter=4,
+            spaceBefore=4,
+            fontName='Helvetica-Bold'
+        ))
+        
+        styles.add(ParagraphStyle(
+            name='NormalText',
+            parent=styles['Normal'],
+            fontSize=9,
+            leading=13,
+            spaceBefore=10,
+            spaceAfter=10,
+            alignment=4 # Justified
+        ))
+
+        styles.add(ParagraphStyle(
+            name='FolioStyle',
+            parent=styles['Normal'],
+            alignment=2, # Right
+            fontSize=9,
+            fontName='Helvetica-Bold',
+            spaceAfter=5
+        ))
+
+        # Helper for proportional scaling (Manually fixed for ReportLab Image)
+        def get_scaled_image(path, max_w, max_h):
+            img_reader = ImageReader(path)
+            iw, ih = img_reader.getSize()
+            aspect = ih / float(iw)
+            
+            w = max_w
+            h = w * aspect
+            
+            if h > max_h:
+                h = max_h
+                w = h / aspect
+                
+            return Image(path, width=w, height=h)
+
+        # Logos paths
+        logo_slep_path = os.path.join(settings.BASE_DIR, 'frontend', 'public', 'Logo SLEP.png')
+        logo_iquique_path = os.path.join(settings.BASE_DIR, 'frontend', 'public', 'Iquique.png')
+
+        header_data = [[]]
+        if os.path.exists(logo_iquique_path):
+            # Decrease Iquique logo size slightly
+            img_iquique = get_scaled_image(logo_iquique_path, 1.6*inch, 0.9*inch)
+            header_data[0].append(img_iquique)
+        else:
+            header_data[0].append("")
+
+        header_data[0].append(Paragraph("", styles['Normal'])) # Spacer
+
+        if os.path.exists(logo_slep_path):
+            # Enlarge SLEP logo size as requested
+            img_slep = get_scaled_image(logo_slep_path, 1.8*inch, 1.5*inch)
+            header_data[0].append(img_slep)
+        else:
+            header_data[0].append("")
+
+        header_table = Table(header_data, colWidths=[2*inch, 3*inch, 2*inch])
+        header_table.setStyle(TableStyle([
+            ('ALIGN', (0,0), (0,0), 'LEFT'),
+            ('ALIGN', (2,0), (2,0), 'RIGHT'),
+            ('ALIGN', (1,0), (1,0), 'CENTER'),
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('TOPPADDING', (0,0), (-1,-1), 0),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 0),
         ]))
-        elements.append(t_meta)
-        elements.append(Spacer(1, 0.3 * inch))
+        elements.append(header_table)
+        elements.append(Spacer(1, 40))
 
-        # Payments Table
-        elements.append(Paragraph("Detalle de Pagos Recibidos:", styles['Heading4']))
-        elements.append(Spacer(1, 0.1 * inch))
+        # Title
+        elements.append(Paragraph("RECEPCIÓN CONFORME", styles['MainTitle']))
 
-        headers = ["Fecha Pago", "Nro Documento", "Servicio / Cliente", "Monto"]
+        # Intro Paragraph
+        first_pago = rc.registros.first()
+        est_name = first_pago.establecimiento.nombre if first_pago else "Establecimiento no definido"
+        prov_name = rc.proveedor.nombre
+        fecha = rc.fecha_emision
+        intro_text = (
+            f"En Iquique, a {fecha.day} de {MESES.get(fecha.month)} de {fecha.year} "
+            f"en el establecimiento {est_name}, se procede a dar recepción conforme a las boletas "
+            f"de {prov_name}, se adjunta listado."
+        )
+        elements.append(Paragraph(intro_text, styles['NormalText']))
+        
+        # Folio Right Aligned above table
+        elements.append(Paragraph(f"FOLIO: {rc.folio}", styles['FolioStyle']))
+        elements.append(Spacer(1, 5))
+
+        # Detail Table
+        headers = ['N° Cliente', 'Establecimiento', 'Factura', 'Monto JUNJI', 'Monto Final']
         data_body = [headers]
         
-        total_monto = 0
         for pago in rc.registros.all():
-            monto_fmt = f"${pago.monto_total:,}".replace(",", ".")
-            fecha_fmt = pago.fecha_pago.strftime('%d/%m/%Y')
-            cliente_fmt = pago.servicio.numero_cliente
-            row = [fecha_fmt, pago.nro_documento, cliente_fmt, monto_fmt]
+            monto_junji = pago.monto_total - pago.monto_interes
+            row = [
+                pago.servicio.numero_cliente,
+                Paragraph(pago.establecimiento.nombre, 
+                         ParagraphStyle(
+                             'EstStyle',
+                             parent=styles['Normal'],
+                             fontSize=9,
+                             leading=11,
+                             wordWrap='LTR',
+                         )),
+                pago.nro_documento,
+                f"${monto_junji:,}".replace(",", "."),
+                f"${pago.monto_total:,}".replace(",", ".")
+            ]
             data_body.append(row)
-            total_monto += pago.monto_total
         
-        # Total Row
-        data_body.append(["", "", "TOTAL", f"${total_monto:,}".replace(",", ".")])
+        # Calculate available width (8.5 inch - 100 points margins)
+        available_width = letter[0] - 100
+        col_widths = [
+            available_width * 0.12,  # N° Cliente
+            available_width * 0.41,  # Establecimiento
+            available_width * 0.17,  # Factura
+            available_width * 0.15,  # Monto JUNJI
+            available_width * 0.15   # Monto Final
+        ]
 
-        t_body = Table(data_body, colWidths=[1.5*inch, 1.5*inch, 2.5*inch, 1.5*inch])
+        t_body = Table(data_body, colWidths=col_widths)
         t_body.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e2e8f0')),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.black),
-            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-            ('ALIGN', (-1,0), (-1,-1), 'RIGHT'), # Align amounts to right
+            ('ALIGN', (0,0), (-1,0), 'CENTER'),
+            ('ALIGN', (0,1), (2,1), 'LEFT'),
+            ('ALIGN', (3,1), (-1,-1), 'RIGHT'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('BOTTOMPADDING', (0,0), (-1,0), 12),
-            ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#f1f5f9')), # Total row bg
-            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
-            ('GRID', (0,0), (-1,-2), 1, colors.black),
-            ('linebelow', (0,-2), (-1,-2), 2, colors.black), # Thick line above total
+            ('FONTNAME', (0,1), (-1,1), 'Helvetica'),
+            ('FONTSIZE', (0,0), (-1,-1), 9),
+            ('BACKGROUND', (0,0), (-1,0), azul_oscuro),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('BACKGROUND', (0,1), (-1,-1), gris_claro),
+            ('GRID', (0,0), (-1,-1), 0.5, gris_lineas),
+            ('BOX', (0,0), (-1,-1), 1, azul_oscuro),
+            ('TOPPADDING', (0,0), (-1,0), 6),
+            ('BOTTOMPADDING', (0,0), (-1,0), 6),
+            ('TOPPADDING', (0,1), (-1,-1), 12),
+            ('BOTTOMPADDING', (0,1), (-1,-1), 12),
+            ('LEFTPADDING', (0,0), (-1,-1), 10),
+            ('RIGHTPADDING', (0,0), (-1,-1), 10),
         ]))
         elements.append(t_body)
-        elements.append(Spacer(1, 0.3 * inch))
+        elements.append(Spacer(1, 180))
 
-        # Observations
-        if rc.observaciones:
-            elements.append(Paragraph("Observaciones:", styles['Heading4']))
-            elements.append(Paragraph(rc.observaciones, normal_style))
-            elements.append(Spacer(1, 0.4 * inch))
-
-        # Signatures
-        elements.append(Spacer(1, 1 * inch))
-        
-        # Signature Table
-        sig_data = [
-            ["__________________________", "__________________________"],
-            ["Firma Responsable", "V°B° Jefatura"]
-        ]
-        t_sig = Table(sig_data, colWidths=[3.5*inch, 3.5*inch])
-        t_sig.setStyle(TableStyle([
+        # Signature Line
+        signature_width = 200
+        signature_line = Table([['']], colWidths=[signature_width])
+        signature_line.setStyle(TableStyle([
+            ('LINEABOVE', (0,0), (-1,-1), 1, azul_oscuro),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('TOPPADDING', (0,0), (-1,-1), 5),
         ]))
-        elements.append(t_sig)
+        elements.append(signature_line)
+        elements.append(Spacer(1, 5))
+        
+        elements.append(Paragraph("RECIBE CONFORME", styles['SignatureTitle']))
 
         doc.build(elements)
         buffer.seek(0)
