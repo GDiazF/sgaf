@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Proveedor, TipoDocumento, Servicio, TipoProveedor, RegistroPago
+from .models import Proveedor, TipoDocumento, Servicio, TipoProveedor, RegistroPago, CDP, TipoEntrega, FacturaAdquisicion
 
 @admin.register(TipoProveedor)
 class TipoProveedorAdmin(admin.ModelAdmin):
@@ -28,3 +28,19 @@ class RegistroPagoAdmin(admin.ModelAdmin):
     list_filter = ('establecimiento', 'fecha_pago')
     search_fields = ('nro_documento', 'servicio__numero_cliente')
     autocomplete_fields = ['servicio', 'establecimiento']
+
+@admin.register(CDP)
+class CDPAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'anio', 'archivo', 'fecha_subida')
+    search_fields = ('nombre',)
+
+@admin.register(TipoEntrega)
+class TipoEntregaAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+
+@admin.register(FacturaAdquisicion)
+class FacturaAdquisicionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'proveedor', 'establecimiento', 'fecha_recepcion', 'total_pagar')
+    list_filter = ('proveedor', 'establecimiento', 'tipo_entrega')
+    search_fields = ('descripcion', 'proveedor__nombre')
+    autocomplete_fields = ['proveedor', 'establecimiento']

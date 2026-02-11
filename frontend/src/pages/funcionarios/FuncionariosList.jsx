@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { Users, Search, Edit2, Power, Filter, Phone, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api';
+import FuncionarioModal from '../../components/funcionarios/FuncionarioModal';
 
 const FuncionariosList = () => {
     const [funcionarios, setFuncionarios] = useState([]);
@@ -11,6 +11,10 @@ const FuncionariosList = () => {
     const [filterEstado, setFilterEstado] = useState('all');
     const [filterSubdireccion, setFilterSubdireccion] = useState('');
     const [subdirecciones, setSubdirecciones] = useState([]);
+
+    // Modal state
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedId, setSelectedId] = useState(null);
 
     useEffect(() => {
         fetchData();
@@ -41,6 +45,16 @@ const FuncionariosList = () => {
         }
     };
 
+    const handleCreate = () => {
+        setSelectedId(null);
+        setIsModalOpen(true);
+    };
+
+    const handleEdit = (id) => {
+        setSelectedId(id);
+        setIsModalOpen(true);
+    };
+
     const filteredData = funcionarios.filter(item => {
         const matchesSearch =
             item.nombre_funcionario.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -68,13 +82,13 @@ const FuncionariosList = () => {
                     <p className="text-gray-600">Gestiona y consulta la información del personal</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    <Link
-                        to="/funcionarios/new"
+                    <button
+                        onClick={handleCreate}
                         className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30"
                     >
                         <Plus className="w-4 h-4" />
                         Nuevo Funcionario
-                    </Link>
+                    </button>
                 </div>
             </div>
 
@@ -174,18 +188,18 @@ const FuncionariosList = () => {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right space-x-2">
-                                            <Link
-                                                to={`/funcionarios/edit/${item.id}`}
-                                                className="text-blue-600 hover:text-blue-800 inline-block"
+                                            <button
+                                                onClick={() => handleEdit(item.id)}
+                                                className="text-blue-600 hover:text-blue-800"
                                             >
-                                                <Edit2 className="w-5 h-5 inline" />
-                                            </Link>
+                                                <Edit2 className="w-5 h-5" />
+                                            </button>
                                             <button
                                                 onClick={() => handleToggleEstado(item.id)}
                                                 className={`${item.estado ? 'text-red-600 hover:text-red-800' : 'text-green-600 hover:text-green-800'}`}
                                                 title={item.estado ? 'Desactivar' : 'Activar'}
                                             >
-                                                <Power className="w-5 h-5 inline" />
+                                                <Power className="w-5 h-5" />
                                             </button>
                                         </td>
                                     </motion.tr>
@@ -200,6 +214,13 @@ const FuncionariosList = () => {
                     </div>
                 )}
             </div>
+
+            <FuncionarioModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSave={fetchData}
+                funcionarioId={selectedId}
+            />
         </div>
     );
 };

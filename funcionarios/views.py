@@ -3,14 +3,24 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
-from .models import Subdireccion, Departamento, Unidad, Funcionario
+from .models import Subdireccion, Departamento, Unidad, Funcionario, Grupo
 from .serializers import (
     SubdireccionSerializer,
     DepartamentoSerializer,
     UnidadSerializer,
     FuncionarioSerializer,
-    FuncionarioListSerializer
+    FuncionarioListSerializer,
+    GrupoSerializer
 )
+
+
+
+class GrupoViewSet(viewsets.ModelViewSet):
+    """ViewSet para Grupos de Funcionarios"""
+    queryset = Grupo.objects.all()
+    serializer_class = GrupoSerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['nombre']
 
 
 class SubdireccionViewSet(viewsets.ModelViewSet):

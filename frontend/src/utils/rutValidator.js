@@ -1,3 +1,5 @@
+import React from 'react';
+
 /**
  * Utilidades para validación de RUT chileno
  */
@@ -120,4 +122,3 @@ export const useRutInput = (initialValue = '') => {
 };
 
 // Para uso sin React
-import React from 'react';
