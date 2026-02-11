@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Proveedor, TipoDocumento, Servicio, TipoProveedor, RegistroPago, RecepcionConforme, HistorialRecepcionConforme, CDP
+from .models import Proveedor, TipoDocumento, Servicio, TipoProveedor, RegistroPago, RecepcionConforme, HistorialRecepcionConforme, CDP, TipoEntrega, FacturaAdquisicion
 from establecimientos.serializers import EstablecimientoSerializer
 
 class TipoProveedorSerializer(serializers.ModelSerializer):
@@ -57,6 +57,7 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
     )
     proveedor_nombre = serializers.ReadOnlyField(source='proveedor.nombre')
     tipo_proveedor_nombre = serializers.ReadOnlyField(source='proveedor.tipo_proveedor.nombre')
+    grupo_firmante_nombre = serializers.ReadOnlyField(source='grupo_firmante.nombre')
     historial = HistorialRecepcionConformeSerializer(many=True, read_only=True)
 
     class Meta:
@@ -170,3 +171,20 @@ class CDPSerializer(serializers.ModelSerializer):
         model = CDP
         fields = '__all__'
         read_only_fields = ['fecha_subida']
+
+class TipoEntregaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TipoEntrega
+        fields = '__all__'
+
+class FacturaAdquisicionSerializer(serializers.ModelSerializer):
+    proveedor_nombre = serializers.ReadOnlyField(source='proveedor.nombre')
+    proveedor_rut = serializers.ReadOnlyField(source='proveedor.rut')
+    establecimiento_nombre = serializers.ReadOnlyField(source='establecimiento.nombre')
+    tipo_entrega_nombre = serializers.ReadOnlyField(source='tipo_entrega.nombre')
+    grupo_firmante_nombre = serializers.ReadOnlyField(source='grupo_firmante.nombre')
+
+    class Meta:
+        model = FacturaAdquisicion
+        fields = '__all__'
+        read_only_fields = ['folio', 'created_at', 'updated_at']

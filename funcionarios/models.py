@@ -96,6 +96,24 @@ class Unidad(models.Model):
         return f"{self.departamento.subdireccion.nombre} / {self.departamento.nombre} / {self.nombre}"
 
 
+class Grupo(models.Model):
+    """Grupo de funcionarios para propósitos específicos (ej: Firmantes)"""
+    nombre = models.CharField("Nombre", max_length=120, unique=True)
+    descripcion = models.TextField("Descripción", blank=True, default="")
+    es_firmante = models.BooleanField("Es Firmante", default=False)
+    activo = models.BooleanField("Activo", default=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Grupo"
+        verbose_name_plural = "Grupos"
+        ordering = ["nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+
 class Funcionario(models.Model):
     """Funcionario - Empleado del SLEP"""
     # Datos personales
@@ -153,6 +171,12 @@ class Funcionario(models.Model):
     # Información laboral
     cargo = models.CharField("Cargo", max_length=120, blank=True, default="")
     estado = models.BooleanField("Activo", default=True)
+    grupos = models.ManyToManyField(
+        Grupo,
+        blank=True,
+        related_name="funcionarios",
+        verbose_name="Grupos"
+    )
     
     # Auditoría
     creado_en = models.DateTimeField(auto_now_add=True)

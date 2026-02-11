@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Subdireccion, Departamento, Unidad, Funcionario
+from .models import Subdireccion, Departamento, Unidad, Funcionario, Grupo
 
 
 class SubdireccionSerializer(serializers.ModelSerializer):
@@ -15,6 +15,22 @@ class SubdireccionSerializer(serializers.ModelSerializer):
         return obj.departamentos.count()
     
     def get_total_funcionarios(self, obj):
+        return obj.funcionarios.count()
+
+class GrupoSerializer(serializers.ModelSerializer):
+    """Serializer para Grupos de Funcionarios"""
+    total_miembros = serializers.SerializerMethodField()
+    funcionarios = serializers.PrimaryKeyRelatedField(
+        many=True, 
+        queryset=Funcionario.objects.all(),
+        required=False
+    )
+
+    class Meta:
+        model = Grupo
+        fields = '__all__'
+    
+    def get_total_miembros(self, obj):
         return obj.funcionarios.count()
 
 
@@ -61,6 +77,8 @@ class FuncionarioSerializer(serializers.ModelSerializer):
     subdireccion_obj = SubdireccionSerializer(source='subdireccion', read_only=True)
     departamento_obj = DepartamentoSerializer(source='departamento', read_only=True)
     unidad_obj = UnidadSerializer(source='unidad', read_only=True)
+    
+    grupos_obj = GrupoSerializer(source='grupos', many=True, read_only=True)
     
     class Meta:
         model = Funcionario
@@ -123,5 +141,6 @@ class FuncionarioListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'rut', 'nombre_funcionario', 'anexo', 'numero_publico',
             'cargo', 'estado', 'subdireccion', 'subdireccion_nombre',
-            'departamento', 'departamento_nombre', 'unidad', 'unidad_nombre'
+            'departamento', 'departamento_nombre', 'unidad', 'unidad_nombre',
+            'grupos'
         ]

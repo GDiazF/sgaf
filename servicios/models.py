@@ -1,4 +1,5 @@
 from django.db import models
+import datetime
 from establecimientos.models import Establecimiento
 
 class TipoProveedor(models.Model):
@@ -70,9 +71,20 @@ class RecepcionConforme(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Grupo de firmantes para este documento
+    grupo_firmante = models.ForeignKey(
+        'funcionarios.Grupo', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='recepciones_conformes',
+        verbose_name="Grupo de Firmantes"
+    )
+
     def save(self, *args, **kwargs):
-        if not self.folio and self.proveedor.tipo_proveedor and self.proveedor.tipo_proveedor.acronimo_nemotecnico:
-            prefix = self.proveedor.tipo_proveedor.acronimo_nemotecnico
+        if not self.folio:
+            year = datetime.date.today().year
+            prefix = f"RLB-{year}"
             last_rc = RecepcionConforme.objects.filter(folio__startswith=prefix).order_by('folio').last()
             
             if last_rc:
@@ -80,7 +92,7 @@ class RecepcionConforme(models.Model):
                     last_seq_str = last_rc.folio.rsplit('-', 1)[-1]
                     last_seq = int(last_seq_str)
                     new_seq = last_seq + 1
-                except ValueError:
+                except (ValueError, IndexError):
                     new_seq = 1
             else:
                 new_seq = 1
@@ -149,3 +161,78 @@ class CDP(models.Model):
         verbose_name = "CDP (Certificado Disp. Presupuestaria)"
         verbose_name_plural = "Repositorio CDPs"
         ordering = ['-fecha_subida']
+
+class TipoEntrega(models.Model):
+    nombre = models.CharField(max_length=100) # e.g., Parcial, Total, etc.
+    
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = "Tipo de Entrega"
+        verbose_name_plural = "Tipos de Entrega"
+class FacturaAdquisicion(models.Model):
+    # Folio field (RCF-YYYY-XXXX)
+    folio = models.CharField(max_length=50, unique=True, blank=True, null=True, verbose_name="Folio RC")
+    
+    nro_factura = models.CharField(max_length=50, blank=True, default="", verbose_name="Número de Factura")
+    nro_oc = models.CharField(max_length=100, blank=True, default="", verbose_name="Orden de Compra")
+
+    # Numero de certificado de presupuesto (FK a CDP)
+    cdp = models.CharField(max_length=100, verbose_name="Certificado de Presupuesto (CDP)")
+    descripcion = models.TextField(verbose_name="Descripción de producto o servicio")
+    # Fecha de recepcion conforme (dd/mm/yyyy predeterminada hoy)
+    fecha_recepcion = models.DateField(default=datetime.date.today, verbose_name="Fecha de recepción conforme")
+    # Entrega parcializada o total
+    tipo_entrega = models.ForeignKey(TipoEntrega, on_delete=models.PROTECT, related_name='facturas', verbose_name="Tipo de Entrega")
+    # Proveedor (FK)
+    proveedor = models.ForeignKey(Proveedor, on_delete=models.PROTECT, related_name='facturas_adquisicion')
+    # Establecimiento (para saber dónde se recibió)
+    establecimiento = models.ForeignKey(Establecimiento, on_delete=models.PROTECT, related_name='facturas_adquisicion')
+    
+    # Financial fields
+    total_neto = models.IntegerField(verbose_name="Total Neto")
+    iva = models.IntegerField(verbose_name="Impuestos (19% IVA)")
+    # Total a Pagar
+    total_pagar = models.IntegerField(verbose_name="Total a Pagar")
+
+    # Grupo de firmantes para este documento
+    grupo_firmante = models.ForeignKey(
+        'funcionarios.Grupo', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='facturas_adquisicion',
+        verbose_name="Grupo de Firmantes"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.folio:
+            year = datetime.date.today().year
+            prefix = f"RCF-{year}"
+            last_factura = FacturaAdquisicion.objects.filter(folio__startswith=prefix).order_by('folio').last()
+            
+            if last_factura:
+                try:
+                    last_seq_str = last_factura.folio.rsplit('-', 1)[-1]
+                    last_seq = int(last_seq_str)
+                    new_seq = last_seq + 1
+                except (ValueError, IndexError, AttributeError):
+                    new_seq = 1
+            else:
+                new_seq = 1
+            
+            self.folio = f"{prefix}-{new_seq:04d}"
+        
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"RC {self.folio} - {self.proveedor.nombre}"
+
+    class Meta:
+        verbose_name = "Factura de Adquisición"
+        verbose_name_plural = "Facturas de Adquisición"
+        ordering = ['-fecha_recepcion']

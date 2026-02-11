@@ -14,11 +14,12 @@ const FuncionariosDashboard = () => {
 
     const fetchStats = async () => {
         try {
-            const [funcionariosRes, subdireccionesRes, departamentosRes, unidadesRes, estadisticasRes] = await Promise.all([
+            const [funcionariosRes, subdireccionesRes, departamentosRes, unidadesRes, gruposRes, estadisticasRes] = await Promise.all([
                 api.get('funcionarios/'),
                 api.get('subdirecciones/'),
                 api.get('departamentos/'),
                 api.get('unidades/'),
+                api.get('grupos/'),
                 api.get('funcionarios/estadisticas/')
             ]);
 
@@ -27,6 +28,7 @@ const FuncionariosDashboard = () => {
                 subdirecciones: subdireccionesRes.data.length,
                 departamentos: departamentosRes.data.length,
                 unidades: unidadesRes.data.length,
+                grupos: gruposRes.data.length || gruposRes.data.results?.length || 0,
                 estadisticas: estadisticasRes.data
             });
         } catch (error) {
@@ -83,11 +85,11 @@ const FuncionariosDashboard = () => {
                     </p>
                 </div>
                 <Link
-                    to="/funcionarios/new"
+                    to="/funcionarios/list"
                     className="group relative inline-flex items-center gap-2 px-6 py-3 bg-slate-900 text-white text-sm font-semibold rounded-xl overflow-hidden transition-all hover:bg-slate-800 hover:shadow-lg hover:shadow-slate-900/20 active:scale-95"
                 >
                     <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
-                    <span>Nuevo Funcionario</span>
+                    <span>Ir a Lista</span>
                 </Link>
             </div>
 
@@ -160,24 +162,24 @@ const FuncionariosDashboard = () => {
             </div>
 
             {/* Bottom Section: Structure Cards Ordered & Aligned */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 <Link to="/funcionarios/subdirecciones" className="group">
                     <motion.div
                         variants={itemVariants}
                         whileHover={{ y: -5 }}
-                        className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-violet-200/50 transition-all h-full relative overflow-hidden"
+                        className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-violet-200/50 transition-all h-full relative overflow-hidden"
                     >
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-violet-50 rounded-bl-[4rem] transition-colors group-hover:bg-violet-100"></div>
-                        <div className="relative z-10">
-                            <div className="w-14 h-14 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center mb-6 group-hover:bg-violet-600 group-hover:text-white transition-all shadow-sm">
-                                <Building2 className="w-7 h-7" />
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-violet-50 rounded-bl-[2rem] transition-colors group-hover:bg-violet-100"></div>
+                        <div className="relative z-10 flex flex-col h-full">
+                            <div className="w-12 h-12 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center mb-4 group-hover:bg-violet-600 group-hover:text-white transition-all shadow-sm">
+                                <Building2 className="w-6 h-6" />
                             </div>
-                            <h4 className="text-xl font-bold text-slate-900 mb-2">Subdirecciones</h4>
-                            <p className="text-sm text-slate-500 mb-6 font-medium">Estructura Estratégica</p>
+                            <h4 className="text-lg font-bold text-slate-900 mb-1">Subdirecciones</h4>
+                            <p className="text-xs text-slate-500 mb-4 font-medium italic">Estructura Estratégica</p>
                             <div className="flex items-center justify-between mt-auto">
-                                <span className="text-4xl font-black text-slate-800 tracking-tight">{stats?.subdirecciones || 0}</span>
-                                <div className="flex items-center gap-2 text-violet-600 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">
-                                    Ver listado <ArrowRight className="w-4 h-4" />
+                                <span className="text-3xl font-black text-slate-800 tracking-tight">{stats?.subdirecciones || 0}</span>
+                                <div className="flex items-center gap-1.5 text-violet-600 text-[10px] font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">
+                                    Ver <ArrowRight className="w-3 h-3" />
                                 </div>
                             </div>
                         </div>
@@ -188,19 +190,19 @@ const FuncionariosDashboard = () => {
                     <motion.div
                         variants={itemVariants}
                         whileHover={{ y: -5 }}
-                        className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-blue-200/50 transition-all h-full relative overflow-hidden"
+                        className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-blue-200/50 transition-all h-full relative overflow-hidden"
                     >
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-[4rem] transition-colors group-hover:bg-blue-100"></div>
-                        <div className="relative z-10">
-                            <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-6 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
-                                <Briefcase className="w-7 h-7" />
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-blue-50 rounded-bl-[2rem] transition-colors group-hover:bg-blue-100"></div>
+                        <div className="relative z-10 flex flex-col h-full">
+                            <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
+                                <Briefcase className="w-6 h-6" />
                             </div>
-                            <h4 className="text-xl font-bold text-slate-900 mb-2">Departamentos</h4>
-                            <p className="text-sm text-slate-500 mb-6 font-medium">Gestión Táctica</p>
+                            <h4 className="text-lg font-bold text-slate-900 mb-1">Departamentos</h4>
+                            <p className="text-xs text-slate-500 mb-4 font-medium italic">Gestión Táctica</p>
                             <div className="flex items-center justify-between mt-auto">
-                                <span className="text-4xl font-black text-slate-800 tracking-tight">{stats?.departamentos || 0}</span>
-                                <div className="flex items-center gap-2 text-blue-600 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">
-                                    Ver listado <ArrowRight className="w-4 h-4" />
+                                <span className="text-3xl font-black text-slate-800 tracking-tight">{stats?.departamentos || 0}</span>
+                                <div className="flex items-center gap-1.5 text-blue-600 text-[10px] font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">
+                                    Ver <ArrowRight className="w-3 h-3" />
                                 </div>
                             </div>
                         </div>
@@ -211,19 +213,42 @@ const FuncionariosDashboard = () => {
                     <motion.div
                         variants={itemVariants}
                         whileHover={{ y: -5 }}
-                        className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-amber-200/50 transition-all h-full relative overflow-hidden"
+                        className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-amber-200/50 transition-all h-full relative overflow-hidden"
                     >
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50 rounded-bl-[4rem] transition-colors group-hover:bg-amber-100"></div>
-                        <div className="relative z-10">
-                            <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-6 group-hover:bg-amber-500 group-hover:text-white transition-all shadow-sm">
-                                <Layers className="w-7 h-7" />
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-amber-50 rounded-bl-[2rem] transition-colors group-hover:bg-amber-100"></div>
+                        <div className="relative z-10 flex flex-col h-full">
+                            <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4 group-hover:bg-amber-500 group-hover:text-white transition-all shadow-sm">
+                                <Layers className="w-6 h-6" />
                             </div>
-                            <h4 className="text-xl font-bold text-slate-900 mb-2">Unidades</h4>
-                            <p className="text-sm text-slate-500 mb-6 font-medium">Nivel Operativo</p>
+                            <h4 className="text-lg font-bold text-slate-900 mb-1">Unidades</h4>
+                            <p className="text-xs text-slate-500 mb-4 font-medium italic">Nivel Operativo</p>
                             <div className="flex items-center justify-between mt-auto">
-                                <span className="text-4xl font-black text-slate-800 tracking-tight">{stats?.unidades || 0}</span>
-                                <div className="flex items-center gap-2 text-amber-600 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">
-                                    Ver listado <ArrowRight className="w-4 h-4" />
+                                <span className="text-3xl font-black text-slate-800 tracking-tight">{stats?.unidades || 0}</span>
+                                <div className="flex items-center gap-1.5 text-amber-600 text-[10px] font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">
+                                    Ver <ArrowRight className="w-3 h-3" />
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                </Link>
+
+                <Link to="/funcionarios/grupos" className="group">
+                    <motion.div
+                        variants={itemVariants}
+                        whileHover={{ y: -5 }}
+                        className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-orange-200/50 transition-all h-full relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-orange-50 rounded-bl-[2rem] transition-colors group-hover:bg-orange-100"></div>
+                        <div className="relative z-10 flex flex-col h-full">
+                            <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center mb-4 group-hover:bg-orange-600 group-hover:text-white transition-all shadow-sm">
+                                <Users className="w-6 h-6" />
+                            </div>
+                            <h4 className="text-lg font-bold text-slate-900 mb-1">Grupos</h4>
+                            <p className="text-xs text-slate-500 mb-4 font-medium italic">Firmas y Organización</p>
+                            <div className="flex items-center justify-between mt-auto">
+                                <span className="text-3xl font-black text-slate-800 tracking-tight">{stats?.grupos || 0}</span>
+                                <div className="flex items-center gap-1.5 text-orange-600 text-[10px] font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">
+                                    Ver <ArrowRight className="w-3 h-3" />
                                 </div>
                             </div>
                         </div>

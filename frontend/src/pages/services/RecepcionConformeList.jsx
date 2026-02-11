@@ -21,6 +21,7 @@ const RecepcionConformeList = () => {
     const [currentPayments, setCurrentPayments] = useState([]);
     const [availablePayments, setAvailablePayments] = useState([]);
     const [loadingAvailable, setLoadingAvailable] = useState(false);
+    const [groups, setGroups] = useState([]);
 
     // History Modal State
     const [historyRC, setHistoryRC] = useState(null);
@@ -33,13 +34,15 @@ const RecepcionConformeList = () => {
                 search: search,
                 ordering: order
             };
-            const response = await api.get('recepciones-conformes/', { params });
+            const [rcRes, grpRes] = await Promise.all([
+                api.get('recepciones-conformes/', { params }),
+                api.get('grupos/')
+            ]);
 
-            // Handle paginated response
-            setRcs(response.data.results);
-            setTotalCount(response.data.count);
-            // Calculate total pages (assuming page_size=10 from default settings)
-            setTotalPages(Math.ceil(response.data.count / 10));
+            setRcs(rcRes.data.results);
+            setTotalCount(rcRes.data.count);
+            setTotalPages(Math.ceil(rcRes.data.count / 10));
+            setGroups(grpRes.data.results || grpRes.data);
 
         } catch (error) {
             console.error("Error fetching RCs:", error);
@@ -106,7 +109,8 @@ const RecepcionConformeList = () => {
         setEditingRC(rc);
         setEditForm({
             observaciones: rc.observaciones || '',
-            registros_ids: rc.registros.map(r => r.id)
+            registros_ids: rc.registros.map(r => r.id),
+            grupo_firmante: rc.grupo_firmante || ''
         });
         setCurrentPayments(rc.registros);
         fetchAvailablePayments(rc.proveedor);
@@ -414,6 +418,28 @@ const RecepcionConformeList = () => {
                                         value={editForm.observaciones}
                                         onChange={e => setEditForm({ ...editForm, observaciones: e.target.value })}
                                     />
+                                </div>
+
+                                {/* Signer Group Selection */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                        <User className="w-4 h-4 text-blue-500" /> Grupo de Firmante
+                                    </label>
+                                    <select
+                                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={editForm.grupo_firmante}
+                                        onChange={e => setEditForm({ ...editForm, grupo_firmante: e.target.value })}
+                                    >
+                                        <option value="">Seleccione grupo...</option>
+                                        {groups.map(g => (
+                                            <option key={g.id} value={g.id}>
+                                                {g.nombre} {g.es_firmante ? '(Predefinido)' : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-[10px] text-slate-400 ml-1 italic">
+                                        Note: Si no selecciona un grupo, el sistema usará el grupo de firmantes por defecto.
+                                    </p>
                                 </div>
 
                                 {/* Payments List */}

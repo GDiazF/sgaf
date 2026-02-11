@@ -34,6 +34,8 @@ const PaymentsDashboard = () => {
     const [providers, setProviders] = useState([]);
     const [selectedType, setSelectedType] = useState('');
     const [selectedProvider, setSelectedProvider] = useState('');
+    const [groups, setGroups] = useState([]);
+    const [selectedSignerGroup, setSelectedSignerGroup] = useState('');
 
     // Initial state for form
     const initialFormState = {
@@ -99,12 +101,17 @@ const PaymentsDashboard = () => {
     useEffect(() => {
         const fetchFilters = async () => {
             try {
-                const [typesRes, provRes] = await Promise.all([
+                const [typesRes, provRes, grpRes] = await Promise.all([
                     api.get('tipos-proveedores/'),
-                    api.get('proveedores/')
+                    api.get('proveedores/'),
+                    api.get('grupos/')
                 ]);
                 setProviderTypes(typesRes.data.results || typesRes.data);
                 setProviders(provRes.data.results || provRes.data);
+                setGroups(grpRes.data.results || grpRes.data);
+                // Pre-select first signer group if any
+                const defaultGrp = (grpRes.data.results || grpRes.data).find(g => g.es_firmante);
+                if (defaultGrp) setSelectedSignerGroup(defaultGrp.id);
             } catch (error) {
                 console.error("Error fetching filter data:", error);
             }
@@ -231,7 +238,8 @@ const PaymentsDashboard = () => {
         try {
             await api.post('recepciones-conformes/', {
                 proveedor: providerId,
-                registros_ids: Array.from(selectedIds)
+                registros_ids: Array.from(selectedIds),
+                grupo_firmante: selectedSignerGroup || null
             });
             alert("Recepción Conforme generada exitosamente.");
             fetchData(currentPage, searchQuery);
@@ -371,13 +379,26 @@ const PaymentsDashboard = () => {
 
                         <div className="flex items-center gap-2">
                             {selectedIds.size > 0 && (
-                                <button
-                                    onClick={handleGenerateRC}
-                                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 font-medium whitespace-nowrap text-sm animate-in fade-in slide-in-from-right-4"
-                                >
-                                    <FileCheck className="w-4 h-4" />
-                                    <span>Generar RC ({selectedIds.size})</span>
-                                </button>
+                                <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4">
+                                    <select
+                                        value={selectedSignerGroup}
+                                        onChange={(e) => setSelectedSignerGroup(e.target.value)}
+                                        className="px-3 py-2 border border-indigo-200 rounded-xl text-xs font-bold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-indigo-50/50 shadow-sm"
+                                        title="Seleccionar grupo que firmará esta RC"
+                                    >
+                                        <option value="">Sin Grupo (Default)</option>
+                                        {groups.map(g => (
+                                            <option key={g.id} value={g.id}>{g.nombre}</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        onClick={handleGenerateRC}
+                                        className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 font-bold whitespace-nowrap text-xs"
+                                    >
+                                        <FileCheck className="w-4 h-4" />
+                                        <span>Generar RC ({selectedIds.size})</span>
+                                    </button>
+                                </div>
                             )}
 
                             <button

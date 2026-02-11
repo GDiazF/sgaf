@@ -1,5 +1,12 @@
 from django.contrib import admin
-from .models import Subdireccion, Departamento, Unidad, Funcionario
+from .models import Subdireccion, Departamento, Unidad, Funcionario, Grupo
+
+@admin.register(Grupo)
+class GrupoAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'es_firmante', 'activo', 'creado_en')
+    list_filter = ('es_firmante', 'activo')
+    search_fields = ('nombre',)
+    ordering = ('nombre',)
 
 
 @admin.register(Subdireccion)
@@ -53,7 +60,7 @@ class FuncionarioAdmin(admin.ModelAdmin):
             'fields': ('subdireccion', 'departamento', 'unidad')
         }),
         ('Información Laboral', {
-            'fields': ('cargo', 'estado')
+            'fields': ('cargo', 'estado', 'grupos')
         }),
         ('Auditoría', {
             'fields': ('creado_en', 'actualizado_en'),

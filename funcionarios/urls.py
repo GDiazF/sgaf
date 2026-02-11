@@ -5,7 +5,8 @@ from .views import (
     DepartamentoViewSet,
     UnidadViewSet,
     FuncionarioViewSet,
-    ControlAnexosViewSet
+    ControlAnexosViewSet,
+    GrupoViewSet
 )
 
 router = DefaultRouter()
@@ -13,6 +14,7 @@ router.register('subdirecciones', SubdireccionViewSet)
 router.register('departamentos', DepartamentoViewSet)
 router.register('unidades', UnidadViewSet)
 router.register('funcionarios', FuncionarioViewSet)
+router.register('grupos', GrupoViewSet)
 router.register('control-anexos', ControlAnexosViewSet, basename='control-anexos')
 
 urlpatterns = [

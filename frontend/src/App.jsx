@@ -14,15 +14,17 @@ import Providers from './pages/services/Providers';
 import PaymentsDashboard from './pages/services/PaymentsDashboard';
 import RecepcionConformeList from './pages/services/RecepcionConformeList';
 import CDPManager from './pages/services/CDPManager';
+import FacturasAdquisicionDashboard from './pages/services/FacturasAdquisicionDashboard';
 import Contracts from './pages/contracts/Contracts';
 import ContractDetail from './pages/contracts/ContractDetail';
 // Funcionarios
 import FuncionariosDashboard from './pages/funcionarios/FuncionariosDashboard';
 import FuncionariosList from './pages/funcionarios/FuncionariosList';
-import FuncionarioForm from './pages/funcionarios/FuncionarioForm';
+// import FuncionarioForm from './pages/funcionarios/FuncionarioForm';
 import Subdirecciones from './pages/funcionarios/Subdirecciones';
 import Departamentos from './pages/funcionarios/Departamentos';
 import Unidades from './pages/funcionarios/Unidades';
+import Grupos from './pages/funcionarios/Grupos';
 import AnexosDashboard from './pages/telecomunicaciones/AnexosDashboard';
 import ImpresorasDashboard from './pages/impresoras/ImpresorasDashboard';
 // Vehiculos
@@ -62,15 +64,17 @@ function App() {
               <Route path="services/payments" element={<PaymentsDashboard />} />
               <Route path="services/rc" element={<RecepcionConformeList />} />
               <Route path="services/cdp" element={<CDPManager />} />
+              <Route path="services/adquisiciones" element={<FacturasAdquisicionDashboard />} />
 
               {/* Funcionarios */}
               <Route path="funcionarios" element={<FuncionariosDashboard />} />
               <Route path="funcionarios/list" element={<FuncionariosList />} />
-              <Route path="funcionarios/new" element={<FuncionarioForm />} />
-              <Route path="funcionarios/edit/:id" element={<FuncionarioForm />} />
+              {/* <Route path="funcionarios/new" element={<FuncionarioForm />} />
+              <Route path="funcionarios/edit/:id" element={<FuncionarioForm />} /> */}
               <Route path="funcionarios/subdirecciones" element={<Subdirecciones />} />
               <Route path="funcionarios/departamentos" element={<Departamentos />} />
               <Route path="funcionarios/unidades" element={<Unidades />} />
+              <Route path="funcionarios/grupos" element={<Grupos />} />
               {/* Telecomunicaciones */}
               <Route path="telecomunicaciones" element={<AnexosDashboard />} />
               {/* Impresoras */}
