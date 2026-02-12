@@ -2,23 +2,15 @@ import React, { useRef, useState } from 'react';
 import { Mail, Phone, Globe, X, Printer, Download, SquareUser, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const TIPOS = [
-    { value: 'SALA_CUNA', label: 'Sala Cuna' },
-    { value: 'JARDIN_INFANTIL', label: 'Jardín Infantil' },
-    { value: 'ESCUELA', label: 'Escuela' },
-    { value: 'LICEO', label: 'Liceo' },
-    { value: 'CENTRO_CAPACITACION', label: 'Centro de Capacitación' },
-    { value: 'ADMINISTRACION', label: 'Administración' },
-];
-
-const EstablishmentCardsView = ({ isOpen, onClose, data }) => {
+const EstablishmentCardsView = ({ isOpen, onClose, data, establishmentTypes = [] }) => {
     const printRef = useRef();
     const [filterType, setFilterType] = useState('ALL');
 
     if (!isOpen) return null;
 
     const filteredData = data.filter(item => {
-        const matchesType = filterType === 'ALL' || item.tipo === filterType;
+        // En el backend, 'tipo' ahora es el ID del FK
+        const matchesType = filterType === 'ALL' || String(item.tipo) === String(filterType);
         const isActivo = item.activo === true;
         return matchesType && isActivo;
     });
@@ -106,8 +98,8 @@ const EstablishmentCardsView = ({ isOpen, onClose, data }) => {
                             className="bg-emerald-600 text-white text-xs font-black px-4 py-2 rounded-lg border-none focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer min-w-[160px]"
                         >
                             <option value="ALL">TODOS LOS TIPOS</option>
-                            {TIPOS.map(t => (
-                                <option key={t.value} value={t.value}>{t.label.toUpperCase()}</option>
+                            {establishmentTypes.map(t => (
+                                <option key={t.id} value={t.id}>{t.nombre.toUpperCase()}</option>
                             ))}
                         </select>
                     </div>
@@ -140,7 +132,7 @@ const EstablishmentCardsView = ({ isOpen, onClose, data }) => {
                                 <>
                                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                                     <span className="text-xs font-black uppercase tracking-[0.2em] text-white">
-                                        {TIPOS.find(t => t.value === filterType)?.label}
+                                        {establishmentTypes.find(t => String(t.id) === String(filterType))?.nombre}
                                     </span>
                                 </>
                             )}

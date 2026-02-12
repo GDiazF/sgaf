@@ -1,5 +1,10 @@
 from django.contrib import admin
-from .models import Establecimiento
+from .models import Establecimiento, TipoEstablecimiento
+
+@admin.register(TipoEstablecimiento)
+class TipoEstablecimientoAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)
 
 @admin.register(Establecimiento)
 class EstablecimientoAdmin(admin.ModelAdmin):

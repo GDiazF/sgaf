@@ -36,7 +36,7 @@ const RecepcionConformeList = () => {
             };
             const [rcRes, grpRes] = await Promise.all([
                 api.get('recepciones-conformes/', { params }),
-                api.get('grupos/')
+                api.get('grupos/', { params: { page_size: 1000 } })
             ]);
 
             setRcs(rcRes.data.results);
@@ -110,7 +110,8 @@ const RecepcionConformeList = () => {
         setEditForm({
             observaciones: rc.observaciones || '',
             registros_ids: rc.registros.map(r => r.id),
-            grupo_firmante: rc.grupo_firmante || ''
+            grupo_firmante: rc.grupo_firmante || '',
+            firmante: rc.firmante || ''
         });
         setCurrentPayments(rc.registros);
         fetchAvailablePayments(rc.proveedor);
@@ -421,25 +422,51 @@ const RecepcionConformeList = () => {
                                 </div>
 
                                 {/* Signer Group Selection */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                        <User className="w-4 h-4 text-blue-500" /> Grupo de Firmante
-                                    </label>
-                                    <select
-                                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                        value={editForm.grupo_firmante}
-                                        onChange={e => setEditForm({ ...editForm, grupo_firmante: e.target.value })}
-                                    >
-                                        <option value="">Seleccione grupo...</option>
-                                        {groups.map(g => (
-                                            <option key={g.id} value={g.id}>
-                                                {g.nombre} {g.es_firmante ? '(Predefinido)' : ''}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <p className="text-[10px] text-slate-400 ml-1 italic">
-                                        Note: Si no selecciona un grupo, el sistema usará el grupo de firmantes por defecto.
-                                    </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                            <User className="w-4 h-4 text-blue-500" /> Grupo de Firmante
+                                        </label>
+                                        <select
+                                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                            value={editForm.grupo_firmante}
+                                            onChange={e => {
+                                                const gid = e.target.value;
+                                                const grp = groups.find(g => g.id.toString() === gid);
+                                                setEditForm({
+                                                    ...editForm,
+                                                    grupo_firmante: gid,
+                                                    firmante: grp ? (grp.jefe || '') : ''
+                                                });
+                                            }}
+                                        >
+                                            <option value="">Seleccione grupo...</option>
+                                            {groups.map(g => (
+                                                <option key={g.id} value={g.id}>
+                                                    {g.nombre}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                            <User className="w-4 h-4 text-amber-500" /> Firmante Específico
+                                        </label>
+                                        <select
+                                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                            value={editForm.firmante}
+                                            onChange={e => setEditForm({ ...editForm, firmante: e.target.value })}
+                                            disabled={!editForm.grupo_firmante}
+                                        >
+                                            <option value="">Seleccione firmante...</option>
+                                            {groups.find(g => g.id.toString() === editForm.grupo_firmante?.toString())?.miembros_detalle?.map(m => (
+                                                <option key={m.id} value={m.id}>
+                                                    {m.nombre} {m.id === groups.find(g => g.id.toString() === editForm.grupo_firmante.toString())?.jefe ? '(Jefe)' : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
 
                                 {/* Payments List */}

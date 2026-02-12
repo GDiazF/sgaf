@@ -1,26 +1,72 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Key, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck } from 'lucide-react';
+import { Key, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import api from '../api';
 
 const Layout = () => {
     const location = useLocation();
     const { user, logout } = useAuth();
-    const [isLoanMenuOpen, setLoanMenuOpen] = useState(false);
-    const [isServicesMenuOpen, setServicesMenuOpen] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true); // Desktop: Collapsed/Expanded
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // Mobile: Open/Closed
+    const [isSSGGOpen, setSSGGOpen] = useState(true); // Main SSGG group
+    const [activeSubMenu, setActiveSubMenu] = useState(null); // 'services' or 'loans'
+    const [isProfileOpen, setIsProfileOpen] = useState(false); // Header profile dropdown
+    const [isOnline, setIsOnline] = useState(true); // Backend status
+    const profileRef = useRef(null);
 
     const isActive = (path) => location.pathname === path;
 
     // Close mobile menu when route changes
-    React.useEffect(() => {
+    useEffect(() => {
         setMobileMenuOpen(false);
     }, [location.pathname]);
 
+    // Handle clicks outside profile dropdown
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (profileRef.current && !profileRef.current.contains(event.target)) {
+                setIsProfileOpen(false);
+            }
+        };
+        if (isProfileOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        } else {
+            document.removeEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isProfileOpen]);
+
+    // Check backend status
+    useEffect(() => {
+        const checkStatus = async () => {
+            try {
+                // Hacemos una petición simple al endpoint de establecimientos que ya está configurado
+                // 'api' ya inyecta el token automáticamente si existe
+                await api.get('establecimientos/', {
+                    params: { limit: 1 }, // Minimizar carga
+                    timeout: 5000
+                });
+                setIsOnline(true);
+            } catch (error) {
+                // Si el error es 401 sigue estando "En Línea" (el servidor respondió)
+                // Si el error es de red o timeout, está "Fuera de Línea"
+                if (error.response) {
+                    setIsOnline(true); // El servidor respondió (aunque sea con error de auth)
+                } else {
+                    setIsOnline(false); // No hubo respuesta del servidor
+                }
+            }
+        };
+
+        checkStatus();
+        const interval = setInterval(checkStatus, 30000); // Check every 30s
+        return () => clearInterval(interval);
+    }, []);
+
     return (
-        <div className="min-h-screen bg-slate-50 flex font-sans text-slate-800">
+        <div className="h-screen bg-slate-50 flex font-sans text-slate-800 overflow-hidden">
             {/* Mobile Overlay */}
             <AnimatePresence>
                 {mobileMenuOpen && (
@@ -39,23 +85,39 @@ const Layout = () => {
                 initial={false}
                 animate={{
                     width: sidebarOpen || mobileMenuOpen ? 256 : 0,
-                    x: mobileMenuOpen || (sidebarOpen && window.innerWidth >= 768) ? 0 : (window.innerWidth < 768 ? -256 : 0)
+                    x: mobileMenuOpen || (sidebarOpen && window.innerWidth >= 768) ? 0 : (window.innerWidth < 768 ? -256 : 0),
+                    opacity: sidebarOpen || mobileMenuOpen || window.innerWidth >= 768 ? 1 : 0
                 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                transition={{
+                    type: 'spring',
+                    stiffness: 260,
+                    damping: 24,
+                    mass: 0.8
+                }}
                 className={`
-                    fixed md:relative inset-y-0 left-0 z-40 bg-slate-900 text-slate-200 flex flex-col shadow-2xl overflow-hidden
+                    fixed md:relative inset-y-0 left-0 z-40 bg-slate-900 text-slate-200 flex flex-col shadow-2xl overflow-hidden h-full
                     ${!mobileMenuOpen && window.innerWidth < 768 ? '-translate-x-full' : ''}
                 `}
             >
-                <div className="p-6 flex items-center justify-center min-w-[256px]">
-                    <div className="flex flex-col items-center gap-2 w-full">
-                        <div className="p-2 w-60 h-28 flex items-center justify-center">
+                <div className="p-4 flex items-center justify-center h-28 overflow-hidden">
+                    <motion.div
+                        initial={false}
+                        animate={{
+                            opacity: sidebarOpen || mobileMenuOpen ? 1 : 0,
+                            scale: sidebarOpen || mobileMenuOpen ? 1 : 0.8,
+                            y: sidebarOpen || mobileMenuOpen ? 0 : -10
+                        }}
+                        transition={{ duration: 0.3 }}
+                        className="flex flex-col items-center w-[200px]"
+                    >
+                        <div className="w-48 h-20 flex items-center justify-center">
                             <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
                         </div>
-                    </div>
+                    </motion.div>
                 </div>
 
-                <nav className="flex-1 px-3 space-y-2 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700">
+                <nav className="flex-1 px-3 space-y-1 py-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-slate-700">
+                    {/* Section: BASE (Outside SSGG) */}
                     <Link
                         to="/"
                         className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
@@ -85,34 +147,6 @@ const Layout = () => {
                     </Link>
 
                     <Link
-                        to="/services/providers"
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/services/providers') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                    >
-                        <Users className="w-5 h-5 flex-shrink-0" />
-                        <motion.span
-                            initial={false}
-                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                            className="font-medium whitespace-nowrap"
-                        >
-                            Proveedores
-                        </motion.span>
-                    </Link>
-
-                    <Link
-                        to="/contracts"
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/contracts') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                    >
-                        <FileText className="w-5 h-5 flex-shrink-0" />
-                        <motion.span
-                            initial={false}
-                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                            className="font-medium whitespace-nowrap"
-                        >
-                            Contratos / Licitaciones
-                        </motion.span>
-                    </Link>
-
-                    <Link
                         to="/funcionarios"
                         className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/funcionarios') || isActive('/funcionarios/list') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
                     >
@@ -122,204 +156,186 @@ const Layout = () => {
                             animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
                             className="font-medium whitespace-nowrap"
                         >
-                            Personal / Funcionarios
+                            Personal
                         </motion.span>
                     </Link>
 
-                    <Link
-                        to="/telecomunicaciones"
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/telecomunicaciones') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                    >
-                        <Phone className="w-5 h-5 flex-shrink-0" />
-                        <motion.span
-                            initial={false}
-                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                            className="font-medium whitespace-nowrap"
-                        >
-                            Telecomunicaciones
-                        </motion.span>
-                    </Link>
-
-                    <Link
-                        to="/impresoras"
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/impresoras') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                    >
-                        <Printer className="w-5 h-5 flex-shrink-0" />
-                        <motion.span
-                            initial={false}
-                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                            className="font-medium whitespace-nowrap"
-                        >
-                            Impresoras
-                        </motion.span>
-                    </Link>
-
-                    <Link
-                        to="/vehiculos"
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/vehiculos') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                    >
-                        <Truck className="w-5 h-5 flex-shrink-0" />
-                        <motion.span
-                            initial={false}
-                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                            className="font-medium whitespace-nowrap"
-                        >
-                            Flota / Vehículos
-                        </motion.span>
-                    </Link>
-
-                    <div className="py-1 px-4">
-                        <div className="border-t border-slate-500/50" />
+                    <div className="py-2 px-4">
+                        <div className="border-t border-slate-700/50" />
                     </div>
 
-                    {/* Collapsible Menu: Préstamo Llaves */}
+                    {/* Main SSGG Submenu */}
                     <div>
                         <button
-                            onClick={() => {
-                                setLoanMenuOpen(!isLoanMenuOpen);
-                                if (!isLoanMenuOpen) setServicesMenuOpen(false);
-                            }}
-                            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${!isLoanMenuOpen && (isActive('/loans/new') || isActive('/applicants') || isActive('/keys')) ? 'bg-slate-800 text-white' : ''}`}
+                            onClick={() => setSSGGOpen(!isSSGGOpen)}
+                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${isSSGGOpen ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
                         >
                             <div className="flex items-center gap-3">
-                                <Key className="w-5 h-5 flex-shrink-0" />
+                                <Cog className="w-6 h-6 flex-shrink-0" />
                                 <motion.span
                                     initial={false}
                                     animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
                                     className="font-medium whitespace-nowrap"
                                 >
-                                    Préstamo Llaves
+                                    SSGG
                                 </motion.span>
                             </div>
-                            <motion.div
-                                animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}
-                            >
-                                {isLoanMenuOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
+                                {isSSGGOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                             </motion.div>
                         </button>
 
-                        {/* Submenu */}
-                        {isLoanMenuOpen && (sidebarOpen || mobileMenuOpen) && (
-                            <div className="pl-4 mt-1 space-y-1">
-                                <Link
-                                    to="/loans"
-                                    className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors ${isActive('/loans') || isActive('/keys') ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
+                        <AnimatePresence>
+                            {isSSGGOpen && (sidebarOpen || mobileMenuOpen) && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="overflow-hidden space-y-3 mt-2 pl-2 border-l border-slate-700/50 ml-6"
                                 >
-                                    <Home className="w-4 h-4" />
-                                    Panel Principal
-                                </Link>
-                                <Link
-                                    to="/loans/new"
-                                    className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors ${isActive('/loans/new') ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
-                                >
-                                    <ClipboardList className="w-4 h-4" />
-                                    Nuevo Préstamo
-                                </Link>
-                                <Link
-                                    to="/history"
-                                    className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors ${isActive('/history') ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
-                                >
-                                    <ClipboardList className="w-4 h-4" />
-                                    Historial
-                                </Link>
-                                <Link
-                                    to="/applicants"
-                                    className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors ${isActive('/applicants') ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
-                                >
-                                    <Users className="w-4 h-4" />
-                                    Solicitantes
-                                </Link>
-                            </div>
-                        )}
-                    </div>
 
-                    <div className="py-1 px-4">
-                        <div className="border-t border-slate-500/50" />
-                    </div>
+                                    {/* Section: FINANZAS */}
+                                    <div className="space-y-0.5">
+                                        <div className="px-4 mb-1">
+                                            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">
+                                                Finanzas
+                                            </span>
+                                        </div>
+                                        <Link
+                                            to="/contracts"
+                                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/contracts') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                        >
+                                            <FileText className="w-4 h-4 flex-shrink-0" />
+                                            <span className="font-medium whitespace-nowrap">Contratos</span>
+                                        </Link>
 
-                    {/* Collapsible Menu: Servicios */}
-                    <div>
-                        <button
-                            onClick={() => {
-                                setServicesMenuOpen(!isServicesMenuOpen);
-                                if (!isServicesMenuOpen) setLoanMenuOpen(false);
-                            }}
-                            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${!isServicesMenuOpen && (isActive('/services') || isActive('/services/payments') || isActive('/services/rc') || isActive('/services/cdp')) ? 'bg-slate-800 text-white' : ''}`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <ClipboardList className="w-5 h-5 flex-shrink-0" />
-                                <motion.span
-                                    initial={false}
-                                    animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                                    className="font-medium whitespace-nowrap"
-                                >
-                                    Gestión Servicios
-                                </motion.span>
-                            </div>
-                            <motion.div
-                                animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}
-                            >
-                                {isServicesMenuOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                            </motion.div>
-                        </button>
+                                        <Link
+                                            to="/services/providers"
+                                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/services/providers') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                        >
+                                            <Users className="w-4 h-4 flex-shrink-0" />
+                                            <span className="font-medium whitespace-nowrap">Proveedores</span>
+                                        </Link>
 
-                        {/* Submenu */}
-                        {isServicesMenuOpen && (sidebarOpen || mobileMenuOpen) && (
-                            <div className="pl-4 mt-1 space-y-1">
-                                <Link
-                                    to="/services"
-                                    className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors ${isActive('/services') ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
-                                >
-                                    <Home className="w-4 h-4" />
-                                    Panel Servicios
-                                </Link>
-                                <Link
-                                    to="/services/payments"
-                                    className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors ${isActive('/services/payments') ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
-                                >
-                                    <DollarSign className="w-4 h-4" />
-                                    Pagos
-                                </Link>
-                                <Link
-                                    to="/services/rc"
-                                    className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors ${isActive('/services/rc') ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
-                                >
-                                    <FileText className="w-4 h-4" />
-                                    Recepciones Conf.
-                                </Link>
-                                <Link
-                                    to="/services/cdp"
-                                    className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors ${isActive('/services/cdp') ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
-                                >
-                                    <FileText className="w-4 h-4" />
-                                    Repositorio CDPs
-                                </Link>
-                                <Link
-                                    to="/services/adquisiciones"
-                                    className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors ${isActive('/services/adquisiciones') ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
-                                >
-                                    <DollarSign className="w-4 h-4" />
-                                    Facturas Adquisición
-                                </Link>
-                            </div>
-                        )}
+                                        {/* Collapsible Menu: Servicios */}
+                                        <div>
+                                            <button
+                                                onClick={() => setActiveSubMenu(activeSubMenu === 'services' ? null : 'services')}
+                                                className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'services' || (isActive('/services') || isActive('/services/payments') || isActive('/services/rc') || isActive('/services/cdp')) ? 'text-blue-400' : ''}`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <ClipboardList className="w-4 h-4 flex-shrink-0" />
+                                                    <span className="font-medium whitespace-nowrap">Servicios</span>
+                                                </div>
+                                                {activeSubMenu === 'services' ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                            </button>
+
+                                            {activeSubMenu === 'services' && (
+                                                <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
+                                                    <Link to="/services" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                        Panel Principal
+                                                    </Link>
+                                                    <Link to="/services/payments" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/payments') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                        Pagos
+                                                    </Link>
+                                                    <Link to="/services/rc" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/rc') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                        Recepciones
+                                                    </Link>
+                                                    <Link to="/services/cdp" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/cdp') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                        CDPs
+                                                    </Link>
+                                                    <Link to="/services/adquisiciones" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/adquisiciones') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                        Facturas
+                                                    </Link>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Section: RECURSOS */}
+                                    <div className="space-y-0.5">
+                                        <div className="px-4 mb-1">
+                                            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">
+                                                Recursos
+                                            </span>
+                                        </div>
+                                        <Link
+                                            to="/telecomunicaciones"
+                                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/telecomunicaciones') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                        >
+                                            <Phone className="w-4 h-4 flex-shrink-0" />
+                                            <span className="font-medium whitespace-nowrap">Teléfonos</span>
+                                        </Link>
+
+                                        <Link
+                                            to="/impresoras"
+                                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/impresoras') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                        >
+                                            <Printer className="w-4 h-4 flex-shrink-0" />
+                                            <span className="font-medium whitespace-nowrap">Impresoras</span>
+                                        </Link>
+
+                                        <Link
+                                            to="/vehiculos"
+                                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/vehiculos') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                        >
+                                            <Truck className="w-4 h-4 flex-shrink-0" />
+                                            <span className="font-medium whitespace-nowrap">Vehículos</span>
+                                        </Link>
+
+                                        {/* Collapsible Menu: Préstamo Llaves */}
+                                        <div>
+                                            <button
+                                                onClick={() => setActiveSubMenu(activeSubMenu === 'loans' ? null : 'loans')}
+                                                className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'loans' || (isActive('/loans/new') || isActive('/applicants') || isActive('/keys')) ? 'text-blue-400' : ''}`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <Key className="w-4 h-4 flex-shrink-0" />
+                                                    <span className="font-medium whitespace-nowrap">Llaves</span>
+                                                </div>
+                                                {activeSubMenu === 'loans' ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                            </button>
+
+                                            {activeSubMenu === 'loans' && (
+                                                <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
+                                                    <Link to="/loans" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/loans') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                        Panel
+                                                    </Link>
+                                                    <Link to="/loans/new" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/loans/new') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                        Nuevo
+                                                    </Link>
+                                                    <Link to="/history" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/history') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                        Historial
+                                                    </Link>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </nav>
 
-                <div className="p-4 border-t border-slate-800 space-y-2">
-                    <button
-                        onClick={logout}
-                        className={`w-full flex items-center justify-start px-4 py-2.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-xl transition-colors gap-3`}
-                    >
-                        <LogOut className="w-5 h-5 flex-shrink-0" />
-                        <motion.span
+                {/* Sidebar Footer: Server Status */}
+                <div className="mt-auto border-t border-slate-800/50 pt-4 mb-4">
+                    <div className="flex items-center gap-3 px-4 py-2.5 w-full">
+                        <div className={`flex-shrink-0 p-1 rounded-lg transition-all duration-500 ${isOnline ? 'bg-emerald-500/10 text-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-red-500/10 text-red-500'}`}>
+                            <Activity className={`w-5 h-5 ${isOnline ? 'animate-[pulse_2s_infinite]' : ''}`} />
+                        </div>
+                        <motion.div
                             initial={false}
-                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                            className="text-sm font-medium whitespace-nowrap"
+                            animate={{
+                                opacity: sidebarOpen || mobileMenuOpen ? 1 : 0,
+                                x: sidebarOpen || mobileMenuOpen ? 0 : -10
+                            }}
+                            className="overflow-hidden"
                         >
-                            Cerrar Sesión
-                        </motion.span>
-                    </button>
+                            <span className={`text-[10px] font-bold uppercase tracking-[0.2em] whitespace-nowrap ${isOnline ? 'text-emerald-500' : 'text-red-500'}`}>
+                                {isOnline ? 'En Línea' : 'Sincronizando'}
+                            </span>
+                        </motion.div>
+                    </div>
                 </div>
             </motion.aside>
 
@@ -336,35 +352,84 @@ const Layout = () => {
                                     setMobileMenuOpen(true);
                                 }
                             }}
-                            className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            className="relative group p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all duration-300"
                         >
-                            <Menu className="w-6 h-6" />
+                            <div className="w-5 h-5 flex flex-col justify-center items-center gap-1">
+                                <motion.span
+                                    animate={{
+                                        rotate: sidebarOpen ? 0 : 0,
+                                        y: sidebarOpen ? 0 : 0,
+                                        width: sidebarOpen ? "100%" : "60%"
+                                    }}
+                                    className="h-0.5 bg-slate-600 rounded-full"
+                                />
+                                <motion.span
+                                    animate={{
+                                        width: sidebarOpen ? "80%" : "100%"
+                                    }}
+                                    className="h-0.5 bg-slate-600 rounded-full"
+                                />
+                                <motion.span
+                                    animate={{
+                                        width: sidebarOpen ? "100%" : "40%"
+                                    }}
+                                    className="h-0.5 bg-slate-600 rounded-full"
+                                />
+                            </div>
                         </button>
 
-                        <div>
-                            <h2 className="text-lg md:text-xl font-bold text-slate-800 truncate max-w-[200px] md:max-w-none">
-                                {isActive('/') ? 'Dashboard' :
-                                    isActive('/establishments') ? 'Establecimientos' :
-                                        isActive('/loans') ? 'Préstamos' :
-                                            isActive('/loans/new') ? 'Nuevo Préstamo' :
-                                                isActive('/history') ? 'Historial' :
-                                                    isActive('/applicants') ? 'Solicitantes' :
-                                                        isActive('/keys') ? 'Llaves' :
-                                                            isActive('/contracts') ? 'Contratos / Licitaciones' :
-                                                                isActive('/vehiculos') ? 'Gestión de Flota' :
-                                                                    isActive('/services/rc') ? 'Recepciones Conformes' : 'Sistema'}
-                            </h2>
-                            <p className="text-xs md:text-sm text-slate-500 hidden md:block">Sistema de Gestión.</p>
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-lg md:text-xl font-bold text-slate-800">
+                                Sistema de Gestión
+                            </h1>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3 md:gap-4">
-                        <div className="hidden md:flex flex-col items-end mr-2">
-                            <span className="text-sm font-semibold text-slate-700">Administrador</span>
-                            <span className="text-xs text-slate-500">SLEP Iquique</span>
+                    <div className="flex items-center gap-3 relative" ref={profileRef}>
+                        <div className="hidden md:flex flex-col items-end">
+                            <span className="text-sm font-semibold text-slate-700">{user?.username || 'Administrador'}</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">SLEP Iquique</span>
                         </div>
-                        <div className="w-8 h-8 md:w-10 md:h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/30">
-                            {user?.username?.charAt(0).toUpperCase() || 'U'}
+
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                                className="relative group transition-transform active:scale-95"
+                            >
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow">
+                                    {user?.username?.charAt(0).toUpperCase() || 'U'}
+                                </div>
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            <AnimatePresence>
+                                {isProfileOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-50 overflow-hidden"
+                                    >
+                                        <div className="px-3 py-2 border-b border-slate-50 mb-1">
+                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cuenta</p>
+                                            <p className="text-sm font-bold text-slate-700 truncate">{user?.username}</p>
+                                        </div>
+
+                                        <button
+                                            onClick={() => {
+                                                setIsProfileOpen(false);
+                                                logout();
+                                            }}
+                                            className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                        >
+                                            <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-red-100 transition-colors">
+                                                <LogOut className="w-4 h-4" />
+                                            </div>
+                                            Cerrar Sesión
+                                        </button>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
                     </div>
                 </header>
@@ -380,7 +445,7 @@ const Layout = () => {
                         <Outlet />
                     </motion.div>
                 </div>
-            </main>
+            </main >
         </div >
     );
 };

@@ -1,21 +1,24 @@
 from django.db import models
 
+class TipoEstablecimiento(models.Model):
+    nombre = models.CharField(max_length=100, unique=True)
+    
+    class Meta:
+        verbose_name = "Tipo de Establecimiento"
+        verbose_name_plural = "Tipos de Establecimientos"
+        ordering = ["nombre"]
+
+    def __str__(self):
+        return self.nombre
+
 class Establecimiento(models.Model):
-    class Tipo(models.TextChoices):
-        SALA_CUNA = 'SALA_CUNA', 'Sala Cuna'
-        JARDIN_INFANTIL = 'JARDIN_INFANTIL', 'Jardín Infantil'
-        ESCUELA = 'ESCUELA', 'Escuela'
-        LICEO = 'LICEO', 'Liceo'
-        CENTRO_CAPACITACION = 'CENTRO_CAPACITACION', 'Centro de Capacitación'
-        ADMINISTRACION = 'ADMINISTRACION', 'Administración'
- 
     rbd = models.PositiveIntegerField("RBD", db_index=True)
     nombre = models.CharField(max_length=255)
-    tipo = models.CharField(
-        max_length=20,
-        choices=Tipo.choices,
-        default=Tipo.ESCUELA,
+    tipo = models.ForeignKey(
+        TipoEstablecimiento,
+        on_delete=models.PROTECT,
         verbose_name="Tipo",
+        related_name="establecimientos"
     )
     director = models.CharField(max_length=255, blank=True)
     direccion = models.CharField(max_length=255, blank=True)

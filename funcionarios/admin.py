@@ -3,9 +3,9 @@ from .models import Subdireccion, Departamento, Unidad, Funcionario, Grupo
 
 @admin.register(Grupo)
 class GrupoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'es_firmante', 'activo', 'creado_en')
-    list_filter = ('es_firmante', 'activo')
-    search_fields = ('nombre',)
+    list_display = ('nombre', 'jefe', 'activo', 'creado_en')
+    list_filter = ('activo',)
+    search_fields = ('nombre', 'jefe__nombre_funcionario')
     ordering = ('nombre',)
 
 

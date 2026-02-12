@@ -100,7 +100,14 @@ class Grupo(models.Model):
     """Grupo de funcionarios para propósitos específicos (ej: Firmantes)"""
     nombre = models.CharField("Nombre", max_length=120, unique=True)
     descripcion = models.TextField("Descripción", blank=True, default="")
-    es_firmante = models.BooleanField("Es Firmante", default=False)
+    jefe = models.ForeignKey(
+        'Funcionario',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='grupos_liderados',
+        verbose_name="Jefe de Grupo"
+    )
     activo = models.BooleanField("Activo", default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)

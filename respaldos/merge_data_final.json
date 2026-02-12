@@ -1,0 +1,2136 @@
+[
+  {
+    "model": "auth.user",
+    "pk": 1,
+    "fields": {
+      "password": "pbkdf2_sha256$1000000$9jaRwqYZMLwCSQ8STT9Tz3$zC1k0p3kuHdcUiIB6XA6PJG8imb6PmYW72dXV68RH1w=",
+      "last_login": "2026-02-02T19:53:20.543Z",
+      "is_superuser": true,
+      "username": "admin",
+      "first_name": "",
+      "last_name": "",
+      "email": "",
+      "is_staff": true,
+      "is_active": true,
+      "date_joined": "2026-01-29T14:24:24.414Z",
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "prestamo_llaves.solicitante",
+    "pk": 1,
+    "fields": {
+      "rut": "18372148-8",
+      "nombre": "GUILLERMO",
+      "apellido": "DIAZ",
+      "telefono": "",
+      "email": "guillermo.diaz@slepiquique.cl"
+    }
+  },
+  {
+    "model": "prestamo_llaves.solicitante",
+    "pk": 2,
+    "fields": {
+      "rut": "17798248-2",
+      "nombre": "JORGE",
+      "apellido": "CUBILLOS",
+      "telefono": "",
+      "email": "jorge.cubillo@slepiquique.cl"
+    }
+  },
+  {
+    "model": "prestamo_llaves.solicitante",
+    "pk": 3,
+    "fields": {
+      "rut": "13867529-7",
+      "nombre": "CLAUDIO",
+      "apellido": "CABEZAS",
+      "telefono": "",
+      "email": ""
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 83,
+    "fields": {
+      "rbd": 1,
+      "nombre": "CASA CENTRAL",
+      "tipo": "ESCUELA",
+      "director": "NAJLE MAJLUF MORALES",
+      "direccion": "ESMERALDA 340",
+      "email": "SOPORTETI@SLEPIQUIQUE.CL",
+      "logo": "",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 84,
+    "fields": {
+      "rbd": 105,
+      "nombre": "CENTRO DE CAPACITACION LABORAL",
+      "tipo": "ESCUELA",
+      "director": "SANDRA FIGUEROA MENESES",
+      "direccion": "JOS FRANCISCO VERGARA N 2877",
+      "email": "centrocapacitacion@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_84.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 85,
+    "fields": {
+      "rbd": 123,
+      "nombre": "COLEGIO ESPAA",
+      "tipo": "ESCUELA",
+      "director": "SHIRLEY FLORES OLIVARES",
+      "direccion": "EL MONTE ESQUINA CERRO DRAGON S/N",
+      "email": "espana@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_85.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 86,
+    "fields": {
+      "rbd": 116,
+      "nombre": "COLEGIO REPUBLICA DE CROACIA",
+      "tipo": "ESCUELA",
+      "director": "JORGE ARACENA CERDA",
+      "direccion": "AVDA. SALVADOR ALLENDE N 1890",
+      "email": "croacia@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_86.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 87,
+    "fields": {
+      "rbd": 126,
+      "nombre": "COLEGIO REPUBLICA DE ITALIA",
+      "tipo": "ESCUELA",
+      "director": "MIGUEL BAEZA CARREO",
+      "direccion": "RANCAGUA N 2958",
+      "email": "italia@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_87.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 88,
+    "fields": {
+      "rbd": 126321,
+      "nombre": "COLEGIO SIMON BOLIVAR ALFONSINA",
+      "tipo": "ESCUELA",
+      "director": "ENRIQUE QUINTANA MALDONADO",
+      "direccion": "ALFONSINA STORNI N 4004",
+      "email": "sbolivar@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_88.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 89,
+    "fields": {
+      "rbd": 126322,
+      "nombre": "COLEGIO SIMON BOLIVAR ANEXO BASICA",
+      "tipo": "ESCUELA",
+      "director": "PAUL SPAUDO VASQUEZ",
+      "direccion": "SANTA JIMENA N 3950",
+      "email": "sbolivar_basica@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_89.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 90,
+    "fields": {
+      "rbd": 126323,
+      "nombre": "COLEGIO SIMON BOLIVAR ESPECIAL",
+      "tipo": "ESCUELA",
+      "director": "PAMELA DELGADO SALAS",
+      "direccion": "AVDA. TTE. HERNAN MERINO CORREA S/N",
+      "email": "sbolivar_edespecial@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_90.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 91,
+    "fields": {
+      "rbd": 102,
+      "nombre": "ESC. EDUCUCACION ESPECIAL FLOR DEL INCA",
+      "tipo": "ESCUELA",
+      "director": "IVONNE ALONSO OYARZO",
+      "direccion": "PEDRO AGUIRRE CERDA N 2098",
+      "email": "eflordelinca@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_91.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 92,
+    "fields": {
+      "rbd": 113,
+      "nombre": "ESCUELA ALMIRANTE PATRICIO LYNCH",
+      "tipo": "ESCUELA",
+      "director": "OSCAR FERNANDEZ RIOS",
+      "direccion": "GENARO GALLO N 2408",
+      "email": "plynch@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_92.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 93,
+    "fields": {
+      "rbd": 103,
+      "nombre": "ESCUELA ARTISTICA VIOLETA PARRA",
+      "tipo": "ESCUELA",
+      "director": "JUANA ROJAS FREDES",
+      "direccion": "ORELLA N 1820",
+      "email": "vparra@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_93.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 94,
+    "fields": {
+      "rbd": 10916,
+      "nombre": "ESCUELA CALETA CHANAVAYITA",
+      "tipo": "ESCUELA",
+      "director": "ELIZABETH AZUA MUOZ",
+      "direccion": "CALETA CHANAVAYITA S/N",
+      "email": "echanavayita@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_94.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 95,
+    "fields": {
+      "rbd": 12542,
+      "nombre": "ESCUELA CALETA SAN MARCOS",
+      "tipo": "ESCUELA",
+      "director": "MONICA CABEZAS CASTILLO",
+      "direccion": "CALETA SAN MARCOS S/N",
+      "email": "esmarcos@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_95.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 96,
+    "fields": {
+      "rbd": 119,
+      "nombre": "ESCUELA CENTENARIO",
+      "tipo": "ESCUELA",
+      "director": "MARTA RUZ PEREZ",
+      "direccion": "SERRANO n 998",
+      "email": "ecentenario@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_96.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 97,
+    "fields": {
+      "rbd": 12538,
+      "nombre": "ESCUELA CHIPANA",
+      "tipo": "ESCUELA",
+      "director": "ROSA CORDOVA ALACHE",
+      "direccion": "LOS ALGARROBOS N 3416",
+      "email": "chipana@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_97.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 98,
+    "fields": {
+      "rbd": 12739,
+      "nombre": "ESCUELA DE LENGUAJE OASIS DEL SABER",
+      "tipo": "ESCUELA",
+      "director": "KATHERINE BRAVO MUOZ",
+      "direccion": "AVDA. TTE. HERNAN MERINO CORREA N 3895",
+      "email": "eoasis@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_98.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 99,
+    "fields": {
+      "rbd": 112,
+      "nombre": "ESCUELA EDUARDO LLANOS NAVA",
+      "tipo": "ESCUELA",
+      "director": "HUGO ALEGRIA MIRANDA",
+      "direccion": "FRANCISCO VERGARA N 527",
+      "email": "eellanos@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_99.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 100,
+    "fields": {
+      "rbd": 111,
+      "nombre": "ESCUELA GABRIELA MISTRAL",
+      "tipo": "ESCUELA",
+      "director": "MARIA LOBOS ESTAY",
+      "direccion": "LIBERTAD N 1525",
+      "email": "egmistral@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_100.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 101,
+    "fields": {
+      "rbd": 117,
+      "nombre": "ESCUELA PAULA JARAQUEMADA ALQUIZAR",
+      "tipo": "ESCUELA",
+      "director": "MARJORIE CORTEZ ROJAS",
+      "direccion": "ORELLA N 960",
+      "email": "paulajaraquemada@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_101.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 102,
+    "fields": {
+      "rbd": 114,
+      "nombre": "ESCUELA PLACIDO VILLAROEL",
+      "tipo": "ESCUELA",
+      "director": "ANICIA GONZALEZ GUTIERREZ",
+      "direccion": "ARTURO FERNNDEZ N 1260",
+      "email": "epvillarroel@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_102.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 103,
+    "fields": {
+      "rbd": 125,
+      "nombre": "ESCUELA PROFESOR MANUEL CASTRO RAMOS",
+      "tipo": "ESCUELA",
+      "director": "JORGE ARACENA CERDA (I)",
+      "direccion": "MANUEL CASTRO RAMOS N 2188",
+      "email": "castroramos@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_103.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 104,
+    "fields": {
+      "rbd": 122,
+      "nombre": "ESCUELA THILDA PORTILLO OLIVA",
+      "tipo": "ESCUELA",
+      "director": "JULIA DAVILA OLIVARES",
+      "direccion": "LAS MAGNOLIAS N 1843",
+      "email": "etportillo@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_104.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 105,
+    "fields": {
+      "rbd": 97,
+      "nombre": "INSTITUTO COMERCIAL BALDOMERO WOLNITZKY",
+      "tipo": "ESCUELA",
+      "director": "LAND-YEN DAVILA CASTILLO",
+      "direccion": "ANIBAL PINTO N 1255",
+      "email": "icomercial@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_105.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 106,
+    "fields": {
+      "rbd": 33027,
+      "nombre": "JARDIN INFANTIL ARCOIRIS DEL DESIERTO",
+      "tipo": "JARDIN_INFANTIL",
+      "director": "XIMENA LARA RIVAS",
+      "direccion": "PASAJE NICARAGUA CON CANADA S/N",
+      "email": "ji.arcoirisdeldesierto@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_106.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 107,
+    "fields": {
+      "rbd": 33024,
+      "nombre": "JARDIN INFANTIL ARUMANTI",
+      "tipo": "JARDIN_INFANTIL",
+      "director": "MADELEINE BAEZ MATAMALA",
+      "direccion": "LOS NOGALES N 3017",
+      "email": "ji.arumanti@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_107.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 108,
+    "fields": {
+      "rbd": 33026,
+      "nombre": "JARDIN INFANTIL AVENTURA DE APRENDER",
+      "tipo": "JARDIN_INFANTIL",
+      "director": "KARINA ALCAINO ALFARO",
+      "direccion": "PASAJE BELGICA N 75-175 ESQUINA NORUEGA",
+      "email": "ji.aventuradeaprender@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_108.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 109,
+    "fields": {
+      "rbd": 33015,
+      "nombre": "JARDIN INFANTIL CARITA DE SOL",
+      "tipo": "JARDIN_INFANTIL",
+      "director": "LORETO VIDELA VASQUEZ",
+      "direccion": "PASAJE UJINA N 3153 MZ ST 24 STA. CATALINA",
+      "email": "ji.caritadesol@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_109.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 110,
+    "fields": {
+      "rbd": 33020,
+      "nombre": "JARDIN INFANTIL INTINA WAWAPA",
+      "tipo": "JARDIN_INFANTIL",
+      "director": "MARITZA PEREZ GUERRERO",
+      "direccion": "LAS FRUTILLAS N 2890",
+      "email": "ji.intinawawapa@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_110.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 111,
+    "fields": {
+      "rbd": 33021,
+      "nombre": "JARDIN INFANTIL LOS NARANJOS",
+      "tipo": "JARDIN_INFANTIL",
+      "director": "N/A N/A N/A",
+      "direccion": "LOS NARANJOS N 3389",
+      "email": "naranjos@slepiquique.cl",
+      "logo": "",
+      "activo": false
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 112,
+    "fields": {
+      "rbd": 33025,
+      "nombre": "JARDIN INFANTIL LUCERITO DORADO",
+      "tipo": "JARDIN_INFANTIL",
+      "director": "MICHELLE LONGA BAUTISTA",
+      "direccion": "LENKA FRANULIC N 4406",
+      "email": "ji.luceritodorado@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_112.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 113,
+    "fields": {
+      "rbd": 33028,
+      "nombre": "JARDIN INFANTIL MAGIA DE APRENDER",
+      "tipo": "JARDIN_INFANTIL",
+      "director": "ANA INZUNZA FONTECILLA",
+      "direccion": "AV. JERICO N 2326",
+      "email": "ji.magiadeaprender@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_113.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 114,
+    "fields": {
+      "rbd": 33030,
+      "nombre": "JARDIN INFANTIL MI PEQUENO MUNDO",
+      "tipo": "JARDIN_INFANTIL",
+      "director": "DANIELA LOAYZA LOYOLA",
+      "direccion": "EL MIRADOR N 3697",
+      "email": "ji.mipequenomundo@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_114.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 115,
+    "fields": {
+      "rbd": 33019,
+      "nombre": "JARDIN INFANTIL OASIS DEL SABER",
+      "tipo": "JARDIN_INFANTIL",
+      "director": "CARLA ARAYA CADAGAN",
+      "direccion": "LOS AROMOS N 3895",
+      "email": "ji.oasisdelsaber@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_115.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 116,
+    "fields": {
+      "rbd": 35987,
+      "nombre": "JARDIN INFANTIL SUMA INTI",
+      "tipo": "JARDIN_INFANTIL",
+      "director": "CARLA CLERY CABEZAS",
+      "direccion": "CALLA LA SERENA N 4450",
+      "email": "ji.sumainti@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_116.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 117,
+    "fields": {
+      "rbd": 33022,
+      "nombre": "JARDIN INFANTIL TORTUGUITAS",
+      "tipo": "JARDIN_INFANTIL",
+      "director": "MARJORIE LONGA DIAZ",
+      "direccion": "AV. LA PAMPA CON PASAJE TRINIDAD S/N",
+      "email": "ji.tortuguitas@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_117.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 118,
+    "fields": {
+      "rbd": 107,
+      "nombre": "LICEO BERNARDO OHIGGINS RIQUELME",
+      "tipo": "ESCUELA",
+      "director": "SEBASTIAN CHANG BRACK",
+      "direccion": "BAQUEDANO N 1200",
+      "email": "lbohiggins@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_118.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 119,
+    "fields": {
+      "rbd": 110,
+      "nombre": "LICEO BICENTENARIO DOMINGO SANTA MARIA",
+      "tipo": "ESCUELA",
+      "director": "MARIA ORMAZABAL VERA",
+      "direccion": "ZEGERS N 818",
+      "email": "lbdsm@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_119.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 120,
+    "fields": {
+      "rbd": 1101,
+      "nombre": "LICEO BICENTENARIO DOMINGO SANTA MARIA ANEXO HOSPICIO",
+      "tipo": "ESCUELA",
+      "director": "MARIA ORMAZABAL VERA",
+      "direccion": "AV. JUANITA FERNANDEZ 3180",
+      "email": "lbdsm2@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_120.jpg",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 121,
+    "fields": {
+      "rbd": 10917,
+      "nombre": "LICEO BICENTENARIO MINERO JUAN PABLO II",
+      "tipo": "ESCUELA",
+      "director": "GOIGHET ANDRADE YANA",
+      "direccion": "PASAJE EL SALITRE N 3397",
+      "email": "lbmjp@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_121.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 122,
+    "fields": {
+      "rbd": 12758,
+      "nombre": "LICEO CEIA JOSE ALEJANDRO SORIA VARAS",
+      "tipo": "ESCUELA",
+      "director": "HECTOR INOSTROZA ROJAS",
+      "direccion": "AVDA. SALVADOR ALLENDE N 1659",
+      "email": "ceia@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_122.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 123,
+    "fields": {
+      "rbd": 109,
+      "nombre": "LICEO ELENA DUVAUCHELLE CABEZON",
+      "tipo": "ESCUELA",
+      "director": "CRISTIAN BUGUEO MARAMBIO",
+      "direccion": "ANIBAL PINTO N 955",
+      "email": "codetp@slepiquique.cl",
+      "logo": "establecimientos/logos/CODE_.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 124,
+    "fields": {
+      "rbd": 124,
+      "nombre": "LICEO LUIS CRUZ MARTINEZ",
+      "tipo": "ESCUELA",
+      "director": "YERKO ECHEVERRIA ARANZAEZ",
+      "direccion": "ANKER NIELSEN N 2250",
+      "email": "llcm@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_124.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 125,
+    "fields": {
+      "rbd": 40429,
+      "nombre": "LICEO TECNICO PROFESIONAL ADULTOS",
+      "tipo": "ESCUELA",
+      "director": "NANCY PEREZ LOBOS",
+      "direccion": "LIBERTAD S/N",
+      "email": "ltpa@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_125.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "establecimientos.establecimiento",
+    "pk": 126,
+    "fields": {
+      "rbd": 108,
+      "nombre": "POLITCNICO JOSE GUTIERREZ DE LA FUENTE",
+      "tipo": "ESCUELA",
+      "director": "INGRID COFRE CASTRO",
+      "direccion": "AVDA. ARTURO PRAT N 750",
+      "email": "politecnico@slepiquique.cl",
+      "logo": "establecimientos/logos/logo_126.png",
+      "activo": true
+    }
+  },
+  {
+    "model": "servicios.tipoproveedor",
+    "pk": 1,
+    "fields": {
+      "nombre": "AGUA",
+      "acronimo_nemotecnico": "RCA"
+    }
+  },
+  {
+    "model": "servicios.tipoproveedor",
+    "pk": 2,
+    "fields": {
+      "nombre": "ENERGIA",
+      "acronimo_nemotecnico": "RCE"
+    }
+  },
+  {
+    "model": "servicios.tipoproveedor",
+    "pk": 3,
+    "fields": {
+      "nombre": "INTERNET",
+      "acronimo_nemotecnico": "RCI"
+    }
+  },
+  {
+    "model": "servicios.tipoproveedor",
+    "pk": 4,
+    "fields": {
+      "nombre": "TRANSPORTE",
+      "acronimo_nemotecnico": "TRA"
+    }
+  },
+  {
+    "model": "servicios.proveedor",
+    "pk": 1,
+    "fields": {
+      "nombre": "AGUAS DEL ALTIPLANO S.A.",
+      "acronimo": "ADA",
+      "rut": "76215634-2",
+      "tipo_proveedor": 1,
+      "contacto": null,
+      "fecha_creacion": "2026-01-29T15:38:36.108Z"
+    }
+  },
+  {
+    "model": "servicios.proveedor",
+    "pk": 2,
+    "fields": {
+      "nombre": "COMPAIA GENERAL DE ELECTRICIDAD S.A.",
+      "acronimo": "CGE",
+      "rut": "76411321-7",
+      "tipo_proveedor": 2,
+      "contacto": null,
+      "fecha_creacion": "2026-01-29T15:40:07.394Z"
+    }
+  },
+  {
+    "model": "servicios.proveedor",
+    "pk": 3,
+    "fields": {
+      "nombre": "TRANSPORTES ARAKSAYA LIMITADA",
+      "acronimo": "TAL",
+      "rut": "77057513-3",
+      "tipo_proveedor": 4,
+      "contacto": "",
+      "fecha_creacion": "2026-02-03T15:35:55.778Z"
+    }
+  },
+  {
+    "model": "servicios.tipodocumento",
+    "pk": 1,
+    "fields": {
+      "nombre": "BOLETA"
+    }
+  },
+  {
+    "model": "servicios.tipodocumento",
+    "pk": 2,
+    "fields": {
+      "nombre": "FACTURA"
+    }
+  },
+  {
+    "model": "servicios.recepcionconforme",
+    "pk": 1,
+    "fields": {
+      "proveedor": 1,
+      "folio": "RCA-0001",
+      "fecha_emision": "2026-01-29",
+      "observaciones": "Registro ya pagado",
+      "estado": "ANULADA",
+      "created_at": "2026-01-29T19:18:17.772Z",
+      "updated_at": "2026-01-29T20:08:06.930Z"
+    }
+  },
+  {
+    "model": "servicios.recepcionconforme",
+    "pk": 2,
+    "fields": {
+      "proveedor": 1,
+      "folio": "RCA-0002",
+      "fecha_emision": "2026-01-29",
+      "observaciones": "",
+      "estado": "ANULADA",
+      "created_at": "2026-01-29T19:34:01.868Z",
+      "updated_at": "2026-01-29T20:08:18.936Z"
+    }
+  },
+  {
+    "model": "servicios.recepcionconforme",
+    "pk": 3,
+    "fields": {
+      "proveedor": 1,
+      "folio": "RCA-0003",
+      "fecha_emision": "2026-01-30",
+      "observaciones": "",
+      "estado": "EMITIDA",
+      "created_at": "2026-01-30T16:11:54.728Z",
+      "updated_at": "2026-01-30T18:46:01.022Z"
+    }
+  },
+  {
+    "model": "servicios.recepcionconforme",
+    "pk": 4,
+    "fields": {
+      "proveedor": 1,
+      "folio": "RCA-0004",
+      "fecha_emision": "2026-01-30",
+      "observaciones": null,
+      "estado": "EMITIDA",
+      "created_at": "2026-01-30T18:45:52.794Z",
+      "updated_at": "2026-01-30T18:45:52.794Z"
+    }
+  },
+  {
+    "model": "servicios.recepcionconforme",
+    "pk": 5,
+    "fields": {
+      "proveedor": 1,
+      "folio": "RCA-0005",
+      "fecha_emision": "2026-02-02",
+      "observaciones": null,
+      "estado": "EMITIDA",
+      "created_at": "2026-02-02T18:59:19.447Z",
+      "updated_at": "2026-02-02T18:59:19.447Z"
+    }
+  },
+  {
+    "model": "servicios.historialrecepcionconforme",
+    "pk": 1,
+    "fields": {
+      "recepcion_conforme": 2,
+      "fecha": "2026-01-29T19:34:01.873Z",
+      "accion": "CREACION",
+      "detalle": "Documento creado con 1 pagos asignados.",
+      "usuario": ""
+    }
+  },
+  {
+    "model": "servicios.historialrecepcionconforme",
+    "pk": 2,
+    "fields": {
+      "recepcion_conforme": 2,
+      "fecha": "2026-01-29T19:35:39.842Z",
+      "accion": "MODIFICACION",
+      "detalle": "Se actualizaron las observaciones.",
+      "usuario": ""
+    }
+  },
+  {
+    "model": "servicios.historialrecepcionconforme",
+    "pk": 3,
+    "fields": {
+      "recepcion_conforme": 2,
+      "fecha": "2026-01-29T19:35:39.862Z",
+      "accion": "MODIFICACION_PAGOS",
+      "detalle": "Se agregaron 1 pagos al documento.",
+      "usuario": ""
+    }
+  },
+  {
+    "model": "servicios.historialrecepcionconforme",
+    "pk": 4,
+    "fields": {
+      "recepcion_conforme": 2,
+      "fecha": "2026-01-29T19:37:14.327Z",
+      "accion": "MODIFICACION_PAGOS",
+      "detalle": "Se quitaron 1 pagos del documento.",
+      "usuario": ""
+    }
+  },
+  {
+    "model": "servicios.historialrecepcionconforme",
+    "pk": 5,
+    "fields": {
+      "recepcion_conforme": 2,
+      "fecha": "2026-01-29T19:39:28.969Z",
+      "accion": "MODIFICACION_PAGOS",
+      "detalle": "Se quitaron 1 pagos del documento.",
+      "usuario": ""
+    }
+  },
+  {
+    "model": "servicios.historialrecepcionconforme",
+    "pk": 6,
+    "fields": {
+      "recepcion_conforme": 2,
+      "fecha": "2026-01-29T19:41:00.789Z",
+      "accion": "MODIFICACION_PAGOS",
+      "detalle": "Se agregaron 1 pagos al documento.",
+      "usuario": ""
+    }
+  },
+  {
+    "model": "servicios.historialrecepcionconforme",
+    "pk": 7,
+    "fields": {
+      "recepcion_conforme": 2,
+      "fecha": "2026-01-29T19:41:10.860Z",
+      "accion": "MODIFICACION_PAGOS",
+      "detalle": "Se quitaron 1 pagos del documento.",
+      "usuario": ""
+    }
+  },
+  {
+    "model": "servicios.historialrecepcionconforme",
+    "pk": 8,
+    "fields": {
+      "recepcion_conforme": 1,
+      "fecha": "2026-01-29T20:08:06.939Z",
+      "accion": "ANULACION",
+      "detalle": "Documento anulado. Se liberaron 0 pagos asociados.",
+      "usuario": ""
+    }
+  },
+  {
+    "model": "servicios.historialrecepcionconforme",
+    "pk": 9,
+    "fields": {
+      "recepcion_conforme": 2,
+      "fecha": "2026-01-29T20:08:18.941Z",
+      "accion": "ANULACION",
+      "detalle": "Documento anulado. Se liberaron 0 pagos asociados.",
+      "usuario": ""
+    }
+  },
+  {
+    "model": "servicios.historialrecepcionconforme",
+    "pk": 10,
+    "fields": {
+      "recepcion_conforme": 3,
+      "fecha": "2026-01-30T16:11:54.735Z",
+      "accion": "CREACION",
+      "detalle": "Documento creado con 1 pagos asignados.",
+      "usuario": ""
+    }
+  },
+  {
+    "model": "servicios.historialrecepcionconforme",
+    "pk": 11,
+    "fields": {
+      "recepcion_conforme": 4,
+      "fecha": "2026-01-30T18:45:52.810Z",
+      "accion": "CREACION",
+      "detalle": "Documento creado con 1 pagos asignados.",
+      "usuario": ""
+    }
+  },
+  {
+    "model": "servicios.historialrecepcionconforme",
+    "pk": 12,
+    "fields": {
+      "recepcion_conforme": 3,
+      "fecha": "2026-01-30T18:46:01.014Z",
+      "accion": "MODIFICACION",
+      "detalle": "Se actualizaron las observaciones.",
+      "usuario": ""
+    }
+  },
+  {
+    "model": "servicios.historialrecepcionconforme",
+    "pk": 13,
+    "fields": {
+      "recepcion_conforme": 3,
+      "fecha": "2026-01-30T18:46:01.036Z",
+      "accion": "MODIFICACION_PAGOS",
+      "detalle": "Se agregaron 1 pagos al documento: 830136",
+      "usuario": ""
+    }
+  },
+  {
+    "model": "servicios.historialrecepcionconforme",
+    "pk": 14,
+    "fields": {
+      "recepcion_conforme": 5,
+      "fecha": "2026-02-02T18:59:19.460Z",
+      "accion": "CREACION",
+      "detalle": "Documento creado con 1 pagos asignados.",
+      "usuario": ""
+    }
+  },
+  {
+    "model": "servicios.cdp",
+    "pk": 1,
+    "fields": {
+      "nombre": "CDP AGUA 01",
+      "archivo": "cdps/2026/CDP_N119_5xChOyF.pdf",
+      "anio": 2026,
+      "descripcion": "01",
+      "fecha_subida": "2026-01-30T13:59:57.334Z"
+    }
+  },
+  {
+    "model": "servicios.cdp",
+    "pk": 2,
+    "fields": {
+      "nombre": "CDP AGUA JUNJI",
+      "archivo": "cdps/2026/JUNJI_130.pdf",
+      "anio": 2026,
+      "descripcion": "JUNJI",
+      "fecha_subida": "2026-01-30T14:03:17.557Z"
+    }
+  },
+  {
+    "model": "servicios.cdp",
+    "pk": 3,
+    "fields": {
+      "nombre": "CDP ELECTRICIDAD JUNJI",
+      "archivo": "cdps/2026/CDP_N137_3.pdf",
+      "anio": 2026,
+      "descripcion": "JUNJI",
+      "fecha_subida": "2026-01-30T14:04:41.187Z"
+    }
+  },
+  {
+    "model": "servicios.cdp",
+    "pk": 4,
+    "fields": {
+      "nombre": "CDP ELECTRICIDAD 01",
+      "archivo": "cdps/2026/CDP_N138_4.pdf",
+      "anio": 2026,
+      "descripcion": "01",
+      "fecha_subida": "2026-01-30T14:05:37.072Z"
+    }
+  },
+  {
+    "model": "servicios.cdp",
+    "pk": 5,
+    "fields": {
+      "nombre": "CDP AGUA 02",
+      "archivo": "cdps/2026/CDP_N128.pdf",
+      "anio": 2026,
+      "descripcion": "02",
+      "fecha_subida": "2026-01-30T14:06:47.877Z"
+    }
+  },
+  {
+    "model": "servicios.cdp",
+    "pk": 6,
+    "fields": {
+      "nombre": "CDP ELECTRICIDAD 02",
+      "archivo": "cdps/2026/CDP_N121.pdf",
+      "anio": 2026,
+      "descripcion": "02",
+      "fecha_subida": "2026-01-30T14:08:26.860Z"
+    }
+  },
+  {
+    "model": "contratos.procesocompra",
+    "pk": 1,
+    "fields": {
+      "nombre": "COMPRA GIL"
+    }
+  },
+  {
+    "model": "contratos.procesocompra",
+    "pk": 2,
+    "fields": {
+      "nombre": "LICITACIN PBLICA"
+    }
+  },
+  {
+    "model": "contratos.procesocompra",
+    "pk": 3,
+    "fields": {
+      "nombre": "LICITACIN PRIVADA"
+    }
+  },
+  {
+    "model": "contratos.procesocompra",
+    "pk": 4,
+    "fields": {
+      "nombre": "GRAN COMPRA"
+    }
+  },
+  {
+    "model": "contratos.procesocompra",
+    "pk": 5,
+    "fields": {
+      "nombre": "TRATO DIRECTO"
+    }
+  },
+  {
+    "model": "contratos.procesocompra",
+    "pk": 6,
+    "fields": {
+      "nombre": "CONVENIO MARCO"
+    }
+  },
+  {
+    "model": "contratos.estadocontrato",
+    "pk": 1,
+    "fields": {
+      "nombre": "VIGENTE"
+    }
+  },
+  {
+    "model": "contratos.estadocontrato",
+    "pk": 2,
+    "fields": {
+      "nombre": "FINALIZADO"
+    }
+  },
+  {
+    "model": "contratos.estadocontrato",
+    "pk": 3,
+    "fields": {
+      "nombre": "CERRADO"
+    }
+  },
+  {
+    "model": "contratos.estadocontrato",
+    "pk": 4,
+    "fields": {
+      "nombre": "MODIFICADO"
+    }
+  },
+  {
+    "model": "contratos.categoriacontrato",
+    "pk": 7,
+    "fields": {
+      "nombre": "ASEO"
+    }
+  },
+  {
+    "model": "contratos.categoriacontrato",
+    "pk": 8,
+    "fields": {
+      "nombre": "INTERNET"
+    }
+  },
+  {
+    "model": "contratos.categoriacontrato",
+    "pk": 9,
+    "fields": {
+      "nombre": "TRANSPORTE"
+    }
+  },
+  {
+    "model": "contratos.orientacionlicitacion",
+    "pk": 1,
+    "fields": {
+      "nombre": "CASA CENTRAL"
+    }
+  },
+  {
+    "model": "contratos.orientacionlicitacion",
+    "pk": 2,
+    "fields": {
+      "nombre": "ESTABLECIMIENTOS"
+    }
+  },
+  {
+    "model": "contratos.orientacionlicitacion",
+    "pk": 3,
+    "fields": {
+      "nombre": "JARDINES"
+    }
+  },
+  {
+    "model": "contratos.contrato",
+    "pk": 1,
+    "fields": {
+      "codigo_mercado_publico": "1426397-32-LQ25",
+      "descripcion": "KJC ADQ SERVICIO DE TRANSPORTE ESCOLAR",
+      "proceso": 2,
+      "estado": 1,
+      "categoria": 9,
+      "orientacion": 2,
+      "proveedor": 3,
+      "fecha_adjudicacion": "2025-10-23",
+      "fecha_inicio": "2025-11-11",
+      "fecha_termino": "2026-03-11",
+      "created_at": "2026-02-03T16:13:44.904Z",
+      "updated_at": "2026-02-03T16:13:44.904Z"
+    }
+  },
+  {
+    "model": "contratos.documentocontrato",
+    "pk": 1,
+    "fields": {
+      "contrato": 1,
+      "nombre": "ORDEN DE COMPRA",
+      "archivo": "contratos/docs/2026/1426397-307-SE25_1.pdf",
+      "fecha_subida": "2026-02-04T17:59:03.821Z"
+    }
+  },
+  {
+    "model": "contratos.documentocontrato",
+    "pk": 2,
+    "fields": {
+      "contrato": 1,
+      "nombre": "REX APRUEBA BASES",
+      "archivo": "contratos/docs/2026/REX_N2849_Aprueba_bases_administrativas_bases.pdf",
+      "fecha_subida": "2026-02-04T18:01:20.632Z"
+    }
+  },
+  {
+    "model": "contratos.documentocontrato",
+    "pk": 3,
+    "fields": {
+      "contrato": 1,
+      "nombre": "CDP 687",
+      "archivo": "contratos/docs/2026/CDP_N687.pdf",
+      "fecha_subida": "2026-02-04T18:01:34.882Z"
+    }
+  },
+  {
+    "model": "contratos.documentocontrato",
+    "pk": 4,
+    "fields": {
+      "contrato": 1,
+      "nombre": "CONTRATO FIRMADO",
+      "archivo": "contratos/docs/2026/CONTRATO_FIRMADO_AMBAS_PARTES_1426397-32-LQ25_Iquique_Bus.pdf",
+      "fecha_subida": "2026-02-04T18:01:46.391Z"
+    }
+  },
+  {
+    "model": "funcionarios.subdireccion",
+    "pk": 1,
+    "fields": {
+      "nombre": "Direccin Ejecutiva",
+      "piso": 13,
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.066Z",
+      "actualizado_en": "2026-02-10T19:26:27.066Z"
+    }
+  },
+  {
+    "model": "funcionarios.subdireccion",
+    "pk": 2,
+    "fields": {
+      "nombre": "Subdireccin de Administracin y Finanzas",
+      "piso": 4,
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.084Z",
+      "actualizado_en": "2026-02-10T19:26:27.084Z"
+    }
+  },
+  {
+    "model": "funcionarios.subdireccion",
+    "pk": 3,
+    "fields": {
+      "nombre": "Subdireccin de Apoyo Tcnico Pedaggico",
+      "piso": 4,
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.121Z",
+      "actualizado_en": "2026-02-10T19:26:27.121Z"
+    }
+  },
+  {
+    "model": "funcionarios.subdireccion",
+    "pk": 4,
+    "fields": {
+      "nombre": "Subdireccin de Gestin de Personas",
+      "piso": 12,
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.159Z",
+      "actualizado_en": "2026-02-10T19:26:27.159Z"
+    }
+  },
+  {
+    "model": "funcionarios.subdireccion",
+    "pk": 5,
+    "fields": {
+      "nombre": "Subdireccin de Infraestructura y Mantenimiento",
+      "piso": 4,
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.166Z",
+      "actualizado_en": "2026-02-10T19:26:27.166Z"
+    }
+  },
+  {
+    "model": "funcionarios.subdireccion",
+    "pk": 6,
+    "fields": {
+      "nombre": "Subdireccin de Planificacin y Control de Gestin",
+      "piso": 13,
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.175Z",
+      "actualizado_en": "2026-02-10T19:26:27.175Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 1,
+    "fields": {
+      "subdireccion": 1,
+      "nombre": "Auditora y Aseguramiento de Calidad",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.070Z",
+      "actualizado_en": "2026-02-10T19:26:27.070Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 2,
+    "fields": {
+      "subdireccion": 1,
+      "nombre": "Gabinete",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.074Z",
+      "actualizado_en": "2026-02-10T19:26:27.074Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 3,
+    "fields": {
+      "subdireccion": 1,
+      "nombre": "Jurdico y Transparencia",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.077Z",
+      "actualizado_en": "2026-02-10T19:26:27.077Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 4,
+    "fields": {
+      "subdireccion": 1,
+      "nombre": "Vinculacin, Participacin y Comunicaciones",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.079Z",
+      "actualizado_en": "2026-02-10T19:26:27.079Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 5,
+    "fields": {
+      "subdireccion": 2,
+      "nombre": "Compras y Logstica",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.088Z",
+      "actualizado_en": "2026-02-10T19:26:27.088Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 6,
+    "fields": {
+      "subdireccion": 2,
+      "nombre": "Contabilidad y Finanzas",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.097Z",
+      "actualizado_en": "2026-02-10T19:26:27.097Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 7,
+    "fields": {
+      "subdireccion": 2,
+      "nombre": "Coordinacin de SSGG, Operaciones y Soporte TI",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.111Z",
+      "actualizado_en": "2026-02-10T19:26:27.111Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 8,
+    "fields": {
+      "subdireccion": 3,
+      "nombre": "Acompaamiento Pedaggico",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.124Z",
+      "actualizado_en": "2026-02-10T19:26:27.124Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 9,
+    "fields": {
+      "subdireccion": 3,
+      "nombre": "Desarrollo Integral",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.133Z",
+      "actualizado_en": "2026-02-10T19:26:27.133Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 10,
+    "fields": {
+      "subdireccion": 3,
+      "nombre": "Innovacin Educativa",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.141Z",
+      "actualizado_en": "2026-02-10T19:26:27.141Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 11,
+    "fields": {
+      "subdireccion": 3,
+      "nombre": "Mejora Continua",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.143Z",
+      "actualizado_en": "2026-02-10T19:26:27.143Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 12,
+    "fields": {
+      "subdireccion": 3,
+      "nombre": "Monitoreo y Datos",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.151Z",
+      "actualizado_en": "2026-02-10T19:26:27.151Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 13,
+    "fields": {
+      "subdireccion": 4,
+      "nombre": "Gestin y Desarrollo de Personas",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.161Z",
+      "actualizado_en": "2026-02-10T19:26:27.161Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 14,
+    "fields": {
+      "subdireccion": 4,
+      "nombre": "Remuneraciones",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.163Z",
+      "actualizado_en": "2026-02-10T19:26:27.163Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 15,
+    "fields": {
+      "subdireccion": 5,
+      "nombre": "Infraestructura",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.169Z",
+      "actualizado_en": "2026-02-10T19:26:27.169Z"
+    }
+  },
+  {
+    "model": "funcionarios.departamento",
+    "pk": 16,
+    "fields": {
+      "subdireccion": 5,
+      "nombre": "Mantenimiento",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.172Z",
+      "actualizado_en": "2026-02-10T19:26:27.172Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 1,
+    "fields": {
+      "departamento": 4,
+      "nombre": "Comunicaciones",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.082Z",
+      "actualizado_en": "2026-02-10T19:26:27.082Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 2,
+    "fields": {
+      "departamento": 5,
+      "nombre": "Bodega y Logstica",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.090Z",
+      "actualizado_en": "2026-02-10T19:26:27.090Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 3,
+    "fields": {
+      "departamento": 5,
+      "nombre": "Compras",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.093Z",
+      "actualizado_en": "2026-02-10T19:26:27.093Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 4,
+    "fields": {
+      "departamento": 5,
+      "nombre": "Inventario",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.095Z",
+      "actualizado_en": "2026-02-10T19:26:27.095Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 5,
+    "fields": {
+      "departamento": 6,
+      "nombre": "Contabilidad y Conciliaciones",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.100Z",
+      "actualizado_en": "2026-02-10T19:26:27.100Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 6,
+    "fields": {
+      "departamento": 6,
+      "nombre": "Control Presupuestario y Subvenciones",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.103Z",
+      "actualizado_en": "2026-02-10T19:26:27.103Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 7,
+    "fields": {
+      "departamento": 6,
+      "nombre": "Rendiciones",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.105Z",
+      "actualizado_en": "2026-02-10T19:26:27.105Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 8,
+    "fields": {
+      "departamento": 6,
+      "nombre": "Tesorera",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.108Z",
+      "actualizado_en": "2026-02-10T19:26:27.108Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 9,
+    "fields": {
+      "departamento": 7,
+      "nombre": "Operaciones",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.113Z",
+      "actualizado_en": "2026-02-10T19:26:27.113Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 10,
+    "fields": {
+      "departamento": 7,
+      "nombre": "Servicios Generales",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.116Z",
+      "actualizado_en": "2026-02-10T19:26:27.116Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 11,
+    "fields": {
+      "departamento": 7,
+      "nombre": "Soporte TI",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.119Z",
+      "actualizado_en": "2026-02-10T19:26:27.119Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 12,
+    "fields": {
+      "departamento": 8,
+      "nombre": "Establecimientos Educacionales",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.126Z",
+      "actualizado_en": "2026-02-10T19:26:27.126Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 13,
+    "fields": {
+      "departamento": 8,
+      "nombre": "Inclusin",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.128Z",
+      "actualizado_en": "2026-02-10T19:26:27.128Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 14,
+    "fields": {
+      "departamento": 8,
+      "nombre": "Jardines Infantiles",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.131Z",
+      "actualizado_en": "2026-02-10T19:26:27.131Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 15,
+    "fields": {
+      "departamento": 9,
+      "nombre": "Convivencia Escolar",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.136Z",
+      "actualizado_en": "2026-02-10T19:26:27.136Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 16,
+    "fields": {
+      "departamento": 9,
+      "nombre": "Trayectoria",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.138Z",
+      "actualizado_en": "2026-02-10T19:26:27.138Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 17,
+    "fields": {
+      "departamento": 11,
+      "nombre": "Desarrollo Profesional Integral",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.146Z",
+      "actualizado_en": "2026-02-10T19:26:27.146Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 18,
+    "fields": {
+      "departamento": 11,
+      "nombre": "Plataformas",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.148Z",
+      "actualizado_en": "2026-02-10T19:26:27.148Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 19,
+    "fields": {
+      "departamento": 12,
+      "nombre": "Monitoreo de Informacin",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.154Z",
+      "actualizado_en": "2026-02-10T19:26:27.154Z"
+    }
+  },
+  {
+    "model": "funcionarios.unidad",
+    "pk": 20,
+    "fields": {
+      "departamento": 12,
+      "nombre": "Programas Educativos",
+      "activo": true,
+      "creado_en": "2026-02-10T19:26:27.156Z",
+      "actualizado_en": "2026-02-10T19:26:27.156Z"
+    }
+  },
+  {
+    "model": "impresoras.printer",
+    "pk": 14,
+    "fields": {
+      "name": "COMPRAS",
+      "location": "Jurdico",
+      "floor": "4",
+      "ip_address": "192.168.1.248",
+      "type": "B/N",
+      "community": "public",
+      "snmp_port": 161,
+      "enabled": true,
+      "notes": "",
+      "last_check": "2026-02-10T19:40:57.119Z",
+      "last_ok": true,
+      "last_message": "OK",
+      "last_black": 38.0,
+      "last_cyan": null,
+      "last_magenta": null,
+      "last_yellow": null,
+      "last_errors": [],
+      "serial_number": "4VF00704",
+      "last_connected": true,
+      "last_woke": true
+    }
+  },
+  {
+    "model": "impresoras.printer",
+    "pk": 15,
+    "fields": {
+      "name": "DIRECCIN",
+      "location": "Planificacin",
+      "floor": "13",
+      "ip_address": "192.168.1.245",
+      "type": "COLOR",
+      "community": "public",
+      "snmp_port": 161,
+      "enabled": true,
+      "notes": "",
+      "last_check": "2026-02-10T19:41:11.629Z",
+      "last_ok": true,
+      "last_message": "OK",
+      "last_black": 8.0,
+      "last_cyan": 37.0,
+      "last_magenta": 26.0,
+      "last_yellow": 37.0,
+      "last_errors": [],
+      "serial_number": "3LP10794",
+      "last_connected": true,
+      "last_woke": true
+    }
+  },
+  {
+    "model": "impresoras.printer",
+    "pk": 16,
+    "fields": {
+      "name": "DIRECCIN",
+      "location": "Secretara",
+      "floor": "13",
+      "ip_address": "192.168.1.249",
+      "type": "B/N",
+      "community": "public",
+      "snmp_port": 161,
+      "enabled": true,
+      "notes": "",
+      "last_check": "2026-02-10T19:41:26.054Z",
+      "last_ok": true,
+      "last_message": "OK",
+      "last_black": 88.0,
+      "last_cyan": null,
+      "last_magenta": null,
+      "last_yellow": null,
+      "last_errors": [],
+      "serial_number": "4GJ01830",
+      "last_connected": true,
+      "last_woke": true
+    }
+  },
+  {
+    "model": "impresoras.printer",
+    "pk": 17,
+    "fields": {
+      "name": "GDP",
+      "location": "Personas",
+      "floor": "12",
+      "ip_address": "192.168.1.246",
+      "type": "B/N",
+      "community": "public",
+      "snmp_port": 161,
+      "enabled": true,
+      "notes": "",
+      "last_check": "2026-02-10T19:41:40.572Z",
+      "last_ok": true,
+      "last_message": "OK",
+      "last_black": 45.0,
+      "last_cyan": null,
+      "last_magenta": null,
+      "last_yellow": null,
+      "last_errors": [],
+      "serial_number": "4VF00705",
+      "last_connected": true,
+      "last_woke": true
+    }
+  },
+  {
+    "model": "impresoras.printer",
+    "pk": 18,
+    "fields": {
+      "name": "GDP",
+      "location": "Personas",
+      "floor": "12",
+      "ip_address": "192.168.1.247",
+      "type": "B/N",
+      "community": "public",
+      "snmp_port": 161,
+      "enabled": true,
+      "notes": "",
+      "last_check": "2026-02-10T19:41:55.278Z",
+      "last_ok": true,
+      "last_message": "OK",
+      "last_black": 34.0,
+      "last_cyan": null,
+      "last_magenta": null,
+      "last_yellow": null,
+      "last_errors": [],
+      "serial_number": "3LP10831",
+      "last_connected": true,
+      "last_woke": true
+    }
+  },
+  {
+    "model": "impresoras.printer",
+    "pk": 19,
+    "fields": {
+      "name": "INFRAESTRUCTURA",
+      "location": "Infraestructura",
+      "floor": "4",
+      "ip_address": "192.168.1.252",
+      "type": "B/N",
+      "community": "public",
+      "snmp_port": 161,
+      "enabled": true,
+      "notes": "",
+      "last_check": "2026-02-10T19:42:09.737Z",
+      "last_ok": true,
+      "last_message": "OK",
+      "last_black": 83.0,
+      "last_cyan": null,
+      "last_magenta": null,
+      "last_yellow": null,
+      "last_errors": [],
+      "serial_number": "4VF00661",
+      "last_connected": true,
+      "last_woke": true
+    }
+  },
+  {
+    "model": "impresoras.printer",
+    "pk": 20,
+    "fields": {
+      "name": "RENDICIONES",
+      "location": "RENDICIONES",
+      "floor": "4",
+      "ip_address": "192.168.1.251",
+      "type": "COLOR",
+      "community": "public",
+      "snmp_port": 161,
+      "enabled": true,
+      "notes": "",
+      "last_check": "2026-02-10T19:42:24.276Z",
+      "last_ok": true,
+      "last_message": "OK",
+      "last_black": 16.0,
+      "last_cyan": 68.0,
+      "last_magenta": 100.0,
+      "last_yellow": 70.0,
+      "last_errors": [],
+      "serial_number": "4VF00696",
+      "last_connected": true,
+      "last_woke": true
+    }
+  },
+  {
+    "model": "impresoras.printer",
+    "pk": 21,
+    "fields": {
+      "name": "SDAF (B/N)",
+      "location": "SDAF",
+      "floor": "4",
+      "ip_address": "192.168.1.244",
+      "type": "B/N",
+      "community": "public",
+      "snmp_port": 161,
+      "enabled": true,
+      "notes": "",
+      "last_check": "2026-02-10T19:42:38.523Z",
+      "last_ok": true,
+      "last_message": "OK",
+      "last_black": 20.0,
+      "last_cyan": null,
+      "last_magenta": null,
+      "last_yellow": null,
+      "last_errors": [],
+      "serial_number": "4VF00706",
+      "last_connected": true,
+      "last_woke": true
+    }
+  },
+  {
+    "model": "impresoras.printer",
+    "pk": 22,
+    "fields": {
+      "name": "SDAF (Color)",
+      "location": "SDAF",
+      "floor": "4",
+      "ip_address": "192.168.1.242",
+      "type": "COLOR",
+      "community": "public",
+      "snmp_port": 161,
+      "enabled": true,
+      "notes": "",
+      "last_check": "2026-02-10T19:42:52.981Z",
+      "last_ok": true,
+      "last_message": "OK",
+      "last_black": 50.0,
+      "last_cyan": 46.0,
+      "last_magenta": 46.0,
+      "last_yellow": 45.0,
+      "last_errors": [],
+      "serial_number": "3LP10799",
+      "last_connected": true,
+      "last_woke": true
+    }
+  },
+  {
+    "model": "impresoras.printer",
+    "pk": 23,
+    "fields": {
+      "name": "UATP (B/N)",
+      "location": "UATP",
+      "floor": "4",
+      "ip_address": "192.168.1.241",
+      "type": "B/N",
+      "community": "public",
+      "snmp_port": 161,
+      "enabled": true,
+      "notes": "",
+      "last_check": "2026-02-10T19:43:07.444Z",
+      "last_ok": true,
+      "last_message": "OK",
+      "last_black": 32.0,
+      "last_cyan": null,
+      "last_magenta": null,
+      "last_yellow": null,
+      "last_errors": [],
+      "serial_number": "4VF00695",
+      "last_connected": true,
+      "last_woke": true
+    }
+  },
+  {
+    "model": "impresoras.printer",
+    "pk": 24,
+    "fields": {
+      "name": "UATP (Color)",
+      "location": "UATP",
+      "floor": "4",
+      "ip_address": "192.168.1.243",
+      "type": "COLOR",
+      "community": "public",
+      "snmp_port": 161,
+      "enabled": true,
+      "notes": "",
+      "last_check": "2026-02-10T19:43:21.864Z",
+      "last_ok": true,
+      "last_message": "OK",
+      "last_black": 73.0,
+      "last_cyan": 100.0,
+      "last_magenta": 100.0,
+      "last_yellow": 5.0,
+      "last_errors": [],
+      "serial_number": "3LP10787",
+      "last_connected": true,
+      "last_woke": true
+    }
+  },
+  {
+    "model": "vehiculos.registromensual",
+    "pk": 3,
+    "fields": {
+      "anio": 2025,
+      "mes": 1,
+      "numero_vehiculos": 2,
+      "kilometros_recorridos": 859,
+      "unidad_monetaria": "Pesos",
+      "gasto_bencina": 54013,
+      "gasto_peajes": 0,
+      "gasto_seguros": 79556
+    }
+  },
+  {
+    "model": "vehiculos.registromensual",
+    "pk": 4,
+    "fields": {
+      "anio": 2025,
+      "mes": 2,
+      "numero_vehiculos": 2,
+      "kilometros_recorridos": 1503,
+      "unidad_monetaria": "Pesos",
+      "gasto_bencina": 178971,
+      "gasto_peajes": 0,
+      "gasto_seguros": 79556
+    }
+  },
+  {
+    "model": "vehiculos.registromensual",
+    "pk": 5,
+    "fields": {
+      "anio": 2025,
+      "mes": 3,
+      "numero_vehiculos": 2,
+      "kilometros_recorridos": 3397,
+      "unidad_monetaria": "Pesos",
+      "gasto_bencina": 405791,
+      "gasto_peajes": 0,
+      "gasto_seguros": 0
+    }
+  },
+  {
+    "model": "vehiculos.registromensual",
+    "pk": 6,
+    "fields": {
+      "anio": 2025,
+      "mes": 4,
+      "numero_vehiculos": 2,
+      "kilometros_recorridos": 2409,
+      "unidad_monetaria": "Pesos",
+      "gasto_bencina": 272917,
+      "gasto_peajes": 0,
+      "gasto_seguros": 100068
+    }
+  },
+  {
+    "model": "vehiculos.registromensual",
+    "pk": 7,
+    "fields": {
+      "anio": 2025,
+      "mes": 5,
+      "numero_vehiculos": 2,
+      "kilometros_recorridos": 2145,
+      "unidad_monetaria": "Pesos",
+      "gasto_bencina": 249134,
+      "gasto_peajes": 0,
+      "gasto_seguros": 100068
+    }
+  },
+  {
+    "model": "vehiculos.registromensual",
+    "pk": 8,
+    "fields": {
+      "anio": 2025,
+      "mes": 6,
+      "numero_vehiculos": 2,
+      "kilometros_recorridos": 2110,
+      "unidad_monetaria": "Pesos",
+      "gasto_bencina": 148767,
+      "gasto_peajes": 0,
+      "gasto_seguros": 100068
+    }
+  },
+  {
+    "model": "vehiculos.registromensual",
+    "pk": 9,
+    "fields": {
+      "anio": 2025,
+      "mes": 7,
+      "numero_vehiculos": 2,
+      "kilometros_recorridos": 1590,
+      "unidad_monetaria": "Pesos",
+      "gasto_bencina": 167035,
+      "gasto_peajes": 0,
+      "gasto_seguros": 100068
+    }
+  },
+  {
+    "model": "vehiculos.registromensual",
+    "pk": 10,
+    "fields": {
+      "anio": 2025,
+      "mes": 8,
+      "numero_vehiculos": 2,
+      "kilometros_recorridos": 2015,
+      "unidad_monetaria": "Pesos",
+      "gasto_bencina": 211610,
+      "gasto_peajes": 0,
+      "gasto_seguros": 100068
+    }
+  },
+  {
+    "model": "vehiculos.registromensual",
+    "pk": 11,
+    "fields": {
+      "anio": 2025,
+      "mes": 9,
+      "numero_vehiculos": 2,
+      "kilometros_recorridos": 2582,
+      "unidad_monetaria": "Pesos",
+      "gasto_bencina": 259382,
+      "gasto_peajes": 0,
+      "gasto_seguros": 100068
+    }
+  },
+  {
+    "model": "vehiculos.registromensual",
+    "pk": 12,
+    "fields": {
+      "anio": 2025,
+      "mes": 10,
+      "numero_vehiculos": 2,
+      "kilometros_recorridos": 2011,
+      "unidad_monetaria": "Pesos",
+      "gasto_bencina": 258350,
+      "gasto_peajes": 0,
+      "gasto_seguros": 100068
+    }
+  },
+  {
+    "model": "vehiculos.registromensual",
+    "pk": 13,
+    "fields": {
+      "anio": 2025,
+      "mes": 11,
+      "numero_vehiculos": 2,
+      "kilometros_recorridos": 2353,
+      "unidad_monetaria": "Pesos",
+      "gasto_bencina": 187189,
+      "gasto_peajes": 0,
+      "gasto_seguros": 100068
+    }
+  },
+  {
+    "model": "vehiculos.registromensual",
+    "pk": 14,
+    "fields": {
+      "anio": 2025,
+      "mes": 12,
+      "numero_vehiculos": 2,
+      "kilometros_recorridos": 2490,
+      "unidad_monetaria": "Pesos",
+      "gasto_bencina": 227694,
+      "gasto_peajes": 0,
+      "gasto_seguros": 100068
+    }
+  },
+  {
+    "model": "vehiculos.registromensual",
+    "pk": 16,
+    "fields": {
+      "anio": 2026,
+      "mes": 1,
+      "numero_vehiculos": 2,
+      "kilometros_recorridos": 1341,
+      "unidad_monetaria": "Pesos",
+      "gasto_bencina": 140332,
+      "gasto_peajes": 0,
+      "gasto_seguros": 100068
+    }
+  }
+]

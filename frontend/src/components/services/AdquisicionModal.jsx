@@ -148,13 +148,43 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
                                 <select
                                     name="grupo_firmante"
                                     value={formData.grupo_firmante || ''}
-                                    onChange={handleChange}
+                                    onChange={(e) => {
+                                        const gid = e.target.value;
+                                        const grp = lookups.groups?.find(g => g.id.toString() === gid);
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            grupo_firmante: gid,
+                                            firmante: grp ? (grp.jefe || '') : ''
+                                        }));
+                                    }}
                                     className="w-full px-3 py-2 bg-blue-50/50 border border-blue-100 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-xs font-bold text-blue-700 h-[38px]"
                                 >
                                     <option value="">Seleccione grupo...</option>
                                     {lookups.groups?.map(g => (
                                         <option key={g.id} value={g.id}>
-                                            {g.nombre} {g.es_firmante ? '(Firmantes)' : ''}
+                                            {g.nombre}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="md:col-span-1">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-amber-600 ml-1 flex items-center gap-1.5">
+                                    <Users className="w-2.5 h-2.5" /> Firmante Específico
+                                </label>
+                                <select
+                                    name="firmante"
+                                    value={formData.firmante || ''}
+                                    onChange={handleChange}
+                                    disabled={!formData.grupo_firmante}
+                                    className="w-full px-3 py-2 bg-amber-50/50 border border-amber-100 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-xs font-bold text-amber-700 h-[38px]"
+                                >
+                                    <option value="">Seleccione firmante...</option>
+                                    {lookups.groups?.find(g => g.id.toString() === formData.grupo_firmante?.toString())?.miembros_detalle?.map(m => (
+                                        <option key={m.id} value={m.id}>
+                                            {m.nombre} {m.id === lookups.groups?.find(g => g.id.toString() === formData.grupo_firmante.toString())?.jefe ? '(Jefe)' : ''}
                                         </option>
                                     ))}
                                 </select>

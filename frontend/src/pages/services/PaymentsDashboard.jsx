@@ -35,7 +35,8 @@ const PaymentsDashboard = () => {
     const [selectedType, setSelectedType] = useState('');
     const [selectedProvider, setSelectedProvider] = useState('');
     const [groups, setGroups] = useState([]);
-    const [selectedSignerGroup, setSelectedSignerGroup] = useState('');
+    const [selectedSignerGroup, setSelectedSignerGroup] = useState(localStorage.getItem('last_signer_group') || '');
+    const [selectedSigner, setSelectedSigner] = useState('');
 
     // Initial state for form
     const initialFormState = {
@@ -104,14 +105,21 @@ const PaymentsDashboard = () => {
                 const [typesRes, provRes, grpRes] = await Promise.all([
                     api.get('tipos-proveedores/'),
                     api.get('proveedores/'),
-                    api.get('grupos/')
+                    api.get('grupos/', { params: { page_size: 1000 } })
                 ]);
                 setProviderTypes(typesRes.data.results || typesRes.data);
                 setProviders(provRes.data.results || provRes.data);
                 setGroups(grpRes.data.results || grpRes.data);
-                // Pre-select first signer group if any
-                const defaultGrp = (grpRes.data.results || grpRes.data).find(g => g.es_firmante);
-                if (defaultGrp) setSelectedSignerGroup(defaultGrp.id);
+
+                // Pre-select group from localStorage or first group
+                const savedGroup = localStorage.getItem('last_signer_group');
+                const allGroups = grpRes.data.results || grpRes.data;
+                const activeGrp = allGroups.find(g => g.id.toString() === savedGroup) || allGroups[0];
+
+                if (activeGrp) {
+                    setSelectedSignerGroup(activeGrp.id);
+                    setSelectedSigner(activeGrp.jefe || '');
+                }
             } catch (error) {
                 console.error("Error fetching filter data:", error);
             }
@@ -239,7 +247,8 @@ const PaymentsDashboard = () => {
             await api.post('recepciones-conformes/', {
                 proveedor: providerId,
                 registros_ids: Array.from(selectedIds),
-                grupo_firmante: selectedSignerGroup || null
+                grupo_firmante: selectedSignerGroup || null,
+                firmante: selectedSigner || null
             });
             alert("Recepción Conforme generada exitosamente.");
             fetchData(currentPage, searchQuery);
@@ -380,20 +389,45 @@ const PaymentsDashboard = () => {
                         <div className="flex items-center gap-2">
                             {selectedIds.size > 0 && (
                                 <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4">
-                                    <select
-                                        value={selectedSignerGroup}
-                                        onChange={(e) => setSelectedSignerGroup(e.target.value)}
-                                        className="px-3 py-2 border border-indigo-200 rounded-xl text-xs font-bold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-indigo-50/50 shadow-sm"
-                                        title="Seleccionar grupo que firmará esta RC"
-                                    >
-                                        <option value="">Sin Grupo (Default)</option>
-                                        {groups.map(g => (
-                                            <option key={g.id} value={g.id}>{g.nombre}</option>
-                                        ))}
-                                    </select>
+                                    <div className="flex flex-col gap-1">
+                                        <select
+                                            value={selectedSignerGroup}
+                                            onChange={(e) => {
+                                                const gid = e.target.value;
+                                                setSelectedSignerGroup(gid);
+                                                localStorage.setItem('last_signer_group', gid);
+                                                const grp = groups.find(g => g.id.toString() === gid);
+                                                if (grp) setSelectedSigner(grp.jefe || '');
+                                            }}
+                                            className="px-3 py-1.5 border border-indigo-200 rounded-lg text-[10px] font-bold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm"
+                                            title="Seleccionar grupo que firmará esta RC"
+                                        >
+                                            <option value="">Seleccionar Grupo...</option>
+                                            {groups.map(g => (
+                                                <option key={g.id} value={g.id}>{g.nombre}</option>
+                                            ))}
+                                        </select>
+
+                                        {selectedSignerGroup && (
+                                            <select
+                                                value={selectedSigner}
+                                                onChange={(e) => setSelectedSigner(e.target.value)}
+                                                className="px-3 py-1.5 border border-amber-200 rounded-lg text-[10px] font-bold text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white shadow-sm"
+                                                title="Seleccionar funcionario que firmará"
+                                            >
+                                                <option value="">Seleccionar Firmante...</option>
+                                                {groups.find(g => g.id.toString() === selectedSignerGroup.toString())?.miembros_detalle?.map(m => (
+                                                    <option key={m.id} value={m.id}>
+                                                        {m.nombre} {m.id === groups.find(g => g.id.toString() === selectedSignerGroup.toString())?.jefe ? '(Jefe)' : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        )}
+                                    </div>
+
                                     <button
                                         onClick={handleGenerateRC}
-                                        className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 font-bold whitespace-nowrap text-xs"
+                                        className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-3 rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 font-bold whitespace-nowrap text-xs h-fit"
                                     >
                                         <FileCheck className="w-4 h-4" />
                                         <span>Generar RC ({selectedIds.size})</span>

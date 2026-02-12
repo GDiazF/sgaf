@@ -62,7 +62,7 @@ const FuncionarioModal = ({ isOpen, onClose, onSave, funcionarioId = null }) => 
 
     const fetchGrupos = async () => {
         try {
-            const response = await api.get('grupos/');
+            const response = await api.get('grupos/', { params: { page_size: 1000 } });
             const data = Array.isArray(response.data) ? response.data : (response.data.results || []);
             setGrupos(data);
         } catch (error) {
@@ -365,8 +365,8 @@ const FuncionarioModal = ({ isOpen, onClose, onSave, funcionarioId = null }) => 
                                         />
                                         <label htmlFor={`grupo-${grupo.id}`} className="text-sm font-semibold text-slate-700 flex-grow cursor-pointer">
                                             {grupo.nombre}
-                                            {grupo.es_firmante && (
-                                                <span className="ml-2 text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-tight">Firmante</span>
+                                            {grupo.jefe === formData.id && (
+                                                <span className="ml-2 text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-tight">Jefe</span>
                                             )}
                                         </label>
                                     </div>

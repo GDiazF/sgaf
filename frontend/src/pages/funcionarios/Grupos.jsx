@@ -14,7 +14,7 @@ const Grupos = () => {
     const [formData, setFormData] = useState({
         nombre: '',
         descripcion: '',
-        es_firmante: false,
+        jefe: '',
         activo: true,
         funcionarios: []
     });
@@ -26,8 +26,8 @@ const Grupos = () => {
     const fetchData = async () => {
         try {
             const [grpRes, funcRes] = await Promise.all([
-                api.get('grupos/'),
-                api.get('funcionarios/?activos=true')
+                api.get('grupos/', { params: { page_size: 1000 } }),
+                api.get('funcionarios/', { params: { activos: true, page_size: 1000 } })
             ]);
             setGrupos(Array.isArray(grpRes.data) ? grpRes.data : (grpRes.data.results || []));
             setFuncionarios(Array.isArray(funcRes.data) ? funcRes.data : (funcRes.data.results || []));
@@ -69,7 +69,7 @@ const Grupos = () => {
         setFormData({
             nombre: item.nombre,
             descripcion: item.descripcion || '',
-            es_firmante: item.es_firmante,
+            jefe: item.jefe || '',
             activo: item.activo,
             funcionarios: item.funcionarios || []
         });
@@ -80,7 +80,7 @@ const Grupos = () => {
     const handleCloseModal = () => {
         setShowModal(false);
         setEditingId(null);
-        setFormData({ nombre: '', descripcion: '', es_firmante: false, activo: true, funcionarios: [] });
+        setFormData({ nombre: '', descripcion: '', jefe: '', activo: true, funcionarios: [] });
     };
 
     const filteredData = grupos.filter(item =>
@@ -143,7 +143,7 @@ const Grupos = () => {
                                 <tr>
                                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre del Grupo</th>
                                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Miembros</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Es Firmante</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Jefe / Líder</th>
                                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Estado</th>
                                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
                                 </tr>
@@ -164,13 +164,13 @@ const Grupos = () => {
                                                 <span className="font-bold text-slate-700">{item.total_miembros || 0}</span>
                                             </td>
                                             <td className="px-6 py-4 text-center">
-                                                {item.es_firmante ? (
+                                                {item.jefe_nombre ? (
                                                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
-                                                        <CheckCircle2 className="w-3 h-3" /> SÍ
+                                                        <CheckCircle2 className="w-3 h-3" /> {item.jefe_nombre}
                                                     </span>
                                                 ) : (
                                                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">
-                                                        <XCircle className="w-3 h-3" /> NO
+                                                        <XCircle className="w-3 h-3" /> SIN JEFE
                                                     </span>
                                                 )}
                                             </td>
@@ -248,21 +248,26 @@ const Grupos = () => {
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4 pt-2">
-                                    <label className="flex flex-col gap-2 p-4 rounded-2xl bg-slate-50 border border-slate-100 cursor-pointer hover:border-indigo-200 transition-all select-none group relative">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">¿Es Firmante?</span>
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.es_firmante}
-                                                onChange={(e) => setFormData({ ...formData, es_firmante: e.target.checked })}
-                                                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
-                                            />
-                                        </div>
-                                        <p className="text-[10px] text-slate-400 leading-tight">Marque si este grupo puede firmar RCs.</p>
-                                    </label>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-indigo-600 ml-1 uppercase tracking-tight">Jefe de Grupo</label>
+                                    <select
+                                        value={formData.jefe}
+                                        onChange={(e) => setFormData({ ...formData, jefe: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 font-medium text-sm transition-all"
+                                    >
+                                        <option value="">Seleccionar Jefe...</option>
+                                        {formData.funcionarios.map(fid => {
+                                            const f = funcionarios.find(func => String(func.id) === String(fid));
+                                            return f ? <option key={fid} value={fid}>{f.nombre_funcionario}</option> : null;
+                                        })}
+                                    </select>
+                                    <p className="text-[10px] text-slate-400 ml-1 italic">
+                                        El jefe debe ser parte de los miembros seleccionados abajo.
+                                    </p>
+                                </div>
 
-                                    <label className="flex flex-col gap-2 p-4 rounded-2xl bg-slate-50 border border-slate-100 cursor-pointer hover:border-emerald-200 transition-all select-none group relative">
+                                <div className="pt-2">
+                                    <label className="flex flex-col gap-2 p-4 rounded-2xl bg-slate-50 border border-slate-100 cursor-pointer hover:border-emerald-200 transition-all select-none group relative w-full">
                                         <div className="flex items-center justify-between">
                                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Estado Activo</span>
                                             <input

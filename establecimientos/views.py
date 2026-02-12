@@ -1,9 +1,16 @@
 from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Establecimiento, TelefonoEstablecimiento
-from .serializers import EstablecimientoSerializer, TelefonoEstablecimientoSerializer
+from .models import Establecimiento, TelefonoEstablecimiento, TipoEstablecimiento
+from .serializers import EstablecimientoSerializer, TelefonoEstablecimientoSerializer, TipoEstablecimientoSerializer
 
 from .pagination import LargeResultsSetPagination
+
+class TipoEstablecimientoViewSet(viewsets.ModelViewSet):
+    queryset = TipoEstablecimiento.objects.all()
+    serializer_class = TipoEstablecimientoSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['nombre']
+    ordering_fields = ['nombre']
 
 class EstablecimientoViewSet(viewsets.ModelViewSet):
     queryset = Establecimiento.objects.all()

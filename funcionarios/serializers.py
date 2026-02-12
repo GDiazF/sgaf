@@ -20,15 +20,26 @@ class SubdireccionSerializer(serializers.ModelSerializer):
 class GrupoSerializer(serializers.ModelSerializer):
     """Serializer para Grupos de Funcionarios"""
     total_miembros = serializers.SerializerMethodField()
-    funcionarios = serializers.PrimaryKeyRelatedField(
-        many=True, 
-        queryset=Funcionario.objects.all(),
-        required=False
-    )
+    jefe_nombre = serializers.ReadOnlyField(source='jefe.nombre_funcionario')
+    miembros_detalle = serializers.SerializerMethodField()
+    
+    funcionarios = serializers.PrimaryKeyRelatedField(many=True, queryset=Funcionario.objects.all(), required=False)
 
     class Meta:
         model = Grupo
         fields = '__all__'
+    
+    def get_total_miembros(self, obj):
+        return obj.funcionarios.count()
+
+    def get_miembros_detalle(self, obj):
+        return [
+            {
+                'id': f.id,
+                'nombre': f.nombre_funcionario,
+                'cargo': f.cargo
+            } for f in obj.funcionarios.filter(estado=True)
+        ]
     
     def get_total_miembros(self, obj):
         return obj.funcionarios.count()

@@ -58,6 +58,7 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
     proveedor_nombre = serializers.ReadOnlyField(source='proveedor.nombre')
     tipo_proveedor_nombre = serializers.ReadOnlyField(source='proveedor.tipo_proveedor.nombre')
     grupo_firmante_nombre = serializers.ReadOnlyField(source='grupo_firmante.nombre')
+    firmante_nombre = serializers.ReadOnlyField(source='firmante.nombre_funcionario')
     historial = HistorialRecepcionConformeSerializer(many=True, read_only=True)
 
     class Meta:
@@ -183,6 +184,7 @@ class FacturaAdquisicionSerializer(serializers.ModelSerializer):
     establecimiento_nombre = serializers.ReadOnlyField(source='establecimiento.nombre')
     tipo_entrega_nombre = serializers.ReadOnlyField(source='tipo_entrega.nombre')
     grupo_firmante_nombre = serializers.ReadOnlyField(source='grupo_firmante.nombre')
+    firmante_nombre = serializers.ReadOnlyField(source='firmante.nombre_funcionario')
 
     class Meta:
         model = FacturaAdquisicion

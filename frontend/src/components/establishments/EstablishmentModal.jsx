@@ -2,26 +2,18 @@ import React, { useState, useEffect } from 'react';
 import BaseModal from '../common/BaseModal';
 import { School, Info, User, Mail, MapPin, Hash, Activity, Image as ImageIcon, Camera } from 'lucide-react';
 
-const TIPOS = [
-    { value: 'SALA_CUNA', label: 'Sala Cuna' },
-    { value: 'JARDIN_INFANTIL', label: 'Jardín Infantil' },
-    { value: 'ESCUELA', label: 'Escuela' },
-    { value: 'LICEO', label: 'Liceo' },
-    { value: 'CENTRO_CAPACITACION', label: 'Centro de Capacitación' },
-    { value: 'ADMINISTRACION', label: 'Administración' },
-];
-
 const EstablishmentModal = ({
     isOpen,
     onClose,
     onSave,
     editingId,
-    initialData
+    initialData,
+    establishmentTypes = []
 }) => {
     const [formData, setFormData] = useState({
         rbd: '',
         nombre: '',
-        tipo: 'ESCUELA',
+        tipo: '',
         direccion: '',
         director: '',
         email: '',
@@ -39,7 +31,7 @@ const EstablishmentModal = ({
             setFormData({
                 rbd: '',
                 nombre: '',
-                tipo: 'ESCUELA',
+                tipo: establishmentTypes.length > 0 ? establishmentTypes[0].id : '',
                 direccion: '',
                 director: '',
                 email: '',
@@ -48,7 +40,7 @@ const EstablishmentModal = ({
             setLogoPreview(null);
             setLogoFile(null);
         }
-    }, [initialData, isOpen]);
+    }, [initialData, isOpen, establishmentTypes]);
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -121,8 +113,9 @@ const EstablishmentModal = ({
                                         value={formData.tipo}
                                         onChange={e => setFormData({ ...formData, tipo: e.target.value })}
                                     >
-                                        {TIPOS.map(t => (
-                                            <option key={t.value} value={t.value}>{t.label}</option>
+                                        {!formData.tipo && <option value="">Seleccionar tipo...</option>}
+                                        {establishmentTypes.map(t => (
+                                            <option key={t.id} value={t.id}>{t.nombre}</option>
                                         ))}
                                     </select>
                                 </div>

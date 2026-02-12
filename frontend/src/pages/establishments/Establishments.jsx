@@ -10,17 +10,9 @@ import EstablishmentPhonesModal from '../../components/establishments/Establishm
 import EstablishmentCardsView from '../../components/establishments/EstablishmentCardsView';
 import { Layout } from 'lucide-react';
 
-const TIPOS = [
-    { value: 'SALA_CUNA', label: 'Sala Cuna' },
-    { value: 'JARDIN_INFANTIL', label: 'Jardín Infantil' },
-    { value: 'ESCUELA', label: 'Escuela' },
-    { value: 'LICEO', label: 'Liceo' },
-    { value: 'CENTRO_CAPACITACION', label: 'Centro de Capacitación' },
-    { value: 'ADMINISTRACION', label: 'Administración' },
-];
-
 const Establishments = () => {
     const [establishments, setEstablishments] = useState([]);
+    const [establishmentTypes, setEstablishmentTypes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [loadingDirectory, setLoadingDirectory] = useState(false);
     const [showForm, setShowForm] = useState(false);
@@ -43,7 +35,7 @@ const Establishments = () => {
     const [formData, setFormData] = useState({
         rbd: '',
         nombre: '',
-        tipo: 'ESCUELA',
+        tipo: '',
         director: '',
         direccion: '',
         email: '',
@@ -75,6 +67,19 @@ const Establishments = () => {
         }
     };
 
+    const fetchTypes = async () => {
+        try {
+            const response = await api.get('tipos-establecimiento/');
+            setEstablishmentTypes(response.data.results || response.data);
+            // Si hay tipos, poner el primero como default para el form si es nuevo
+            if ((response.data.results || response.data).length > 0) {
+                setFormData(prev => ({ ...prev, tipo: (response.data.results || response.data)[0].id }));
+            }
+        } catch (error) {
+            console.error("Error fetching types:", error);
+        }
+    };
+
     const fetchAllForDirectory = async () => {
         setLoadingDirectory(true);
         try {
@@ -92,8 +97,12 @@ const Establishments = () => {
     };
 
     useEffect(() => {
+        fetchTypes();
+    }, []);
+
+    useEffect(() => {
         fetchData(currentPage, searchQuery, filterType, ordering);
-    }, [currentPage, filterType, ordering]); // Refetch when Page, Filter or Ordering changes
+    }, [currentPage, filterType, ordering]);
 
     const handleSearch = (query) => {
         setSearchQuery(query);
@@ -131,7 +140,7 @@ const Establishments = () => {
         setFormData({
             rbd: '',
             nombre: '',
-            tipo: 'ESCUELA',
+            tipo: establishmentTypes.length > 0 ? establishmentTypes[0].id : '',
             director: '',
             direccion: '',
             email: '',
@@ -211,29 +220,31 @@ const Establishments = () => {
                         className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm"
                     >
                         <option value="">Todos los tipos</option>
-                        {TIPOS.map(t => (
-                            <option key={t.value} value={t.value}>{t.label}</option>
+                        {establishmentTypes.map(t => (
+                            <option key={t.id} value={t.id}>{t.nombre}</option>
                         ))}
                     </select>
 
                     <FilterBar onSearch={handleSearch} placeholder="Buscar por nombre o RBD..." />
 
-                    <button
-                        onClick={fetchAllForDirectory}
-                        className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 font-bold whitespace-nowrap disabled:opacity-50"
-                        disabled={loadingDirectory}
-                    >
-                        <Layout className="w-5 h-5" />
-                        <span>{loadingDirectory ? 'Cargando...' : 'Directorio'}</span>
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={fetchAllForDirectory}
+                            className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 font-bold whitespace-nowrap disabled:opacity-50"
+                            disabled={loadingDirectory}
+                        >
+                            <Layout className="w-5 h-5" />
+                            <span>{loadingDirectory ? 'Cargando...' : 'Directorio'}</span>
+                        </button>
 
-                    <button
-                        onClick={handleNew}
-                        className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
-                    >
-                        <Plus className="w-5 h-5" />
-                        <span>Nuevo</span>
-                    </button>
+                        <button
+                            onClick={handleNew}
+                            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
+                        >
+                            <Plus className="w-5 h-5" />
+                            <span>Nuevo</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -244,6 +255,7 @@ const Establishments = () => {
                 onSave={handleSave}
                 editingId={editingId}
                 initialData={formData}
+                establishmentTypes={establishmentTypes}
             />
 
             {/* Phones Modal */}
@@ -261,6 +273,7 @@ const Establishments = () => {
                 isOpen={isCardsViewOpen}
                 onClose={() => setIsCardsViewOpen(false)}
                 data={allEstablishments}
+                establishmentTypes={establishmentTypes}
             />
 
             {/* Table List */}
@@ -322,7 +335,7 @@ const Establishments = () => {
                                         </td>
                                         <td className="p-2.5">
                                             <span className="capitalize px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-[10px] font-medium border border-blue-100">
-                                                {item.tipo}
+                                                {item.tipo_nombre}
                                             </span>
                                         </td>
                                         <td className="p-2.5 text-slate-600 truncate" title={item.director || ''}>{item.director || '-'}</td>
@@ -399,7 +412,7 @@ const Establishments = () => {
                     />
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 

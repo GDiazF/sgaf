@@ -227,8 +227,8 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
             pagesize=FOLIO,
             rightMargin=50,
             leftMargin=50,
-            topMargin=60, # Space for color strip
-            bottomMargin=60 # Space for color strip
+            topMargin=40,
+            bottomMargin=40
         )
 
         # Container for elements
@@ -432,14 +432,7 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
         elements.append(Spacer(1, 180))
 
         # Signature Section
-        from funcionarios.models import Funcionario
-        firmante = None
-        if rc.grupo_firmante:
-            firmante = Funcionario.objects.filter(grupos=rc.grupo_firmante, estado=True).first()
-        
-        # If no specific group assigned, fallback to any group with es_firmante=True
-        if not firmante:
-            firmante = Funcionario.objects.filter(grupos__es_firmante=True, estado=True).first()
+        firmante = rc.firmante
 
         if firmante:
             # Signature Line
@@ -494,7 +487,7 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
             elements.append(Spacer(1, 5))
             elements.append(Paragraph("RECIBE CONFORME", styles['SignatureTitle']))
 
-        doc.build(elements, onFirstPage=draw_color_strips, onLaterPages=draw_color_strips)
+        doc.build(elements)
         buffer.seek(0)
         return FileResponse(buffer, as_attachment=True, filename=f'RC_{rc.folio}.pdf')
 
@@ -807,14 +800,7 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
         elements.append(Spacer(1, 80))
 
         # Signature
-        from funcionarios.models import Funcionario
-        firmante = None
-        if factura.grupo_firmante:
-            firmante = Funcionario.objects.filter(grupos=factura.grupo_firmante, estado=True).first()
-        
-        # If no specific group assigned, fallback to any group with es_firmante=True
-        if not firmante:
-            firmante = Funcionario.objects.filter(grupos__es_firmante=True, estado=True).first()
+        firmante = factura.firmante
 
         if firmante:
             # Signature Line
@@ -869,7 +855,5 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
             )))
 
         doc.build(elements, onFirstPage=draw_color_strips, onLaterPages=draw_color_strips)
-        buffer.seek(0)
-        return FileResponse(buffer, as_attachment=True, filename=f'RC_Adquisicion_{factura.folio}.pdf')
         buffer.seek(0)
         return FileResponse(buffer, as_attachment=True, filename=f'RC_Adquisicion_{factura.folio}.pdf')

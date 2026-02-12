@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Proveedor, TipoDocumento, Servicio, TipoProveedor, RegistroPago, CDP, TipoEntrega, FacturaAdquisicion
+from .models import Proveedor, TipoDocumento, Servicio, TipoProveedor, RegistroPago, CDP, TipoEntrega, FacturaAdquisicion, RecepcionConforme
 
 @admin.register(TipoProveedor)
 class TipoProveedorAdmin(admin.ModelAdmin):
@@ -34,13 +34,20 @@ class CDPAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'anio', 'archivo', 'fecha_subida')
     search_fields = ('nombre',)
 
+@admin.register(RecepcionConforme)
+class RecepcionConformeAdmin(admin.ModelAdmin):
+    list_display = ('folio', 'proveedor', 'fecha_emision', 'estado', 'firmante')
+    list_filter = ('estado', 'fecha_emision', 'proveedor')
+    search_fields = ('folio', 'proveedor__nombre', 'firmante__nombre_funcionario')
+    autocomplete_fields = ['proveedor', 'firmante']
+
 @admin.register(TipoEntrega)
 class TipoEntregaAdmin(admin.ModelAdmin):
     list_display = ('nombre',)
 
 @admin.register(FacturaAdquisicion)
 class FacturaAdquisicionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'proveedor', 'establecimiento', 'fecha_recepcion', 'total_pagar')
-    list_filter = ('proveedor', 'establecimiento', 'tipo_entrega')
-    search_fields = ('descripcion', 'proveedor__nombre')
-    autocomplete_fields = ['proveedor', 'establecimiento']
+    list_display = ('id', 'proveedor', 'establecimiento', 'fecha_recepcion', 'total_pagar', 'firmante')
+    list_filter = ('proveedor', 'establecimiento', 'tipo_entrega', 'firmante')
+    search_fields = ('descripcion', 'proveedor__nombre', 'firmante__nombre_funcionario')
+    autocomplete_fields = ['proveedor', 'establecimiento', 'firmante']

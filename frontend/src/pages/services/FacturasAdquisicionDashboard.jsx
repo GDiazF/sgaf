@@ -37,6 +37,7 @@ const FacturasAdquisicionDashboard = () => {
         iva: 0,
         total_pagar: 0,
         grupo_firmante: '',
+        firmante: '',
         nro_factura: '',
         nro_oc: ''
     };
@@ -105,6 +106,7 @@ const FacturasAdquisicionDashboard = () => {
             iva: item.iva,
             total_pagar: item.total_pagar,
             grupo_firmante: item.grupo_firmante || '',
+            firmante: item.firmante || '',
             nro_factura: item.nro_factura || '',
             nro_oc: item.nro_oc || ''
         });
@@ -116,7 +118,11 @@ const FacturasAdquisicionDashboard = () => {
         try {
             const dataToSave = {
                 ...data,
-                grupo_firmante: data.grupo_firmante || null
+                total_neto: parseInt(data.total_neto) || 0,
+                iva: parseInt(data.iva) || 0,
+                total_pagar: parseInt(data.total_pagar) || 0,
+                grupo_firmante: data.grupo_firmante || null,
+                firmante: data.firmante || null
             };
             if (editingId) {
                 await api.put(`facturas-adquisicion/${editingId}/`, dataToSave);
@@ -127,7 +133,8 @@ const FacturasAdquisicionDashboard = () => {
             fetchData(currentPage, searchQuery);
         } catch (error) {
             console.error(error);
-            alert("Error al guardar factura.");
+            const detail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+            alert("Error al guardar factura: " + detail);
         }
     };
 
@@ -179,7 +186,7 @@ const FacturasAdquisicionDashboard = () => {
                         <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-200">
                             <ShoppingBag className="w-6 h-6 text-white" />
                         </div>
-                        Facturas de Adquisición
+                        Facturas
                     </h1>
                     <p className="text-sm text-slate-500 font-medium ml-1">Gestión integral de compras directas y adquisiciones sin servicio</p>
                 </div>

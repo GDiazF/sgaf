@@ -81,6 +81,16 @@ class RecepcionConforme(models.Model):
         verbose_name="Grupo de Firmantes"
     )
 
+    # El funcionario específico que firmó este documento
+    firmante = models.ForeignKey(
+        'funcionarios.Funcionario',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='rcs_firmadas',
+        verbose_name="Firmante"
+    )
+
     def save(self, *args, **kwargs):
         if not self.folio:
             year = datetime.date.today().year
@@ -204,6 +214,16 @@ class FacturaAdquisicion(models.Model):
         blank=True, 
         related_name='facturas_adquisicion',
         verbose_name="Grupo de Firmantes"
+    )
+
+    # El funcionario específico que firmó este documento
+    firmante = models.ForeignKey(
+        'funcionarios.Funcionario',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='facturas_firmadas',
+        verbose_name="Firmante"
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
