@@ -1,0 +1,9 @@
+#carpetas locales
+solicitudes_reservas/
+prueba_oc/
+
+
+# bases de datos locales
+db.sqlite3
+antigua.db.sqlite3
+*.sqlite3
