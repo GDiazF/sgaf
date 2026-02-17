@@ -1,7 +1,18 @@
 from django.db import models
 
 class TipoEstablecimiento(models.Model):
+    AREA_CHOICES = [
+        ('ESTABLECIMIENTO', 'Establecimiento (Escuela/Liceo/Colegio)'),
+        ('JARDIN', 'Jardín Infantil VTF'),
+        ('OFICINA', 'Oficina Central / Administración'),
+    ]
     nombre = models.CharField(max_length=100, unique=True)
+    area_gestion = models.CharField(
+        max_length=20, 
+        choices=AREA_CHOICES, 
+        default='ESTABLECIMIENTO',
+        verbose_name="Área de Gestión"
+    )
     
     class Meta:
         verbose_name = "Tipo de Establecimiento"

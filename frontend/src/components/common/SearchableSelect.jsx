@@ -52,9 +52,16 @@ const SearchableSelect = ({
     };
 
     return (
-        <div className={`space-y-1.5 relative ${className}`} ref={containerRef}>
+        <div className={`form-container relative ${className}`} ref={containerRef}>
             {label && (
-                <label className="text-xs font-bold text-slate-600 ml-1 block">
+                <label className="form-label">
+                    {Icon && (
+                        React.isValidElement(Icon) ? (
+                            <span className="flex-shrink-0">{Icon}</span>
+                        ) : (
+                            <Icon className="w-2.5 h-2.5 text-blue-500" />
+                        )
+                    )}
                     {label} {required && <span className="text-red-500">*</span>}
                 </label>
             )}
@@ -63,9 +70,9 @@ const SearchableSelect = ({
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className={`w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between transition-all hover:bg-white text-sm font-medium h-[46px] ${isOpen ? 'ring-4 ring-blue-500/10 border-blue-500 bg-white' : ''}`}
+                className={`form-input flex items-center justify-between !py-0 ${isOpen ? 'ring-4 ring-blue-500/5 !border-blue-400' : ''}`}
             >
-                <span className={`truncate ${!displayValue ? 'text-slate-400 font-normal' : 'text-slate-700'}`}>
+                <span className={`truncate text-[13px] font-bold ${!displayValue ? 'text-slate-400' : 'text-slate-700'}`}>
                     {displayValue || placeholder}
                 </span>
                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
@@ -75,24 +82,23 @@ const SearchableSelect = ({
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
+                        initial={{ opacity: 0, y: -10, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.98 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute z-[110] left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-64"
+                        className="form-dropdown-container"
                     >
                         {/* Search Input */}
-                        <div className="p-2 border-b border-slate-100 bg-slate-50/50">
+                        <div className="p-3 border-b border-slate-100 bg-slate-50/30">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                 <input
                                     ref={inputRef}
                                     type="text"
-                                    className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none text-sm focus:border-blue-500 transition-all font-medium"
+                                    className="form-dropdown-search"
                                     placeholder="Buscar..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    // Prevent form submission if in a form
                                     onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
                                 />
                             </div>
@@ -106,11 +112,11 @@ const SearchableSelect = ({
                                         key={opt.value}
                                         type="button"
                                         onClick={() => handleSelect(opt.value)}
-                                        className={`w-full px-4 py-2.5 text-left text-sm flex items-center justify-between transition-colors hover:bg-blue-50/50 group ${String(opt.value) === String(value) ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600 font-medium'}`}
+                                        className={`form-dropdown-option ${String(opt.value) === String(value) ? 'bg-blue-50/50 text-blue-700' : ''}`}
                                     >
                                         <span className="truncate">{opt.label}</span>
                                         {String(opt.value) === String(value) && (
-                                            <Check className="w-4 h-4 text-blue-600" />
+                                            <Check className="w-4 h-4 text-blue-600 stroke-[3px]" />
                                         )}
                                     </button>
                                 ))

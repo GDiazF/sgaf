@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import ProcesoCompra, EstadoContrato, CategoriaContrato, Contrato, OrientacionLicitacion, DocumentoContrato, HistorialContrato
+from establecimientos.serializers import EstablecimientoSerializer
 
 class ProcesoCompraSerializer(serializers.ModelSerializer):
     class Meta:
@@ -38,9 +39,16 @@ class ContratoSerializer(serializers.ModelSerializer):
     orientacion_nombre = serializers.ReadOnlyField(source='orientacion.nombre')
     proveedor_nombre = serializers.ReadOnlyField(source='proveedor.nombre')
     plazo_meses = serializers.ReadOnlyField()
+    monto_ejecutado = serializers.ReadOnlyField()
+    monto_restante = serializers.ReadOnlyField()
+    gastos_mensuales = serializers.ReadOnlyField()
     
     documentos = DocumentoContratoSerializer(many=True, read_only=True)
     historial = HistorialContratoSerializer(many=True, read_only=True)
+    establecimientos_detalle = EstablecimientoSerializer(source='establecimientos', many=True, read_only=True)
+
+    from servicios.serializers import FacturaAdquisicionSerializer
+    recepciones = FacturaAdquisicionSerializer(many=True, read_only=True)
 
     class Meta:
         model = Contrato

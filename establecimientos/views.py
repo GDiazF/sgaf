@@ -17,7 +17,7 @@ class EstablecimientoViewSet(viewsets.ModelViewSet):
     serializer_class = EstablecimientoSerializer
     pagination_class = LargeResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['tipo']
+    filterset_fields = ['tipo', 'activo']
     ordering_fields = ['nombre', 'rbd']
     search_fields = ['nombre', 'rbd']
 

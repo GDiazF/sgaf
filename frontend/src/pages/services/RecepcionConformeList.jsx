@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '../../components/common/Pagination';
 import FilterBar from '../../components/common/FilterBar';
 import SortableHeader from '../../components/common/SortableHeader';
+import FormInput from '../../components/common/FormInput';
+import FormSelect from '../../components/common/FormSelect';
 
 const RecepcionConformeList = () => {
     const [rcs, setRcs] = useState([]);
@@ -409,64 +411,53 @@ const RecepcionConformeList = () => {
                                 </button>
                             </div>
 
-                            <form onSubmit={handleSaveEdit} className="flex-1 overflow-auto p-6 space-y-6">
+                            <form onSubmit={handleSaveEdit} className="flex-1 overflow-auto p-8 space-y-8">
                                 {/* Observations */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-slate-700">Observaciones</label>
-                                    <textarea
-                                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none h-32"
-                                        placeholder="Ingrese observaciones adicionales..."
-                                        value={editForm.observaciones}
-                                        onChange={e => setEditForm({ ...editForm, observaciones: e.target.value })}
-                                    />
-                                </div>
+                                <FormInput
+                                    multiline
+                                    rows={3}
+                                    label="Observaciones"
+                                    icon={<FileText />}
+                                    placeholder="Ingrese observaciones adicionales que aparecerán en el documento..."
+                                    value={editForm.observaciones}
+                                    onChange={e => setEditForm({ ...editForm, observaciones: e.target.value })}
+                                />
 
                                 {/* Signer Group Selection */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                            <User className="w-4 h-4 text-blue-500" /> Grupo de Firmante
-                                        </label>
-                                        <select
-                                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                            value={editForm.grupo_firmante}
-                                            onChange={e => {
-                                                const gid = e.target.value;
-                                                const grp = groups.find(g => g.id.toString() === gid);
-                                                setEditForm({
-                                                    ...editForm,
-                                                    grupo_firmante: gid,
-                                                    firmante: grp ? (grp.jefe || '') : ''
-                                                });
-                                            }}
-                                        >
-                                            <option value="">Seleccione grupo...</option>
-                                            {groups.map(g => (
-                                                <option key={g.id} value={g.id}>
-                                                    {g.nombre}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2">
+                                    <FormSelect
+                                        label="Grupo de Firmante"
+                                        icon={<User className="text-blue-500" />}
+                                        value={editForm.grupo_firmante}
+                                        onChange={e => {
+                                            const gid = e.target.value;
+                                            const grp = groups.find(g => g.id.toString() === gid);
+                                            setEditForm({
+                                                ...editForm,
+                                                grupo_firmante: gid,
+                                                firmante: grp ? (grp.jefe || '') : ''
+                                            });
+                                        }}
+                                        options={groups.map(g => ({ value: g.id, label: g.nombre }))}
+                                        placeholder="Seleccione grupo..."
+                                        inputClassName="bg-blue-50/50 border-blue-100 text-blue-700"
+                                        labelClassName="text-blue-600"
+                                    />
 
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                            <User className="w-4 h-4 text-amber-500" /> Firmante Específico
-                                        </label>
-                                        <select
-                                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                            value={editForm.firmante}
-                                            onChange={e => setEditForm({ ...editForm, firmante: e.target.value })}
-                                            disabled={!editForm.grupo_firmante}
-                                        >
-                                            <option value="">Seleccione firmante...</option>
-                                            {groups.find(g => g.id.toString() === editForm.grupo_firmante?.toString())?.miembros_detalle?.map(m => (
-                                                <option key={m.id} value={m.id}>
-                                                    {m.nombre} {m.id === groups.find(g => g.id.toString() === editForm.grupo_firmante.toString())?.jefe ? '(Jefe)' : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
+                                    <FormSelect
+                                        label="Firmante Específico"
+                                        icon={<User className="text-amber-500" />}
+                                        value={editForm.firmante}
+                                        onChange={e => setEditForm({ ...editForm, firmante: e.target.value })}
+                                        disabled={!editForm.grupo_firmante}
+                                        options={groups.find(g => g.id.toString() === editForm.grupo_firmante?.toString())?.miembros_detalle?.map(m => ({
+                                            value: m.id,
+                                            label: `${m.nombre} ${m.id === groups.find(g => g.id.toString() === editForm.grupo_firmante.toString())?.jefe ? '(Jefe)' : ''}`
+                                        })) || []}
+                                        placeholder="Seleccione firmante..."
+                                        inputClassName="bg-amber-50/50 border-amber-100 text-amber-700"
+                                        labelClassName="text-amber-600"
+                                    />
                                 </div>
 
                                 {/* Payments List */}
@@ -484,23 +475,23 @@ const RecepcionConformeList = () => {
                                         ) : (
                                             <div className="divide-y divide-slate-100">
                                                 {currentPayments.map(payment => (
-                                                    <div key={payment.id} className="p-3 flex items-center justify-between hover:bg-white transition-colors">
+                                                    <div key={payment.id} className="p-4 flex items-center justify-between hover:bg-white transition-all group/pago">
                                                         <div className="flex-1 min-w-0 pr-4">
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <span className="font-mono text-xs font-bold text-slate-700 bg-slate-200 px-1.5 rounded">{payment.nro_documento}</span>
-                                                                <span className="text-xs text-slate-500 flex items-center gap-1">
+                                                            <div className="flex items-center gap-2 mb-1.5">
+                                                                <span className="font-mono text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 group-hover/pago:border-blue-200 group-hover/pago:bg-blue-50 transition-colors uppercase tracking-widest">{payment.nro_documento}</span>
+                                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 opacity-60">
                                                                     <Calendar className="w-3 h-3" />
                                                                     {formatDate(payment.fecha_pago)}
                                                                 </span>
                                                             </div>
-                                                            <div className="text-xs text-slate-600 truncate">{payment.servicio_detalle}</div>
+                                                            <div className="text-xs font-bold text-slate-700 truncate group-hover/pago:text-blue-800 transition-colors">{payment.servicio_detalle}</div>
                                                         </div>
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="font-bold text-sm text-slate-900">{formatCurrency(payment.monto_total)}</div>
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="font-black text-sm text-slate-900">{formatCurrency(payment.monto_total)}</div>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleRemovePayment(payment.id)}
-                                                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover/pago:opacity-100"
                                                                 title="Quitar pago de esta RC"
                                                             >
                                                                 <Trash2 className="w-4 h-4" />

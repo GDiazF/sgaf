@@ -8,6 +8,7 @@ import FilterBar from '../../components/common/FilterBar';
 import SortableHeader from '../../components/common/SortableHeader';
 import BulkUploadModal from '../../components/common/BulkUploadModal';
 import PaymentModal from '../../components/services/PaymentModal';
+import FormSelect from '../../components/common/FormSelect';
 
 const PaymentsDashboard = () => {
     const [payments, setPayments] = useState([]);
@@ -352,44 +353,44 @@ const PaymentsDashboard = () => {
                     </div>
 
                     <div className="flex flex-col lg:flex-row lg:items-center gap-3 w-full lg:w-auto">
-                        <div className="flex items-center gap-2">
-                            <select
+                        <div className="flex items-center gap-3">
+                            <FormSelect
                                 value={selectedType}
                                 onChange={handleTypeChange}
-                                className="w-full md:w-48 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm"
-                            >
-                                <option value="">Todos los Tipos</option>
-                                {providerTypes.map(t => (
-                                    <option key={t.id} value={t.id}>{t.nombre}</option>
-                                ))}
-                            </select>
+                                options={providerTypes.map(t => ({ value: t.id, label: t.nombre }))}
+                                placeholder="Tipos de Proveedor"
+                                inputClassName="!py-2 !h-[38px] !text-xs !w-44"
+                            />
 
-                            <select
+                            <FormSelect
                                 value={selectedProvider}
                                 onChange={handleProviderChange}
-                                className="w-full md:w-64 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm"
-                            >
-                                <option value="">Todos los Proveedores</option>
-                                {providers.map(p => (
-                                    <option key={p.id} value={p.id}>{p.nombre}</option>
-                                ))}
-                            </select>
+                                options={providers.map(p => ({ value: p.id, label: p.nombre }))}
+                                placeholder="Proveedores..."
+                                inputClassName="!py-2 !h-[38px] !text-xs !w-60"
+                            />
 
-                            <select
+                            <FormSelect
                                 value={statusFilter}
                                 onChange={handleStatusChange}
-                                className="w-full md:w-40 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm"
-                            >
-                                <option value="all">Ver: Todos</option>
-                                <option value="pending">Pendientes</option>
-                                <option value="paid">Con RC</option>
-                            </select>
+                                options={[
+                                    { value: 'all', label: 'Todos' },
+                                    { value: 'pending', label: 'Pendientes' },
+                                    { value: 'paid', label: 'Con RC' }
+                                ]}
+                                label="Estado"
+                                inputClassName="!py-2 !h-[38px] !text-xs !w-32"
+                            />
                         </div>
 
                         <div className="flex items-center gap-2">
                             {selectedIds.size > 0 && (
-                                <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4">
-                                    <div className="flex flex-col gap-1">
+                                <motion.div
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    className="flex items-center gap-3 p-2.5 bg-indigo-600 rounded-2xl shadow-xl shadow-indigo-600/20 border border-indigo-400 group"
+                                >
+                                    <div className="flex flex-col gap-1.5 w-48">
                                         <select
                                             value={selectedSignerGroup}
                                             onChange={(e) => {
@@ -399,12 +400,12 @@ const PaymentsDashboard = () => {
                                                 const grp = groups.find(g => g.id.toString() === gid);
                                                 if (grp) setSelectedSigner(grp.jefe || '');
                                             }}
-                                            className="px-3 py-1.5 border border-indigo-200 rounded-lg text-[10px] font-bold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm"
+                                            className="px-3 py-1.5 bg-white/10 border border-white/20 rounded-xl text-[9px] font-black text-white hover:bg-white/20 transition-all outline-none"
                                             title="Seleccionar grupo que firmará esta RC"
                                         >
-                                            <option value="">Seleccionar Grupo...</option>
+                                            <option value="" className="text-slate-800">Grupo de Firma...</option>
                                             {groups.map(g => (
-                                                <option key={g.id} value={g.id}>{g.nombre}</option>
+                                                <option key={g.id} value={g.id} className="text-slate-800">{g.nombre}</option>
                                             ))}
                                         </select>
 
@@ -412,12 +413,12 @@ const PaymentsDashboard = () => {
                                             <select
                                                 value={selectedSigner}
                                                 onChange={(e) => setSelectedSigner(e.target.value)}
-                                                className="px-3 py-1.5 border border-amber-200 rounded-lg text-[10px] font-bold text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white shadow-sm"
+                                                className="px-3 py-1.5 bg-white/10 border border-white/20 rounded-xl text-[9px] font-black text-white hover:bg-white/20 transition-all outline-none animate-in slide-in-from-top-1"
                                                 title="Seleccionar funcionario que firmará"
                                             >
-                                                <option value="">Seleccionar Firmante...</option>
+                                                <option value="" className="text-slate-800">Firmante...</option>
                                                 {groups.find(g => g.id.toString() === selectedSignerGroup.toString())?.miembros_detalle?.map(m => (
-                                                    <option key={m.id} value={m.id}>
+                                                    <option key={m.id} value={m.id} className="text-slate-800">
                                                         {m.nombre} {m.id === groups.find(g => g.id.toString() === selectedSignerGroup.toString())?.jefe ? '(Jefe)' : ''}
                                                     </option>
                                                 ))}
@@ -427,12 +428,12 @@ const PaymentsDashboard = () => {
 
                                     <button
                                         onClick={handleGenerateRC}
-                                        className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-3 rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 font-bold whitespace-nowrap text-xs h-fit"
+                                        className="flex items-center gap-2 bg-white text-indigo-600 px-6 py-3 rounded-xl hover:bg-white/90 transition-all shadow-lg font-black whitespace-nowrap text-[10px] uppercase tracking-widest h-full group-hover:scale-105"
                                     >
                                         <FileCheck className="w-4 h-4" />
                                         <span>Generar RC ({selectedIds.size})</span>
                                     </button>
-                                </div>
+                                </motion.div>
                             )}
 
                             <button

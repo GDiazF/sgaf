@@ -1,16 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import BaseModal from '../common/BaseModal';
-import { ShoppingBag, Calendar, FileText, DollarSign, List, Briefcase, Building2, Info, Hash, Users } from 'lucide-react';
+import { ShoppingBag, Calendar, FileText, DollarSign, List, Briefcase, Building2, Info, Hash, Users, CreditCard, PenLine } from 'lucide-react';
 import DateInput from '../common/DateInput';
 import SearchableSelect from '../common/SearchableSelect';
+import MultiSearchableSelect from '../common/MultiSearchableSelect';
+import FormInput from '../common/FormInput';
+import FormSelect from '../common/FormSelect';
+import MonthInput from '../common/MonthInput';
 
 const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, lookups }) => {
     const [formData, setFormData] = useState(initialData);
-    const { establishments, providers, deliveryTypes } = lookups;
+    const { establishments, providers, deliveryTypes, establishmentTypes } = lookups;
 
     useEffect(() => {
         if (isOpen) {
-            setFormData(initialData);
+            setFormData({
+                ...initialData,
+                periodo: initialData?.periodo ? initialData.periodo.substring(0, 7) : ''
+            });
         }
     }, [isOpen, initialData]);
 
@@ -24,8 +31,70 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
     };
 
     const handleFormSave = () => {
-        onSave(formData);
+        // Prepare data for backend: periodo must be a full date (YYYY-MM-DD)
+        const finalData = { ...formData };
+        if (finalData.periodo && finalData.periodo.length === 7) {
+            finalData.periodo = `${finalData.periodo}-01`;
+        }
+        onSave(finalData);
     };
+
+    const handleBulkSelect = (type) => {
+        let selectedIds = [];
+        if (type === 'ALL') {
+            selectedIds = establishments.map(e => e.id);
+        } else if (type === 'CLEAR') {
+            selectedIds = [];
+        } else {
+            const typesInArea = (establishmentTypes || [])
+                .filter(t => t.area_gestion === type)
+                .map(t => t.id);
+
+            selectedIds = establishments
+                .filter(e => typesInArea.includes(e.tipo))
+                .map(e => e.id);
+        }
+        setFormData(prev => ({ ...prev, establecimientos: selectedIds }));
+    };
+
+    const getSmartGlosa = () => {
+        if (!formData.establecimientos || formData.establecimientos.length === 0) return "";
+
+        const count = formData.establecimientos.length;
+
+        // If all are selected, use summary
+        if (count === establishments.length && count > 5) {
+            return "\n- TOTALIDAD DE ESTABLECIMIENTOS";
+        }
+
+        const selectedSet = new Set(formData.establecimientos);
+        const areaTotals = {};
+        const areaCounts = {};
+
+        (establishmentTypes || []).forEach(t => {
+            const area = t.area_gestion || 'ESTABLECIMIENTO';
+            areaTotals[area] = (areaTotals[area] || 0) + establishments.filter(e => e.tipo === t.id).length;
+            areaCounts[area] = (areaCounts[area] || 0) + establishments.filter(e => e.tipo === t.id && selectedSet.has(e.id)).length;
+        });
+
+        // Summary labels for full areas if more than 5
+        if (count > 5) {
+            if (areaCounts['ESTABLECIMIENTO'] === areaTotals['ESTABLECIMIENTO'] && count === areaCounts['ESTABLECIMIENTO'])
+                return "\n- TOTALIDAD DE ESTABLECIMIENTOS (ESCUELAS/LICEOS)";
+            if (areaCounts['JARDIN'] === areaTotals['JARDIN'] && count === areaCounts['JARDIN'])
+                return "\n- TOTALIDAD DE JARDINES INFANTILES VTF";
+            if (areaCounts['OFICINA'] === areaTotals['OFICINA'] && count === areaCounts['OFICINA'])
+                return "\n- OFICINA CENTRAL ADM.";
+        }
+
+        // Default to vertical list
+        const names = formData.establecimientos
+            .map(id => establishments.find(e => e.id === id)?.nombre)
+            .filter(Boolean);
+
+        return names.length > 0 ? "\n- " + names.join('\n- ') : "";
+    };
+
 
     return (
         <BaseModal
@@ -39,58 +108,110 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
             saveLabel={editingId ? 'Actualizar Factura' : 'Guardar Factura'}
         >
             <div className="space-y-6">
-                {/* Section: Identificación y Origen */}
-                <div className="space-y-3">
-                    <h4 className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-2">
-                        <Info className="w-3 h-3" /> Identificación y Origen
+                {/* Section: Identificación del Documento */}
+                <div className="space-y-4">
+                    <h4 className="form-section-header">
+                        <Hash className="w-3.5 h-3.5" /> Identificación del Documento
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-600 ml-1 flex items-center gap-1.5">
-                                <Hash className="w-2.5 h-2.5" /> Nº Certificado Presupuesto (CDP)
-                            </label>
-                            <input
-                                type="text"
-                                name="cdp"
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 pt-2">
+                        <FormInput
+                            label="Nº CDP"
+                            icon={<Hash />}
+                            name="cdp"
+                            required
+                            placeholder="Certificado..."
+                            value={formData.cdp}
+                            onChange={handleChange}
+                        />
+                        <FormInput
+                            label="Nº Factura"
+                            icon={<FileText />}
+                            name="nro_factura"
+                            placeholder="Folio..."
+                            value={formData.nro_factura}
+                            onChange={handleChange}
+                        />
+                        <FormInput
+                            label="Nº Orden de Compra"
+                            icon={<Hash />}
+                            name="nro_oc"
+                            placeholder="Opcional..."
+                            value={formData.nro_oc}
+                            onChange={handleChange}
+                        />
+                    </div>
+                </div>
+
+                {/* Section: Actores Involucrados */}
+                <div className="space-y-4">
+                    <h4 className="form-section-header">
+                        <Users className="w-3.5 h-3.5" /> Proveedor y Establecimientos
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2">
+                        <SearchableSelect
+                            label="Proveedor / Emisor"
+                            icon={<Building2 className="w-3.5 h-3.5" />}
+                            options={providers.map(p => ({ value: p.id, label: `${p.nombre} (RUT: ${p.rut})` }))}
+                            value={formData.proveedor}
+                            onChange={(val) => handleSelectChange('proveedor', val)}
+                            placeholder="Seleccione proveedor..."
+                            required
+                        />
+                        <div className="space-y-2">
+                            <MultiSearchableSelect
+                                label="Establecimientos de Destino"
+                                icon={<Building2 className="w-3.5 h-3.5" />}
+                                options={establishments.map(e => ({ value: e.id, label: e.nombre }))}
+                                value={formData.establecimientos || []}
+                                onChange={(val) => handleSelectChange('establecimientos', val)}
+                                placeholder="Seleccione uno o muchos..."
                                 required
-                                placeholder="Nº CDP..."
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-xs font-semibold h-[38px]"
-                                value={formData.cdp}
-                                onChange={handleChange}
                             />
-                        </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => handleBulkSelect('ALL')}
+                                    className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                >
+                                    Todos
+                                </button>
 
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-600 ml-1 flex items-center gap-1.5">
-                                <FileText className="w-2.5 h-2.5" /> Nº Factura
-                            </label>
-                            <input
-                                type="text"
-                                name="nro_factura"
-                                placeholder="Nº Factura..."
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-xs font-semibold h-[38px]"
-                                value={formData.nro_factura}
-                                onChange={handleChange}
-                            />
-                        </div>
+                                {[
+                                    { key: 'ESTABLECIMIENTO', label: 'Establecimientos', color: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
+                                    { key: 'JARDIN', label: 'Jardines VTF', color: 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' },
+                                    { key: 'OFICINA', label: 'Oficina Central', color: 'bg-amber-50 text-amber-600 hover:bg-amber-100' }
+                                ].map(area => (
+                                    <button
+                                        key={area.key}
+                                        type="button"
+                                        onClick={() => handleBulkSelect(area.key)}
+                                        className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent ${area.color}`}
+                                    >
+                                        {area.label}
+                                    </button>
+                                ))}
 
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-600 ml-1 flex items-center gap-1.5">
-                                <Hash className="w-2.5 h-2.5" /> Nº Orden de Compra (Opcional)
-                            </label>
-                            <input
-                                type="text"
-                                name="nro_oc"
-                                placeholder="Ej: 1234-56-LP24..."
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-xs font-semibold h-[38px]"
-                                value={formData.nro_oc}
-                                onChange={handleChange}
-                            />
+                                <button
+                                    type="button"
+                                    onClick={() => handleBulkSelect('CLEAR')}
+                                    className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent text-red-500 hover:bg-red-50"
+                                >
+                                    Limpiar
+                                </button>
+                            </div>
                         </div>
+                    </div>
+                </div>
 
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-600 ml-1 flex items-center gap-1.5">
-                                <Calendar className="w-2.5 h-2.5" /> Fecha de Recepción
+                {/* Section: Tiempos y Entrega */}
+                <div className="space-y-4">
+                    <h4 className="form-section-header">
+                        <Calendar className="w-3.5 h-3.5" /> Cronología y Entrega
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 pt-2">
+                        <div className="space-y-2">
+                            <label className="form-label">
+                                <Calendar className="w-3.5 h-3.5 text-blue-500" /> Fecha Recepción
                             </label>
                             <DateInput
                                 value={formData.fecha_recepcion}
@@ -98,166 +219,142 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
                                 required
                             />
                         </div>
+                        <MonthInput
+                            label="Periodo de Cobro"
+                            name="periodo"
+                            value={formData.periodo || ''}
+                            onChange={(val) => handleSelectChange('periodo', val)}
+                        />
+                        <FormSelect
+                            label="Tipo de Entrega"
+                            icon={<List />}
+                            name="tipo_entrega"
+                            value={formData.tipo_entrega}
+                            onChange={handleChange}
+                            required
+                            placeholder="Seleccione..."
+                            options={deliveryTypes.map(t => ({ value: t.id, label: t.nombre }))}
+                        />
                     </div>
                 </div>
 
-                {/* Section: Participantes */}
-                <div className="space-y-3">
-                    <h4 className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-2">
-                        <Users className="w-3 h-3" /> Participantes y Entrega
+                {/* Section: Detalle y Costos */}
+                <div className="space-y-4">
+                    <h4 className="form-section-header">
+                        <PenLine className="w-3.5 h-3.5" /> Contenido y Finanzas
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <SearchableSelect
-                            label="Proveedor"
-                            options={providers.map(p => ({ value: p.id, label: `${p.nombre} (RUT: ${p.rut})` }))}
-                            value={formData.proveedor}
-                            onChange={(val) => handleSelectChange('proveedor', val)}
-                            placeholder="Buscar proveedor..."
-                            required
-                        />
-                        <SearchableSelect
-                            label="Establecimiento"
-                            options={establishments.map(e => ({ value: e.id, label: e.nombre }))}
-                            value={formData.establecimiento}
-                            onChange={(val) => handleSelectChange('establecimiento', val)}
-                            placeholder="Buscar establecimiento..."
-                            required
-                        />
-                        <div className="md:col-span-1">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-slate-600 ml-1">Tipo de Entrega</label>
-                                <select
-                                    name="tipo_entrega"
-                                    value={formData.tipo_entrega}
-                                    onChange={handleChange}
-                                    required
-                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-xs font-semibold h-[38px]"
-                                >
-                                    <option value="">Seleccione tipo...</option>
-                                    {deliveryTypes.map(t => (
-                                        <option key={t.id} value={t.id}>{t.nombre}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                        <div className="md:col-span-1">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-blue-600 ml-1 flex items-center gap-1.5">
-                                    <Users className="w-2.5 h-2.5" /> Grupo de Firmantes
-                                </label>
-                                <select
-                                    name="grupo_firmante"
-                                    value={formData.grupo_firmante || ''}
-                                    onChange={(e) => {
-                                        const gid = e.target.value;
-                                        const grp = lookups.groups?.find(g => g.id.toString() === gid);
-                                        setFormData(prev => ({
-                                            ...prev,
-                                            grupo_firmante: gid,
-                                            firmante: grp ? (grp.jefe || '') : ''
-                                        }));
-                                    }}
-                                    className="w-full px-3 py-2 bg-blue-50/50 border border-blue-100 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-xs font-bold text-blue-700 h-[38px]"
-                                >
-                                    <option value="">Seleccione grupo...</option>
-                                    {lookups.groups?.map(g => (
-                                        <option key={g.id} value={g.id}>
-                                            {g.nombre}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="md:col-span-1">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-amber-600 ml-1 flex items-center gap-1.5">
-                                    <Users className="w-2.5 h-2.5" /> Firmante Específico
-                                </label>
-                                <select
-                                    name="firmante"
-                                    value={formData.firmante || ''}
-                                    onChange={handleChange}
-                                    disabled={!formData.grupo_firmante}
-                                    className="w-full px-3 py-2 bg-amber-50/50 border border-amber-100 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-xs font-bold text-amber-700 h-[38px]"
-                                >
-                                    <option value="">Seleccione firmante...</option>
-                                    {lookups.groups?.find(g => g.id.toString() === formData.grupo_firmante?.toString())?.miembros_detalle?.map(m => (
-                                        <option key={m.id} value={m.id}>
-                                            {m.nombre} {m.id === lookups.groups?.find(g => g.id.toString() === formData.grupo_firmante.toString())?.jefe ? '(Jefe)' : ''}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Section: Detalle y Montos */}
-                <div className="space-y-3">
-                    <h4 className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-2">
-                        <FileText className="w-3 h-3" /> Detalle de Adquisición
-                    </h4>
-                    <div className="space-y-4">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-600 ml-1">Descripción</label>
-                            <textarea
+                    <div className="space-y-4 pt-2">
+                        <div className="space-y-3">
+                            <FormInput
+                                label="Concepto / Glosa Base"
+                                icon={<PenLine />}
                                 name="descripcion"
-                                value={formData.descripcion}
+                                value={formData.descripcion || ''}
                                 onChange={handleChange}
                                 required
-                                rows="2"
-                                placeholder="..."
-                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-xs font-semibold resize-none"
+                                placeholder="Ej: Servicios de transporte, Compra de computadores..."
                             />
+
+                            {/* Preview of the final combined description */}
+                            <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Vista Previa Glosa Final (PDF)</span>
+                                <p className="text-[11px] text-slate-600 font-bold leading-tight italic whitespace-pre-line">
+                                    {formData.descripcion || ''}
+                                    {formData.periodo && (() => {
+                                        const [year, month] = formData.periodo.split('-');
+                                        const date = new Date(year, month - 1, 1);
+                                        return ` - ${date.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' }).toUpperCase()}`;
+                                    })()}
+                                    {getSmartGlosa()}
+                                </p>
+                            </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-slate-600 ml-1">Neto ($)</label>
-                                <input
-                                    type="number"
-                                    name="total_neto"
-                                    value={formData.total_neto}
-                                    onChange={handleChange}
-                                    required
-                                    placeholder="0"
-                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-xs font-semibold h-[38px]"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-slate-600 ml-1">IVA ($)</label>
-                                <input
-                                    type="number"
-                                    name="iva"
-                                    value={formData.iva}
-                                    onChange={handleChange}
-                                    required
-                                    placeholder="0"
-                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-xs font-semibold h-[38px]"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-blue-600 ml-1">Total</label>
-                                <input
-                                    type="number"
-                                    name="total_pagar"
-                                    value={formData.total_pagar}
-                                    onChange={handleChange}
-                                    required
-                                    placeholder="0"
-                                    className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-xs font-bold text-blue-700 h-[38px]"
-                                />
-                            </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <FormInput
+                                type="number"
+                                label="Monto Neto ($)"
+                                icon={<DollarSign />}
+                                name="total_neto"
+                                value={formData.total_neto}
+                                onChange={handleChange}
+                                required
+                                placeholder="0"
+                            />
+                            <FormInput
+                                type="number"
+                                label="IVA ($)"
+                                icon={<DollarSign className="text-slate-300" />}
+                                name="iva"
+                                value={formData.iva}
+                                onChange={handleChange}
+                                required
+                                placeholder="0"
+                            />
+                            <FormInput
+                                type="number"
+                                label="Total a Pagar"
+                                icon={<CreditCard className="text-blue-500" />}
+                                name="total_pagar"
+                                value={formData.total_pagar}
+                                onChange={handleChange}
+                                required
+                                placeholder="0"
+                                inputClassName="bg-blue-50/50 border-blue-200 text-blue-700 font-black"
+                                labelClassName="text-blue-600"
+                            />
                         </div>
+                    </div>
+                </div>
+
+                {/* Section: Aprobación */}
+                <div className="space-y-4">
+                    <h4 className="form-section-header">
+                        < PenLine className="w-3.5 h-3.5" /> Firmante de la RC
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2">
+                        <FormSelect
+                            label="Grupo de Firmantes"
+                            icon={<Users className="text-blue-500" />}
+                            name="grupo_firmante"
+                            value={formData.grupo_firmante || ''}
+                            onChange={(e) => {
+                                const gid = e.target.value;
+                                const grp = lookups.groups?.find(g => g.id.toString() === gid);
+                                setFormData(prev => ({
+                                    ...prev,
+                                    grupo_firmante: gid,
+                                    firmante: grp ? (grp.jefe || '') : ''
+                                }));
+                            }}
+                            placeholder="Seleccione grupo..."
+                            options={lookups.groups?.map(g => ({ value: g.id, label: g.nombre }))}
+                            inputClassName="bg-blue-50/50 border-blue-100 text-blue-700"
+                            labelClassName="text-blue-600"
+                        />
+                        <FormSelect
+                            label="Funcionario Firmante"
+                            icon={<Users className="text-amber-500" />}
+                            name="firmante"
+                            value={formData.firmante || ''}
+                            onChange={handleChange}
+                            disabled={!formData.grupo_firmante}
+                            placeholder="Seleccione funcionario..."
+                            options={lookups.groups?.find(g => g.id.toString() === formData.grupo_firmante?.toString())?.miembros_detalle?.map(m => ({
+                                value: m.id,
+                                label: `${m.nombre} ${m.id === lookups.groups?.find(g => g.id.toString() === formData.grupo_firmante.toString())?.jefe ? '(Jefe)' : ''}`
+                            })) || []}
+                            inputClassName="bg-amber-50/50 border-amber-100 text-amber-700"
+                            labelClassName="text-amber-600"
+                        />
                     </div>
                 </div>
 
                 {/* Warning Box */}
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-100 flex gap-2">
-                    <Info className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-                    <p className="text-[9px] text-amber-700 leading-tight font-bold uppercase tracking-tight">
-                        Nota: Verifique los montos e IVA manualmente si existen saldos exentos. Ingrese el CDP para foliar RC.
+                <div className="p-3 bg-blue-50/50 rounded-2xl border border-blue-100/50 flex gap-3">
+                    <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+                    <p className="text-[10px] text-blue-700/70 leading-relaxed font-bold uppercase tracking-tight">
+                        Nota: Ingrese el monto neto e IVA. El sistema calculará automáticamente para el documento si el CDP es válido.
                     </p>
                 </div>
             </div>

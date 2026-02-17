@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import { Save, Search, Plus, X, Key, UserPlus, Check, Building } from 'lucide-react';
 import ApplicantModal from '../../components/applicants/ApplicantModal';
+import FormInput from '../../components/common/FormInput';
+import FormSelect from '../../components/common/FormSelect';
 
 const LoanForm = () => {
     const navigate = useNavigate();
@@ -129,34 +131,22 @@ const LoanForm = () => {
 
                     <div className="p-6 space-y-4">
                         {/* Establishment Select */}
-                        <div>
-                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Filtrar por Establecimiento</label>
-                            <div className="relative">
-                                <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                                <select
-                                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none"
-                                    value={selectedEst}
-                                    onChange={e => setSelectedEst(e.target.value)}
-                                >
-                                    <option value="">Todos los establecimientos</option>
-                                    {establishments.map(est => (
-                                        <option key={est.id} value={est.id}>{est.nombre}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
+                        <FormSelect
+                            label="Filtrar por Establecimiento"
+                            id="est_filter"
+                            icon={Building}
+                            value={selectedEst}
+                            onChange={e => setSelectedEst(e.target.value)}
+                            options={establishments.map(est => ({ value: est.id, label: est.nombre }))}
+                            placeholder="Todos los establecimientos"
+                        />
 
-                        {/* Search Input */}
-                        <div className="relative">
-                            <input
-                                type="text"
-                                placeholder="Buscar llave por nombre..."
-                                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                                value={keySearchTerm}
-                                onChange={e => setKeySearchTerm(e.target.value)}
-                            />
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                        </div>
+                        <FormInput
+                            placeholder="Buscar llave por nombre..."
+                            icon={Search}
+                            value={keySearchTerm}
+                            onChange={e => setKeySearchTerm(e.target.value)}
+                        />
 
                         {/* Search Results */}
                         <div className="bg-white border border-slate-200 rounded-xl shadow-inner max-h-48 overflow-y-auto divide-y divide-slate-100">
@@ -245,21 +235,19 @@ const LoanForm = () => {
                                 initialData={newApplicantData}
                             />
                             {!applicant ? (
-                                <div className="flex gap-2">
-                                    <div className="relative flex-1">
-                                        <input
-                                            type="text"
-                                            placeholder="Ingresar RUT o Nombre"
-                                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-mono"
-                                            value={rutSearch}
-                                            onChange={e => setRutSearch(e.target.value)}
-                                            onKeyDown={e => e.key === 'Enter' && searchApplicant()}
-                                        />
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                                    </div>
+                                <div className="flex gap-2 items-end">
+                                    <FormInput
+                                        placeholder="Ingresar RUT o Nombre"
+                                        icon={Search}
+                                        className="flex-1"
+                                        inputClassName="font-mono"
+                                        value={rutSearch}
+                                        onChange={e => setRutSearch(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && searchApplicant()}
+                                    />
                                     <button
                                         onClick={searchApplicant}
-                                        className="bg-slate-900 text-white px-4 rounded-xl hover:bg-slate-800 font-medium transition-colors"
+                                        className="h-[46px] bg-slate-900 text-white px-6 rounded-2xl hover:bg-slate-800 font-bold transition-all shadow-lg flex items-center justify-center text-sm"
                                     >
                                         Buscar
                                     </button>
@@ -279,14 +267,14 @@ const LoanForm = () => {
                     </div>
 
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Observación (Opcional)</label>
-                        <textarea
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            rows="2"
+                        <FormInput
+                            label="Observación (Opcional)"
+                            placeholder="Notas adicionales..."
                             value={observacion}
                             onChange={e => setObservacion(e.target.value)}
-                            placeholder="Notas adicionales..."
-                        ></textarea>
+                            multiline
+                            rows="2"
+                        />
 
                         <button
                             onClick={handleSubmit}

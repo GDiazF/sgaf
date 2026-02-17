@@ -29,10 +29,11 @@ const FacturasAdquisicionDashboard = () => {
     const initialFormState = {
         cdp: '',
         descripcion: '',
+        periodo: '',
         fecha_recepcion: new Date().toISOString().split('T')[0],
         tipo_entrega: '',
         proveedor: '',
-        establecimiento: '',
+        establecimientos: [],
         total_neto: '',
         iva: 0,
         total_pagar: 0,
@@ -48,12 +49,13 @@ const FacturasAdquisicionDashboard = () => {
         setLoading(true);
         try {
             const params = { page, search, ordering: order };
-            const [factRes, estRes, provRes, delRes, grpRes] = await Promise.all([
+            const [factRes, estRes, provRes, delRes, grpRes, typRes] = await Promise.all([
                 api.get('facturas-adquisicion/', { params }),
-                api.get('establecimientos/'),
-                api.get('proveedores/'),
-                api.get('tipos-entrega/'),
-                api.get('grupos/')
+                api.get('establecimientos/', { params: { page_size: 1000, activo: true } }),
+                api.get('proveedores/', { params: { page_size: 1000 } }),
+                api.get('tipos-entrega/', { params: { page_size: 1000 } }),
+                api.get('grupos/', { params: { page_size: 1000 } }),
+                api.get('tipos-establecimiento/')
             ]);
 
             setFacturas(factRes.data.results || []);
@@ -64,7 +66,8 @@ const FacturasAdquisicionDashboard = () => {
                 establishments: estRes.data.results || estRes.data,
                 providers: provRes.data.results || provRes.data,
                 deliveryTypes: delRes.data.results || delRes.data,
-                groups: grpRes.data.results || grpRes.data
+                groups: grpRes.data.results || grpRes.data,
+                establishmentTypes: typRes.data.results || typRes.data
             });
         } catch (error) {
             console.error("Error fetching data:", error);
@@ -97,11 +100,12 @@ const FacturasAdquisicionDashboard = () => {
     const handleEdit = (item) => {
         setFormData({
             cdp: item.cdp,
+            periodo: item.periodo || '',
             descripcion: item.descripcion,
             fecha_recepcion: item.fecha_recepcion,
             tipo_entrega: item.tipo_entrega,
             proveedor: item.proveedor,
-            establecimiento: item.establecimiento,
+            establecimientos: item.establecimientos || [],
             total_neto: item.total_neto,
             iva: item.iva,
             total_pagar: item.total_pagar,
@@ -206,7 +210,7 @@ const FacturasAdquisicionDashboard = () => {
             <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="lg:col-span-2">
-                        <FilterBar onSearch={handleSearch} placeholder="Buscar por CDP, proveedor o descripción..." />
+                        <FilterBar onSearch={handleSearch} placeholder="Buscar por Folio, CDP, proveedor o total..." />
                     </div>
                 </div>
             </div>
@@ -265,12 +269,21 @@ const FacturasAdquisicionDashboard = () => {
                                         </td>
                                         <td className="p-4">
                                             <div className="flex flex-col gap-0.5 max-w-xs">
-                                                <div className="flex items-center gap-1">
+                                                <div className="flex items-center gap-1 flex-wrap">
                                                     <Hash className="w-2.5 h-2.5 text-blue-500" />
-                                                    <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0 rounded-md border border-blue-100">CDP: {item.cdp}</span>
+                                                    <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0 rounded-md border border-blue-100 whitespace-nowrap">CDP: {item.cdp}</span>
+                                                    {item.periodo && (
+                                                        <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0 rounded-md border border-indigo-100 whitespace-nowrap">{item.periodo}</span>
+                                                    )}
                                                 </div>
-                                                <span className="text-[11px] text-slate-500 font-medium truncate" title={item.descripcion}>
+                                                <span className="text-[11px] text-slate-500 font-medium truncate" title={`${item.descripcion}${item.periodo ? ` - ${item.periodo}` : ''}${item.establecimientos_detalle?.length > 0 ? ` - ${item.establecimientos_detalle.map(e => e.nombre).join(', ')}` : ''}`}>
                                                     {item.descripcion}
+                                                    {item.periodo && !item.descripcion?.toLowerCase().includes(item.periodo.toLowerCase()) && (
+                                                        <span className="text-slate-400"> - {item.periodo}</span>
+                                                    )}
+                                                    {item.establecimientos_detalle?.length > 0 && !item.descripcion?.toLowerCase().includes(item.establecimientos_detalle[0].nombre.toLowerCase()) && (
+                                                        <span className="text-slate-300"> - {item.establecimientos_detalle.map(e => e.nombre).join(', ')}</span>
+                                                    )}
                                                 </span>
                                             </div>
                                         </td>

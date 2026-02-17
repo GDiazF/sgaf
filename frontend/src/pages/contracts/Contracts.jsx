@@ -21,13 +21,15 @@ const Contracts = () => {
     const [categorias, setCategorias] = useState([]);
     const [orientaciones, setOrientaciones] = useState([]);
     const [proveedores, setProveedores] = useState([]);
+    const [establecimientos, setEstablecimientos] = useState([]);
+    const [tiposEstablecimiento, setTiposEstablecimiento] = useState([]);
 
     // Pagination & Search State
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
-    const [ordering, setOrdering] = useState('-fecha_inicio');
+    const [ordering, setOrdering] = useState('vigente_first');
 
     // Filters
     const [filterCategoria, setFilterCategoria] = useState('');
@@ -44,7 +46,10 @@ const Contracts = () => {
         proveedor: '',
         fecha_adjudicacion: '',
         fecha_inicio: '',
-        fecha_termino: ''
+        fecha_termino: '',
+        tipo_oc: 'UNICA',
+        nro_oc: '',
+        establecimientos: []
     });
 
     const fetchData = async (page = 1) => {
@@ -53,7 +58,7 @@ const Contracts = () => {
             const params = {
                 page,
                 search: searchQuery,
-                ordering,
+                ordering: ordering === 'vigente_first' ? '-estado__nombre, -fecha_inicio' : ordering,
                 ...(filterCategoria && { categoria: filterCategoria }),
                 ...(filterEstado && { estado: filterEstado }),
                 ...(filterOrientacion && { orientacion: filterOrientacion })
@@ -71,18 +76,22 @@ const Contracts = () => {
 
     const fetchLookups = async () => {
         try {
-            const [procRes, estRes, catRes, oriRes, provRes] = await Promise.all([
+            const [procRes, estRes, catRes, oriRes, provRes, setupsRes, typesRes] = await Promise.all([
                 api.get('contratos/procesos/'),
                 api.get('contratos/estados/'),
                 api.get('contratos/categorias/'),
                 api.get('contratos/orientaciones/'),
-                api.get('proveedores/')
+                api.get('proveedores/'),
+                api.get('establecimientos/', { params: { page_size: 1000, activo: true } }),
+                api.get('tipos-establecimiento/')
             ]);
             setProcesos(procRes.data.results || procRes.data);
             setEstados(estRes.data.results || estRes.data);
             setCategorias(catRes.data.results || catRes.data);
             setOrientaciones(oriRes.data.results || oriRes.data);
             setProveedores(provRes.data.results || provRes.data);
+            setEstablecimientos(setupsRes.data.results || setupsRes.data);
+            setTiposEstablecimiento(typesRes.data.results || typesRes.data);
         } catch (error) {
             console.error("Error fetching lookups:", error);
         }
@@ -119,7 +128,10 @@ const Contracts = () => {
             proveedor: '',
             fecha_adjudicacion: '',
             fecha_inicio: '',
-            fecha_termino: ''
+            fecha_termino: '',
+            tipo_oc: 'UNICA',
+            nro_oc: '',
+            establecimientos: []
         });
         setEditingId(null);
         setShowForm(true);
@@ -136,7 +148,10 @@ const Contracts = () => {
             proveedor: item.proveedor || '',
             fecha_adjudicacion: item.fecha_adjudicacion,
             fecha_inicio: item.fecha_inicio,
-            fecha_termino: item.fecha_termino
+            fecha_termino: item.fecha_termino,
+            tipo_oc: item.tipo_oc || 'UNICA',
+            nro_oc: item.nro_oc || '',
+            establecimientos: item.establecimientos || []
         });
         setEditingId(item.id);
         setShowForm(true);
@@ -220,7 +235,7 @@ const Contracts = () => {
                 onSave={handleSave}
                 editingId={editingId}
                 initialData={formData}
-                lookups={{ procesos, estados, categorias, orientaciones, proveedores }}
+                lookups={{ procesos, estados, categorias, orientaciones, proveedores, establecimientos, tiposEstablecimiento }}
             />
 
             {/* Table */}
@@ -230,10 +245,10 @@ const Contracts = () => {
                         <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-bold text-slate-500 tracking-wider">
                             <tr>
                                 <SortableHeader label="Código MP" sortKey="codigo_mercado_publico" currentOrdering={ordering} onSort={handleSort} />
-                                <th className="p-3">Proveedor</th>
-                                <th className="p-3">Orientación / Distribución</th>
-                                <th className="p-3">Categoría / Proceso</th>
-                                <th className="p-3">Estado</th>
+                                <SortableHeader label="Proveedor" sortKey="proveedor__nombre" currentOrdering={ordering} onSort={handleSort} />
+                                <SortableHeader label="Orientación / Distribución" sortKey="orientacion__nombre" currentOrdering={ordering} onSort={handleSort} />
+                                <SortableHeader label="Categoría / Proceso" sortKey="categoria__nombre" currentOrdering={ordering} onSort={handleSort} />
+                                <SortableHeader label="Estado" sortKey="estado__nombre" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="Inicio" sortKey="fecha_inicio" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="Término" sortKey="fecha_termino" currentOrdering={ordering} onSort={handleSort} />
                                 <th className="p-3 text-center">Plazo</th>
@@ -267,11 +282,11 @@ const Contracts = () => {
                                         </div>
                                     </td>
                                     <td className="p-3">
-                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${item.estado_nombre.toLowerCase().includes('activo') ? 'bg-emerald-100 text-emerald-700' :
-                                            item.estado_nombre.toLowerCase().includes('termin') ? 'bg-slate-100 text-slate-500' :
+                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${(item.estado_nombre?.toLowerCase() || '').includes('activo') || (item.estado_nombre?.toLowerCase() || '').includes('vigente') ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-sm' :
+                                            (item.estado_nombre?.toLowerCase() || '').includes('termin') ? 'bg-slate-100 text-slate-500' :
                                                 'bg-amber-100 text-amber-700'
                                             }`}>
-                                            {item.estado_nombre}
+                                            {item.estado_nombre || 'N/A'}
                                         </span>
                                     </td>
                                     <td className="p-3 text-slate-600 font-medium">

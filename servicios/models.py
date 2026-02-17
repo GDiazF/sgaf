@@ -190,16 +190,30 @@ class FacturaAdquisicion(models.Model):
 
     # Numero de certificado de presupuesto (FK a CDP)
     cdp = models.CharField(max_length=100, verbose_name="Certificado de Presupuesto (CDP)")
+    
+    # El periodo al que corresponde la factura (primero de mes para registrar mes/año)
+    periodo = models.DateField(blank=True, null=True, verbose_name="Periodo")
+
     descripcion = models.TextField(verbose_name="Descripción de producto o servicio")
+    
     # Fecha de recepcion conforme (dd/mm/yyyy predeterminada hoy)
     fecha_recepcion = models.DateField(default=datetime.date.today, verbose_name="Fecha de recepción conforme")
+    
     # Entrega parcializada o total
     tipo_entrega = models.ForeignKey(TipoEntrega, on_delete=models.PROTECT, related_name='facturas', verbose_name="Tipo de Entrega")
+    
     # Proveedor (FK)
     proveedor = models.ForeignKey(Proveedor, on_delete=models.PROTECT, related_name='facturas_adquisicion')
-    # Establecimiento (para saber dónde se recibió)
-    establecimiento = models.ForeignKey(Establecimiento, on_delete=models.PROTECT, related_name='facturas_adquisicion')
     
+    # Establecimiento (para saber dónde se recibió) - Deprecated, moving to M2M
+    establecimiento = models.ForeignKey(Establecimiento, on_delete=models.PROTECT, related_name='facturas_adquisicion', null=True, blank=True)
+    
+    # Múltiples establecimientos asociados
+    establecimientos = models.ManyToManyField(Establecimiento, related_name='facturas_adquisicion_m2m', blank=True, verbose_name="Establecimientos")
+    
+    # Vinculación opcional a un contrato
+    contrato = models.ForeignKey('contratos.Contrato', on_delete=models.SET_NULL, null=True, blank=True, related_name='recepciones', verbose_name="Contrato Asociado")
+
     # Financial fields
     total_neto = models.IntegerField(verbose_name="Total Neto")
     iva = models.IntegerField(verbose_name="Impuestos (19% IVA)")
@@ -232,7 +246,11 @@ class FacturaAdquisicion(models.Model):
     def save(self, *args, **kwargs):
         if not self.folio:
             year = datetime.date.today().year
-            prefix = f"RCF-{year}"
+            # Prefix: ROC for contracts, RCF for direct acquisitions
+            prefix_base = "ROC" if self.contrato else "RCF"
+            prefix = f"{prefix_base}-{year}"
+            
+            # Filter specifically by the derived prefix to maintain independent sequences
             last_factura = FacturaAdquisicion.objects.filter(folio__startswith=prefix).order_by('folio').last()
             
             if last_factura:

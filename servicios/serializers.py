@@ -181,7 +181,7 @@ class TipoEntregaSerializer(serializers.ModelSerializer):
 class FacturaAdquisicionSerializer(serializers.ModelSerializer):
     proveedor_nombre = serializers.ReadOnlyField(source='proveedor.nombre')
     proveedor_rut = serializers.ReadOnlyField(source='proveedor.rut')
-    establecimiento_nombre = serializers.ReadOnlyField(source='establecimiento.nombre')
+    establecimientos_detalle = EstablecimientoSerializer(source='establecimientos', many=True, read_only=True)
     tipo_entrega_nombre = serializers.ReadOnlyField(source='tipo_entrega.nombre')
     grupo_firmante_nombre = serializers.ReadOnlyField(source='grupo_firmante.nombre')
     firmante_nombre = serializers.ReadOnlyField(source='firmante.nombre_funcionario')

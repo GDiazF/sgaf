@@ -489,7 +489,7 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
 
         doc.build(elements)
         buffer.seek(0)
-        return FileResponse(buffer, as_attachment=True, filename=f'RC_{rc.folio}.pdf')
+        return FileResponse(buffer, as_attachment=True, filename=f'{rc.folio}.pdf')
 
     @action(detail=True, methods=['post'])
     def anular(self, request, pk=None):
@@ -532,7 +532,7 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
     queryset = FacturaAdquisicion.objects.all()
     serializer_class = FacturaAdquisicionSerializer
     filterset_fields = ['proveedor', 'establecimiento', 'tipo_entrega', 'cdp']
-    search_fields = ['descripcion', 'proveedor__nombre', 'id']
+    search_fields = ['descripcion', 'proveedor__nombre', 'id', 'folio', 'cdp', 'total_pagar']
 
     @action(detail=True, methods=['get'])
     def generate_pdf(self, request, pk=None):
@@ -721,11 +721,43 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
         elements.append(Paragraph("<b>IDENTIFICACIÓN DEL PRODUCTO O SERVICIO ADQUIRIDO</b>", section_style))
         fecha_recepcion = factura.fecha_recepcion.strftime("%d-%m-%Y")
         
+        # Format establishments string
+        establecimientos_str = ", ".join([e.nombre for e in factura.establecimientos.all()])
+        
+        # Format combined description: {descripcion} - {periodo} - {establecimientos}
+        # Avoid duplicating period if it's already in the description text
+        descripcion_final = factura.descripcion or ""
+        period_str = ""
+        if factura.periodo:
+            m_name = MESES.get(factura.periodo.month, "").upper()
+            period_str = f"{m_name} {factura.periodo.year}"
+        
+        if period_str and period_str.lower() not in descripcion_final.lower():
+            if descripcion_final:
+                descripcion_final += f" - {period_str}"
+            else:
+                descripcion_final = period_str
+                
+        if establecimientos_str and establecimientos_str.lower() not in descripcion_final.lower():
+            # Create a vertical list for establishments
+            est_list = [f"- {e.nombre}" for e in factura.establecimientos.all()]
+            vertical_est_str = "<br/>" + "<br/>".join(est_list)
+            
+            if descripcion_final:
+                descripcion_final += vertical_est_str
+            else:
+                descripcion_final = vertical_est_str.replace("<br/>", "", 1) # remove leading br if empty
+
+        # Get OC from factura or contract
+        nro_oc_final = factura.nro_oc
+        if not nro_oc_final and factura.contrato:
+            nro_oc_final = factura.contrato.nro_oc
+            
         producto_rows = [
-            ["NÚMERO DE ORDEN DE COMPRA", ""], # Empty as requested
-            ["NÚMERO DE FACTURA", str(factura.nro_factura or "")], # Use new field
+            ["NÚMERO DE ORDEN DE COMPRA", str(nro_oc_final or "-")],
+            ["NÚMERO DE FACTURA", str(factura.nro_factura or "")],
             ["NÚMERO DE CERTIFICADO DE PRESUPUESTO", factura.cdp],
-            ["DESCRIPCIÓN DE PRODUCTO O SERVICIO ADQUIRIDO", factura.descripcion],
+            ["DESCRIPCIÓN DE PRODUCTO O SERVICIO ADQUIRIDO", descripcion_final],
             ["FECHA DE RECEPCIÓN CONFORME", fecha_recepcion],
             ["ENTREGA PARCIALIZADA O TOTAL DE PRODUCTO Y/O SERVICIO", str(factura.tipo_entrega)],
         ]
@@ -856,4 +888,4 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
 
         doc.build(elements, onFirstPage=draw_color_strips, onLaterPages=draw_color_strips)
         buffer.seek(0)
-        return FileResponse(buffer, as_attachment=True, filename=f'RC_Adquisicion_{factura.folio}.pdf')
+        return FileResponse(buffer, as_attachment=True, filename=f'{factura.folio}.pdf')

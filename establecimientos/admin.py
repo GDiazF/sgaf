@@ -3,7 +3,8 @@ from .models import Establecimiento, TipoEstablecimiento
 
 @admin.register(TipoEstablecimiento)
 class TipoEstablecimientoAdmin(admin.ModelAdmin):
-    list_display = ('nombre',)
+    list_display = ('nombre', 'area_gestion')
+    list_filter = ('area_gestion',)
     search_fields = ('nombre',)
 
 @admin.register(Establecimiento)

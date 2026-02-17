@@ -74,13 +74,18 @@ const DateInput = ({ label, value, onChange, required = false, className = "" })
     };
 
     return (
-        <div className={`space-y-1.5 ${className}`}>
-            {label && <label className="text-xs font-bold text-slate-600 ml-1">{label}</label>}
+        <div className={`form-container ${className}`}>
+            {label && (
+                <label className="form-label">
+                    <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                    {label} {required && <span className="text-red-500">*</span>}
+                </label>
+            )}
             <div className="relative group">
                 <input
                     type="text"
                     required={required}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium font-mono h-[46px]"
+                    className="form-input font-mono"
                     value={inputValue}
                     onChange={handleTextChange}
                     onBlur={handleBlur}
@@ -90,16 +95,17 @@ const DateInput = ({ label, value, onChange, required = false, className = "" })
                 {/* Calendar Icon Button */}
                 <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-blue-500 transition-colors p-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 group-hover:text-blue-500 transition-colors p-1"
                     onClick={handleDateIconClick}
                 >
-                    <Calendar className="w-5 h-5" />
+                    <Calendar className="w-4 h-4" />
                 </button>
 
                 {/* Hidden Native Date Input */}
                 <input
                     ref={dateInputRef}
                     type="date"
+                    lang="es-CL"
                     className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
                     onChange={handleNativeDateChange}
                     tabIndex={-1}

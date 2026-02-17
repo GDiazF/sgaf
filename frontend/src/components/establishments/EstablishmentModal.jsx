@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import BaseModal from '../common/BaseModal';
+import FormInput from '../common/FormInput';
+import FormSelect from '../common/FormSelect';
 import { School, Info, User, Mail, MapPin, Hash, Activity, Image as ImageIcon, Camera } from 'lucide-react';
 
 const EstablishmentModal = ({
@@ -95,84 +97,61 @@ const EstablishmentModal = ({
 
                         <div className="flex-1 space-y-4 w-full">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">RBD Nacional</label>
-                                    <input
-                                        type="number"
-                                        required
-                                        placeholder="Ej: 12345"
-                                        className="w-full p-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-bold"
-                                        value={formData.rbd}
-                                        onChange={e => setFormData({ ...formData, rbd: e.target.value })}
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo de Institución</label>
-                                    <select
-                                        className="w-full p-3 bg-white border border-slate-200 rounded-2xl outline-none text-sm appearance-none focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer font-bold pr-10"
-                                        value={formData.tipo}
-                                        onChange={e => setFormData({ ...formData, tipo: e.target.value })}
-                                    >
-                                        {!formData.tipo && <option value="">Seleccionar tipo...</option>}
-                                        {establishmentTypes.map(t => (
-                                            <option key={t.id} value={t.id}>{t.nombre}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre Oficial</label>
-                                <input
-                                    type="text"
+                                <FormInput
+                                    label="RBD Nacional"
+                                    icon={<Hash />}
+                                    type="number"
                                     required
-                                    placeholder="Nombre completo..."
-                                    className="w-full p-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-bold"
-                                    value={formData.nombre}
-                                    onChange={e => setFormData({ ...formData, nombre: e.target.value })}
+                                    placeholder="Ej: 12345"
+                                    value={formData.rbd}
+                                    onChange={e => setFormData({ ...formData, rbd: e.target.value })}
+                                />
+                                <FormSelect
+                                    label="Tipo de Institución"
+                                    icon={<Activity />}
+                                    value={formData.tipo}
+                                    onChange={e => setFormData({ ...formData, tipo: e.target.value })}
+                                    options={establishmentTypes.map(t => ({ value: t.id, label: t.nombre }))}
+                                    placeholder="Seleccionar tipo..."
                                 />
                             </div>
+                            <FormInput
+                                label="Nombre Oficial del Establecimiento"
+                                icon={<School />}
+                                required
+                                placeholder="Nombre completo de la institución..."
+                                value={formData.nombre}
+                                onChange={e => setFormData({ ...formData, nombre: e.target.value })}
+                            />
                         </div>
                     </div>
                 </div>
 
                 {/* Section: Contacto y Ubicación */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                            <User className="w-3.5 h-3.5" /> Director(a) / Responsable
-                        </label>
-                        <input
-                            type="text"
-                            placeholder="Nombre del directivo..."
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium"
-                            value={formData.director}
-                            onChange={e => setFormData({ ...formData, director: e.target.value })}
-                        />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                            <Mail className="w-3.5 h-3.5" /> Correo Institucional
-                        </label>
-                        <input
-                            type="email"
-                            placeholder="ejemplo@slep.cl"
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium"
-                            value={formData.email}
-                            onChange={e => setFormData({ ...formData, email: e.target.value })}
-                        />
-                    </div>
-                    <div className="space-y-1.5 md:col-span-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                            <MapPin className="w-3.5 h-3.5" /> Dirección Física
-                        </label>
-                        <input
-                            type="text"
-                            placeholder="Calle, número, comuna..."
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium"
-                            value={formData.direccion}
-                            onChange={e => setFormData({ ...formData, direccion: e.target.value })}
-                        />
-                    </div>
+                    <FormInput
+                        label="Director(a) / Responsable"
+                        icon={User}
+                        placeholder="Nombre del directivo..."
+                        value={formData.director}
+                        onChange={e => setFormData({ ...formData, director: e.target.value })}
+                    />
+                    <FormInput
+                        label="Correo Institucional"
+                        icon={Mail}
+                        type="email"
+                        placeholder="ejemplo@slep.cl"
+                        value={formData.email}
+                        onChange={e => setFormData({ ...formData, email: e.target.value })}
+                    />
+                    <FormInput
+                        label="Dirección Física"
+                        icon={MapPin}
+                        placeholder="Calle, número, comuna..."
+                        className="md:col-span-2"
+                        value={formData.direccion}
+                        onChange={e => setFormData({ ...formData, direccion: e.target.value })}
+                    />
                 </div>
 
                 {/* Section: Estado */}

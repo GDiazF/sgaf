@@ -27,7 +27,7 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
             <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -35,8 +35,7 @@ const Login = () => {
                 className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative"
             >
                 {/* Decorative header */}
-                <div className="bg-blue-600 p-8 text-center relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-full bg-white/10 backdrop-blur-sm"></div>
+                <div className="bg-slate-900 p-8 text-center relative overflow-hidden">
                     <motion.div
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
@@ -44,11 +43,11 @@ const Login = () => {
                         className="relative z-10 flex flex-col items-center"
                     >
                         {/* Modified for wide logo */}
-                        <div className="mb-6 p-2 w-72 h-36 flex items-center justify-center">
+                        <div className="mb-6 p-2 w-72 h-36 flex items-center justify-center bg-white/10 rounded-2xl backdrop-blur-md border border-white/10">
                             <img src="/logo.png" alt="SLEP Logo" className="w-full h-full object-contain" />
                         </div>
-                        <h1 className="text-2xl font-bold text-white">Bienvenido</h1>
-                        <p className="text-blue-100 text-sm mt-1">Sistema de Gestión SLEP Iquique</p>
+                        <h1 className="text-2xl font-black text-white tracking-tight">Bienvenido</h1>
+                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-1">Sistema de Gestión SLEP Iquique</p>
                     </motion.div>
                 </div>
 
@@ -69,48 +68,48 @@ const Login = () => {
                             <input
                                 type="text"
                                 id="username"
-                                className="peer w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:border-blue-600 focus:ring-0 outline-none transition-all placeholder-transparent text-slate-900 font-medium"
-                                placeholder="Usuario"
+                                className="peer w-full px-4 py-3 bg-white border-2 border-slate-100 rounded-xl !focus:border-slate-900 !focus:ring-[6px] !focus:ring-slate-900/5 outline-none transition-all placeholder:text-transparent text-slate-900 font-bold text-sm"
+                                placeholder=" "
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
                                 required
                             />
                             <label
                                 htmlFor="username"
-                                className="absolute left-4 -top-2.5 bg-white px-2 text-xs font-semibold text-slate-500 transition-all 
-                                peer-placeholder-shown:text-base peer-placeholder-shown:text-slate-400 peer-placeholder-shown:top-3.5 peer-placeholder-shown:bg-transparent
-                                peer-focus:-top-2.5 peer-focus:text-xs peer-focus:text-blue-600 peer-focus:bg-white pointer-events-none"
+                                className="absolute left-4 -top-2 bg-white px-2 text-[8px] font-black text-slate-400 uppercase tracking-widest transition-all 
+                                peer-placeholder-shown:text-[11px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:top-3.5 peer-placeholder-shown:bg-transparent peer-placeholder-shown:font-bold
+                                peer-focus:-top-2 peer-focus:text-[8px] peer-focus:text-slate-900 peer-focus:bg-white pointer-events-none"
                             >
                                 Usuario
                             </label>
-                            <User className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 peer-focus:text-blue-600 transition-colors pointer-events-none" />
+                            <User className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 peer-focus:text-slate-900 transition-colors pointer-events-none" />
                         </div>
 
                         <div className="relative">
                             <input
                                 type="password"
                                 id="password"
-                                className="peer w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:border-blue-600 focus:ring-0 outline-none transition-all placeholder-transparent text-slate-900 font-medium"
-                                placeholder="Contraseña"
+                                className="peer w-full px-4 py-3 bg-white border-2 border-slate-100 rounded-xl !focus:border-slate-900 !focus:ring-[6px] !focus:ring-slate-900/5 outline-none transition-all placeholder:text-transparent text-slate-900 font-bold text-sm"
+                                placeholder=" "
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                             />
                             <label
                                 htmlFor="password"
-                                className="absolute left-4 -top-2.5 bg-white px-2 text-xs font-semibold text-slate-500 transition-all 
-                                peer-placeholder-shown:text-base peer-placeholder-shown:text-slate-400 peer-placeholder-shown:top-3.5 peer-placeholder-shown:bg-transparent
-                                peer-focus:-top-2.5 peer-focus:text-xs peer-focus:text-blue-600 peer-focus:bg-white pointer-events-none"
+                                className="absolute left-4 -top-2 bg-white px-2 text-[8px] font-black text-slate-400 uppercase tracking-widest transition-all 
+                                peer-placeholder-shown:text-[11px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:top-3.5 peer-placeholder-shown:bg-transparent peer-placeholder-shown:font-bold
+                                peer-focus:-top-2 peer-focus:text-[8px] peer-focus:text-slate-900 peer-focus:bg-white pointer-events-none"
                             >
                                 Contraseña
                             </label>
-                            <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 peer-focus:text-blue-600 transition-colors pointer-events-none" />
+                            <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 peer-focus:text-slate-900 transition-colors pointer-events-none" />
                         </div>
 
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-500/30 transition-all transform active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center mt-4"
+                            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-3.5 rounded-xl shadow-xl shadow-slate-900/10 transition-all transform active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center mt-4 uppercase text-[11px] tracking-widest"
                         >
                             {isLoading ? (
                                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>

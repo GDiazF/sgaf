@@ -4,7 +4,7 @@ from .models import Establecimiento, TelefonoEstablecimiento, TipoEstablecimient
 class TipoEstablecimientoSerializer(serializers.ModelSerializer):
     class Meta:
         model = TipoEstablecimiento
-        fields = ['id', 'nombre']
+        fields = ['id', 'nombre', 'area_gestion']
 
 class TelefonoEstablecimientoSerializer(serializers.ModelSerializer):
     class Meta:

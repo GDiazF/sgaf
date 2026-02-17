@@ -57,12 +57,62 @@ class Contrato(models.Model):
     orientacion = models.ForeignKey(OrientacionLicitacion, on_delete=models.PROTECT, related_name='contratos', verbose_name="Orientación", null=True, blank=True)
     proveedor = models.ForeignKey(Proveedor, on_delete=models.PROTECT, related_name='contratos', verbose_name="Proveedor", null=True, blank=True)
     
+    TIPO_OC_CHOICES = [
+        ('UNICA', 'OC Única'),
+        ('MULTIPLE', 'OC Múltiple'),
+    ]
+    tipo_oc = models.CharField(max_length=10, choices=TIPO_OC_CHOICES, default='AGREEMENT', verbose_name="Tipo de OC")
+    nro_oc = models.CharField(max_length=50, blank=True, null=True, verbose_name="Número de OC")
+    cdp = models.CharField(max_length=100, blank=True, null=True, verbose_name="Nº CDP")
+    monto_total = models.IntegerField(default=0, verbose_name="Monto Total Adjudicado")
+    
+    # Establecimientos asociados al contrato
+    establecimientos = models.ManyToManyField('establecimientos.Establecimiento', related_name='contratos', blank=True, verbose_name="Establecimientos Asociados")
+
     fecha_adjudicacion = models.DateField(verbose_name="Fecha de Adjudicación")
     fecha_inicio = models.DateField(verbose_name="Fecha de Inicio")
     fecha_termino = models.DateField(verbose_name="Fecha de Término")
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def monto_ejecutado(self):
+        # Sum of total_pagar from all related receptions (FacturaAdquisicion)
+        # Assuming recepciones is the related_name in FacturaAdquisicion
+        total = self.recepciones.aggregate(total=models.Sum('total_pagar'))['total'] or 0
+        return total
+
+    @property
+    def monto_restante(self):
+        return self.monto_total - self.monto_ejecutado
+
+    @property
+    def gastos_mensuales(self):
+        from django.db.models.functions import ExtractMonth, ExtractYear
+        from django.db.models import Sum
+        import calendar
+        
+        # Get execution data grouped by year and month
+        stats = self.recepciones.filter(periodo__isnull=False).annotate(
+            year=ExtractYear('periodo'),
+            month=ExtractMonth('periodo')
+        ).values('year', 'month').annotate(
+            total=Sum('total_pagar')
+        ).order_by('year', 'month')
+
+        result = []
+        for s in stats:
+            month_name = calendar.month_name[s['month']].capitalize()
+            # You might want to translate to Spanish if your locale is set, 
+            # but calendar.month_name depends on system locale.
+            # Let's use a manual map for reliability in Spanish as per user context.
+            MESES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+            result.append({
+                "mes": f"{MESES_ES[s['month']-1]} {s['year']}",
+                "monto": s['total']
+            })
+        return result
 
     @property
     def plazo_meses(self):
