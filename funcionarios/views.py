@@ -97,14 +97,21 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def estadisticas(self, request):
-        """Obtener estadísticas de funcionarios"""
-        total = self.get_queryset().count()
-        activos = self.get_queryset().filter(estado=True).count()
+        """Obtener estadísticas de funcionarios y estructura organizacional"""
+        # Funcionarios
+        total = Funcionario.objects.count()
+        activos = Funcionario.objects.filter(estado=True).count()
         inactivos = total - activos
         
-        # Por subdirección
+        # Estructura (solo activos)
+        subdirecciones_count = Subdireccion.objects.filter(activo=True).count()
+        departamentos_count = Departamento.objects.filter(activo=True).count()
+        unidades_count = Unidad.objects.filter(activo=True).count()
+        grupos_count = Grupo.objects.filter(activo=True).count()
+        
+        # Por subdirección (solo funcionarios activos)
         por_subdireccion = {}
-        subdirecciones = Subdireccion.objects.all()
+        subdirecciones = Subdireccion.objects.filter(activo=True)
         for sub in subdirecciones:
             por_subdireccion[sub.nombre] = sub.funcionarios.filter(estado=True).count()
         
@@ -112,6 +119,10 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
             'total': total,
             'activos': activos,
             'inactivos': inactivos,
+            'subdirecciones': subdirecciones_count,
+            'departamentos': departamentos_count,
+            'unidades': unidades_count,
+            'grupos': grupos_count,
             'por_subdireccion': por_subdireccion
         })
 

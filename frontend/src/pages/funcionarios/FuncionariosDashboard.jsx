@@ -14,23 +14,8 @@ const FuncionariosDashboard = () => {
 
     const fetchStats = async () => {
         try {
-            const [funcionariosRes, subdireccionesRes, departamentosRes, unidadesRes, gruposRes, estadisticasRes] = await Promise.all([
-                api.get('funcionarios/'),
-                api.get('subdirecciones/'),
-                api.get('departamentos/'),
-                api.get('unidades/'),
-                api.get('grupos/'),
-                api.get('funcionarios/estadisticas/')
-            ]);
-
-            setStats({
-                funcionarios: funcionariosRes.data.length,
-                subdirecciones: subdireccionesRes.data.length,
-                departamentos: departamentosRes.data.length,
-                unidades: unidadesRes.data.length,
-                grupos: gruposRes.data.length || gruposRes.data.results?.length || 0,
-                estadisticas: estadisticasRes.data
-            });
+            const response = await api.get('funcionarios/estadisticas/');
+            setStats(response.data);
         } catch (error) {
             console.error('Error fetching stats:', error);
         } finally {
@@ -70,7 +55,7 @@ const FuncionariosDashboard = () => {
 
     return (
         <motion.div
-            className="flex flex-col gap-8 pb-8 max-w-7xl mx-auto"
+            className="flex flex-col gap-8 pb-8"
             variants={containerVariants}
             initial="hidden"
             animate="visible"
@@ -111,7 +96,7 @@ const FuncionariosDashboard = () => {
                                 <span className="text-xs font-bold uppercase tracking-widest">Nómina Total</span>
                             </div>
                             <div className="text-6xl font-black tracking-tighter mb-8">
-                                {stats?.estadisticas?.total || 0}
+                                {stats?.total || 0}
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -119,13 +104,13 @@ const FuncionariosDashboard = () => {
                                     <div className="flex items-center gap-2 text-emerald-300 text-xs font-bold uppercase mb-1">
                                         <UserCheck className="w-3 h-3" /> Activos
                                     </div>
-                                    <div className="text-2xl font-bold">{stats?.estadisticas?.activos || 0}</div>
+                                    <div className="text-2xl font-bold">{stats?.activos || 0}</div>
                                 </div>
                                 <div className="bg-white/5 backdrop-blur-md rounded-xl p-3 border border-white/5">
                                     <div className="flex items-center gap-2 text-rose-300 text-xs font-bold uppercase mb-1">
                                         <UserX className="w-3 h-3" /> Inactivos
                                     </div>
-                                    <div className="text-2xl font-bold text-white/80">{stats?.estadisticas?.inactivos || 0}</div>
+                                    <div className="text-2xl font-bold text-white/80">{stats?.inactivos || 0}</div>
                                 </div>
                             </div>
                         </div>

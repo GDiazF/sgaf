@@ -64,7 +64,7 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
     class Meta:
         model = RecepcionConforme
         fields = '__all__'
-        read_only_fields = ('folio', 'fecha_emision')
+        read_only_fields = ('fecha_emision',)
 
     def validate(self, data):
         registros_ids = data.get('registros_ids', [])
@@ -189,4 +189,4 @@ class FacturaAdquisicionSerializer(serializers.ModelSerializer):
     class Meta:
         model = FacturaAdquisicion
         fields = '__all__'
-        read_only_fields = ['folio', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']

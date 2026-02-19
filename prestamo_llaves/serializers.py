@@ -4,9 +4,22 @@ from .models import Establecimiento, Solicitante, Llave, Prestamo
 from establecimientos.serializers import EstablecimientoSerializer
 
 class SolicitanteSerializer(serializers.ModelSerializer):
+    funcionario_detalle = serializers.SerializerMethodField()
+    
     class Meta:
         model = Solicitante
         fields = '__all__'
+
+    def get_funcionario_detalle(self, obj):
+        if obj.funcionario:
+            return {
+                'id': obj.funcionario.id,
+                'nombre': obj.funcionario.nombre_funcionario,
+                'cargo': obj.funcionario.cargo,
+                'subdireccion': obj.funcionario.subdireccion.nombre if obj.funcionario.subdireccion else None,
+                'departamento': obj.funcionario.departamento.nombre if obj.funcionario.departamento else None,
+            }
+        return None
 
 class LlaveSerializer(serializers.ModelSerializer):
     establecimiento_nombre = serializers.ReadOnlyField(source='establecimiento.nombre')

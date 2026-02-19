@@ -23,9 +23,9 @@ class SolicitanteViewSet(viewsets.ModelViewSet):
 class LlaveViewSet(viewsets.ModelViewSet):
     queryset = Llave.objects.all()
     serializer_class = LlaveSerializer
-    filterset_fields = ['establecimiento']
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['establecimiento']
+    filterset_fields = {
+        'establecimiento': ['exact', 'in'],
+    }
     ordering_fields = ['nombre', 'establecimiento__nombre']
     search_fields = ['nombre', 'establecimiento__nombre']
 
@@ -40,6 +40,13 @@ class PrestamoViewSet(viewsets.ModelViewSet):
         'fecha_devolucion': ['isnull']
     }
     ordering_fields = ['fecha_prestamo', 'fecha_devolucion', 'llave__nombre', 'solicitante__nombre']
+    search_fields = [
+        'llave__nombre', 
+        'llave__establecimiento__nombre', 
+        'solicitante__nombre', 
+        'solicitante__apellido', 
+        'solicitante__rut'
+    ]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -59,8 +66,27 @@ class PrestamoViewSet(viewsets.ModelViewSet):
              return Response({'error': 'Debe seleccionar al menos una llave'}, status=status.HTTP_400_BAD_REQUEST)
 
         solicitante_id = request.data.get('solicitante')
+        funcionario_id = request.data.get('funcionario') # New: if linked to a staff
         observacion = request.data.get('observacion', '')
         
+        # Logic to handle Funcionario automatic linking
+        if funcionario_id and not solicitante_id:
+            from funcionarios.models import Funcionario
+            try:
+                # Find or create Solicitante for this funcionario
+                funcionario = Funcionario.objects.get(id=funcionario_id)
+                solicitante, created = Solicitante.objects.get_or_create(
+                    funcionario=funcionario,
+                    defaults={
+                        'rut': funcionario.rut,
+                        'nombre': funcionario.nombre_funcionario.split(' ')[0], # Basic split
+                        'apellido': ' '.join(funcionario.nombre_funcionario.split(' ')[1:]),
+                    }
+                )
+                solicitante_id = solicitante.id
+            except Funcionario.DoesNotExist:
+                return Response({'error': 'Funcionario no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
         created_prestamos = []
         
         # Validate all keys are available first (Optional, but good practice)

@@ -156,6 +156,27 @@ const ContractDetail = () => {
         }
     };
 
+    const handleDownloadPDF = async (rc) => {
+        try {
+            const response = await api.get(`facturas-adquisicion/${rc.id}/generate_pdf/`, {
+                responseType: 'blob'
+            });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const oc = rc.nro_oc || contract.nro_oc;
+            const rawFilename = oc ? `RC ${oc}.pdf` : `RC ${rc.folio || rc.id}.pdf`;
+            const filename = rawFilename.replace(/[/\\?%*:|"<>]/g, '-');
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (error) {
+            console.error("Error downloading PDF:", error);
+            alert("Error al generar el PDF.");
+        }
+    };
+
     const handleSort = (key) => {
         let direction = 'desc';
         if (sortConfig.key === key && sortConfig.direction === 'desc') {
@@ -738,10 +759,7 @@ const ContractDetail = () => {
                                                                 <Pencil className="w-3.5 h-3.5" />
                                                             </button>
                                                             <button
-                                                                onClick={() => {
-                                                                    const url = api.defaults.baseURL + 'facturas-adquisicion/' + rc.id + '/generate_pdf/';
-                                                                    window.open(url, '_blank');
-                                                                }}
+                                                                onClick={() => handleDownloadPDF(rc)}
                                                                 className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 transition-all"
                                                                 title="Descargar PDF"
                                                             >

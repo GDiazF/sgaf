@@ -19,14 +19,18 @@ const EstablishmentModal = ({
         direccion: '',
         director: '',
         email: '',
+        latitud: '',
+        longitud: '',
         activo: true
     });
+    const [coordsString, setCoordsString] = useState('');
     const [logoFile, setLogoFile] = useState(null);
     const [logoPreview, setLogoPreview] = useState(null);
 
     useEffect(() => {
         if (initialData) {
             setFormData(initialData);
+            setCoordsString(initialData.latitud && initialData.longitud ? `${initialData.latitud}, ${initialData.longitud}` : '');
             setLogoPreview(initialData.logo);
             setLogoFile(null);
         } else {
@@ -37,8 +41,11 @@ const EstablishmentModal = ({
                 direccion: '',
                 director: '',
                 email: '',
+                latitud: '',
+                longitud: '',
                 activo: true
             });
+            setCoordsString('');
             setLogoPreview(null);
             setLogoFile(null);
         }
@@ -49,6 +56,25 @@ const EstablishmentModal = ({
         if (file) {
             setLogoFile(file);
             setLogoPreview(URL.createObjectURL(file));
+        }
+    };
+
+    const handleCoordsChange = (value) => {
+        setCoordsString(value);
+        // Simple logic: if there is a comma, split and update lat/long
+        const parts = value.split(',').map(p => p.trim());
+        if (parts.length === 2) {
+            setFormData(prev => ({
+                ...prev,
+                latitud: parts[0],
+                longitud: parts[1]
+            }));
+        } else if (value === '') {
+            setFormData(prev => ({
+                ...prev,
+                latitud: '',
+                longitud: ''
+            }));
         }
     };
 
@@ -151,6 +177,14 @@ const EstablishmentModal = ({
                         className="md:col-span-2"
                         value={formData.direccion}
                         onChange={e => setFormData({ ...formData, direccion: e.target.value })}
+                    />
+                    <FormInput
+                        label="Coordenadas GPS (Latitud, Longitud)"
+                        icon={<Activity />}
+                        placeholder="Pegue aquí las coordenadas de Google Maps (Ej: -20.21, -70.14)"
+                        className="md:col-span-2"
+                        value={coordsString}
+                        onChange={e => handleCoordsChange(e.target.value)}
                     />
                 </div>
 

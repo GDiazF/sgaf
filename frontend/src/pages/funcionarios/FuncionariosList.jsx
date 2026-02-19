@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Edit2, Power, Filter, Phone, Plus } from 'lucide-react';
+import { Users, Search, Edit2, Power, Filter, Phone, Plus, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api';
 import FuncionarioModal from '../../components/funcionarios/FuncionarioModal';
+import Pagination from '../../components/common/Pagination';
 
 const FuncionariosList = () => {
     const [funcionarios, setFuncionarios] = useState([]);
@@ -12,22 +14,57 @@ const FuncionariosList = () => {
     const [filterSubdireccion, setFilterSubdireccion] = useState('');
     const [subdirecciones, setSubdirecciones] = useState([]);
 
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalResults, setTotalResults] = useState(0);
+
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedId, setSelectedId] = useState(null);
 
     useEffect(() => {
-        fetchData();
+        fetchSubdirecciones();
+        fetchData(1);
     }, []);
 
-    const fetchData = async () => {
+    const fetchSubdirecciones = async () => {
         try {
-            const [funcRes, subRes] = await Promise.all([
-                api.get('funcionarios/'),
-                api.get('subdirecciones/')
-            ]);
-            setFuncionarios(Array.isArray(funcRes.data) ? funcRes.data : (funcRes.data.results || []));
-            setSubdirecciones(Array.isArray(subRes.data) ? subRes.data : (subRes.data.results || []));
+            const response = await api.get('subdirecciones/', { params: { nopaginate: true } });
+            setSubdirecciones(Array.isArray(response.data) ? response.data : (response.data.results || []));
+        } catch (error) {
+            console.error('Error fetching subdirecciones:', error);
+        }
+    };
+
+    const fetchData = async (page = 1, search = searchTerm, estado = filterEstado, sub = filterSubdireccion) => {
+        setLoading(true);
+        try {
+            const params = {
+                page,
+                search,
+                ordering: 'nombre_funcionario'
+            };
+
+            if (estado !== 'all') {
+                params.estado = estado === 'activo';
+            }
+            if (sub) {
+                params.subdireccion = sub;
+            }
+
+            const response = await api.get('funcionarios/', { params });
+
+            if (response.data.results) {
+                setFuncionarios(response.data.results);
+                setTotalPages(Math.ceil(response.data.count / 10)); // Assuming PAGE_SIZE=10
+                setTotalResults(response.data.count);
+            } else {
+                setFuncionarios(response.data);
+                setTotalPages(1);
+                setTotalResults(response.data.length);
+            }
+            setCurrentPage(page);
         } catch (error) {
             console.error('Error fetching data:', error);
         } finally {
@@ -35,10 +72,28 @@ const FuncionariosList = () => {
         }
     };
 
+    const handleSearch = (e) => {
+        const value = e.target.value;
+        setSearchTerm(value);
+        fetchData(1, value, filterEstado, filterSubdireccion);
+    };
+
+    const handleFilterEstado = (e) => {
+        const value = e.target.value;
+        setFilterEstado(value);
+        fetchData(1, searchTerm, value, filterSubdireccion);
+    };
+
+    const handleFilterSubdireccion = (e) => {
+        const value = e.target.value;
+        setFilterSubdireccion(value);
+        fetchData(1, searchTerm, filterEstado, value);
+    };
+
     const handleToggleEstado = async (id) => {
         try {
             await api.post(`funcionarios/${id}/toggle_estado/`);
-            fetchData();
+            fetchData(currentPage);
         } catch (error) {
             console.error('Error toggling estado:', error);
             alert('Error al cambiar estado');
@@ -55,162 +110,170 @@ const FuncionariosList = () => {
         setIsModalOpen(true);
     };
 
-    const filteredData = funcionarios.filter(item => {
-        const matchesSearch =
-            item.nombre_funcionario.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.rut.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.anexo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.cargo?.toLowerCase().includes(searchTerm.toLowerCase());
-
-        const matchesEstado =
-            filterEstado === 'all' ||
-            (filterEstado === 'activo' && item.estado) ||
-            (filterEstado === 'inactivo' && !item.estado);
-
-        const matchesSubdireccion =
-            !filterSubdireccion ||
-            item.subdireccion == filterSubdireccion;
-
-        return matchesSearch && matchesEstado && matchesSubdireccion;
-    });
-
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Lista de Funcionarios</h1>
-                    <p className="text-gray-600">Gestiona y consulta la información del personal</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    <button
-                        onClick={handleCreate}
-                        className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30"
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-200/60 pb-6">
+                <div className="flex flex-col gap-3">
+                    <Link
+                        to="/funcionarios"
+                        className="flex items-center gap-2 text-slate-500 hover:text-sky-600 transition-colors w-fit group"
                     >
-                        <Plus className="w-4 h-4" />
-                        Nuevo Funcionario
-                    </button>
-                </div>
-            </div>
-
-            {/* Filtros */}
-            <div className="bg-white rounded-xl shadow-md p-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        <input
-                            type="text"
-                            placeholder="Buscar por nombre, RUT, anexo o cargo..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                    </div>
-                    <div className="relative">
-                        <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        <select
-                            value={filterEstado}
-                            onChange={(e) => setFilterEstado(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="all">Todos los estados</option>
-                            <option value="activo">Solo activos</option>
-                            <option value="inactivo">Solo inactivos</option>
-                        </select>
-                    </div>
-                    <div className="relative">
-                        <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        <select
-                            value={filterSubdireccion}
-                            onChange={(e) => setFilterSubdireccion(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="">Todas las subdirecciones</option>
-                            {subdirecciones.map(sub => (
-                                <option key={sub.id} value={sub.id}>{sub.nombre}</option>
-                            ))}
-                        </select>
+                        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                        <span className="text-xs font-bold uppercase tracking-wider">Volver al Portal</span>
+                    </Link>
+                    <div>
+                        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Funcionarios</h1>
+                        <p className="text-sm font-medium text-slate-500 mt-1 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span>
+                            Gestión de Capital Humano ({totalResults})
+                        </p>
                     </div>
                 </div>
+                <button
+                    onClick={handleCreate}
+                    className="group relative inline-flex items-center gap-2 px-6 py-3 bg-sky-600 text-white text-sm font-semibold rounded-xl overflow-hidden transition-all hover:bg-sky-700 hover:shadow-lg hover:shadow-sky-900/20 active:scale-95 shadow-xl shadow-sky-500/20"
+                >
+                    <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
+                    <span>Nuevo Funcionario</span>
+                </button>
             </div>
 
-            {/* Tabla */}
-            <div className="bg-white rounded-xl shadow-md overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="md:col-span-2 relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                            <input
+                                type="text"
+                                placeholder="Nombre, RUT, anexo o cargo..."
+                                value={searchTerm}
+                                onChange={handleSearch}
+                                className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
+                            />
+                        </div>
+                        <div className="relative">
+                            <select
+                                value={filterEstado}
+                                onChange={handleFilterEstado}
+                                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-sky-500 outline-none appearance-none"
+                            >
+                                <option value="all">Todos los estados</option>
+                                <option value="activo">Solo activos</option>
+                                <option value="inactivo">Solo inactivos</option>
+                            </select>
+                        </div>
+                        <div className="relative">
+                            <select
+                                value={filterSubdireccion}
+                                onChange={handleFilterSubdireccion}
+                                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-sky-500 outline-none appearance-none"
+                            >
+                                <option value="">Todas las subdirecciones</option>
+                                {subdirecciones.map(sub => (
+                                    <option key={sub.id} value={sub.id}>{sub.nombre}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
                 {loading ? (
-                    <div className="text-center py-12">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                    <div className="flex flex-col items-center justify-center py-20 gap-4">
+                        <div className="w-10 h-10 rounded-full border-4 border-slate-100 border-t-sky-600 animate-spin"></div>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cargando...</span>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-gray-50">
+                        <table className="w-full text-left whitespace-nowrap table-fixed">
+                            <colgroup>
+                                <col style={{ width: '120px' }} /> {/* Estado */}
+                                <col style={{ width: '25%' }} />   {/* Nombre */}
+                                <col style={{ width: '130px' }} /> {/* RUT */}
+                                <col style={{ width: '100px' }} /> {/* Anexo */}
+                                <col style={{ width: '20%' }} />   {/* Subdireccion */}
+                                <col style={{ width: '15%' }} />   {/* Cargo */}
+                                <col style={{ width: '100px' }} /> {/* Acciones */}
+                            </colgroup>
+                            <thead className="bg-slate-50 border-b border-slate-200">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">RUT</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Anexo</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subdirección</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cargo</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                                    <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+                                    <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nombre</th>
+                                    <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">RUT</th>
+                                    <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Anexo</th>
+                                    <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Subdirección</th>
+                                    <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Cargo</th>
+                                    <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-200">
-                                {filteredData.map((item) => (
-                                    <motion.tr
-                                        key={item.id}
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        className="hover:bg-gray-50"
-                                    >
-                                        <td className="px-6 py-4">
-                                            <div className="font-semibold text-gray-900">{item.nombre_funcionario}</div>
-                                            {item.departamento_nombre && (
-                                                <div className="text-sm text-gray-500">{item.departamento_nombre}</div>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-600 font-mono text-sm">{item.rut}</td>
-                                        <td className="px-6 py-4">
-                                            {item.anexo ? (
-                                                <div>
-                                                    <div className="font-semibold text-gray-900">{item.anexo}</div>
-                                                    <div className="text-xs text-gray-500">{item.numero_publico}</div>
-                                                </div>
-                                            ) : (
-                                                <span className="text-gray-400">-</span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-600 text-sm">
-                                            {item.subdireccion_nombre || '-'}
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-600 text-sm">{item.cargo || '-'}</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${item.estado ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                {item.estado ? 'Activo' : 'Inactivo'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right space-x-2">
-                                            <button
-                                                onClick={() => handleEdit(item.id)}
-                                                className="text-blue-600 hover:text-blue-800"
-                                            >
-                                                <Edit2 className="w-5 h-5" />
-                                            </button>
+                            <tbody className="divide-y divide-slate-100">
+                                {funcionarios.map((item) => (
+                                    <tr key={item.id} className="hover:bg-slate-50 transition-colors text-xs">
+                                        <td className="p-3">
                                             <button
                                                 onClick={() => handleToggleEstado(item.id)}
-                                                className={`${item.estado ? 'text-red-600 hover:text-red-800' : 'text-green-600 hover:text-green-800'}`}
-                                                title={item.estado ? 'Desactivar' : 'Activar'}
+                                                className={`flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black transition-all ${item.estado ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-rose-100 text-rose-700 hover:bg-rose-200'}`}
                                             >
-                                                <Power className="w-5 h-5" />
+                                                <Power className="w-3 h-3" />
+                                                {item.estado ? 'ACTIVO' : 'INACTIVO'}
                                             </button>
                                         </td>
-                                    </motion.tr>
+                                        <td className="p-3">
+                                            <div className="flex flex-col">
+                                                <span className="font-semibold text-slate-900 truncate" title={item.nombre_funcionario}>
+                                                    {item.nombre_funcionario}
+                                                </span>
+                                                {item.departamento_nombre && (
+                                                    <span className="text-[10px] text-slate-400 truncate w-full" title={item.departamento_nombre}>
+                                                        {item.departamento_nombre}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="p-3 text-slate-500 font-mono text-[11px]">{item.rut}</td>
+                                        <td className="p-3 text-center">
+                                            {item.anexo ? (
+                                                <div className="flex flex-col items-center">
+                                                    <span className="font-bold text-slate-700">{item.anexo}</span>
+                                                    <span className="text-[9px] text-slate-400">{item.numero_publico}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-slate-300">-</span>
+                                            )}
+                                        </td>
+                                        <td className="p-3 text-slate-600 truncate" title={item.subdireccion_nombre}>
+                                            {item.subdireccion_nombre || '-'}
+                                        </td>
+                                        <td className="p-3 text-slate-500 truncate" title={item.cargo}>{item.cargo || '-'}</td>
+                                        <td className="p-3 text-right">
+                                            <div className="flex justify-end gap-1">
+                                                <button
+                                                    onClick={() => handleEdit(item.id)}
+                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-sky-600 hover:bg-sky-50 transition-colors"
+                                                    title="Editar"
+                                                >
+                                                    <Edit2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 ))}
                             </tbody>
                         </table>
-                        {filteredData.length === 0 && (
-                            <div className="text-center py-12 text-gray-500">
+                        {funcionarios.length === 0 && (
+                            <div className="py-12 text-center text-slate-400 font-medium text-xs italic">
                                 No se encontraron funcionarios
                             </div>
                         )}
+                    </div>
+                )}
+
+                {totalPages > 1 && (
+                    <div className="p-4 border-t border-slate-100 bg-slate-50/30">
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={(page) => fetchData(page)}
+                        />
                     </div>
                 )}
             </div>
@@ -218,7 +281,7 @@ const FuncionariosList = () => {
             <FuncionarioModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                onSave={fetchData}
+                onSave={() => fetchData(currentPage)}
                 funcionarioId={selectedId}
             />
         </div>

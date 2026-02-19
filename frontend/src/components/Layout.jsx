@@ -217,6 +217,14 @@ const Layout = () => {
                                             <span className="font-medium whitespace-nowrap">Proveedores</span>
                                         </Link>
 
+                                        <Link
+                                            to="/services/adquisiciones"
+                                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/services/adquisiciones') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                        >
+                                            <DollarSign className="w-4 h-4 flex-shrink-0" />
+                                            <span className="font-medium whitespace-nowrap">Factura sin OC</span>
+                                        </Link>
+
                                         {/* Collapsible Menu: Servicios */}
                                         <div>
                                             <button
@@ -243,9 +251,6 @@ const Layout = () => {
                                                     </Link>
                                                     <Link to="/services/cdp" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/cdp') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
                                                         CDPs
-                                                    </Link>
-                                                    <Link to="/services/adquisiciones" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/adquisiciones') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
-                                                        Facturas
                                                     </Link>
                                                 </div>
                                             )}
@@ -302,7 +307,7 @@ const Layout = () => {
                                                         Panel
                                                     </Link>
                                                     <Link to="/loans/new" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/loans/new') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
-                                                        Nuevo
+                                                        Nuevo Préstamo
                                                     </Link>
                                                     <Link to="/history" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/history') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
                                                         Historial

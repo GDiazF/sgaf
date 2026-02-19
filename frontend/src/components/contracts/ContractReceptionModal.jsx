@@ -24,7 +24,8 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
         iva: 0,
         total_pagar: 0,
         grupo_firmante: '',
-        firmante: ''
+        firmante: '',
+        folio: ''
     };
 
     const [formData, setFormData] = useState(initialData);
@@ -39,7 +40,8 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                     tipo_entrega: editingRC.tipo_entrega?.id || editingRC.tipo_entrega,
                     grupo_firmante: editingRC.grupo_firmante?.id || editingRC.grupo_firmante,
                     firmante: editingRC.firmante?.id || editingRC.firmante,
-                    establecimientos: editingRC.establecimientos?.map(e => e.id || e) || []
+                    establecimientos: editingRC.establecimientos?.map(e => e.id || e) || [],
+                    folio: editingRC.folio || ''
                 });
             } else {
                 setFormData({
@@ -123,11 +125,19 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
     };
 
     const handleFormSave = () => {
-        // Prepare data for backend: periodo must be a full date (YYYY-MM-DD)
+        // Prepare data for backend: periodo must be a full date (YYYY-MM-DD) or null
         const finalData = { ...formData };
         if (finalData.periodo && finalData.periodo.length === 7) {
             finalData.periodo = `${finalData.periodo}-01`;
+        } else if (!finalData.periodo) {
+            finalData.periodo = null;
         }
+
+        // Ensure establecimientos is at least an empty array if empty
+        if (!finalData.establecimientos) {
+            finalData.establecimientos = [];
+        }
+
         onSave(finalData);
     };
 
@@ -148,7 +158,16 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                     <h4 className="form-section-header">
                         <Hash className="w-3.5 h-3.5" /> Detalles de Facturación
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2">
+                        <FormInput
+                            label="Folio RC"
+                            icon={<FileText />}
+                            name="folio"
+                            placeholder="Automático..."
+                            value={formData.folio}
+                            onChange={handleChange}
+                            inputClassName="bg-slate-50 font-mono"
+                        />
                         <FormInput
                             label="Nº CDP"
                             icon={<Hash />}
@@ -201,7 +220,6 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                             value={formData.establecimientos || []}
                             onChange={(val) => handleSelectChange('establecimientos', val)}
                             placeholder="Seleccione uno o muchos..."
-                            required
                         />
                         <div className="flex flex-wrap gap-2 mt-2">
                             <button
@@ -306,39 +324,45 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <FormInput
-                                type="number"
-                                label="Monto Neto ($)"
-                                icon={<DollarSign />}
-                                name="total_neto"
-                                value={formData.total_neto}
-                                onChange={handleChange}
-                                required
-                                placeholder="0"
-                            />
-                            <FormInput
-                                type="number"
-                                label="IVA ($)"
-                                icon={<DollarSign className="text-slate-300" />}
-                                name="iva"
-                                value={formData.iva}
-                                onChange={handleChange}
-                                required
-                                placeholder="0"
-                            />
-                            <FormInput
-                                type="number"
-                                label="Total a Pagar"
-                                icon={<CreditCard className="text-blue-500" />}
-                                name="total_pagar"
-                                value={formData.total_pagar}
-                                onChange={handleChange}
-                                required
-                                placeholder="0"
-                                inputClassName="bg-blue-50/50 border-blue-200 text-blue-700 font-black"
-                                labelClassName="text-blue-600"
-                            />
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormInput
+                                    type="number"
+                                    label="Monto Neto ($)"
+                                    icon={<DollarSign />}
+                                    name="total_neto"
+                                    value={formData.total_neto}
+                                    onChange={handleChange}
+                                    required
+                                    placeholder="0"
+                                />
+                                <FormInput
+                                    type="number"
+                                    label="IVA ($)"
+                                    icon={<DollarSign className="text-slate-300" />}
+                                    name="iva"
+                                    value={formData.iva}
+                                    onChange={handleChange}
+                                    required
+                                    placeholder="0"
+                                />
+                            </div>
+                            <div className="flex justify-center">
+                                <div className="w-full md:w-1/2">
+                                    <FormInput
+                                        type="number"
+                                        label="Total a Pagar"
+                                        icon={<CreditCard className="text-blue-500" />}
+                                        name="total_pagar"
+                                        value={formData.total_pagar}
+                                        onChange={handleChange}
+                                        required
+                                        placeholder="0"
+                                        inputClassName="bg-blue-50/50 border-blue-200 text-blue-700 font-black text-center"
+                                        labelClassName="text-blue-600 text-center block w-full"
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

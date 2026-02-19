@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api';
-import { Link } from 'react-router-dom';
-import { Clock, User, Key as KeyIcon, CheckCircle, Search, AlertCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Clock, User, Key as KeyIcon, CheckCircle, Search, Plus, Calendar, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '../../components/common/Pagination';
-import SortableHeader from '../../components/common/SortableHeader';
 import FilterBar from '../../components/common/FilterBar';
 import ReturnLoanModal from '../../components/loans/ReturnLoanModal';
 
 const Dashboard = () => {
+    const navigate = useNavigate();
     const [loans, setLoans] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedLoan, setSelectedLoan] = useState(null);
@@ -17,6 +18,7 @@ const Dashboard = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
+    const [totalKeys, setTotalKeys] = useState(0);
     const [ordering, setOrdering] = useState('-fecha_prestamo');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -25,16 +27,19 @@ const Dashboard = () => {
         try {
             const params = {
                 page,
-                search: searchQuery, // Use searchQuery from state
+                search: searchQuery,
                 active: 'true',
                 ordering: order
             };
-            const response = await api.get('prestamos/', { params });
+            const [loansRes, keysRes] = await Promise.all([
+                api.get('prestamos/', { params }),
+                api.get('llaves/')
+            ]);
 
-            // Handle Pagination
-            setLoans(response.data.results || []);
-            setTotalCount(response.data.count || 0);
-            setTotalPages(Math.ceil((response.data.count || 0) / 10)); // Assuming page_size 10
+            setLoans(loansRes.data.results || []);
+            setTotalCount(loansRes.data.count || 0);
+            setTotalPages(Math.ceil((loansRes.data.count || 0) / 10));
+            setTotalKeys(keysRes.data.count || 0);
         } catch (error) {
             console.error("Error fetching loans:", error);
             setLoans([]);
@@ -45,12 +50,11 @@ const Dashboard = () => {
 
     useEffect(() => {
         fetchData(currentPage, ordering);
-    }, [currentPage, ordering, searchQuery]); // Added searchQuery to dependencies
+    }, [currentPage, ordering, searchQuery]);
 
     const handleSearch = (query) => {
         setSearchQuery(query);
         setCurrentPage(1);
-        // No need to call fetchData here, useEffect will react to searchQuery change
     };
 
     const handlePageChange = (page) => {
@@ -78,147 +82,220 @@ const Dashboard = () => {
         }
     };
 
-    if (loading && currentPage === 1) return (
-        <div className="flex items-center justify-center p-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-    );
-
     return (
-        <div>
-            {/* Stats / Header Area */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl p-6 text-white shadow-lg shadow-blue-200">
-                    <h3 className="text-white/80 font-medium mb-1">Total Activos</h3>
-                    <div className="text-4xl font-bold">{totalCount}</div>
-                    <div className="flex items-center gap-1 text-sm text-blue-100 mt-2">
-                        <KeyIcon className="w-4 h-4" />
-                        <span>Llaves prestadas actualmente</span>
-                    </div>
+        <div className="flex flex-col gap-6 pb-12 w-full">
+            {/* Header Area */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Gestión de Préstamos</h1>
+                    <p className="text-slate-500 font-medium text-xs mt-1.5">Monitoreo y control de llaves institucionales en circulación.</p>
                 </div>
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between">
-                    <div>
-                        <h3 className="text-slate-500 font-medium mb-1">Fecha</h3>
-                        <div className="text-2xl font-bold text-slate-800">{new Date().toLocaleDateString('es-CL')}</div>
-                    </div>
-                    <Clock className="w-10 h-10 text-blue-100" />
+
+                <div className="flex items-center gap-2">
+                    <Link
+                        to="/history"
+                        className="flex items-center gap-2 bg-white text-slate-600 px-4 py-2 rounded-xl hover:bg-slate-50 transition-all border border-slate-200 font-bold text-[11px] uppercase tracking-wider shadow-sm active:scale-95"
+                    >
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        Historial
+                    </Link>
+                    <Link
+                        to="/loans/new"
+                        className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-500/10 font-black text-[11px] uppercase tracking-[0.1em] active:scale-95"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Nuevo Préstamo
+                    </Link>
                 </div>
             </div>
 
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
-                <div className="space-y-4 flex-1">
-                    <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                        <div className="w-2 h-8 bg-blue-500 rounded-full"></div>
-                        Panel de Préstamos
-                    </h2>
-                    <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-                        <div className="w-full md:max-w-md">
-                            <FilterBar onSearch={handleSearch} placeholder="Buscar por llave o solicitante..." />
+            {/* Structured Stats Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white rounded-[1.5rem] p-6 border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-blue-200 transition-all">
+                    <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Préstamos Activos</span>
+                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <KeyIcon className="w-4 h-4" />
                         </div>
-                        <select
-                            value={ordering}
-                            onChange={(e) => handleSort(e.target.value)}
-                            className="w-full md:w-auto flex-shrink-0 px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="-fecha_prestamo">Más recientes primero</option>
-                            <option value="fecha_prestamo">Más antiguos primero</option>
-                            <option value="llave__nombre">Llave (A-Z)</option>
-                            <option value="-llave__nombre">Llave (Z-A)</option>
-                            <option value="solicitante__nombre">Solicitante (A-Z)</option>
-                        </select>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-black text-slate-900 leading-none">{totalCount}</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Llaves fuera</span>
                     </div>
                 </div>
 
-                <Link
-                    to="/keys"
-                    className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
-                >
-                    <KeyIcon className="w-5 h-5" />
-                    <span>Gestionar Inventario</span>
+                <div className="bg-white rounded-[1.5rem] p-6 border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-slate-300 transition-all">
+                    <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Total Llaves</span>
+                        <div className="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 flex items-center justify-center">
+                            <KeyIcon className="w-4 h-4" />
+                        </div>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-black text-slate-900 leading-none">{totalKeys}</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">En Inventario</span>
+                    </div>
+                </div>
+
+                <Link to="/keys" className="bg-white rounded-[1.5rem] p-6 border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-blue-500 transition-all hover:shadow-lg hover:shadow-blue-500/5">
+                    <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none">Gestión Inventario</span>
+                        <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-md">
+                            <Plus className="w-4 h-4" />
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <span className="text-lg font-black text-slate-900 leading-none">Ir al Inventario</span>
+                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
+                    </div>
                 </Link>
             </div>
 
-            {loans.length === 0 && !loading ? (
-                <div className="bg-white p-12 rounded-2xl shadow-sm border border-slate-100 text-center">
-                    <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <CheckCircle className="w-10 h-10 text-green-500" />
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-2">Todo en orden</h3>
-                    <p className="text-slate-500 max-w-sm mx-auto">No hay llaves prestadas en este momento (según los criterios de búsqueda).</p>
+            {/* Refined Filter Bar */}
+            <div className="bg-white rounded-2xl p-2 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center gap-2">
+                <div className="flex-1">
+                    <FilterBar
+                        onSearch={handleSearch}
+                        placeholder="Buscar préstamos activos por RUT, responsable o llave..."
+                        inputClassName="!shadow-none"
+                    />
                 </div>
-            ) : (
-                <>
-                    <ReturnLoanModal
-                        isOpen={showReturnModal}
-                        onClose={() => setShowReturnModal(false)}
-                        onConfirm={handleConfirmReturn}
-                        loanData={selectedLoan}
-                    />
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-8">
-                        {loans.map((loan) => (
-                            <div key={loan.id} className="group bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-blue-100 transition-all duration-300 flex flex-col justify-between overflow-hidden">
-                                <div className="p-6">
-                                    <div className="flex items-start justify-between mb-4">
-                                        <h3 className="text-lg font-bold text-slate-900 mb-1 line-clamp-1 group-hover:text-blue-600 transition-colors">
-                                            {loan.llave_obj?.nombre}
-                                        </h3>
-                                        <span className="relative flex h-3 w-3 mt-1">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-slate-500 mb-6 flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                                        {loan.llave_obj?.establecimiento_nombre}
-                                    </p>
+                <div className="flex items-center gap-2 px-4 py-2 border-l border-slate-100 md:border-l lg:border-l">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Ordenar:</span>
+                    <select
+                        value={ordering}
+                        onChange={(e) => handleSort(e.target.value)}
+                        className="bg-transparent text-[11px] font-black text-slate-700 focus:outline-none cursor-pointer hover:text-blue-600 transition-colors"
+                    >
+                        <option value="-fecha_prestamo">Recientes</option>
+                        <option value="fecha_prestamo">Antiguos</option>
+                        <option value="llave__nombre">Nombre Llave</option>
+                        <option value="solicitante__nombre">Responsable</option>
+                    </select>
+                </div>
+            </div>
 
-                                    <div className="space-y-4">
-                                        <div className="flex items-start gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                                <User className="w-4 h-4 text-slate-500" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Solicitante</p>
-                                                <p className="text-sm font-semibold text-slate-700">{loan.solicitante_obj?.nombre} {loan.solicitante_obj?.apellido}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-start gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                                <Clock className="w-4 h-4 text-slate-500" />
-                                            </div>
-                                            <div>
-                                                <div className="text-xs text-slate-400 font-medium uppercase tracking-wide">Fecha Préstamo</div>
-                                                <p className="text-sm font-semibold text-slate-700">
-                                                    {new Date(loan.fecha_prestamo).toLocaleDateString('es-CL')}
-                                                    <span className="text-slate-400 font-normal ml-1">
-                                                        {new Date(loan.fecha_prestamo).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
-                                                    </span>
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+            {/* Content Area */}
+            <AnimatePresence mode="wait">
+                {loans.length === 0 && !loading ? (
+                    <motion.div
+                        key="empty"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white p-12 rounded-[2rem] border border-slate-100 text-center flex flex-col items-center justify-center min-h-[300px]"
+                    >
+                        <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4">
+                            <CheckCircle className="w-8 h-8 text-emerald-500" />
+                        </div>
+                        <h3 className="text-lg font-black text-slate-900">Todo en Orden</h3>
+                        <p className="text-slate-400 font-medium text-xs max-w-[240px] mt-1">No hay llaves en circulación. Todo el inventario está bajo resguardo.</p>
+                    </motion.div>
+                ) : (
+                    <motion.div
+                        key="list"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="space-y-6"
+                    >
+                        <ReturnLoanModal
+                            isOpen={showReturnModal}
+                            onClose={() => setShowReturnModal(false)}
+                            onConfirm={handleConfirmReturn}
+                            loanData={selectedLoan}
+                        />
 
-                                <div className="p-4 bg-slate-50 border-t border-slate-100 group-hover:bg-blue-50/30 transition-colors">
-                                    <button
-                                        onClick={() => handleReturnClick(loan)}
-                                        className="w-full py-2.5 bg-white text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-800 hover:text-white hover:border-slate-800 transition-all font-medium text-sm flex items-center justify-center gap-2 shadow-sm"
-                                    >
-                                        <CheckCircle className="w-4 h-4" />
-                                        Registrar Devolución
-                                    </button>
-                                </div>
+                        <div className="bg-white rounded-[1.5rem] border border-slate-200 overflow-hidden shadow-sm">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50 border-b border-slate-200">
+                                        <tr>
+                                            <th className="p-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest pl-6">Responsable</th>
+                                            <th className="p-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Llave / Activo</th>
+                                            <th className="p-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Desde</th>
+                                            <th className="p-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right pr-6">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {loans.map((loan, idx) => {
+                                            const isInternal = !!loan.solicitante_obj?.funcionario;
+                                            return (
+                                                <tr key={loan.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                    <td className="p-2.5 pl-6">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${isInternal ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-400'}`}>
+                                                                <User className="w-3.5 h-3.5" />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    <p className="text-[13px] font-black text-slate-900 truncate">
+                                                                        {loan.solicitante_obj?.nombre} {loan.solicitante_obj?.apellido}
+                                                                    </p>
+                                                                    <span className={`text-[7px] font-black px-1 py-0.5 rounded-md uppercase tracking-widest border ${isInternal ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
+                                                                        {isInternal ? 'Personal' : 'Externo'}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-[9px] text-slate-400 font-bold mt-0">{loan.solicitante_obj?.rut || 'Sin RUT'}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-2.5">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
+                                                                <KeyIcon className="w-3.5 h-3.5" />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-[13px] font-bold text-slate-800 leading-tight">
+                                                                    {loan.llave_obj?.nombre}
+                                                                </p>
+                                                                <p className="text-[8px] text-slate-400 font-black uppercase tracking-wider mt-0 truncate">
+                                                                    {loan.llave_obj?.establecimiento_nombre}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-2.5">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
+                                                                <Clock className="w-3.5 h-3.5" />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-[13px] font-bold text-slate-800 capitalize">
+                                                                    {new Date(loan.fecha_prestamo).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })}
+                                                                </p>
+                                                                <p className="text-[9px] text-slate-400 font-bold">
+                                                                    {new Date(loan.fecha_prestamo).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} hrs
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-2.5 text-right pr-6">
+                                                        <button
+                                                            onClick={() => handleReturnClick(loan)}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all font-black text-[9px] uppercase tracking-widest shadow-sm active:scale-95"
+                                                        >
+                                                            <CheckCircle className="w-3 h-3" />
+                                                            <span className="hidden sm:inline">Devolver</span>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
                             </div>
-                        ))}
-                    </div>
-                    <Pagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        onPageChange={handlePageChange}
-                        totalCount={totalCount}
-                    />
-                </>
-            )}
+                        </div>
+
+                        <div className="flex justify-center mt-2">
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={handlePageChange}
+                                totalCount={totalCount}
+                            />
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

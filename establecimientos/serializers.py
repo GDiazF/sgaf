@@ -17,4 +17,4 @@ class EstablecimientoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Establecimiento
-        fields = ['id', 'rbd', 'nombre', 'tipo', 'tipo_nombre', 'director', 'direccion', 'email', 'logo', 'activo', 'telefonos']
+        fields = ['id', 'rbd', 'nombre', 'tipo', 'tipo_nombre', 'director', 'direccion', 'email', 'logo', 'activo', 'telefonos', 'latitud', 'longitud']

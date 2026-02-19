@@ -40,7 +40,8 @@ const FacturasAdquisicionDashboard = () => {
         grupo_firmante: '',
         firmante: '',
         nro_factura: '',
-        nro_oc: ''
+        nro_oc: '',
+        folio: ''
     };
 
     const [formData, setFormData] = useState(initialFormState);
@@ -112,7 +113,8 @@ const FacturasAdquisicionDashboard = () => {
             grupo_firmante: item.grupo_firmante || '',
             firmante: item.firmante || '',
             nro_factura: item.nro_factura || '',
-            nro_oc: item.nro_oc || ''
+            nro_oc: item.nro_oc || '',
+            folio: item.folio || ''
         });
         setEditingId(item.id);
         setShowModal(true);
@@ -153,15 +155,17 @@ const FacturasAdquisicionDashboard = () => {
         }
     };
 
-    const handleDownloadPDF = async (id) => {
+    const handleDownloadPDF = async (item) => {
         try {
-            const response = await api.get(`facturas-adquisicion/${id}/generate_pdf/`, {
+            const response = await api.get(`facturas-adquisicion/${item.id}/generate_pdf/`, {
                 responseType: 'blob'
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
+            const rawFilename = item.nro_oc ? `RC ${item.nro_oc}.pdf` : `RC_Adquisicion_${item.folio || item.id}.pdf`;
+            const filename = rawFilename.replace(/[/\\?%*:|"<>]/g, '-');
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `RC_Adquisicion_${id}.pdf`);
+            link.setAttribute('download', filename);
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -296,7 +300,7 @@ const FacturasAdquisicionDashboard = () => {
                                                 <motion.button
                                                     whileHover={{ scale: 1.1 }}
                                                     whileTap={{ scale: 0.9 }}
-                                                    onClick={() => handleDownloadPDF(item.id)}
+                                                    onClick={() => handleDownloadPDF(item)}
                                                     className="p-2 text-blue-500 hover:bg-blue-100 rounded-xl transition-all"
                                                     title="Generar Recepción Conforme"
                                                 >

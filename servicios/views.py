@@ -25,7 +25,7 @@ class ProveedorViewSet(viewsets.ModelViewSet):
         'tipo_proveedor': ['exact'],
     }
     ordering_fields = ['nombre', 'rut', 'tipo_proveedor__nombre']
-    search_fields = ['nombre', 'rut']
+    search_fields = ['nombre', 'rut', 'tipo_proveedor__nombre']
 
 class TipoDocumentoViewSet(viewsets.ModelViewSet):
     queryset = TipoDocumento.objects.all()
@@ -471,9 +471,9 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
                 elements.append(Paragraph(cargo_line or org_unit, sig_p_style))
 
             # 3. Administrador del Contrato
-            elements.append(Paragraph("ADMINISTRADOR DEL CONTRATO", sig_p_style))
+            # Line removed as requested
             # 4. Institution
-            elements.append(Paragraph("SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE IQUIQUE", sig_p_style))
+            # Line removed as requested
         else:
             # Fallback for generic signature line
             signature_width = 200
@@ -870,9 +870,9 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
                 elements.append(Paragraph(cargo_line or org_unit, sig_p_style))
 
             # 3. Administrador del Contrato
-            elements.append(Paragraph("ADMINISTRADOR DEL CONTRATO", sig_p_style))
+            # Line removed as requested
             # 4. Institution
-            elements.append(Paragraph("SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE IQUIQUE", sig_p_style))
+            # Line removed as requested
         else:
             # Fallback if no signer found
             signature_line = Table([['']], colWidths=[2.5*inch])
