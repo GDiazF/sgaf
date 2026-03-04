@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://10.0.100.25:8000/api/';
+
 const api = axios.create({
-    baseURL: 'http://localhost:8000/api/',
+    baseURL: BASE_URL,
 });
 
 // Interceptor para agregar el token JWT a todas las peticiones
@@ -30,7 +32,7 @@ api.interceptors.response.use(
 
             try {
                 const refreshToken = localStorage.getItem('refresh_token');
-                const response = await axios.post('http://localhost:8000/api/token/refresh/', {
+                const response = await axios.post(`${BASE_URL.replace('/api/', '')}/api/token/refresh/`, {
                     refresh: refreshToken,
                 });
 

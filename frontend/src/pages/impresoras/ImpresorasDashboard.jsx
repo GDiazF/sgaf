@@ -18,8 +18,16 @@ const PrinterCard = ({ printer, onRefresh, onEdit, onDelete }) => {
     };
 
     const getStatusStyles = () => {
-        if (!printer.last_ok && printer.last_check) return { bg: 'bg-rose-500', iconBg: 'bg-rose-50', iconColor: 'text-rose-600', label: 'Desconectada', glow: 'shadow-rose-400/20' };
+        const hasLowToner = printer.toner && (
+            (printer.toner.black !== null && printer.toner.black < 10) ||
+            (printer.toner.cyan !== null && printer.toner.cyan < 10) ||
+            (printer.toner.magenta !== null && printer.toner.magenta < 10) ||
+            (printer.toner.yellow !== null && printer.toner.yellow < 10)
+        );
+
+        if (!printer.last_ok && printer.last_check) return { bg: 'bg-red-500', iconBg: 'bg-red-50', iconColor: 'text-red-600', label: 'Desconectada', glow: 'shadow-red-400/20' };
         if (printer.last_errors && printer.last_errors.length > 0) return { bg: 'bg-amber-500', iconBg: 'bg-amber-50', iconColor: 'text-amber-600', label: 'Atención', glow: 'shadow-amber-400/20' };
+        if (hasLowToner) return { bg: 'bg-orange-500', iconBg: 'bg-orange-50', iconColor: 'text-orange-600', label: 'Tóner Bajo', glow: 'shadow-orange-400/20' };
         if (printer.last_ok) return { bg: 'bg-emerald-500', iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: 'Operativa', glow: 'shadow-emerald-400/20' };
         return { bg: 'bg-slate-300', iconBg: 'bg-slate-50', iconColor: 'text-slate-400', label: 'Sin Datos', glow: 'shadow-slate-200' };
     };
@@ -29,26 +37,24 @@ const PrinterCard = ({ printer, onRefresh, onEdit, onDelete }) => {
     const TonerBar = ({ color, level, label }) => {
         if (level === null || level === undefined) return null;
         const colorMap = {
-            black: 'from-slate-700 via-slate-800 to-slate-900',
-            cyan: 'from-cyan-400 via-blue-500 to-blue-600',
-            magenta: 'from-pink-400 via-rose-500 to-rose-600',
-            yellow: 'from-yellow-300 via-yellow-400 to-amber-500',
+            black: 'bg-slate-900',
+            cyan: 'bg-cyan-500',
+            magenta: 'bg-pink-600',
+            yellow: 'bg-yellow-400',
         };
 
         return (
-            <div className="flex flex-col gap-1.5 flex-1">
-                <div className="flex justify-between items-center px-1">
-                    <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider transition-colors">{label}</span>
-                    <span className={`text-[10px] font-black ${level < 20 ? 'text-rose-500' : 'text-slate-800'}`}>{level}%</span>
-                </div>
-                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/50 p-[1px]">
+            <div className="flex items-center gap-2 flex-1 min-w-[60px]">
+                <div className="w-1.5 h-1.5 rounded-full shadow-sm flex-shrink-0" style={{ background: color === 'black' ? '#0f172a' : color }} />
+                <div className="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-200/50">
                     <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${level}%` }}
                         transition={{ duration: 1.2, ease: [0.34, 1.56, 0.64, 1] }}
-                        className={`h-full rounded-full bg-gradient-to-r ${colorMap[color]} shadow-sm`}
+                        className={`h-full rounded-full ${colorMap[color]}`}
                     />
                 </div>
+                <span className={`text-[10px] font-bold w-7 text-right ${level < 10 ? 'text-red-600 font-extrabold animate-pulse' : level < 20 ? 'text-orange-500 font-bold' : 'text-slate-600'}`}>{level}%</span>
             </div>
         );
     };
@@ -56,80 +62,106 @@ const PrinterCard = ({ printer, onRefresh, onEdit, onDelete }) => {
     return (
         <motion.div
             layout
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            whileHover={{ y: -5 }}
-            className="group relative bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 transition-all flex flex-col h-full overflow-hidden"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            whileHover={{ scale: 1.002 }}
+            className="group relative bg-white py-2 px-4 pl-5 rounded-lg border border-slate-100 shadow-sm hover:shadow-md hover:shadow-indigo-500/5 transition-all duration-300 md:flex items-center gap-4 overflow-hidden"
         >
-            {/* Status Accent Corner */}
-            <div className={`absolute top-0 right-0 w-24 h-24 ${status.iconBg} rounded-bl-[4rem] transition-colors group-hover:bg-indigo-50/50 z-0`} />
+            {/* Status Accent Line */}
+            <div className={`absolute left-0 top-0 bottom-0 w-1 ${status.bg}`} />
 
-            {/* Hover Actions - More Integrated */}
-            <div className="absolute top-4 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all z-20 translate-x-4 group-hover:translate-x-0">
-                <button onClick={() => onEdit(printer)} className="p-2 bg-white shadow-xl border border-slate-100 text-slate-400 hover:text-indigo-600 rounded-xl transition-all hover:scale-110 active:scale-95"><Edit2 className="w-3.5 h-3.5" /></button>
-                <button onClick={() => onDelete(printer.id)} className="p-2 bg-white shadow-xl border border-slate-100 text-slate-400 hover:text-rose-600 rounded-xl transition-all hover:scale-110 active:scale-95"><Trash2 className="w-3.5 h-3.5" /></button>
+            {/* Left: Info & Status Icon */}
+            <div className="flex items-center gap-3 min-w-[200px] lg:w-[28%]">
+                <div className={`relative flex-shrink-0 w-8 h-8 rounded-lg ${status.iconBg} flex items-center justify-center transition-transform group-hover:scale-105 duration-500`}>
+                    <Printer className={`w-3.5 h-3.5 ${status.iconColor}`} />
+                    <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${status.bg} flex items-center justify-center shadow-sm`}>
+                        {status.label === 'Operativa' && <CheckCircle className="w-1 h-1 text-white" />}
+                        {status.label === 'Atención' && <AlertTriangle className="w-1 h-1 text-white" />}
+                        {status.label === 'Tóner Bajo' && <Droplet className="w-1 h-1 text-white" />}
+                        {status.label === 'Desconectada' && <div className="w-0.5 h-0.5 rounded-full bg-white" />}
+                    </div>
+                </div>
+
+                <div className="min-w-0 flex flex-col justify-center">
+                    <div className="flex items-baseline gap-2">
+                        <h3 className="text-sm font-black text-slate-900 tracking-tight leading-none uppercase truncate group-hover:text-indigo-600 transition-colors" title={printer.name}>
+                            {printer.name}
+                        </h3>
+                        <span className="text-slate-300 text-[10px]">•</span>
+                        <div className="flex items-center gap-1 text-slate-500">
+                            <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
+                            <span className="text-[10px] font-bold uppercase tracking-wide truncate max-w-[120px]" title={printer.location}>{printer.location}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div className="relative z-10 flex flex-col h-full">
-                <div className="mb-5 flex flex-col">
-                    <div className="flex items-center gap-2 mb-2">
-                        <div className={`w-2 h-2 rounded-full ${status.bg} ${printer.last_ok ? 'animate-pulse' : ''} ${status.glow}`} />
-                        <span className={`text-[10px] font-bold uppercase tracking-widest ${status.iconColor}`}>{status.label}</span>
-                    </div>
-                    <h3 className="text-[17px] font-black text-slate-900 tracking-tight leading-tight uppercase group-hover:text-indigo-600 transition-colors truncate" title={printer.name}>
-                        {printer.name}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-1 px-1">
-                        <MapPin className="w-3 h-3 text-slate-400" />
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] truncate">{printer.location}</span>
-                    </div>
-                </div>
-
-                <div className="flex-1 bg-slate-50/50 rounded-2xl p-5 border border-slate-100 mb-5 flex flex-col justify-center min-h-[145px] group-hover:bg-white transition-colors duration-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
-                    <div className="space-y-5">
-                        <TonerBar color="black" level={printer.toner?.black} label="BK - Black" />
-
-                        {printer.type === 'COLOR' && printer.toner ? (
-                            <div className="grid grid-cols-3 gap-3 pt-4 border-t border-slate-200/40">
-                                <TonerBar color="cyan" level={printer.toner.cyan} label="Cyan" />
-                                <TonerBar color="magenta" level={printer.toner.magenta} label="Mag." />
-                                <TonerBar color="yellow" level={printer.toner.yellow} label="Yel." />
-                            </div>
-                        ) : (
-                            <div className="pt-4 border-t border-slate-100 flex flex-col items-center gap-1">
-                                <span className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em]">Monocromática</span>
-                                <div className="flex gap-1">
-                                    {[1, 2].map(i => <div key={i} className="w-1 h-1 rounded-full bg-slate-200" />)}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {printer.last_errors && printer.last_errors.length > 0 && (
-                    <div className="px-3 py-2 bg-rose-50/50 border border-rose-100 rounded-xl flex items-center gap-2 mb-3">
-                        <AlertTriangle className="w-3 h-3 text-rose-500 flex-shrink-0" />
-                        <span className="text-[10px] text-rose-600 font-bold leading-tight line-clamp-1">{printer.last_errors[0]}</span>
+            {/* Middle: Toner Levels */}
+            <div className="hidden md:flex flex-1 items-center gap-4 px-4 border-l border-slate-100/50 h-full">
+                <TonerBar color="black" level={printer.toner?.black} label="BK" />
+                {printer.type === 'COLOR' ? (
+                    <>
+                        <TonerBar color="cyan" level={printer.toner?.cyan} label="CY" />
+                        <TonerBar color="magenta" level={printer.toner?.magenta} label="MG" />
+                        <TonerBar color="yellow" level={printer.toner?.yellow} label="YL" />
+                    </>
+                ) : (
+                    <div className="flex-1 flex items-center gap-2 opacity-40 px-2">
+                        <div className="h-px bg-slate-200 flex-1" />
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Monocromática</span>
+                        <div className="h-px bg-slate-200 flex-1" />
                     </div>
                 )}
+            </div>
 
-                <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <div className="flex flex-col">
-                        <div className="flex items-center gap-1.5 grayscale group-hover:grayscale-0 transition-all">
-                            <Hash className="w-3 h-3 text-indigo-400" />
-                            <span className="text-[10px] font-black font-mono text-slate-500 tracking-tighter uppercase">{printer.ip_address}</span>
+            {/* Right: Meta & Actions */}
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-3 ml-auto min-w-[150px] border-l border-slate-100/50 pl-4 py-0.5">
+
+                {/* Status/Error Message if present */}
+                <div className="flex flex-col items-end gap-0.5 text-right">
+                    {printer.last_errors && printer.last_errors.length > 0 ? (
+                        <div className="flex items-center gap-1 px-1 py-0.5 bg-red-50 rounded border border-red-100 max-w-[120px]">
+                            <AlertTriangle className="w-2.5 h-2.5 text-red-500 flex-shrink-0" />
+                            <span className="text-[9px] font-bold text-red-600 truncate" title={printer.last_errors[0]}>{printer.last_errors[0]}</span>
                         </div>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 pl-4">
-                            Sinc: {printer.last_check ? printer.last_check.split(' ')[1] : '--:--'}
-                        </span>
+                    ) : (
+                        <div className="h-[18px]" />
+                    )}
+
+                    <div className="flex items-center gap-1 text-slate-400">
+                        <Hash className="w-2.5 h-2.5 text-indigo-300" />
+                        <span className="font-mono text-[10px] font-bold text-slate-500">{printer.ip_address}</span>
                     </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1.5">
                     <button
                         onClick={handleRefresh}
                         disabled={refreshing}
-                        className={`p-2.5 bg-slate-900 shadow-lg shadow-slate-900/10 rounded-xl text-white hover:bg-slate-800 transition-all active:scale-95 group-hover:scale-110 ${refreshing ? 'animate-spin pr-1' : ''}`}
+                        className={`p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white hover:shadow-md transition-all active:scale-95 ${refreshing ? 'animate-spin' : ''}`}
+                        title="Actualizar estado"
                     >
-                        <RefreshCw className="w-3.5 h-3.5 text-indigo-300" />
+                        <RefreshCw className="w-3.5 h-3.5" />
                     </button>
+
+                    <div className="flex bg-slate-50 p-0.5 rounded-lg border border-slate-200/50">
+                        <button
+                            onClick={() => onEdit(printer)}
+                            className="p-1 px-1.5 rounded text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm transition-all"
+                            title="Editar"
+                        >
+                            <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                            onClick={() => onDelete(printer.id)}
+                            className="p-1 px-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-white hover:shadow-sm transition-all"
+                            title="Eliminar"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
                 </div>
             </div>
         </motion.div>
@@ -337,7 +369,7 @@ const ImpresorasDashboard = () => {
                     <p className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em] animate-pulse">Sincronizando flota...</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
+                <div className="flex flex-col gap-2">
                     <AnimatePresence mode="popLayout">
                         {filteredPrinters.map(printer => (
                             <PrinterCard
@@ -357,7 +389,7 @@ const ImpresorasDashboard = () => {
                         <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="col-span-full py-24 text-center bg-white rounded-[2rem] border border-slate-100 shadow-sm"
+                            className="w-full py-24 text-center bg-white rounded-[2rem] border border-slate-100 shadow-sm"
                         >
                             <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto mb-6">
                                 <Printer className="w-10 h-10 text-slate-200" />

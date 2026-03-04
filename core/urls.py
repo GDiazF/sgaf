@@ -32,6 +32,11 @@ urlpatterns = [
     path('api/', include('funcionarios.urls')),
     path('api/', include('impresoras.urls')),
     path('api/', include('vehiculos.urls')),
+    path('api/remuneraciones/', include('remuneraciones.urls')),
+    path('api/licitaciones/', include('licitaciones.urls')),
+    path('api/orden_compra/', include('orden_compra.urls')),
+    path('api/reservas/', include('solicitudes_reservas.urls')),
+    path('api/', include('personal_ti.urls')),
 ]
 
 from django.conf import settings

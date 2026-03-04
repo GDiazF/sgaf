@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Key, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity } from 'lucide-react';
+import { Key, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, ShoppingCart, Calendar, FileStack, MonitorSmartphone } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
@@ -11,6 +11,7 @@ const Layout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(true); // Desktop: Collapsed/Expanded
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // Mobile: Open/Closed
     const [isSSGGOpen, setSSGGOpen] = useState(true); // Main SSGG group
+    const [isTesoreriaOpen, setTesoreriaOpen] = useState(false); // Tesoreria group
     const [activeSubMenu, setActiveSubMenu] = useState(null); // 'services' or 'loans'
     const [isProfileOpen, setIsProfileOpen] = useState(false); // Header profile dropdown
     const [isOnline, setIsOnline] = useState(true); // Backend status
@@ -314,6 +315,90 @@ const Layout = () => {
                                 </motion.div>
                             )}
                         </AnimatePresence>
+                    </div>
+
+                    <div className="py-2 px-4">
+                        <div className="border-t border-slate-700/50" />
+                    </div>
+
+                    {/* Tesorería Submenu */}
+                    <div>
+                        <button
+                            onClick={() => setTesoreriaOpen(!isTesoreriaOpen)}
+                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${isTesoreriaOpen ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <DollarSign className="w-6 h-6 flex-shrink-0" />
+                                <motion.span
+                                    initial={false}
+                                    animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                                    className="font-medium whitespace-nowrap"
+                                >
+                                    TESORERÍA
+                                </motion.span>
+                            </div>
+                            <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
+                                {isTesoreriaOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            </motion.div>
+                        </button>
+
+                        <AnimatePresence>
+                            {isTesoreriaOpen && (sidebarOpen || mobileMenuOpen) && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="overflow-hidden space-y-3 mt-2 pl-2 border-l border-slate-700/50 ml-6"
+                                >
+                                    <div className="space-y-0.5">
+                                        <Link
+                                            to="/tesoreria"
+                                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/tesoreria') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                        >
+                                            <FileText className="w-4 h-4 flex-shrink-0" />
+                                            <span className="font-medium whitespace-nowrap">Remuneraciones</span>
+                                        </Link>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+                    <div className="py-2 px-4">
+                        <div className="border-t border-slate-700/50" />
+                    </div>
+
+                    {/* Labs / Beta */}
+                    <div className="px-4 py-2">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 px-2">Beta / Pruebas</p>
+                        <Link
+                            to="/orden-compra"
+                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm mb-1 ${isActive('/orden-compra') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                        >
+                            <ShoppingCart className="w-4 h-4 flex-shrink-0" />
+                            <span className="font-medium whitespace-nowrap">Visor OC</span>
+                        </Link>
+                        <Link
+                            to="/licitaciones"
+                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm mb-1 ${isActive('/licitaciones') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                        >
+                            <FileStack className="w-4 h-4 flex-shrink-0" />
+                            <span className="font-medium whitespace-nowrap">Visor Licitaciones</span>
+                        </Link>
+                        <Link
+                            to="/reservas"
+                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm mb-1 ${isActive('/reservas') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                        >
+                            <Calendar className="w-4 h-4 flex-shrink-0" />
+                            <span className="font-medium whitespace-nowrap">Reservas</span>
+                        </Link>
+                        <Link
+                            to="/personal-ti"
+                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/personal-ti') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                        >
+                            <MonitorSmartphone className="w-4 h-4 flex-shrink-0" />
+                            <span className="font-medium whitespace-nowrap">Personal TI</span>
+                        </Link>
                     </div>
                 </nav>
 

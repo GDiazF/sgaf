@@ -14,22 +14,15 @@ const FuncionariosDashboard = () => {
 
     const fetchStats = async () => {
         try {
-            const [funcionariosRes, subdireccionesRes, departamentosRes, unidadesRes, gruposRes, estadisticasRes] = await Promise.all([
-                api.get('funcionarios/'),
-                api.get('subdirecciones/'),
-                api.get('departamentos/'),
-                api.get('unidades/'),
-                api.get('grupos/'),
-                api.get('funcionarios/estadisticas/')
-            ]);
+            const response = await api.get('funcionarios/estadisticas/');
+            const data = response.data;
 
             setStats({
-                funcionarios: funcionariosRes.data.length,
-                subdirecciones: subdireccionesRes.data.length,
-                departamentos: departamentosRes.data.length,
-                unidades: unidadesRes.data.length,
-                grupos: gruposRes.data.length || gruposRes.data.results?.length || 0,
-                estadisticas: estadisticasRes.data
+                subdirecciones: data.total_subdirecciones,
+                departamentos: data.total_departamentos,
+                unidades: data.total_unidades,
+                grupos: data.total_grupos,
+                estadisticas: data
             });
         } catch (error) {
             console.error('Error fetching stats:', error);

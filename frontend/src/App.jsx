@@ -29,6 +29,12 @@ import AnexosDashboard from './pages/telecomunicaciones/AnexosDashboard';
 import ImpresorasDashboard from './pages/impresoras/ImpresorasDashboard';
 // Vehiculos
 import VehiculosDashboard from './pages/vehiculos/VehiculosDashboard';
+import RemuneracionesDashboard from './pages/tesoreria/Remuneraciones';
+import LicitacionesDashboard from './pages/licitaciones/LicitacionesDashboard';
+import OCDashboard from './pages/orden_compra/OCDashboard';
+import ReservasDashboard from './pages/reservas/ReservasDashboard';
+import PublicReservas from './pages/reservas/PublicReservas';
+import PersonalTIDashboard from './pages/personal_ti/PersonalTIDashboard';
 import Login from './pages/Login';
 
 // Private Route Wrapper
@@ -46,6 +52,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/reservas-externas" element={<PublicReservas />} />
 
           {/* Protected Routes */}
           <Route element={<PrivateRoute />}>
@@ -81,6 +88,13 @@ function App() {
               <Route path="impresoras" element={<ImpresorasDashboard />} />
               {/* Vehiculos */}
               <Route path="vehiculos" element={<VehiculosDashboard />} />
+              {/* Tesorería */}
+              <Route path="tesoreria" element={<RemuneracionesDashboard />} />
+              {/* Pruebas */}
+              <Route path="licitaciones" element={<LicitacionesDashboard />} />
+              <Route path="orden-compra" element={<OCDashboard />} />
+              <Route path="reservas" element={<ReservasDashboard />} />
+              <Route path="personal-ti" element={<PersonalTIDashboard />} />
             </Route>
           </Route>
         </Routes>
