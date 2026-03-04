@@ -4,22 +4,29 @@ usando python-decouple para separar configuración
 del código fuente.
 """
 
+import os
 from pathlib import Path
 from datetime import timedelta
 from decouple import config, Csv
+from dotenv import load_dotenv
 
 # ────────────────────────────────────────────────────────────
 # RUTAS BASE
 # ────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load environment variables
+load_dotenv(BASE_DIR / '.env')
 
 # ────────────────────────────────────────────────────────────
 # SEGURIDAD BÁSICA
 # ────────────────────────────────────────────────────────────
-SECRET_KEY = config('SECRET_KEY')
-DEBUG = config('DEBUG', default=False, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost', cast=Csv())
+# Load environment variables
+load_dotenv(BASE_DIR / '.env')
+
+SECRET_KEY = config('SECRET_KEY', default=os.getenv('SECRET_KEY', 'django-insecure-fallback-default-change-me'))
+DEBUG = config('DEBUG', default=os.getenv('DEBUG', 'True') == 'True', cast=bool)
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default=os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1'), cast=Csv())
 
 
 # ────────────────────────────────────────────────────────────
@@ -52,6 +59,28 @@ INSTALLED_APPS = [
     'personal_ti',
 ]
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.DjangoModelPermissions',
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter'
+    ],
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+}
+
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)
 
 # ────────────────────────────────────────────────────────────
 # MIDDLEWARE

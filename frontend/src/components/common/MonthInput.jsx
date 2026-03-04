@@ -113,7 +113,17 @@ const MonthInput = ({ label, value, onChange, required = false, className = "" }
                         </div>
 
                         {/* Footer: Quick Actions */}
-                        <div className="px-3 py-2 bg-slate-50/50 border-t border-slate-100 flex justify-end">
+                        <div className="px-3 py-2 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onChange('');
+                                    setIsOpen(false);
+                                }}
+                                className="text-[9px] font-black text-red-500 uppercase hover:underline"
+                            >
+                                Limpiar
+                            </button>
                             <button
                                 type="button"
                                 onClick={() => {

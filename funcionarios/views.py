@@ -2,6 +2,7 @@ from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
+from establecimientos.pagination import LargeResultsSetPagination
 
 from .models import Subdireccion, Departamento, Unidad, Funcionario, Grupo
 from .serializers import (
@@ -61,6 +62,7 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
         'subdireccion', 'departamento', 'unidad',
         'departamento__subdireccion', 'unidad__departamento'
     ).all()
+    pagination_class = LargeResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['subdireccion', 'departamento', 'unidad', 'estado']
     search_fields = ['nombre_funcionario', 'rut', 'anexo', 'numero_publico', 'cargo']
@@ -102,15 +104,15 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
         activos = self.get_queryset().filter(estado=True).count()
         inactivos = total - activos
         
-        # Conteos de estructura
-        total_subdirecciones = Subdireccion.objects.count()
-        total_departamentos = Departamento.objects.count()
-        total_unidades = Unidad.objects.count()
-        total_grupos = Grupo.objects.count()
+        # Conteos de estructura (solo activos)
+        subdirecciones_count = Subdireccion.objects.filter(activo=True).count()
+        departamentos_count = Departamento.objects.filter(activo=True).count()
+        unidades_count = Unidad.objects.filter(activo=True).count()
+        grupos_count = Grupo.objects.filter(activo=True).count()
         
-        # Por subdirección (funcionarios activos)
+        # Por subdirección (solo funcionarios activos)
         por_subdireccion = {}
-        subdirecciones = Subdireccion.objects.all()
+        subdirecciones = Subdireccion.objects.filter(activo=True)
         for sub in subdirecciones:
             por_subdireccion[sub.nombre] = sub.funcionarios.filter(estado=True).count()
         
@@ -118,16 +120,17 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
             'total': total,
             'activos': activos,
             'inactivos': inactivos,
-            'total_subdirecciones': total_subdirecciones,
-            'total_departamentos': total_departamentos,
-            'total_unidades': total_unidades,
-            'total_grupos': total_grupos,
+            'subdirecciones': subdirecciones_count,
+            'departamentos': departamentos_count,
+            'unidades': unidades_count,
+            'grupos': grupos_count,
             'por_subdireccion': por_subdireccion
         })
 
 
 class ControlAnexosViewSet(viewsets.ViewSet):
     """ViewSet para gestión centralizada de anexos telefónicos"""
+    queryset = Funcionario.objects.none()
     
     ANEXO_MIN = 400
     ANEXO_MAX = 600

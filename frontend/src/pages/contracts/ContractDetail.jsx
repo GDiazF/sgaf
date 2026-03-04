@@ -11,11 +11,13 @@ import {
     Users, TrendingUp, Activity, DollarSign, Pencil, X, ArrowLeft, Eye, History,
     FileSearch, ShieldCheck, ShoppingBag, ChevronRight, Tag
 } from 'lucide-react';
+import { usePermission } from '../../hooks/usePermission';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const ContractDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { can } = usePermission();
     const [contract, setContract] = useState(null);
     const [loading, setLoading] = useState(true);
     const [receptions, setReceptions] = useState([]);
@@ -153,6 +155,27 @@ const ContractDetail = () => {
         } catch (error) {
             console.error(error);
             alert("Error al eliminar la recepción.");
+        }
+    };
+
+    const handleDownloadPDF = async (rc) => {
+        try {
+            const response = await api.get(`facturas-adquisicion/${rc.id}/generate_pdf/`, {
+                responseType: 'blob'
+            });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const oc = rc.nro_oc || contract.nro_oc;
+            const rawFilename = oc ? `RC ${oc}.pdf` : `RC ${rc.folio || rc.id}.pdf`;
+            const filename = rawFilename.replace(/[/\\?%*:|"<>]/g, '-');
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (error) {
+            console.error("Error downloading PDF:", error);
+            alert("Error al generar el PDF.");
         }
     };
 
@@ -565,13 +588,15 @@ const ContractDetail = () => {
                                         <h3 className="text-lg font-black text-slate-800 tracking-tight">Expediente Documental</h3>
                                         <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1">Gestión Centralizada</p>
                                     </div>
-                                    <button
-                                        onClick={() => setDocModalOpen(true)}
-                                        className="flex items-center gap-2.5 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/10 active:scale-95"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        Adjuntar
-                                    </button>
+                                    {can('contratos.add_documentocontrato') && (
+                                        <button
+                                            onClick={() => setDocModalOpen(true)}
+                                            className="flex items-center gap-2.5 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/10 active:scale-95"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            Adjuntar
+                                        </button>
+                                    )}
                                 </div>
 
                                 <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm max-h-[400px] overflow-y-auto">
@@ -601,19 +626,26 @@ const ContractDetail = () => {
                                                     </td>
                                                     <td className="px-6 py-4 text-right px-8">
                                                         <div className="flex justify-end gap-1.5">
-                                                            {[
-                                                                { icon: <Eye className="w-3.5 h-3.5" />, color: 'text-blue-500 hover:bg-blue-50', onClick: () => setPreviewDoc(doc) },
-                                                                { icon: <Download className="w-3.5 h-3.5" />, color: 'text-emerald-500 hover:bg-emerald-50', onClick: () => window.open(doc.archivo) },
-                                                                { icon: <Trash2 className="w-3.5 h-3.5" />, color: 'text-red-500 hover:bg-red-50', onClick: () => handleDeleteDoc(doc.id) }
-                                                            ].map((act, i) => (
+                                                            <button
+                                                                onClick={() => setPreviewDoc(doc)}
+                                                                className="p-1.5 rounded-lg transition-all text-blue-500 hover:bg-blue-50"
+                                                            >
+                                                                <Eye className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => window.open(doc.archivo)}
+                                                                className="p-1.5 rounded-lg transition-all text-emerald-500 hover:bg-emerald-50"
+                                                            >
+                                                                <Download className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            {can('contratos.delete_documentocontrato') && (
                                                                 <button
-                                                                    key={i}
-                                                                    onClick={act.onClick}
-                                                                    className={`p-1.5 rounded-lg transition-all ${act.color}`}
+                                                                    onClick={() => handleDeleteDoc(doc.id)}
+                                                                    className="p-1.5 rounded-lg transition-all text-red-500 hover:bg-red-50"
                                                                 >
-                                                                    {act.icon}
+                                                                    <Trash2 className="w-3.5 h-3.5" />
                                                                 </button>
-                                                            ))}
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -643,13 +675,15 @@ const ContractDetail = () => {
                                         <h3 className="text-lg font-black text-slate-800 tracking-tight">Recepciones Conformes relacionadas</h3>
                                         <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1">Control de entregas y facturación</p>
                                     </div>
-                                    <button
-                                        onClick={() => setReceptionModalOpen(true)}
-                                        className="flex items-center gap-2.5 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/10 active:scale-95"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        Nueva Recepción
-                                    </button>
+                                    {can('servicios.add_recepcionconforme') && (
+                                        <button
+                                            onClick={() => setReceptionModalOpen(true)}
+                                            className="flex items-center gap-2.5 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/10 active:scale-95"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            Nueva Recepción
+                                        </button>
+                                    )}
                                 </div>
 
                                 <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
@@ -730,30 +764,31 @@ const ContractDetail = () => {
                                                     </td>
                                                     <td className="px-4 py-4">
                                                         <div className="flex items-center justify-center gap-2 transition-all">
+                                                            {can('servicios.change_recepcionconforme') && (
+                                                                <button
+                                                                    onClick={() => handleEditReception(rc)}
+                                                                    className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 transition-all"
+                                                                    title="Editar RC"
+                                                                >
+                                                                    <Pencil className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
                                                             <button
-                                                                onClick={() => handleEditReception(rc)}
-                                                                className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 transition-all"
-                                                                title="Editar RC"
-                                                            >
-                                                                <Pencil className="w-3.5 h-3.5" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    const url = api.defaults.baseURL + 'facturas-adquisicion/' + rc.id + '/generate_pdf/';
-                                                                    window.open(url, '_blank');
-                                                                }}
+                                                                onClick={() => handleDownloadPDF(rc)}
                                                                 className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 transition-all"
                                                                 title="Descargar PDF"
                                                             >
                                                                 <Download className="w-3.5 h-3.5" />
                                                             </button>
-                                                            <button
-                                                                onClick={() => handleDeleteReception(rc.id)}
-                                                                className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-100 hover:bg-red-50 transition-all"
-                                                                title="Anular RC"
-                                                            >
-                                                                <Trash2 className="w-3.5 h-3.5" />
-                                                            </button>
+                                                            {can('servicios.delete_recepcionconforme') && (
+                                                                <button
+                                                                    onClick={() => handleDeleteReception(rc.id)}
+                                                                    className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-100 hover:bg-red-50 transition-all"
+                                                                    title="Anular RC"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>

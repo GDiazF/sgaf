@@ -3,12 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Truck, Fuel, DollarSign, Activity, TrendingUp, Plus, ChevronRight, X, Save, Download, Calculator, Car, Trash2, Pencil, Sigma } from 'lucide-react';
 import api from '../../api';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
+import { usePermission } from '../../hooks/usePermission';
 
 const VehiculosDashboard = () => {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [year, setYear] = useState(2025);
     const [registros, setRegistros] = useState([]);
+    const { can } = usePermission();
 
     // Modal State
     const [isModalOpen, setModalOpen] = useState(false);
@@ -291,12 +293,14 @@ const VehiculosDashboard = () => {
                         Exportar
                     </button>
 
-                    <button
-                        onClick={handleOpenCreateModal}
-                        className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-xl text-xs font-semibold shadow-lg shadow-slate-900/10 flex items-center justify-center gap-2 flex-auto sm:flex-none"
-                    >
-                        <Plus className="w-4 h-4" /> Nuevo Registro
-                    </button>
+                    {can('vehiculos.add_registromensual') && (
+                        <button
+                            onClick={handleOpenCreateModal}
+                            className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-xl text-xs font-semibold shadow-lg shadow-slate-900/10 flex items-center justify-center gap-2 flex-auto sm:flex-none"
+                        >
+                            <Plus className="w-4 h-4" /> Nuevo Registro
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -434,8 +438,12 @@ const VehiculosDashboard = () => {
                                                     </td>
                                                     <td className="px-3 py-1 text-center">
                                                         <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button onClick={() => handleOpenEditModal(registro)} className="text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
-                                                            <button onClick={() => handleDelete(registro.id, registro.mes_nombre)} disabled={isDeleting} className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                            {can('vehiculos.change_registromensual') && (
+                                                                <button onClick={() => handleOpenEditModal(registro)} className="text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
+                                                            )}
+                                                            {can('vehiculos.delete_registromensual') && (
+                                                                <button onClick={() => handleDelete(registro.id, registro.mes_nombre)} disabled={isDeleting} className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>

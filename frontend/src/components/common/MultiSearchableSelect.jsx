@@ -46,6 +46,9 @@ const MultiSearchableSelect = ({
     }, [isOpen]);
 
     const handleToggleOption = (optionValue) => {
+        const option = options.find(o => o.value === optionValue);
+        if (option?.disabled) return;
+
         const newValue = value.includes(optionValue)
             ? value.filter(v => v !== optionValue)
             : [...value, optionValue];
@@ -147,10 +150,10 @@ const MultiSearchableSelect = ({
                                         <div
                                             key={opt.value}
                                             onClick={() => handleToggleOption(opt.value)}
-                                            className={`form-dropdown-option ${isSelected ? 'bg-blue-50/30' : ''}`}
+                                            className={`form-dropdown-option ${isSelected ? 'bg-blue-50/30' : ''} ${opt.disabled ? 'opacity-50 grayscale cursor-not-allowed pointer-events-none' : ''}`}
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-blue-600 border-blue-600 shadow-lg shadow-blue-500/20' : 'border-slate-200 group-hover:border-blue-400 bg-white'}`}>
+                                                <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-blue-600 border-blue-600 shadow-lg shadow-blue-500/20' : 'border-slate-200 group-hover:border-blue-400 bg-white'} ${opt.disabled ? 'bg-slate-100 border-slate-200' : ''}`}>
                                                     {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />}
                                                 </div>
                                                 <span className={`truncate ${isSelected ? 'text-blue-700 font-bold' : 'text-slate-600'}`}>

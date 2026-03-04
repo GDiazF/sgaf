@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import { FileText, Calendar, Building2, Download, Edit2, X, Save, Trash2, Clock, User, PlusCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { usePermission } from '../../hooks/usePermission';
 import Pagination from '../../components/common/Pagination';
 import FilterBar from '../../components/common/FilterBar';
 import SortableHeader from '../../components/common/SortableHeader';
@@ -11,6 +12,7 @@ import FormSelect from '../../components/common/FormSelect';
 const RecepcionConformeList = () => {
     const [rcs, setRcs] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { can } = usePermission();
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
@@ -94,17 +96,24 @@ const RecepcionConformeList = () => {
         }
     };
 
-    const handleDownloadPDF = (id) => {
-        api.get(`recepciones-conformes/${id}/generate_pdf/`, { responseType: 'blob' })
-            .then((response) => {
-                const url = window.URL.createObjectURL(new Blob([response.data]));
-                const link = document.createElement('a');
-                link.href = url;
-                link.setAttribute('download', `RC_${id}.pdf`);
-                document.body.appendChild(link);
-                link.click();
-            })
-            .catch((error) => console.error(error));
+    const handleDownloadPDF = async (item) => {
+        try {
+            const response = await api.get(`recepciones-conformes/${item.id}/generate_pdf/`, {
+                responseType: 'blob'
+            });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const rawFilename = item.nro_oc ? `RC ${item.nro_oc}.pdf` : `RC_Adquisicion_${item.folio || item.id}.pdf`;
+            const filename = rawFilename.replace(/[/\\?%*:|"<>]/g, '-');
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (error) {
+            console.error("Error downloading PDF:", error);
+            alert("Error al generar el PDF.");
+        }
     };
 
     const handleEdit = (rc) => {
@@ -113,7 +122,8 @@ const RecepcionConformeList = () => {
             observaciones: rc.observaciones || '',
             registros_ids: rc.registros.map(r => r.id),
             grupo_firmante: rc.grupo_firmante || '',
-            firmante: rc.firmante || ''
+            firmante: rc.firmante || '',
+            folio: rc.folio || ''
         });
         setCurrentPayments(rc.registros);
         fetchAvailablePayments(rc.proveedor);
@@ -268,26 +278,30 @@ const RecepcionConformeList = () => {
                                             {item.estado !== 'ANULADA' && (
                                                 <>
                                                     <button
-                                                        onClick={() => handleDownloadPDF(item.id)}
+                                                        onClick={() => handleDownloadPDF(item)}
                                                         className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
                                                         title="Descargar PDF"
                                                     >
                                                         <Download className="w-3.5 h-3.5" />
                                                     </button>
-                                                    <button
-                                                        onClick={() => handleEdit(item)}
-                                                        className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
-                                                        title="Editar Contenido"
-                                                    >
-                                                        <Edit2 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleAnulate(item)}
-                                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                                        title="Anular RC"
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
+                                                    {can('servicios.change_recepcionconforme') && (
+                                                        <button
+                                                            onClick={() => handleEdit(item)}
+                                                            className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
+                                                            title="Editar Contenido"
+                                                        >
+                                                            <Edit2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                    {can('servicios.delete_recepcionconforme') && (
+                                                        <button
+                                                            onClick={() => handleAnulate(item)}
+                                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                            title="Anular RC"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
                                                 </>
                                             )}
                                         </div>
@@ -421,6 +435,16 @@ const RecepcionConformeList = () => {
                                     placeholder="Ingrese observaciones adicionales que aparecerán en el documento..."
                                     value={editForm.observaciones}
                                     onChange={e => setEditForm({ ...editForm, observaciones: e.target.value })}
+                                />
+
+                                <FormInput
+                                    label="Folio RC"
+                                    icon={<FileText />}
+                                    name="folio"
+                                    placeholder="Automático..."
+                                    value={editForm.folio}
+                                    readOnly
+                                    inputClassName="bg-slate-50 font-mono opacity-60 cursor-not-allowed"
                                 />
 
                                 {/* Signer Group Selection */}

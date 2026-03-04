@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import BaseModal from '../common/BaseModal';
 import { Key, Building, MapPin, Hash, Info, Lock } from 'lucide-react';
+import SearchableSelect from '../common/SearchableSelect';
 
 const KeyModal = ({
     isOpen,
@@ -10,6 +11,10 @@ const KeyModal = ({
     initialData,
     lookups: { establishments }
 }) => {
+    const establishmentOptions = (establishments || []).map(est => ({
+        value: est.id,
+        label: est.nombre
+    }));
     const [formData, setFormData] = useState({
         nombre: '',
         establecimiento: '',
@@ -49,35 +54,22 @@ const KeyModal = ({
                         <Hash className="w-3.5 h-3.5" /> Identificación de Llave
                     </h4>
                     <div className="space-y-6">
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-600 ml-1">Nombre Descriptivo</label>
-                            <input
-                                type="text"
-                                required
-                                placeholder="Ej: Portón Principal, Oficina Director..."
-                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium"
-                                value={formData.nombre}
-                                onChange={e => setFormData({ ...formData, nombre: e.target.value })}
-                            />
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-600 ml-1">Establecimiento / Unidad</label>
-                            <div className="relative">
-                                <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                                <select
-                                    required
-                                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm appearance-none focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all cursor-pointer font-medium"
-                                    value={formData.establecimiento}
-                                    onChange={e => setFormData({ ...formData, establecimiento: e.target.value })}
-                                >
-                                    <option value="">Seleccione el establecimiento...</option>
-                                    {establishments.map(est => (
-                                        <option key={est.id} value={est.id}>{est.nombre}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
+                        <SearchableSelect
+                            label="Establecimiento / Unidad"
+                            required
+                            options={establishmentOptions}
+                            value={formData.establecimiento}
+                            onChange={val => {
+                                const selectedOpt = establishmentOptions.find(o => o.value === val);
+                                setFormData({
+                                    ...formData,
+                                    establecimiento: val,
+                                    nombre: selectedOpt ? `LLAVES ${selectedOpt.label?.toUpperCase()}` : ''
+                                });
+                            }}
+                            placeholder="Seleccione el establecimiento..."
+                            icon={Building}
+                        />
                     </div>
                 </div>
 

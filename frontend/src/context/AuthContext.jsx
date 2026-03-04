@@ -24,10 +24,12 @@ export const AuthProvider = ({ children }) => {
                 if (decoded.exp < currentTime) {
                     await refreshToken();
                 } else {
-                    setUser({ username: decoded.username || 'Admin' }); // Customize based on token payload
+                    // Fetch full profile
+                    const response = await api.get('auth/me/');
+                    setUser(response.data);
                 }
             } catch (error) {
-                console.error("Invalid token", error);
+                console.error("Invalid token or profile fetch failed", error);
                 logout();
             }
         }
@@ -39,7 +41,10 @@ export const AuthProvider = ({ children }) => {
             const response = await api.post('token/', { username, password });
             localStorage.setItem('access_token', response.data.access);
             localStorage.setItem('refresh_token', response.data.refresh);
-            setUser({ username }); // Simple user object
+
+            // Immediately fetch profile after login
+            const profileRes = await api.get('auth/me/');
+            setUser(profileRes.data);
             return true;
         } catch (error) {
             console.error("Login failed", error);
@@ -62,6 +67,10 @@ export const AuthProvider = ({ children }) => {
         try {
             const response = await api.post('token/refresh/', { refresh });
             localStorage.setItem('access_token', response.data.access);
+
+            // Re-fetch profile to be sure
+            const profileRes = await api.get('auth/me/');
+            setUser(profileRes.data);
             return true;
         } catch (error) {
             console.error("Refresh failed", error);
@@ -73,7 +82,8 @@ export const AuthProvider = ({ children }) => {
         user,
         login,
         logout,
-        loading
+        loading,
+        checkUserStatus // Exported purely for manual refreshes if needed
     };
 
     return (

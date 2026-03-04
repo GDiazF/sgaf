@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import api from '../../api';
-import { Building, Search, Plus, Edit2, Trash2, X, Save, CheckCircle, XCircle, Power, Phone, Mail } from 'lucide-react';
+import { Building, Search, Plus, Edit2, Trash2, X, Save, CheckCircle, XCircle, Power, Phone, Mail, FileDown, Layout, MapPin } from 'lucide-react';
+import { usePermission } from '../../hooks/usePermission';
 import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '../../components/common/Pagination';
 import FilterBar from '../../components/common/FilterBar';
@@ -8,9 +10,10 @@ import SortableHeader from '../../components/common/SortableHeader';
 import EstablishmentModal from '../../components/establishments/EstablishmentModal';
 import EstablishmentPhonesModal from '../../components/establishments/EstablishmentPhonesModal';
 import EstablishmentCardsView from '../../components/establishments/EstablishmentCardsView';
-import { Layout } from 'lucide-react';
+import EstablishmentMapModal from '../../components/establishments/EstablishmentMapModal';
 
 const Establishments = () => {
+    const { can } = usePermission();
     const [establishments, setEstablishments] = useState([]);
     const [establishmentTypes, setEstablishmentTypes] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -29,6 +32,8 @@ const Establishments = () => {
 
     const [editingId, setEditingId] = useState(null);
     const [isCardsViewOpen, setIsCardsViewOpen] = useState(false);
+    const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+    const [selectedEstForMap, setSelectedEstForMap] = useState(null);
 
     const [filterType, setFilterType] = useState('');
 
@@ -39,6 +44,8 @@ const Establishments = () => {
         director: '',
         direccion: '',
         email: '',
+        latitud: '',
+        longitud: '',
         activo: true
     });
 
@@ -80,24 +87,44 @@ const Establishments = () => {
         }
     };
 
-    const fetchAllForDirectory = async () => {
-        setLoadingDirectory(true);
-        try {
-            const response = await api.get('establecimientos/', {
-                params: { page_size: 1000 }
-            });
-            setAllEstablishments(response.data.results || response.data);
+    const fetchAllForDirectory = () => {
+        if (allEstablishments.length === 0) {
+            // In case it hasn't loaded yet
+            const loadData = async () => {
+                setLoadingDirectory(true);
+                try {
+                    const response = await api.get('establecimientos/', {
+                        params: { page_size: 1000 }
+                    });
+                    setAllEstablishments(response.data.results || response.data);
+                    setIsCardsViewOpen(true);
+                } catch (error) {
+                    console.error("Error fetching all establishments:", error);
+                    alert("Error al cargar el directorio completo.");
+                } finally {
+                    setLoadingDirectory(false);
+                }
+            };
+            loadData();
+        } else {
             setIsCardsViewOpen(true);
-        } catch (error) {
-            console.error("Error fetching all establishments:", error);
-            alert("Error al cargar el directorio completo.");
-        } finally {
-            setLoadingDirectory(false);
         }
     };
 
     useEffect(() => {
         fetchTypes();
+        // Fetch all establishments for map and directory on mount
+        const loadAllData = async () => {
+            try {
+                const response = await api.get('establecimientos/', {
+                    params: { page_size: 1000 }
+                });
+                setAllEstablishments(response.data.results || response.data);
+            } catch (error) {
+                console.error("Error fetching all establishments for map:", error);
+            }
+        };
+        loadAllData();
     }, []);
 
     useEffect(() => {
@@ -136,6 +163,42 @@ const Establishments = () => {
         setIsPhonesModalOpen(true);
     };
 
+    const handleOpenMap = (item) => {
+        setSelectedEstForMap(item);
+        setIsMapModalOpen(true);
+    };
+
+    const handleExportExcel = () => {
+        if (allEstablishments.length === 0) {
+            alert("No hay datos para exportar.");
+            return;
+        }
+
+        // Prepare data for Excel
+        const exportData = allEstablishments.map(est => ({
+            'RBD': est.rbd,
+            'Nombre': est.nombre,
+            'Tipo': est.tipo_nombre,
+            'Director/a': est.director || 'No asignado',
+            'Email': est.email || 'Sin email',
+            'Dirección': est.direccion || 'Sin dirección',
+            'Teléfonos': (est.telefonos || []).map(t => t.numero).join(', '),
+            'Latitud': est.latitud || '',
+            'Longitud': est.longitud || '',
+            'Estado': est.activo ? 'Activo' : 'Inactivo'
+        }));
+
+        // Create worksheet
+        const ws = XLSX.utils.json_to_sheet(exportData);
+
+        // Create workbook
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Establecimientos");
+
+        // Download file
+        XLSX.writeFile(wb, `Establecimientos_SLEP_${new Date().getFullYear()}.xlsx`);
+    };
+
     const handleNew = () => {
         setFormData({
             rbd: '',
@@ -144,6 +207,8 @@ const Establishments = () => {
             director: '',
             direccion: '',
             email: '',
+            latitud: '',
+            longitud: '',
             activo: true
         });
         setEditingId(null);
@@ -238,12 +303,22 @@ const Establishments = () => {
                         </button>
 
                         <button
-                            onClick={handleNew}
-                            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
+                            onClick={handleExportExcel}
+                            className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 font-medium whitespace-nowrap"
                         >
-                            <Plus className="w-5 h-5" />
-                            <span>Nuevo</span>
+                            <FileDown className="w-5 h-5" />
+                            <span>Exportar</span>
                         </button>
+
+                        {can('establecimientos.add_establecimiento') && (
+                            <button
+                                onClick={handleNew}
+                                className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
+                            >
+                                <Plus className="w-5 h-5" />
+                                <span>Nuevo</span>
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -274,6 +349,14 @@ const Establishments = () => {
                 onClose={() => setIsCardsViewOpen(false)}
                 data={allEstablishments}
                 establishmentTypes={establishmentTypes}
+            />
+
+            {/* Map Modal */}
+            <EstablishmentMapModal
+                isOpen={isMapModalOpen}
+                onClose={() => setIsMapModalOpen(false)}
+                establishment={selectedEstForMap}
+                allEstablishments={allEstablishments}
             />
 
             {/* Table List */}
@@ -310,13 +393,19 @@ const Establishments = () => {
                                 return (
                                     <tr key={item.id} className="hover:bg-slate-50 transition-colors text-xs">
                                         <td className="p-2.5">
-                                            <button
-                                                onClick={() => handleStatusToggle(item.id, item.activo)}
-                                                className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold transition-all ${item.activo ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                                            >
-                                                <Power className="w-3 h-3" />
-                                                {item.activo ? 'ACTIVO' : 'INACTIVO'}
-                                            </button>
+                                            {can('establecimientos.change_establecimiento') ? (
+                                                <button
+                                                    onClick={() => handleStatusToggle(item.id, item.activo)}
+                                                    className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold transition-all ${item.activo ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                                >
+                                                    <Power className="w-3 h-3" />
+                                                    {item.activo ? 'ACTIVO' : 'INACTIVO'}
+                                                </button>
+                                            ) : (
+                                                <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold ${item.activo ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}>
+                                                    {item.activo ? 'ACTIVO' : 'INACTIVO'}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="p-2.5 font-mono text-slate-600 font-semibold">{item.rbd}</td>
                                         <td className="p-2.5">
@@ -379,18 +468,29 @@ const Establishments = () => {
                                         <td className="p-2.5 text-right">
                                             <div className="flex justify-end gap-2">
                                                 <button
+                                                    onClick={() => handleOpenMap(item)}
+                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                    title="Ver Ubicación en Mapa"
+                                                >
+                                                    <MapPin className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
                                                     onClick={() => handleOpenPhones(item)}
                                                     className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                                                    title="Gestionar Teléfonos"
+                                                    title="Teléfonos"
                                                 >
                                                     <Phone className="w-3.5 h-3.5" />
                                                 </button>
-                                                <button onClick={() => handleEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
-                                                    <Edit2 className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button onClick={() => handleDelete(item.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
+                                                {can('establecimientos.change_establecimiento') && (
+                                                    <button onClick={() => handleEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+                                                        <Edit2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                                {can('establecimientos.delete_establecimiento') && (
+                                                    <button onClick={() => handleDelete(item.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

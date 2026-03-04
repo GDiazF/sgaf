@@ -105,7 +105,10 @@ const SearchableSelect = ({
                         </div>
 
                         {/* Options List */}
-                        <div className="overflow-y-auto custom-scrollbar flex-grow py-1">
+                        <div
+                            className="max-h-56 overflow-y-auto custom-scrollbar flex-grow py-1"
+                            onWheel={(e) => e.stopPropagation()}
+                        >
                             {filteredOptions.length > 0 ? (
                                 filteredOptions.map((opt) => (
                                     <button

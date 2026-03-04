@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import BaseModal from '../common/BaseModal';
 import FormInput from '../common/FormInput';
 import FormSelect from '../common/FormSelect';
-import { School, Info, User, Mail, MapPin, Hash, Activity, Image as ImageIcon, Camera } from 'lucide-react';
+import { School, Info, User, Mail, Phone, MapPin, Hash, Activity, Image as ImageIcon, Camera } from 'lucide-react';
 
 const EstablishmentModal = ({
     isOpen,
@@ -19,14 +19,25 @@ const EstablishmentModal = ({
         direccion: '',
         director: '',
         email: '',
-        activo: true
+        latitud: '',
+        longitud: '',
+        activo: true,
+        telefono_principal: ''
     });
+    const [coordsString, setCoordsString] = useState('');
     const [logoFile, setLogoFile] = useState(null);
     const [logoPreview, setLogoPreview] = useState(null);
 
     useEffect(() => {
         if (initialData) {
-            setFormData(initialData);
+            // Find principal phone if it exists in the list
+            const principal = initialData.telefonos?.find(p => p.es_principal) || initialData.telefonos?.[0];
+
+            setFormData({
+                ...initialData,
+                telefono_principal: principal ? principal.numero : ''
+            });
+            setCoordsString(initialData.latitud && initialData.longitud ? `${initialData.latitud}, ${initialData.longitud}` : '');
             setLogoPreview(initialData.logo);
             setLogoFile(null);
         } else {
@@ -37,8 +48,12 @@ const EstablishmentModal = ({
                 direccion: '',
                 director: '',
                 email: '',
-                activo: true
+                latitud: '',
+                longitud: '',
+                activo: true,
+                telefono_principal: ''
             });
+            setCoordsString('');
             setLogoPreview(null);
             setLogoFile(null);
         }
@@ -49,6 +64,24 @@ const EstablishmentModal = ({
         if (file) {
             setLogoFile(file);
             setLogoPreview(URL.createObjectURL(file));
+        }
+    };
+
+    const handleCoordsChange = (value) => {
+        setCoordsString(value);
+        const parts = value.split(',').map(p => p.trim());
+        if (parts.length === 2) {
+            setFormData(prev => ({
+                ...prev,
+                latitud: parts[0],
+                longitud: parts[1]
+            }));
+        } else if (value === '') {
+            setFormData(prev => ({
+                ...prev,
+                latitud: '',
+                longitud: ''
+            }));
         }
     };
 
@@ -128,29 +161,56 @@ const EstablishmentModal = ({
                 </div>
 
                 {/* Section: Contacto y Ubicación */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormInput
-                        label="Director(a) / Responsable"
-                        icon={User}
-                        placeholder="Nombre del directivo..."
-                        value={formData.director}
-                        onChange={e => setFormData({ ...formData, director: e.target.value })}
-                    />
-                    <FormInput
-                        label="Correo Institucional"
-                        icon={Mail}
-                        type="email"
-                        placeholder="ejemplo@slep.cl"
-                        value={formData.email}
-                        onChange={e => setFormData({ ...formData, email: e.target.value })}
-                    />
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <FormInput
+                            label="Director(a) / Responsable"
+                            icon={<User className="w-4 h-4" />}
+                            placeholder="Nombre del directivo..."
+                            value={formData.director}
+                            onChange={e => setFormData({ ...formData, director: e.target.value })}
+                        />
+                        <FormInput
+                            label="Correo Institucional"
+                            icon={<Mail className="w-4 h-4" />}
+                            type="email"
+                            placeholder="ejemplo@slep.cl"
+                            value={formData.email}
+                            onChange={e => setFormData({ ...formData, email: e.target.value })}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <FormInput
+                            label="Teléfono Principal"
+                            icon={<Phone className="w-4 h-4" />}
+                            placeholder="Ej: +56 9 1234 5678"
+                            value={formData.telefono_principal}
+                            onChange={e => setFormData({ ...formData, telefono_principal: e.target.value })}
+                        />
+                        <div className="flex items-center p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                            <Info className="w-5 h-5 text-blue-500 mr-3 flex-shrink-0" />
+                            <p className="text-[10px] text-blue-700 font-bold uppercase tracking-tight">
+                                Este es el contacto principal. Otros números pueden gestionarse desde el ícono de teléfono en la tabla.
+                            </p>
+                        </div>
+                    </div>
+
                     <FormInput
                         label="Dirección Física"
-                        icon={MapPin}
+                        icon={<MapPin className="w-4 h-4" />}
                         placeholder="Calle, número, comuna..."
                         className="md:col-span-2"
                         value={formData.direccion}
                         onChange={e => setFormData({ ...formData, direccion: e.target.value })}
+                    />
+                    <FormInput
+                        label="Coordenadas GPS (Latitud, Longitud)"
+                        icon={<Activity className="w-4 h-4" />}
+                        placeholder="Pegue aquí las coordenadas de Google Maps (Ej: -20.21, -70.14)"
+                        className="md:col-span-2"
+                        value={coordsString}
+                        onChange={e => handleCoordsChange(e.target.value)}
                     />
                 </div>
 
