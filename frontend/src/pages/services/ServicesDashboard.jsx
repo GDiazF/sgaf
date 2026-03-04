@@ -6,8 +6,10 @@ import Pagination from '../../components/common/Pagination';
 import FilterBar from '../../components/common/FilterBar';
 import SortableHeader from '../../components/common/SortableHeader';
 import ServiceModal from '../../components/services/ServiceModal';
+import { usePermission } from '../../hooks/usePermission';
 
 const ServicesDashboard = () => {
+    const { can } = usePermission();
     const [services, setServices] = useState([]);
     const [providers, setProviders] = useState([]);
     const [establishments, setEstablishments] = useState([]);
@@ -149,13 +151,15 @@ const ServicesDashboard = () => {
 
                 <div className="flex items-center gap-3">
                     <FilterBar onSearch={handleSearch} placeholder="Buscar por cliente, proveedor..." />
-                    <button
-                        onClick={handleNew}
-                        className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
-                    >
-                        <Plus className="w-5 h-5" />
-                        <span>Nuevo Servicio</span>
-                    </button>
+                    {can('servicios.add_servicio') && (
+                        <button
+                            onClick={handleNew}
+                            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
+                        >
+                            <Plus className="w-5 h-5" />
+                            <span>Nuevo Servicio</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -212,12 +216,16 @@ const ServicesDashboard = () => {
                                     </td>
                                     <td className="p-2.5 text-right">
                                         <div className="flex justify-end gap-2">
-                                            <button onClick={() => handleEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
-                                                <Edit2 className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button onClick={() => handleDelete(item.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
+                                            {can('servicios.change_servicio') && (
+                                                <button onClick={() => handleEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                            {can('servicios.delete_servicio') && (
+                                                <button onClick={() => handleDelete(item.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>

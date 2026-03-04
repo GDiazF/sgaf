@@ -2,6 +2,7 @@ from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
+from establecimientos.pagination import LargeResultsSetPagination
 
 from .models import Subdireccion, Departamento, Unidad, Funcionario, Grupo
 from .serializers import (
@@ -61,6 +62,7 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
         'subdireccion', 'departamento', 'unidad',
         'departamento__subdireccion', 'unidad__departamento'
     ).all()
+    pagination_class = LargeResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['subdireccion', 'departamento', 'unidad', 'estado']
     search_fields = ['nombre_funcionario', 'rut', 'anexo', 'numero_publico', 'cargo']
@@ -129,6 +131,7 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
 
 class ControlAnexosViewSet(viewsets.ViewSet):
     """ViewSet para gestión centralizada de anexos telefónicos"""
+    queryset = Funcionario.objects.none()
     
     ANEXO_MIN = 400
     ANEXO_MAX = 600

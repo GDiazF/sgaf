@@ -121,8 +121,19 @@ class Grupo(models.Model):
         return self.nombre
 
 
+from django.contrib.auth.models import User
+
 class Funcionario(models.Model):
     """Funcionario - Empleado del SLEP"""
+    # Vínculo con cuenta de usuario
+    user = models.OneToOneField(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="funcionario_profile",
+        verbose_name="Usuario del Sistema"
+    )
     # Datos personales
     rut = models.CharField(
         "RUT",

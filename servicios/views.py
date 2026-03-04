@@ -13,6 +13,37 @@ from .serializers import (
     TipoProveedorSerializer, RegistroPagoSerializer, RecepcionConformeSerializer, 
     CDPSerializer, TipoEntregaSerializer, FacturaAdquisicionSerializer
 )
+from reportlab.lib.colors import HexColor
+
+# --- Corporate Branding for PDFs ---
+COLOR_VERDE = HexColor('#92D050')
+COLOR_AMARILLO = HexColor('#FFD400')
+COLOR_ROSADO = HexColor('#F68A91')
+COLOR_ROJO = HexColor('#E33E41')
+COLOR_CELESTE = HexColor('#48C1EB')
+COLOR_AZUL = HexColor('#3E7AB7')
+STRIP_COLORS = [COLOR_VERDE, COLOR_AMARILLO, COLOR_ROSADO, COLOR_ROJO, COLOR_CELESTE, COLOR_AZUL]
+
+def draw_color_strips(canvas, doc):
+    """
+    Robustly draws corporate color strips at the very top and bottom of the page.
+    Uses canvas._pagesize to ensure anchoring to physical boundaries regardless of doc setting.
+    """
+    canvas.saveState()
+    page_w, page_h = canvas._pagesize
+    h_strip = 12
+    n = len(STRIP_COLORS)
+    w_seg = page_w / n
+    
+    for i, color in enumerate(STRIP_COLORS):
+        # Top strip
+        canvas.setFillColor(color)
+        canvas.rect(i * w_seg, page_h - h_strip, w_seg, h_strip, stroke=0, fill=1)
+        # Bottom strip
+        canvas.rect(i * w_seg, 0, w_seg, h_strip, stroke=0, fill=1)
+    
+    canvas.restoreState()
+# ----------------------------------
 
 class TipoProveedorViewSet(viewsets.ModelViewSet):
     queryset = TipoProveedor.objects.all()
@@ -186,6 +217,157 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': f'Error al guardar en la base de datos: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @action(detail=True, methods=['get'])
+    def generate_pdf(self, request, pk=None):
+        import io
+        from django.http import FileResponse
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch, mm
+        from reportlab.lib.enums import TA_CENTER
+        from reportlab.lib.colors import HexColor
+        from django.conf import settings
+        from reportlab.lib.utils import ImageReader
+        import os
+
+        # Page Size Folio (216x330mm)
+        FOLIO = (216*mm, 330*mm)
+
+        # Spanish Month Names
+        MESES = {
+            1: "enero", 2: "febrero", 3: "marzo", 4: "abril",
+            5: "mayo", 6: "junio", 7: "julio", 8: "agosto",
+            9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
+        }
+
+        pago = self.get_object()
+        buffer = io.BytesIO()
+        
+        # Custom margins
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=FOLIO,
+            rightMargin=50,
+            leftMargin=50,
+            topMargin=40,
+            bottomMargin=40
+        )
+
+        # Container for elements
+        elements = []
+        styles = getSampleStyleSheet()
+        
+
+        azul_oscuro = HexColor('#1F4970')
+        gris_claro = HexColor('#F5F5F5')
+        gris_lineas = HexColor('#CCCCCC')
+
+        styles.add(ParagraphStyle(
+            name='MainTitle', parent=styles['Heading1'], alignment=TA_CENTER,
+            fontSize=12, spaceAfter=15, spaceBefore=15, fontName='Helvetica-Bold'
+        ))
+        styles.add(ParagraphStyle(
+            name='NormalText', parent=styles['Normal'], fontSize=9, leading=13,
+            spaceBefore=10, spaceAfter=10, alignment=4 # Justified
+        ))
+
+        def get_scaled_image(path, max_w, max_h):
+            img_reader = ImageReader(path)
+            iw, ih = img_reader.getSize()
+            aspect = ih / float(iw)
+            w = max_w
+            h = w * aspect
+            if h > max_h:
+                h = max_h
+                w = h / aspect
+            return Image(path, width=w, height=h)
+
+        logo_slep_path = os.path.join(settings.BASE_DIR, 'frontend', 'public', 'Logo SLEP.png')
+        logo_iquique_path = os.path.join(settings.BASE_DIR, 'frontend', 'public', 'Iquique.png')
+
+        header_data = [[]]
+        if os.path.exists(logo_iquique_path):
+            header_data[0].append(get_scaled_image(logo_iquique_path, 1.6*inch, 0.9*inch))
+        else:
+            header_data[0].append("")
+        header_data[0].append(Paragraph("", styles['Normal']))
+        if os.path.exists(logo_slep_path):
+            header_data[0].append(get_scaled_image(logo_slep_path, 1.8*inch, 1.5*inch))
+        else:
+            header_data[0].append("")
+
+        header_table = Table(header_data, colWidths=[2*inch, 3*inch, 2*inch])
+        header_table.setStyle(TableStyle([
+            ('ALIGN', (0,0), (0,0), 'LEFT'), ('ALIGN', (2,0), (2,0), 'RIGHT'), ('ALIGN', (1,0), (1,0), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'), ('TOPPADDING', (0,0), (-1,-1), 0), ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ]))
+        elements.append(header_table)
+        elements.append(Spacer(1, 40))
+        elements.append(Paragraph("RECEPCIÓN CONFORME", styles['MainTitle']))
+
+        fecha = pago.fecha_pago
+        intro_text = (
+            f"En Iquique, a {fecha.day} de {MESES.get(fecha.month)} de {fecha.year} "
+            f"en el establecimiento {pago.establecimiento.nombre}, se procede a dar recepción conforme a la boleta "
+            f"N° {pago.nro_documento} de {pago.servicio.proveedor.nombre}."
+        )
+        elements.append(Paragraph(intro_text, styles['NormalText']))
+        elements.append(Spacer(1, 10))
+
+        headers = ['N° Cliente', 'Establecimiento', 'Factura', 'Monto JUNJI', 'Monto Final']
+        data_body = [headers]
+        monto_junji = pago.monto_total - pago.monto_interes
+        data_body.append([
+            pago.servicio.numero_cliente,
+            Paragraph(pago.establecimiento.nombre, styles['Normal']),
+            pago.nro_documento,
+            f"${monto_junji:,}".replace(",", "."),
+            f"${pago.monto_total:,}".replace(",", ".")
+        ])
+
+        available_width = FOLIO[0] - 100
+        # Compact widths for individual RC
+        col_widths = [
+            available_width * 0.18, # N° Cliente (wider for ~15 digits)
+            available_width * 0.44, # Establecimiento
+            available_width * 0.14, # Factura
+            available_width * 0.12, # Monto JUNJI
+            available_width * 0.12  # Monto Final
+        ]
+
+        t_body = Table(data_body, colWidths=col_widths)
+        t_body.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,0), 'CENTER'), ('ALIGN', (0,1), (2,1), 'LEFT'), ('ALIGN', (3,1), (-1,-1), 'RIGHT'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 9),
+            ('BACKGROUND', (0,0), (-1,0), azul_oscuro), ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('BACKGROUND', (0,1), (-1,-1), gris_claro), ('GRID', (0,0), (-1,-1), 0.5, gris_lineas),
+            ('BOX', (0,0), (-1,-1), 1, azul_oscuro), ('TOPPADDING', (0,0), (-1,0), 6), ('BOTTOMPADDING', (0,0), (-1,0), 6),
+            ('TOPPADDING', (0,1), (-1,-1), 3), ('BOTTOMPADDING', (0,1), (-1,-1), 3), # Compact
+            ('LEFTPADDING', (0,0), (-1,-1), 3), ('RIGHTPADDING', (0,0), (-1,-1), 3),
+        ]))
+        elements.append(t_body)
+        elements.append(Spacer(1, 150))
+
+        # Generic signature section (No signer details)
+        signature_width = 200
+        signature_line = Table([['']], colWidths=[signature_width])
+        signature_line.setStyle(TableStyle([
+            ('LINEABOVE', (0,0), (-1,-1), 0.8, colors.black),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('TOPPADDING', (0,0), (-1,-1), 5),
+        ]))
+        elements.append(signature_line)
+        elements.append(Spacer(1, 5))
+        elements.append(Paragraph("RECIBE CONFORME", ParagraphStyle(
+            'SigStyle', parent=styles['Normal'], fontSize=9, alignment=TA_CENTER, fontName='Helvetica-Bold'
+        )))
+
+        doc.build(elements) # Color strips removed
+        buffer.seek(0)
+        return FileResponse(buffer, as_attachment=True, filename=f'RC_{pago.nro_documento}.pdf')
+
 class RecepcionConformeViewSet(viewsets.ModelViewSet):
     queryset = RecepcionConforme.objects.all().order_by('-fecha_emision', '-id')
     serializer_class = RecepcionConformeSerializer
@@ -237,34 +419,6 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
         # Styles from reference code
         styles = getSampleStyleSheet()
         
-        # Corporate Colors
-        color_verde = HexColor('#92D050')
-        color_amarillo = HexColor('#FFD400')
-        color_rosado = HexColor('#F68A91')
-        color_rojo = HexColor('#E33E41')
-        color_celeste = HexColor('#48C1EB')
-        color_azul = HexColor('#3E7AB7')
-        strip_colors = [color_verde, color_amarillo, color_rosado, color_rojo, color_celeste, color_azul]
-
-        def draw_color_strips(canvas, doc):
-            canvas.saveState()
-            page_w, page_h = doc.pagesize
-            h_strip = 12
-            n = len(strip_colors)
-            w_seg = page_w / n
-            
-            # Top strip
-            for i, color in enumerate(strip_colors):
-                canvas.setFillColor(color)
-                canvas.rect(i * w_seg, page_h - h_strip, w_seg, h_strip, stroke=0, fill=1)
-            
-            # Bottom strip
-            for i, color in enumerate(strip_colors):
-                canvas.setFillColor(color)
-                canvas.rect(i * w_seg, 0, w_seg, h_strip, stroke=0, fill=1)
-            
-            canvas.restoreState()
-
         azul_oscuro = HexColor('#1F4970')
         gris_claro = HexColor('#F5F5F5')
         gris_lineas = HexColor('#CCCCCC')
@@ -376,69 +530,78 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
         elements.append(Spacer(1, 5))
 
         # Detail Table
-        headers = ['N° Cliente', 'Establecimiento', 'Factura', 'Monto JUNJI', 'Monto Final']
+        headers = ['N° Cliente', 'RBD', 'Establecimiento', 'Factura', 'Fecha Venc.', 'Interés', 'Saldo Final']
         data_body = [headers]
         
-        for pago in rc.registros.all():
-            monto_junji = pago.monto_total - pago.monto_interes
+        for p in rc.registros.all():
+            saldo_final = p.monto_total
+            interes = p.monto_interes
+            
             row = [
-                pago.servicio.numero_cliente,
-                Paragraph(pago.establecimiento.nombre, 
+                p.servicio.numero_cliente,
+                str(p.establecimiento.rbd),
+                Paragraph(p.establecimiento.nombre, 
                          ParagraphStyle(
                              'EstStyle',
                              parent=styles['Normal'],
-                             fontSize=9,
-                             leading=11,
+                             fontSize=8,
+                             leading=10,
                              wordWrap='LTR',
                          )),
-                pago.nro_documento,
-                f"${monto_junji:,}".replace(",", "."),
-                f"${pago.monto_total:,}".replace(",", ".")
+                p.nro_documento,
+                p.fecha_vencimiento.strftime("%d-%m-%Y"),
+                f"${interes:,}".replace(",", "."),
+                f"${saldo_final:,}".replace(",", ".")
             ]
             data_body.append(row)
         
         # Calculate available width (8.5 inch - 100 points margins)
         available_width = FOLIO[0] - 100
+        # 7 columns: Optimized further for 'Establecimiento'
         col_widths = [
-            available_width * 0.12,  # N° Cliente
-            available_width * 0.41,  # Establecimiento
-            available_width * 0.17,  # Factura
-            available_width * 0.15,  # Monto JUNJI
-            available_width * 0.15   # Monto Final
+            available_width * 0.15,  # N° Cliente (wider for ~15 digits)
+            available_width * 0.06,  # RBD
+            available_width * 0.37,  # Establecimiento
+            available_width * 0.12,  # Factura
+            available_width * 0.12,  # Fecha Venc.
+            available_width * 0.09,  # Interés
+            available_width * 0.09   # Saldo Final
         ]
 
         t_body = Table(data_body, colWidths=col_widths)
         t_body.setStyle(TableStyle([
             ('ALIGN', (0,0), (-1,0), 'CENTER'),
-            ('ALIGN', (0,1), (2,1), 'LEFT'),
-            ('ALIGN', (3,1), (-1,-1), 'RIGHT'),
+            ('ALIGN', (0,1), (1,-1), 'CENTER'),
+            ('ALIGN', (2,1), (2,-1), 'LEFT'),
+            ('ALIGN', (3,1), (4,-1), 'CENTER'),
+            ('ALIGN', (5,1), (-1,-1), 'RIGHT'),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTNAME', (0,1), (-1,1), 'Helvetica'),
-            ('FONTSIZE', (0,0), (-1,-1), 9),
+            ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+            ('FONTSIZE', (0,0), (-1,-1), 8),
             ('BACKGROUND', (0,0), (-1,0), azul_oscuro),
             ('TEXTCOLOR', (0,0), (-1,0), colors.white),
             ('BACKGROUND', (0,1), (-1,-1), gris_claro),
             ('GRID', (0,0), (-1,-1), 0.5, gris_lineas),
-            ('BOX', (0,0), (-1,-1), 1, azul_oscuro),
+            ('BOX', (0,0), (-1,-1), 0.8, azul_oscuro),
             ('TOPPADDING', (0,0), (-1,0), 6),
             ('BOTTOMPADDING', (0,0), (-1,0), 6),
-            ('TOPPADDING', (0,1), (-1,-1), 12),
-            ('BOTTOMPADDING', (0,1), (-1,-1), 12),
-            ('LEFTPADDING', (0,0), (-1,-1), 10),
-            ('RIGHTPADDING', (0,0), (-1,-1), 10),
+            ('TOPPADDING', (0,1), (-1,-1), 2.5),
+            ('BOTTOMPADDING', (0,1), (-1,-1), 2.5),
+            ('LEFTPADDING', (0,0), (-1,-1), 3),
+            ('RIGHTPADDING', (0,0), (-1,-1), 3),
         ]))
         elements.append(t_body)
-        elements.append(Spacer(1, 180))
+        elements.append(Spacer(1, 40))
 
-        # Signature Section
+        # Signature
         firmante = rc.firmante
 
         if firmante:
             # Signature Line
             sig_line = Table([[""]], colWidths=[2.5*inch])
             sig_line.setStyle(TableStyle([
-                ('LINEABOVE', (0,0), (-1,-1), 0.8, azul_oscuro),
+                ('LINEABOVE', (0,0), (-1,-1), 0.8, colors.black),
                 ('ALIGN', (0,0), (-1,-1), 'CENTER'),
                 ('TOPPADDING', (0,0), (-1,-1), 0),
                 ('BOTTOMPADDING', (0,0), (-1,-1), 0),
@@ -452,7 +615,6 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
 
             # 1. Name
             elements.append(Paragraph(firmante.nombre_funcionario.upper(), sig_p_style))
-            # 2. Cargo
             # 2. Cargo + Dept/Subdiv
             cargo_line = firmante.cargo.upper() if firmante.cargo else ""
             org_unit = ""
@@ -469,23 +631,20 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
                 elements.append(Paragraph(f"{cargo_line} DE {org_unit}", sig_p_style))
             elif cargo_line or org_unit:
                 elements.append(Paragraph(cargo_line or org_unit, sig_p_style))
-
-            # 3. Administrador del Contrato
-            # Line removed as requested
-            # 4. Institution
-            # Line removed as requested
         else:
             # Fallback for generic signature line
             signature_width = 200
             signature_line = Table([['']], colWidths=[signature_width])
             signature_line.setStyle(TableStyle([
-                ('LINEABOVE', (0,0), (-1,-1), 1, azul_oscuro),
+                ('LINEABOVE', (0,0), (-1,-1), 1, colors.black),
                 ('ALIGN', (0,0), (-1,-1), 'CENTER'),
                 ('TOPPADDING', (0,0), (-1,-1), 5),
             ]))
             elements.append(signature_line)
             elements.append(Spacer(1, 5))
-            elements.append(Paragraph("RECIBE CONFORME", styles['SignatureTitle']))
+            elements.append(Paragraph("RECIBE CONFORME", ParagraphStyle(
+                'SigStyle', parent=styles['Normal'], fontSize=9, alignment=TA_CENTER, fontName='Helvetica-Bold'
+            )))
 
         doc.build(elements)
         buffer.seek(0)
@@ -576,34 +735,6 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
         elements = []
         styles = getSampleStyleSheet()
 
-        # Corporate Colors
-        color_verde = HexColor('#92D050')
-        color_amarillo = HexColor('#FFD400')
-        color_rosado = HexColor('#F68A91')
-        color_rojo = HexColor('#E33E41')
-        color_celeste = HexColor('#48C1EB')
-        color_azul = HexColor('#3E7AB7')
-        strip_colors = [color_verde, color_amarillo, color_rosado, color_rojo, color_celeste, color_azul]
-
-        def draw_color_strips(canvas, doc):
-            canvas.saveState()
-            page_w, page_h = doc.pagesize
-            h_strip = 12
-            n = len(strip_colors)
-            w_seg = page_w / n
-            
-            # Top strip
-            for i, color in enumerate(strip_colors):
-                canvas.setFillColor(color)
-                canvas.rect(i * w_seg, page_h - h_strip, w_seg, h_strip, stroke=0, fill=1)
-            
-            # Bottom strip
-            for i, color in enumerate(strip_colors):
-                canvas.setFillColor(color)
-                canvas.rect(i * w_seg, 0, w_seg, h_strip, stroke=0, fill=1)
-            
-            canvas.restoreState()
-        
         # Styles from user snippet
         title_style = ParagraphStyle(
             "OCTitle",

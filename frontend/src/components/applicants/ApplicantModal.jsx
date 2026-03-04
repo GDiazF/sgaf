@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import BaseModal from '../common/BaseModal';
 import FormInput from '../common/FormInput';
 import { UserPlus, User, Mail, Phone, Hash, Info } from 'lucide-react';
+import { formatRut, validateRut } from '../../utils/rutValidator';
 
 const ApplicantModal = ({
     isOpen,
@@ -54,13 +55,16 @@ const ApplicantModal = ({
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <FormInput
-                            label="RUT (Sin puntos y con guion)"
+                            label="RUT (Formato: 12345678-9)"
                             required
                             placeholder="Ej: 12345678-k"
                             className="md:col-span-2"
-                            inputClassName="font-mono"
+                            inputClassName="font-mono uppercase"
                             value={formData.rut}
-                            onChange={e => setFormData({ ...formData, rut: e.target.value })}
+                            onChange={e => {
+                                const formatted = formatRut(e.target.value);
+                                setFormData({ ...formData, rut: formatted });
+                            }}
                         />
                         <FormInput
                             label="Nombres"

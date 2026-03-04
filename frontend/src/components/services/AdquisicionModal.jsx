@@ -128,8 +128,8 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
                             name="folio"
                             placeholder="Automático..."
                             value={formData.folio}
-                            onChange={handleChange}
-                            inputClassName="bg-slate-50 font-mono"
+                            readOnly
+                            inputClassName="bg-slate-50 font-mono opacity-60 cursor-not-allowed"
                         />
                         <FormInput
                             label="Nº CDP"

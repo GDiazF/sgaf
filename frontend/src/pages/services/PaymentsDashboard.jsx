@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
-import { DollarSign, Search, Plus, Edit2, Trash2, X, Save, Building2, Calendar, FileText, FileCheck, CheckSquare, Square, Power } from 'lucide-react';
+import { DollarSign, Search, Plus, Edit2, Trash2, X, Save, Building2, Calendar, FileText, FileCheck, CheckSquare, Square, Power, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import DateInput from '../../components/common/DateInput';
 import Pagination from '../../components/common/Pagination';
@@ -9,8 +9,14 @@ import SortableHeader from '../../components/common/SortableHeader';
 import BulkUploadModal from '../../components/common/BulkUploadModal';
 import PaymentModal from '../../components/services/PaymentModal';
 import FormSelect from '../../components/common/FormSelect';
+import { useAuth } from '../../context/AuthContext';
+import { usePermission } from '../../hooks/usePermission';
 
 const PaymentsDashboard = () => {
+    const { user } = useAuth();
+    const { can } = usePermission();
+    const isPrivileged = user?.is_superuser || can('servicios.delete_recepcionconforme');
+
     const [payments, setPayments] = useState([]);
     const [services, setServices] = useState([]);
     const [establishments, setEstablishments] = useState([]);
@@ -35,9 +41,6 @@ const PaymentsDashboard = () => {
     const [providers, setProviders] = useState([]);
     const [selectedType, setSelectedType] = useState('');
     const [selectedProvider, setSelectedProvider] = useState('');
-    const [groups, setGroups] = useState([]);
-    const [selectedSignerGroup, setSelectedSignerGroup] = useState(localStorage.getItem('last_signer_group') || '');
-    const [selectedSigner, setSelectedSigner] = useState('');
 
     // Initial state for form
     const initialFormState = {
@@ -103,24 +106,13 @@ const PaymentsDashboard = () => {
     useEffect(() => {
         const fetchFilters = async () => {
             try {
-                const [typesRes, provRes, grpRes] = await Promise.all([
+                const [typesRes, provRes] = await Promise.all([
                     api.get('tipos-proveedores/'),
-                    api.get('proveedores/'),
-                    api.get('grupos/', { params: { page_size: 1000 } })
+                    api.get('proveedores/')
                 ]);
                 setProviderTypes(typesRes.data.results || typesRes.data);
                 setProviders(provRes.data.results || provRes.data);
-                setGroups(grpRes.data.results || grpRes.data);
 
-                // Pre-select group from localStorage or first group
-                const savedGroup = localStorage.getItem('last_signer_group');
-                const allGroups = grpRes.data.results || grpRes.data;
-                const activeGrp = allGroups.find(g => g.id.toString() === savedGroup) || allGroups[0];
-
-                if (activeGrp) {
-                    setSelectedSignerGroup(activeGrp.id);
-                    setSelectedSigner(activeGrp.jefe || '');
-                }
             } catch (error) {
                 console.error("Error fetching filter data:", error);
             }
@@ -202,10 +194,11 @@ const PaymentsDashboard = () => {
         if (!window.confirm("¿Seguro que desea eliminar este registro de pago?")) return;
         try {
             await api.delete(`registros-pagos/${id}/`);
-            fetchData(currentPage, searchQuery);
+            // Pass current search AND status to maintain view
+            fetchData(currentPage, searchQuery, statusFilter);
         } catch (error) {
             console.error(error);
-            alert("Error al eliminar.");
+            alert("Error al eliminar el registro. Verifique que no tenga documentos asociados.");
         }
     };
 
@@ -247,9 +240,7 @@ const PaymentsDashboard = () => {
         try {
             await api.post('recepciones-conformes/', {
                 proveedor: providerId,
-                registros_ids: Array.from(selectedIds),
-                grupo_firmante: selectedSignerGroup || null,
-                firmante: selectedSigner || null
+                registros_ids: Array.from(selectedIds)
             });
             alert("Recepción Conforme generada exitosamente.");
             fetchData(currentPage, searchQuery);
@@ -260,18 +251,44 @@ const PaymentsDashboard = () => {
         }
     };
 
-    const handleSave = async (dataToSubmit) => {
+    const handleDownloadRC = async (payment) => {
         try {
-            if (editingId) {
-                await api.put(`registros-pagos/${editingId}/`, dataToSubmit);
-            } else {
-                await api.post('registros-pagos/', dataToSubmit);
-            }
-            setShowForm(false);
-            fetchData(currentPage, searchQuery);
+            const response = await api.get(`registros-pagos/${payment.id}/generate_pdf/`, {
+                responseType: 'blob'
+            });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `RC_${payment.nro_documento}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
         } catch (error) {
             console.error(error);
-            alert("Error al guardar registro.");
+            alert("Error al descargar la RC.");
+        }
+    };
+
+    const handleSave = async (dataToSubmit) => {
+        try {
+            // Ensure numeric values are numbers
+            const preparedData = {
+                ...dataToSubmit,
+                monto_total: parseInt(dataToSubmit.monto_total) || 0,
+                monto_interes: parseInt(dataToSubmit.monto_interes) || 0
+            };
+
+            if (editingId) {
+                await api.put(`registros-pagos/${editingId}/`, preparedData);
+            } else {
+                await api.post('registros-pagos/', preparedData);
+            }
+            setShowForm(false);
+            fetchData(currentPage, searchQuery, statusFilter);
+        } catch (error) {
+            console.error(error);
+            const detail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+            alert("Error al guardar registro: " + detail);
         }
     };
 
@@ -378,79 +395,31 @@ const PaymentsDashboard = () => {
                                     { value: 'pending', label: 'Pendientes' },
                                     { value: 'paid', label: 'Con RC' }
                                 ]}
-                                label="Estado"
+                                placeholder="Estado"
                                 inputClassName="!py-2 !h-[38px] !text-xs !w-32"
                             />
                         </div>
 
                         <div className="flex items-center gap-2">
-                            {selectedIds.size > 0 && (
-                                <motion.div
-                                    initial={{ opacity: 0, x: 20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    className="flex items-center gap-3 p-2.5 bg-indigo-600 rounded-2xl shadow-xl shadow-indigo-600/20 border border-indigo-400 group"
-                                >
-                                    <div className="flex flex-col gap-1.5 w-48">
-                                        <select
-                                            value={selectedSignerGroup}
-                                            onChange={(e) => {
-                                                const gid = e.target.value;
-                                                setSelectedSignerGroup(gid);
-                                                localStorage.setItem('last_signer_group', gid);
-                                                const grp = groups.find(g => g.id.toString() === gid);
-                                                if (grp) setSelectedSigner(grp.jefe || '');
-                                            }}
-                                            className="px-3 py-1.5 bg-white/10 border border-white/20 rounded-xl text-[9px] font-black text-white hover:bg-white/20 transition-all outline-none"
-                                            title="Seleccionar grupo que firmará esta RC"
-                                        >
-                                            <option value="" className="text-slate-800">Grupo de Firma...</option>
-                                            {groups.map(g => (
-                                                <option key={g.id} value={g.id} className="text-slate-800">{g.nombre}</option>
-                                            ))}
-                                        </select>
-
-                                        {selectedSignerGroup && (
-                                            <select
-                                                value={selectedSigner}
-                                                onChange={(e) => setSelectedSigner(e.target.value)}
-                                                className="px-3 py-1.5 bg-white/10 border border-white/20 rounded-xl text-[9px] font-black text-white hover:bg-white/20 transition-all outline-none animate-in slide-in-from-top-1"
-                                                title="Seleccionar funcionario que firmará"
-                                            >
-                                                <option value="" className="text-slate-800">Firmante...</option>
-                                                {groups.find(g => g.id.toString() === selectedSignerGroup.toString())?.miembros_detalle?.map(m => (
-                                                    <option key={m.id} value={m.id} className="text-slate-800">
-                                                        {m.nombre} {m.id === groups.find(g => g.id.toString() === selectedSignerGroup.toString())?.jefe ? '(Jefe)' : ''}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        )}
-                                    </div>
+                            {can('servicios.add_registropago') && (
+                                <>
+                                    <button
+                                        onClick={handleNew}
+                                        className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap text-sm"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        <span>Registrar</span>
+                                    </button>
 
                                     <button
-                                        onClick={handleGenerateRC}
-                                        className="flex items-center gap-2 bg-white text-indigo-600 px-6 py-3 rounded-xl hover:bg-white/90 transition-all shadow-lg font-black whitespace-nowrap text-[10px] uppercase tracking-widest h-full group-hover:scale-105"
+                                        onClick={handleBulk}
+                                        className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 font-medium whitespace-nowrap text-sm"
                                     >
-                                        <FileCheck className="w-4 h-4" />
-                                        <span>Generar RC ({selectedIds.size})</span>
+                                        <FileText className="w-4 h-4" />
+                                        <span>Carga Masiva</span>
                                     </button>
-                                </motion.div>
+                                </>
                             )}
-
-                            <button
-                                onClick={handleNew}
-                                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap text-sm"
-                            >
-                                <Plus className="w-4 h-4" />
-                                <span>Registrar</span>
-                            </button>
-
-                            <button
-                                onClick={handleBulk}
-                                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 font-medium whitespace-nowrap text-sm"
-                            >
-                                <FileText className="w-4 h-4" />
-                                <span>Carga Masiva</span>
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -510,11 +479,11 @@ const PaymentsDashboard = () => {
                                     </button>
                                 </th>
                                 <SortableHeader label="Documento" sortKey="nro_documento" currentOrdering={ordering} onSort={handleSort} />
+                                <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Servicio</th>
+                                <SortableHeader label="Establecimiento" sortKey="establecimiento__nombre" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="Fecha Emisión" sortKey="fecha_emision" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="Fecha Venc." sortKey="fecha_vencimiento" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="Envío a Pago" sortKey="fecha_pago" currentOrdering={ordering} onSort={handleSort} />
-                                <SortableHeader label="Establecimiento" sortKey="establecimiento__nombre" currentOrdering={ordering} onSort={handleSort} />
-                                <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Servicio</th>
                                 <SortableHeader label="Monto" sortKey="monto_total" currentOrdering={ordering} onSort={handleSort} className="text-right" />
                                 <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
                             </tr>
@@ -546,6 +515,17 @@ const PaymentsDashboard = () => {
                                             </span>
                                         )}
                                     </td>
+                                    <td className="p-2.5">
+                                        <div className="font-medium text-blue-700 truncate max-w-xs" title={item.servicio_detalle}>
+                                            {item.servicio_detalle}
+                                        </div>
+                                    </td>
+                                    <td className="p-2.5">
+                                        <div className="flex items-center gap-2 text-slate-700">
+                                            <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                                            {item.establecimiento_nombre}
+                                        </div>
+                                    </td>
                                     <td className="p-2.5 text-slate-600">
                                         {formatDate(item.fecha_emision)}
                                     </td>
@@ -558,38 +538,45 @@ const PaymentsDashboard = () => {
                                             {formatDate(item.fecha_pago)}
                                         </div>
                                     </td>
-                                    <td className="p-2.5">
-                                        <div className="flex items-center gap-2 text-slate-700">
-                                            <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                                            {item.establecimiento_nombre}
-                                        </div>
-                                    </td>
-                                    <td className="p-2.5">
-                                        <div className="font-medium text-blue-700 truncate max-w-xs" title={item.servicio_detalle}>
-                                            {item.servicio_detalle}
-                                        </div>
-                                    </td>
                                     <td className="p-2.5 text-right">
                                         <div className="font-bold text-slate-900">{formatCurrency(item.monto_total)}</div>
                                     </td>
                                     <td className="p-2.5 text-right">
                                         <div className="flex justify-end gap-2">
                                             <button
-                                                onClick={() => handleEdit(item)}
-                                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                                title="Editar"
-                                                disabled={item.recepcion_conforme}
+                                                onClick={() => handleDownloadRC(item)}
+                                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                title="Descargar RC"
+                                                disabled={!item.recepcion_conforme}
                                             >
-                                                <Edit2 className="w-3.5 h-3.5" />
+                                                <Download className={`w-3.5 h-3.5 ${!item.recepcion_conforme ? 'opacity-20' : ''}`} />
                                             </button>
-                                            <button
-                                                onClick={() => handleDelete(item.id)}
-                                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                                title="Eliminar"
-                                                disabled={item.recepcion_conforme}
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
+                                            {can('servicios.change_registropago') && (
+                                                <button
+                                                    onClick={() => handleEdit(item)}
+                                                    className={`p-1.5 rounded-lg transition-all ${item.recepcion_conforme && !isPrivileged
+                                                        ? 'text-slate-200 cursor-not-allowed'
+                                                        : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
+                                                        }`}
+                                                    title={item.recepcion_conforme ? (isPrivileged ? "Editar (Admin)" : "No se puede editar: tiene RC asociada") : "Editar"}
+                                                    disabled={item.recepcion_conforme && !isPrivileged}
+                                                >
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                            {can('servicios.delete_registropago') && (
+                                                <button
+                                                    onClick={() => handleDelete(item.id)}
+                                                    className={`p-1.5 rounded-lg transition-all ${item.recepcion_conforme && !isPrivileged
+                                                        ? 'text-slate-200 cursor-not-allowed'
+                                                        : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
+                                                        }`}
+                                                    title={item.recepcion_conforme ? (isPrivileged ? "Eliminar (Admin)" : "No se puede eliminar: tiene RC asociada") : "Eliminar"}
+                                                    disabled={item.recepcion_conforme && !isPrivileged}
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -612,6 +599,50 @@ const PaymentsDashboard = () => {
                     totalCount={totalCount}
                 />
             </div>
+            {/* Floating Bulk Action Bar */}
+            <AnimatePresence>
+                {selectedIds.size > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 100 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 100 }}
+                        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 p-4 bg-slate-900/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-slate-700 text-white min-w-[500px]"
+                    >
+                        <div className="flex items-center gap-3 pr-4 border-r border-slate-700">
+                            <div className="bg-indigo-600 p-2 rounded-lg">
+                                <FileCheck className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <div className="text-xs font-bold">{selectedIds.size} seleccionados</div>
+                                <div className="text-[10px] text-slate-400">Generación masiva de RC</div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 px-4 text-center">
+                            <p className="text-[10px] text-slate-400 font-medium">
+                                Los firmantes se asignan editando la RC después de generarla.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 pl-4 border-l border-slate-700">
+                            <button
+                                onClick={() => setSelectedIds(new Set())}
+                                className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            {can('servicios.add_recepcionconforme') && (
+                                <button
+                                    onClick={handleGenerateRC}
+                                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-xl transition-all shadow-lg font-black text-xs uppercase tracking-wider"
+                                >
+                                    Generar RC
+                                </button>
+                            )}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

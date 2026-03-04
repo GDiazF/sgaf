@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import { FileText, Calendar, Building2, Download, Edit2, X, Save, Trash2, Clock, User, PlusCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { usePermission } from '../../hooks/usePermission';
 import Pagination from '../../components/common/Pagination';
 import FilterBar from '../../components/common/FilterBar';
 import SortableHeader from '../../components/common/SortableHeader';
@@ -11,6 +12,7 @@ import FormSelect from '../../components/common/FormSelect';
 const RecepcionConformeList = () => {
     const [rcs, setRcs] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { can } = usePermission();
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
@@ -282,20 +284,24 @@ const RecepcionConformeList = () => {
                                                     >
                                                         <Download className="w-3.5 h-3.5" />
                                                     </button>
-                                                    <button
-                                                        onClick={() => handleEdit(item)}
-                                                        className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
-                                                        title="Editar Contenido"
-                                                    >
-                                                        <Edit2 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleAnulate(item)}
-                                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                                        title="Anular RC"
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
+                                                    {can('servicios.change_recepcionconforme') && (
+                                                        <button
+                                                            onClick={() => handleEdit(item)}
+                                                            className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
+                                                            title="Editar Contenido"
+                                                        >
+                                                            <Edit2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                    {can('servicios.delete_recepcionconforme') && (
+                                                        <button
+                                                            onClick={() => handleAnulate(item)}
+                                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                            title="Anular RC"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
                                                 </>
                                             )}
                                         </div>
@@ -437,8 +443,8 @@ const RecepcionConformeList = () => {
                                     name="folio"
                                     placeholder="Automático..."
                                     value={editForm.folio}
-                                    onChange={e => setEditForm({ ...editForm, folio: e.target.value })}
-                                    inputClassName="bg-slate-50 font-mono"
+                                    readOnly
+                                    inputClassName="bg-slate-50 font-mono opacity-60 cursor-not-allowed"
                                 />
 
                                 {/* Signer Group Selection */}

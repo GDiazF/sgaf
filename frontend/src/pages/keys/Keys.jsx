@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import { Key, Search, Plus, Edit2, Trash2, X, Save, Building, Lock, Unlock, ArrowLeft } from 'lucide-react';
+import { usePermission } from '../../hooks/usePermission';
 import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '../../components/common/Pagination';
 import FilterBar from '../../components/common/FilterBar';
@@ -10,6 +11,7 @@ import KeyModal from '../../components/keys/KeyModal';
 
 const Keys = () => {
     const navigate = useNavigate();
+    const { can } = usePermission();
     const [keys, setKeys] = useState([]);
     const [establishments, setEstablishments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -20,6 +22,7 @@ const Keys = () => {
     const [totalPages, setTotalPages] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
+    const [availabilityFilter, setAvailabilityFilter] = useState('all'); // 'all', 'available', 'in_use'
     const [ordering, setOrdering] = useState('nombre');
 
     const [editingId, setEditingId] = useState(null);
@@ -38,6 +41,12 @@ const Keys = () => {
                 search,
                 ordering: order
             };
+
+            if (availabilityFilter === 'available') {
+                params.disponible = 'true';
+            } else if (availabilityFilter === 'in_use') {
+                params.disponible = 'false';
+            }
 
             const [keysRes, estRes] = await Promise.all([
                 api.get('llaves/', { params }),
@@ -61,7 +70,7 @@ const Keys = () => {
 
     useEffect(() => {
         fetchData(currentPage, searchQuery, ordering);
-    }, [currentPage, ordering]);
+    }, [currentPage, ordering, availabilityFilter]);
 
     const handleSearch = (query) => {
         setSearchQuery(query);
@@ -160,6 +169,21 @@ const Keys = () => {
                     />
                 </div>
                 <div className="flex items-center gap-2 px-4 py-2 border-l border-slate-100">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Estado:</span>
+                    <select
+                        value={availabilityFilter}
+                        onChange={(e) => {
+                            setAvailabilityFilter(e.target.value);
+                            setCurrentPage(1);
+                        }}
+                        className="bg-transparent text-[11px] font-black text-slate-700 focus:outline-none cursor-pointer hover:text-blue-600 transition-colors"
+                    >
+                        <option value="all">Todas</option>
+                        <option value="available">Disponibles</option>
+                        <option value="in_use">En uso</option>
+                    </select>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 border-l border-slate-100">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Ordenar:</span>
                     <select
                         value={ordering}
@@ -226,15 +250,19 @@ const Keys = () => {
                                 </td>
                                 <td className="p-2.5 text-right pr-8">
                                     <div className="flex justify-end gap-2">
-                                        <button
-                                            onClick={() => handleEdit(key)}
-                                            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                        >
-                                            <Edit2 className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button onClick={() => handleDelete(key.id)} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
+                                        {can('prestamo_llaves.change_llave') && (
+                                            <button
+                                                onClick={() => handleEdit(key)}
+                                                className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                            >
+                                                <Edit2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                        {can('prestamo_llaves.delete_llave') && (
+                                            <button onClick={() => handleDelete(key.id)} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
                                     </div>
                                 </td>
                             </tr>

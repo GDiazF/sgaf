@@ -2,8 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Phone, Search, X, Check, AlertCircle, Info, User, Building, Trash2, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api';
+import { usePermission } from '../../hooks/usePermission';
 
 const ControlAnexos = ({ isOpen, onClose }) => {
+    const { can } = usePermission();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -262,13 +264,20 @@ const ControlAnexos = ({ isOpen, onClose }) => {
                                             </div>
 
                                             <div className="pt-4 border-t border-gray-50">
-                                                <button
-                                                    onClick={() => handleLiberar(selectedAnexo)}
-                                                    className="w-full bg-red-50 hover:bg-red-500 text-red-600 hover:text-white py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 group"
-                                                >
-                                                    <Trash2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                                                    Liberar Anexo
-                                                </button>
+                                                {can('funcionarios.change_funcionario') ? (
+                                                    <button
+                                                        onClick={() => handleLiberar(selectedAnexo)}
+                                                        className="w-full bg-red-50 hover:bg-red-500 text-red-600 hover:text-white py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 group"
+                                                    >
+                                                        <Trash2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                                        Liberar Anexo
+                                                    </button>
+                                                ) : (
+                                                    <div className="flex items-center gap-2 p-4 bg-amber-50 rounded-2xl border border-amber-100 text-amber-600 text-[10px] font-bold uppercase tracking-widest">
+                                                        <Info className="w-4 h-4" />
+                                                        Sin permisos para liberar
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     ) : (
@@ -311,14 +320,21 @@ const ControlAnexos = ({ isOpen, onClose }) => {
                                                     </select>
                                                 </div>
 
-                                                <button
-                                                    onClick={handleAsignar}
-                                                    disabled={!selectedFuncionarioId}
-                                                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-200 disabled:shadow-none transition-all flex items-center justify-center gap-2 mt-4"
-                                                >
-                                                    Asignar Ahora
-                                                    <ArrowRight className="w-5 h-5" />
-                                                </button>
+                                                {can('funcionarios.change_funcionario') ? (
+                                                    <button
+                                                        onClick={handleAsignar}
+                                                        disabled={!selectedFuncionarioId}
+                                                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-200 disabled:shadow-none transition-all flex items-center justify-center gap-2 mt-4"
+                                                    >
+                                                        Asignar Ahora
+                                                        <ArrowRight className="w-5 h-5" />
+                                                    </button>
+                                                ) : (
+                                                    <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100 text-amber-600 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 mt-4">
+                                                        <Info className="w-4 h-4" />
+                                                        Sin permisos para asignar
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )}

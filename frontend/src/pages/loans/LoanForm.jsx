@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
-import { Save, Search, Plus, X, Key, UserPlus, Check, Building, ArrowLeft } from 'lucide-react';
+import { Save, Search, Plus, X, Key, UserPlus, Check, Building, ArrowLeft, GraduationCap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ApplicantModal from '../../components/applicants/ApplicantModal';
 import FormInput from '../../components/common/FormInput';
@@ -23,6 +23,7 @@ const LoanForm = () => {
     const [funcionarios, setFuncionarios] = useState([]);
     const [selectedApplicantId, setSelectedApplicantId] = useState('');
     const [selectedFuncionarioId, setSelectedFuncionarioId] = useState('');
+    const [selectedDirectorEstId, setSelectedDirectorEstId] = useState('');
     const [showApplicantForm, setShowApplicantForm] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -32,13 +33,33 @@ const LoanForm = () => {
         // Initial load of Lookups
         const loadLookups = async () => {
             try {
-                const [estRes, appRes, funcRes] = await Promise.all([
+                const [estRes, appRes, funcRes, allKeysRes] = await Promise.all([
                     api.get('establecimientos/?page_size=1000'),
                     api.get('solicitantes/?page_size=1000'),
-                    api.get('funcionarios/?page_size=1000')
+                    api.get('funcionarios/?page_size=1000'),
+                    api.get('llaves/?page_size=1000') // Fetch all keys to analyze establishments
                 ]);
-                setEstablishments(estRes.data.results || estRes.data);
-                setApplicants(appRes.data.results || appRes.data);
+
+                const allKeys = allKeysRes.data.results || allKeysRes.data || [];
+                const allEsts = estRes.data.results || estRes.data || [];
+
+                // Filter establishments: Only those that have at least one key
+                const estsWithKeys = allEsts.filter(est =>
+                    allKeys.some(key => key.establecimiento === est.id)
+                ).map(est => {
+                    const keysOfEst = allKeys.filter(key => key.establecimiento === est.id);
+                    const anyAvailable = keysOfEst.some(key => key.disponible);
+                    return {
+                        ...est,
+                        hasAvailableKeys: anyAvailable
+                    };
+                });
+
+                setEstablishments(allEsts);
+
+                // Filter applicants: Only show those who are NOT associated with a funcionario
+                const allApplicants = appRes.data.results || appRes.data;
+                setApplicants(allApplicants.filter(a => !a.funcionario));
                 setFuncionarios(funcRes.data.results || funcRes.data || []);
             } catch (error) {
                 console.error("Error loading lookups:", error);
@@ -80,6 +101,17 @@ const LoanForm = () => {
         setSelectedKeys(selectedKeys.filter(k => k.id !== id));
     };
 
+    const handleAddAllAvailable = () => {
+        const available = foundKeys.filter(k => k.disponible);
+        const newKeys = [...selectedKeys];
+        available.forEach(k => {
+            if (!newKeys.find(nk => nk.id === k.id)) {
+                newKeys.push(k);
+            }
+        });
+        setSelectedKeys(newKeys);
+    };
+
     const handleSaveApplicant = async (data) => {
         try {
             const res = await api.post('solicitantes/', data);
@@ -101,6 +133,13 @@ const LoanForm = () => {
     const handleApplicantSelect = (id) => {
         setSelectedApplicantId(id);
         setSelectedFuncionarioId('');
+        setSelectedDirectorEstId('');
+    };
+
+    const handleDirectorEstSelect = (id) => {
+        setSelectedDirectorEstId(id);
+        setSelectedApplicantId('');
+        setSelectedFuncionarioId('');
     };
 
     const handleSubmit = async (e) => {
@@ -118,6 +157,7 @@ const LoanForm = () => {
         const payload = {
             solicitante: selectedApplicantId || null,
             funcionario: selectedFuncionarioId || null,
+            director_establecimiento_id: selectedDirectorEstId || null,
             llaves: selectedKeys.map(k => k.id),
             observacion: observacion
         };
@@ -160,8 +200,17 @@ const LoanForm = () => {
                                 <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shadow-sm">
                                     <Key className="w-4 h-4" />
                                 </div>
-                                <div>
+                                <div className="flex flex-col md:flex-row md:items-center gap-2">
                                     <h2 className="text-sm font-bold text-slate-900">1. Seleccionar Llaves</h2>
+                                    {foundKeys.some(k => k.disponible) && (
+                                        <button
+                                            type="button"
+                                            onClick={handleAddAllAvailable}
+                                            className="text-[9px] font-black text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100 transition-all uppercase tracking-widest whitespace-nowrap"
+                                        >
+                                            Seleccionar todas las disponibles
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                             {selectedKeys.length > 0 && (
@@ -177,7 +226,11 @@ const LoanForm = () => {
                                 label="Establecimientos"
                                 icon={Building}
                                 placeholder="Filtrar por establecimientos..."
-                                options={establishments.map(est => ({ value: est.id, label: est.nombre }))}
+                                options={establishments.map(est => ({
+                                    value: est.id,
+                                    label: est.hasAvailableKeys ? est.nombre : `${est.nombre} (OCUPADO)`,
+                                    disabled: !est.hasAvailableKeys
+                                }))}
                                 value={selectedEsts}
                                 onChange={setSelectedEsts}
                                 className="shrink-0"
@@ -209,7 +262,7 @@ const LoanForm = () => {
                                                     type="button"
                                                     onClick={() => k.disponible && handleAddKey(k)}
                                                     disabled={!k.disponible}
-                                                    className={`w-full text-left p-3 flex justify-between items-center group transition-all ${!k.disponible ? 'opacity-40 grayscale pointer-events-none' : 'hover:bg-indigo-50/50'}`}
+                                                    className={`w-full text-left p-3 flex justify-between items-center group transition-all ${!k.disponible ? 'opacity-40 grayscale-0 bg-slate-100/50 cursor-not-allowed' : 'hover:bg-indigo-50/50'}`}
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${selectedKeys.find(s => s.id === k.id) ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white border border-slate-200 text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600'}`}>
@@ -284,6 +337,21 @@ const LoanForm = () => {
                                     value={selectedApplicantId}
                                     onChange={handleApplicantSelect}
                                 />
+
+                                <div className="flex items-center gap-3 py-1">
+                                    <div className="h-px bg-slate-100 flex-1"></div>
+                                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">o</span>
+                                    <div className="h-px bg-slate-100 flex-1"></div>
+                                </div>
+
+                                <SearchableSelect
+                                    label="Dirección de Establecimiento (Director)"
+                                    placeholder="Seleccionar escuela..."
+                                    icon={<GraduationCap className="w-3 h-3 text-emerald-500" />}
+                                    options={establishments.map(e => ({ value: e.id, label: `${e.nombre} (${e.rbd})` }))}
+                                    value={selectedDirectorEstId}
+                                    onChange={handleDirectorEstSelect}
+                                />
                             </div>
                         </div>
                     </div>
@@ -342,7 +410,7 @@ const LoanForm = () => {
 
                                 <button
                                     onClick={handleSubmit}
-                                    disabled={(!selectedApplicantId && !selectedFuncionarioId) || selectedKeys.length === 0 || loading}
+                                    disabled={(!selectedApplicantId && !selectedFuncionarioId && !selectedDirectorEstId) || selectedKeys.length === 0 || loading}
                                     className="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-500 active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed shadow-xl shadow-blue-900/30 transition-all font-black text-xs flex items-center justify-center gap-2 uppercase tracking-widest shrink-0 mt-auto"
                                 >
                                     {loading ? (

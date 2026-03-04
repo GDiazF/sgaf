@@ -3,10 +3,12 @@ import { Users, Search, Edit2, Power, Filter, Phone, Plus, ArrowLeft } from 'luc
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api';
+import { usePermission } from '../../hooks/usePermission';
 import FuncionarioModal from '../../components/funcionarios/FuncionarioModal';
 import Pagination from '../../components/common/Pagination';
 
 const FuncionariosList = () => {
+    const { can } = usePermission();
     const [funcionarios, setFuncionarios] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -129,13 +131,15 @@ const FuncionariosList = () => {
                         </p>
                     </div>
                 </div>
-                <button
-                    onClick={handleCreate}
-                    className="group relative inline-flex items-center gap-2 px-6 py-3 bg-sky-600 text-white text-sm font-semibold rounded-xl overflow-hidden transition-all hover:bg-sky-700 hover:shadow-lg hover:shadow-sky-900/20 active:scale-95 shadow-xl shadow-sky-500/20"
-                >
-                    <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
-                    <span>Nuevo Funcionario</span>
-                </button>
+                {can('funcionarios.add_funcionario') && (
+                    <button
+                        onClick={handleCreate}
+                        className="group relative inline-flex items-center gap-2 px-6 py-3 bg-sky-600 text-white text-sm font-semibold rounded-xl overflow-hidden transition-all hover:bg-sky-700 hover:shadow-lg hover:shadow-sky-900/20 active:scale-95 shadow-xl shadow-sky-500/20"
+                    >
+                        <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
+                        <span>Nuevo Funcionario</span>
+                    </button>
+                )}
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -209,13 +213,20 @@ const FuncionariosList = () => {
                                 {funcionarios.map((item) => (
                                     <tr key={item.id} className="hover:bg-slate-50 transition-colors text-xs">
                                         <td className="p-3">
-                                            <button
-                                                onClick={() => handleToggleEstado(item.id)}
-                                                className={`flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black transition-all ${item.estado ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-rose-100 text-rose-700 hover:bg-rose-200'}`}
-                                            >
-                                                <Power className="w-3 h-3" />
-                                                {item.estado ? 'ACTIVO' : 'INACTIVO'}
-                                            </button>
+                                            {can('funcionarios.change_funcionario') ? (
+                                                <button
+                                                    onClick={() => handleToggleEstado(item.id)}
+                                                    className={`flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black transition-all ${item.estado ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-rose-100 text-rose-700 hover:bg-rose-200'}`}
+                                                >
+                                                    <Power className="w-3 h-3" />
+                                                    {item.estado ? 'ACTIVO' : 'INACTIVO'}
+                                                </button>
+                                            ) : (
+                                                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black w-fit ${item.estado ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                                    <Power className="w-3 h-3" />
+                                                    {item.estado ? 'ACTIVO' : 'INACTIVO'}
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="p-3">
                                             <div className="flex flex-col">
@@ -246,13 +257,15 @@ const FuncionariosList = () => {
                                         <td className="p-3 text-slate-500 truncate" title={item.cargo}>{item.cargo || '-'}</td>
                                         <td className="p-3 text-right">
                                             <div className="flex justify-end gap-1">
-                                                <button
-                                                    onClick={() => handleEdit(item.id)}
-                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-sky-600 hover:bg-sky-50 transition-colors"
-                                                    title="Editar"
-                                                >
-                                                    <Edit2 className="w-4 h-4" />
-                                                </button>
+                                                {can('funcionarios.change_funcionario') && (
+                                                    <button
+                                                        onClick={() => handleEdit(item.id)}
+                                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-sky-600 hover:bg-sky-50 transition-colors"
+                                                        title="Editar"
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api';
 import { Link, useNavigate } from 'react-router-dom';
-import { Clock, User, Key as KeyIcon, CheckCircle, Search, Plus, Calendar, ChevronRight } from 'lucide-react';
+import { Plus, Search, Key as KeyIcon, ChevronRight, Clock, User, Building, Calendar, ArrowRight, CheckCircle2, XCircle } from 'lucide-react';
+import { usePermission } from '../../hooks/usePermission';
 import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '../../components/common/Pagination';
 import FilterBar from '../../components/common/FilterBar';
 import ReturnLoanModal from '../../components/loans/ReturnLoanModal';
+import TransferModal from '../../components/loans/TransferModal';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -13,6 +15,8 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const [selectedLoan, setSelectedLoan] = useState(null);
     const [showReturnModal, setShowReturnModal] = useState(false);
+    const [showTransferModal, setShowTransferModal] = useState(false);
+    const { can } = usePermission();
 
     // Pagination & Search
     const [currentPage, setCurrentPage] = useState(1);
@@ -71,6 +75,11 @@ const Dashboard = () => {
         setShowReturnModal(true);
     };
 
+    const handleTransferClick = (loan) => {
+        setSelectedLoan(loan);
+        setShowTransferModal(true);
+    };
+
     const handleConfirmReturn = async (id) => {
         try {
             await api.post(`prestamos/${id}/devolver/`);
@@ -99,30 +108,34 @@ const Dashboard = () => {
                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
                         Historial
                     </Link>
-                    <Link
-                        to="/loans/new"
-                        className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-500/10 font-black text-[11px] uppercase tracking-[0.1em] active:scale-95"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Nuevo Préstamo
-                    </Link>
+                    {can('prestamo_llaves.add_prestamo') && (
+                        <Link
+                            to="/loans/new"
+                            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-500/10 font-black text-[11px] uppercase tracking-[0.1em] active:scale-95"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Nuevo Préstamo
+                        </Link>
+                    )}
                 </div>
             </div>
 
             {/* Structured Stats Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white rounded-[1.5rem] p-6 border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-blue-200 transition-all">
-                    <div className="flex items-center justify-between mb-4">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Préstamos Activos</span>
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                            <KeyIcon className="w-4 h-4" />
+                {can('prestamo_llaves.add_prestamo') && (
+                    <Link to="/loans/new" className="bg-white rounded-[1.5rem] p-6 border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-blue-600 transition-all hover:shadow-lg hover:shadow-blue-600/5">
+                        <div className="flex items-center justify-between mb-4">
+                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none">Acción Rápida</span>
+                            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-md">
+                                <Plus className="w-4 h-4" />
+                            </div>
                         </div>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-black text-slate-900 leading-none">{totalCount}</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Llaves fuera</span>
-                    </div>
-                </div>
+                        <div className="flex items-center justify-between">
+                            <span className="text-lg font-black text-slate-900 leading-none">Nuevo Préstamo</span>
+                            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
+                        </div>
+                    </Link>
+                )}
 
                 <div className="bg-white rounded-[1.5rem] p-6 border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-slate-300 transition-all">
                     <div className="flex items-center justify-between mb-4">
@@ -137,18 +150,20 @@ const Dashboard = () => {
                     </div>
                 </div>
 
-                <Link to="/keys" className="bg-white rounded-[1.5rem] p-6 border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-blue-500 transition-all hover:shadow-lg hover:shadow-blue-500/5">
-                    <div className="flex items-center justify-between mb-4">
-                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none">Gestión Inventario</span>
-                        <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-md">
-                            <Plus className="w-4 h-4" />
+                {can('prestamo_llaves.view_llave') && (
+                    <Link to="/keys" className="bg-white rounded-[1.5rem] p-6 border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-blue-500 transition-all hover:shadow-lg hover:shadow-blue-500/5">
+                        <div className="flex items-center justify-between mb-4">
+                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none">Gestión Inventario</span>
+                            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-md">
+                                <Plus className="w-4 h-4" />
+                            </div>
                         </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <span className="text-lg font-black text-slate-900 leading-none">Ir al Inventario</span>
-                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                </Link>
+                        <div className="flex items-center justify-between">
+                            <span className="text-lg font-black text-slate-900 leading-none">Ir al Inventario</span>
+                            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
+                        </div>
+                    </Link>
+                )}
             </div>
 
             {/* Refined Filter Bar */}
@@ -185,7 +200,7 @@ const Dashboard = () => {
                         className="bg-white p-12 rounded-[2rem] border border-slate-100 text-center flex flex-col items-center justify-center min-h-[300px]"
                     >
                         <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4">
-                            <CheckCircle className="w-8 h-8 text-emerald-500" />
+                            <CheckCircle2 className="w-8 h-8 text-emerald-500" />
                         </div>
                         <h3 className="text-lg font-black text-slate-900">Todo en Orden</h3>
                         <p className="text-slate-400 font-medium text-xs max-w-[240px] mt-1">No hay llaves en circulación. Todo el inventario está bajo resguardo.</p>
@@ -204,15 +219,23 @@ const Dashboard = () => {
                             loanData={selectedLoan}
                         />
 
-                        <div className="bg-white rounded-[1.5rem] border border-slate-200 overflow-hidden shadow-sm">
+                        <TransferModal
+                            isOpen={showTransferModal}
+                            onClose={() => setShowTransferModal(false)}
+                            loan={selectedLoan}
+                            onTransferSuccess={() => fetchData(currentPage, ordering)}
+                        />
+
+                        {/* Loans Table */}
+                        <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead className="bg-slate-50 border-b border-slate-200">
-                                        <tr>
-                                            <th className="p-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest pl-6">Responsable</th>
-                                            <th className="p-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Llave / Activo</th>
-                                            <th className="p-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Desde</th>
-                                            <th className="p-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right pr-6">Acciones</th>
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50/50 border-b border-slate-100">
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Responsable</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Llave / Activo</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Desde</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -269,13 +292,23 @@ const Dashboard = () => {
                                                         </div>
                                                     </td>
                                                     <td className="p-2.5 text-right pr-6">
-                                                        <button
-                                                            onClick={() => handleReturnClick(loan)}
-                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all font-black text-[9px] uppercase tracking-widest shadow-sm active:scale-95"
-                                                        >
-                                                            <CheckCircle className="w-3 h-3" />
-                                                            <span className="hidden sm:inline">Devolver</span>
-                                                        </button>
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <button
+                                                                onClick={() => handleTransferClick(loan)}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl hover:bg-indigo-100 transition-all font-black text-[9px] uppercase tracking-widest active:scale-95"
+                                                                title="Traspasar Responsabilidad"
+                                                            >
+                                                                <ArrowRight className="w-3 h-3" />
+                                                                <span className="hidden lg:inline">Traspasar</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleReturnClick(loan)}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all font-black text-[9px] uppercase tracking-widest shadow-sm active:scale-95"
+                                                            >
+                                                                <CheckCircle2 className="w-3 h-3" />
+                                                                <span className="hidden sm:inline">Devolver</span>
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );

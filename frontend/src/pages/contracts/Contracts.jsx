@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import { FileText, Search, Plus, Edit2, Trash2, X, Save, Calendar, Tag, ShieldCheck, Info, Building2, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { usePermission } from '../../hooks/usePermission';
 import Pagination from '../../components/common/Pagination';
 import FilterBar from '../../components/common/FilterBar';
 import SortableHeader from '../../components/common/SortableHeader';
@@ -11,6 +12,7 @@ import ContractModal from '../../components/contracts/ContractModal';
 const Contracts = () => {
     const [contracts, setContracts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { can } = usePermission();
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const navigate = useNavigate();
@@ -197,13 +199,12 @@ const Contracts = () => {
                     </h2>
                     <p className="text-slate-500">Gestión de convenios y procesos de compra activos.</p>
                 </div>
-
                 <div className="flex flex-col md:flex-row gap-4 items-center">
                     <div className="flex gap-2 w-full md:w-auto">
                         <select
                             value={filterOrientacion}
                             onChange={(e) => setFilterOrientacion(e.target.value)}
-                            className="px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="px-4 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500/30 outline-none transition-all shadow-sm min-w-[180px]"
                         >
                             <option value="">Todas las orientaciones</option>
                             {orientaciones.map(o => <option key={o.id} value={o.id}>{o.nombre}</option>)}
@@ -211,20 +212,22 @@ const Contracts = () => {
                         <select
                             value={filterCategoria}
                             onChange={(e) => setFilterCategoria(e.target.value)}
-                            className="px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
+                            className="px-4 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500/30 outline-none transition-all shadow-sm min-w-[180px]"
                         >
                             <option value="">Todas las categorías</option>
                             {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                         </select>
                     </div>
                     <FilterBar onSearch={handleSearch} placeholder="Buscar por código o desc..." />
-                    <button
-                        onClick={handleNew}
-                        className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
-                    >
-                        <Plus className="w-5 h-5" />
-                        <span>Nuevo Contrato</span>
-                    </button>
+                    {can('contratos.add_contrato') && (
+                        <button
+                            onClick={handleNew}
+                            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
+                        >
+                            <Plus className="w-5 h-5" />
+                            <span>Nuevo Contrato</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -310,12 +313,16 @@ const Contracts = () => {
                                             >
                                                 <Eye className="w-3.5 h-3.5" />
                                             </button>
-                                            <button onClick={() => handleEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
-                                                <Edit2 className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button onClick={() => handleDelete(item.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
+                                            {can('contratos.change_contrato') && (
+                                                <button onClick={() => handleEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                            {can('contratos.delete_contrato') && (
+                                                <button onClick={() => handleDelete(item.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -348,7 +355,7 @@ const Contracts = () => {
                     Este módulo permite el seguimiento manual de procesos de Mercado Público. El <strong>plazo</strong> es una estimación calculada automáticamente en base a las fechas de vigencia configuradas.
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 

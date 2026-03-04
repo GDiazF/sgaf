@@ -4,9 +4,11 @@ import { Printer, RefreshCw, AlertTriangle, CheckCircle, Search, Filter, Droplet
 import api from '../../api';
 import PrinterModal from './PrinterModal';
 import DiscoveryModal from './DiscoveryModal';
+import { usePermission } from '../../hooks/usePermission';
 
 const PrinterCard = ({ printer, onRefresh, onEdit, onDelete }) => {
     const [refreshing, setRefreshing] = useState(false);
+    const { can } = usePermission();
 
     const handleRefresh = async () => {
         setRefreshing(true);
@@ -66,8 +68,12 @@ const PrinterCard = ({ printer, onRefresh, onEdit, onDelete }) => {
 
             {/* Hover Actions - More Integrated */}
             <div className="absolute top-4 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all z-20 translate-x-4 group-hover:translate-x-0">
-                <button onClick={() => onEdit(printer)} className="p-2 bg-white shadow-xl border border-slate-100 text-slate-400 hover:text-indigo-600 rounded-xl transition-all hover:scale-110 active:scale-95"><Edit2 className="w-3.5 h-3.5" /></button>
-                <button onClick={() => onDelete(printer.id)} className="p-2 bg-white shadow-xl border border-slate-100 text-slate-400 hover:text-rose-600 rounded-xl transition-all hover:scale-110 active:scale-95"><Trash2 className="w-3.5 h-3.5" /></button>
+                {can('impresoras.change_printer') && (
+                    <button onClick={() => onEdit(printer)} className="p-2 bg-white shadow-xl border border-slate-100 text-slate-400 hover:text-indigo-600 rounded-xl transition-all hover:scale-110 active:scale-95"><Edit2 className="w-3.5 h-3.5" /></button>
+                )}
+                {can('impresoras.delete_printer') && (
+                    <button onClick={() => onDelete(printer.id)} className="p-2 bg-white shadow-xl border border-slate-100 text-slate-400 hover:text-rose-600 rounded-xl transition-all hover:scale-110 active:scale-95"><Trash2 className="w-3.5 h-3.5" /></button>
+                )}
             </div>
 
             <div className="relative z-10 flex flex-col h-full">
@@ -139,6 +145,7 @@ const PrinterCard = ({ printer, onRefresh, onEdit, onDelete }) => {
 const ImpresorasDashboard = () => {
     const [printers, setPrinters] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { can } = usePermission();
     const [refreshingAll, setRefreshingAll] = useState(false);
     const [filter, setFilter] = useState('all');
 
@@ -266,24 +273,28 @@ const ImpresorasDashboard = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setIsDiscoveryOpen(true)}
-                        className="group relative hidden sm:inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-widest rounded-xl transition-all hover:border-indigo-300 hover:text-indigo-600 hover:shadow-lg hover:shadow-indigo-500/5 active:scale-95"
-                    >
-                        <Globe className="w-4 h-4 text-slate-400 transition-transform group-hover:rotate-12" />
-                        <span>Escanear Red</span>
-                    </button>
+                    {can('impresoras.add_printer') && (
+                        <>
+                            <button
+                                onClick={() => setIsDiscoveryOpen(true)}
+                                className="group relative hidden sm:inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-widest rounded-xl transition-all hover:border-indigo-300 hover:text-indigo-600 hover:shadow-lg hover:shadow-indigo-500/5 active:scale-95"
+                            >
+                                <Globe className="w-4 h-4 text-slate-400 transition-transform group-hover:rotate-12" />
+                                <span>Escanear Red</span>
+                            </button>
 
-                    <button
-                        onClick={() => {
-                            setSelectedPrinter(null);
-                            setIsModalOpen(true);
-                        }}
-                        className="group relative inline-flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white text-xs font-bold uppercase tracking-widest rounded-xl transition-all hover:bg-slate-800 hover:shadow-lg hover:shadow-slate-900/20 active:scale-95"
-                    >
-                        <Plus className="w-5 h-5 text-indigo-400 transition-transform group-hover:rotate-90" />
-                        <span>Añadir</span>
-                    </button>
+                            <button
+                                onClick={() => {
+                                    setSelectedPrinter(null);
+                                    setIsModalOpen(true);
+                                }}
+                                className="group relative inline-flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white text-xs font-bold uppercase tracking-widest rounded-xl transition-all hover:bg-slate-800 hover:shadow-lg hover:shadow-slate-900/20 active:scale-95"
+                            >
+                                <Plus className="w-5 h-5 text-indigo-400 transition-transform group-hover:rotate-90" />
+                                <span>Añadir</span>
+                            </button>
+                        </>
+                    )}
 
                     <div className="h-8 w-px bg-slate-200 mx-1" />
 

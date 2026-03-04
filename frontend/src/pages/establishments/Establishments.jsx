@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import api from '../../api';
 import { Building, Search, Plus, Edit2, Trash2, X, Save, CheckCircle, XCircle, Power, Phone, Mail, FileDown, Layout, MapPin } from 'lucide-react';
+import { usePermission } from '../../hooks/usePermission';
 import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '../../components/common/Pagination';
 import FilterBar from '../../components/common/FilterBar';
@@ -12,6 +13,7 @@ import EstablishmentCardsView from '../../components/establishments/Establishmen
 import EstablishmentMapModal from '../../components/establishments/EstablishmentMapModal';
 
 const Establishments = () => {
+    const { can } = usePermission();
     const [establishments, setEstablishments] = useState([]);
     const [establishmentTypes, setEstablishmentTypes] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -305,16 +307,18 @@ const Establishments = () => {
                             className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 font-medium whitespace-nowrap"
                         >
                             <FileDown className="w-5 h-5" />
-                            <span>Exportar Excel</span>
+                            <span>Exportar</span>
                         </button>
 
-                        <button
-                            onClick={handleNew}
-                            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
-                        >
-                            <Plus className="w-5 h-5" />
-                            <span>Nuevo</span>
-                        </button>
+                        {can('establecimientos.add_establecimiento') && (
+                            <button
+                                onClick={handleNew}
+                                className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
+                            >
+                                <Plus className="w-5 h-5" />
+                                <span>Nuevo</span>
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -389,13 +393,19 @@ const Establishments = () => {
                                 return (
                                     <tr key={item.id} className="hover:bg-slate-50 transition-colors text-xs">
                                         <td className="p-2.5">
-                                            <button
-                                                onClick={() => handleStatusToggle(item.id, item.activo)}
-                                                className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold transition-all ${item.activo ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                                            >
-                                                <Power className="w-3 h-3" />
-                                                {item.activo ? 'ACTIVO' : 'INACTIVO'}
-                                            </button>
+                                            {can('establecimientos.change_establecimiento') ? (
+                                                <button
+                                                    onClick={() => handleStatusToggle(item.id, item.activo)}
+                                                    className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold transition-all ${item.activo ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                                >
+                                                    <Power className="w-3 h-3" />
+                                                    {item.activo ? 'ACTIVO' : 'INACTIVO'}
+                                                </button>
+                                            ) : (
+                                                <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold ${item.activo ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}>
+                                                    {item.activo ? 'ACTIVO' : 'INACTIVO'}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="p-2.5 font-mono text-slate-600 font-semibold">{item.rbd}</td>
                                         <td className="p-2.5">
@@ -467,16 +477,20 @@ const Establishments = () => {
                                                 <button
                                                     onClick={() => handleOpenPhones(item)}
                                                     className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                                                    title="Gestionar Teléfonos"
+                                                    title="Teléfonos"
                                                 >
                                                     <Phone className="w-3.5 h-3.5" />
                                                 </button>
-                                                <button onClick={() => handleEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
-                                                    <Edit2 className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button onClick={() => handleDelete(item.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
+                                                {can('establecimientos.change_establecimiento') && (
+                                                    <button onClick={() => handleEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+                                                        <Edit2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                                {can('establecimientos.delete_establecimiento') && (
+                                                    <button onClick={() => handleDelete(item.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

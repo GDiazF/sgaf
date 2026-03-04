@@ -3,9 +3,12 @@ import { Link } from 'react-router-dom';
 import { Layers, Plus, Edit2, Trash2, Search, ArrowLeft, Power } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api';
+import { usePermission } from '../../hooks/usePermission';
 import Pagination from '../../components/common/Pagination';
+import Portal from '../../components/common/Portal';
 
 const Unidades = () => {
+    const { can } = usePermission();
     const [unidades, setUnidades] = useState([]);
     const [departamentos, setDepartamentos] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -129,13 +132,15 @@ const Unidades = () => {
                         </p>
                     </div>
                 </div>
-                <button
-                    onClick={() => setShowModal(true)}
-                    className="group relative inline-flex items-center gap-2 px-6 py-3 bg-amber-500 text-white text-sm font-semibold rounded-xl overflow-hidden transition-all hover:bg-amber-600 hover:shadow-lg hover:shadow-amber-900/20 active:scale-95 shadow-xl shadow-amber-500/20"
-                >
-                    <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
-                    <span>Nueva Unidad</span>
-                </button>
+                {can('funcionarios.add_unidad') && (
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="group relative inline-flex items-center gap-2 px-6 py-3 bg-amber-500 text-white text-sm font-semibold rounded-xl overflow-hidden transition-all hover:bg-amber-600 hover:shadow-lg hover:shadow-amber-900/20 active:scale-95 shadow-xl shadow-amber-500/20"
+                    >
+                        <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
+                        <span>Nueva Unidad</span>
+                    </button>
+                )}
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -200,20 +205,24 @@ const Unidades = () => {
                                         </td>
                                         <td className="p-3 text-right">
                                             <div className="flex justify-end gap-1">
-                                                <button
-                                                    onClick={() => handleEdit(item)}
-                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-amber-600 hover:bg-amber-50 transition-colors"
-                                                    title="Editar"
-                                                >
-                                                    <Edit2 className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(item.id)}
-                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
-                                                    title="Eliminar"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
+                                                {can('funcionarios.change_unidad') && (
+                                                    <button
+                                                        onClick={() => handleEdit(item)}
+                                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-amber-600 hover:bg-amber-50 transition-colors"
+                                                        title="Editar"
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                                {can('funcionarios.delete_unidad') && (
+                                                    <button
+                                                        onClick={() => handleDelete(item.id)}
+                                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
+                                                        title="Eliminar"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -242,79 +251,81 @@ const Unidades = () => {
             {/* Modal */}
             <AnimatePresence>
                 {showModal && (
-                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden border border-slate-200"
-                        >
-                            <div className="p-8 pb-4">
-                                <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                                    {editingId ? 'Editar' : 'Nueva'} Unidad
-                                </h2>
-                                <p className="text-sm font-medium text-slate-500">Gestión de nivel operativo</p>
-                            </div>
+                    <Portal>
+                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden border border-slate-200"
+                            >
+                                <div className="p-8 pb-4">
+                                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                                        {editingId ? 'Editar' : 'Nueva'} Unidad
+                                    </h2>
+                                    <p className="text-sm font-medium text-slate-500">Gestión de nivel operativo</p>
+                                </div>
 
-                            <form onSubmit={handleSubmit} className="p-8 pt-4 space-y-6">
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Departamento Superior</label>
-                                        <select
-                                            value={formData.departamento}
-                                            onChange={(e) => setFormData({ ...formData, departamento: e.target.value })}
-                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all outline-none appearance-none"
-                                            required
-                                        >
-                                            <option value="">Seleccionar...</option>
-                                            {departamentos.map(dept => (
-                                                <option key={dept.id} value={dept.id}>{dept.nombre} ({dept.subdireccion_nombre})</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Nombre de la Unidad</label>
-                                        <input
-                                            type="text"
-                                            value={formData.nombre}
-                                            onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all outline-none"
-                                            placeholder="Ej: Unidad de Abastecimiento"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200/60">
-                                        <div className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.activo}
-                                                onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
-                                                className="sr-only peer"
-                                            />
-                                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                                <form onSubmit={handleSubmit} className="p-8 pt-4 space-y-6">
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Departamento Superior</label>
+                                            <select
+                                                value={formData.departamento}
+                                                onChange={(e) => setFormData({ ...formData, departamento: e.target.value })}
+                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all outline-none appearance-none"
+                                                required
+                                            >
+                                                <option value="">Seleccionar...</option>
+                                                {departamentos.map(dept => (
+                                                    <option key={dept.id} value={dept.id}>{dept.nombre} ({dept.subdireccion_nombre})</option>
+                                                ))}
+                                            </select>
                                         </div>
-                                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Estado Activo</span>
+                                        <div>
+                                            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Nombre de la Unidad</label>
+                                            <input
+                                                type="text"
+                                                value={formData.nombre}
+                                                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all outline-none"
+                                                placeholder="Ej: Unidad de Abastecimiento"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200/60">
+                                            <div className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={formData.activo}
+                                                    onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
+                                                    className="sr-only peer"
+                                                />
+                                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                                            </div>
+                                            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Estado Activo</span>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div className="flex gap-3 pt-4">
-                                    <button
-                                        type="button"
-                                        onClick={handleCloseModal}
-                                        className="flex-1 px-6 py-3 bg-slate-100 text-slate-600 text-sm font-bold rounded-2xl hover:bg-slate-200 transition-all active:scale-95"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="flex-1 px-6 py-3 bg-amber-500 text-white text-sm font-bold rounded-2xl hover:bg-amber-600 shadow-lg shadow-amber-500/30 transition-all active:scale-95"
-                                    >
-                                        Guardar
-                                    </button>
-                                </div>
-                            </form>
-                        </motion.div>
-                    </div>
+                                    <div className="flex gap-3 pt-4">
+                                        <button
+                                            type="button"
+                                            onClick={handleCloseModal}
+                                            className="flex-1 px-6 py-3 bg-slate-100 text-slate-600 text-sm font-bold rounded-2xl hover:bg-slate-200 transition-all active:scale-95"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="flex-1 px-6 py-3 bg-amber-500 text-white text-sm font-bold rounded-2xl hover:bg-amber-600 shadow-lg shadow-amber-500/30 transition-all active:scale-95"
+                                        >
+                                            Guardar
+                                        </button>
+                                    </div>
+                                </form>
+                            </motion.div>
+                        </div>
+                    </Portal>
                 )}
             </AnimatePresence>
         </div>

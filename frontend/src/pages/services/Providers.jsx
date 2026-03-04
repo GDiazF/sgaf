@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import { Truck, Search, Plus, Edit2, Trash2, X, Save, Building2 } from 'lucide-react';
+import { usePermission } from '../../hooks/usePermission';
 import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '../../components/common/Pagination';
 import FilterBar from '../../components/common/FilterBar';
@@ -8,6 +9,7 @@ import SortableHeader from '../../components/common/SortableHeader';
 import ProviderModal from '../../components/services/ProviderModal';
 
 const Providers = () => {
+    const { can } = usePermission();
     const [providers, setProviders] = useState([]);
     const [providerTypes, setProviderTypes] = useState([]);
 
@@ -143,13 +145,15 @@ const Providers = () => {
 
                 <div className="flex items-center gap-3">
                     <FilterBar onSearch={handleSearch} placeholder="Buscar por nombre, RUT o tipo..." />
-                    <button
-                        onClick={handleNew}
-                        className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
-                    >
-                        <Plus className="w-5 h-5" />
-                        <span>Nuevo Proveedor</span>
-                    </button>
+                    {can('servicios.add_proveedor') && (
+                        <button
+                            onClick={handleNew}
+                            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
+                        >
+                            <Plus className="w-5 h-5" />
+                            <span>Nuevo Proveedor</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -200,12 +204,16 @@ const Providers = () => {
                                 <td className="p-2.5 text-slate-600">{item.contacto || '-'}</td>
                                 <td className="p-2.5 text-right">
                                     <div className="flex justify-end gap-2">
-                                        <button onClick={() => handleEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
-                                            <Edit2 className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button onClick={() => handleDelete(item.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
+                                        {can('servicios.change_proveedor') && (
+                                            <button onClick={() => handleEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+                                                <Edit2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                        {can('servicios.delete_proveedor') && (
+                                            <button onClick={() => handleDelete(item.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
                                     </div>
                                 </td>
                             </tr>

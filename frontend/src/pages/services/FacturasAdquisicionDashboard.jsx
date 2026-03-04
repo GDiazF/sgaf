@@ -186,9 +186,9 @@ const FacturasAdquisicionDashboard = () => {
     };
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             {/* Header section with Premium design */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="space-y-1">
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
                         <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-200">
@@ -211,7 +211,7 @@ const FacturasAdquisicionDashboard = () => {
             </div>
 
             {/* Filters bar matching Funcionarios style */}
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="lg:col-span-2">
                         <FilterBar onSearch={handleSearch} placeholder="Buscar por Folio, CDP, proveedor o total..." />
@@ -234,12 +234,12 @@ const FacturasAdquisicionDashboard = () => {
                     <table className="w-full text-left">
                         <thead>
                             <tr className="bg-slate-50/50 border-b border-slate-100">
-                                <SortableHeader label="Folio" sortKey="id" currentOrdering={ordering} onSort={handleSort} className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400" />
-                                <SortableHeader label="Fecha" sortKey="fecha_recepcion" currentOrdering={ordering} onSort={handleSort} className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400" />
-                                <SortableHeader label="Proveedor" sortKey="proveedor__nombre" currentOrdering={ordering} onSort={handleSort} className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400" />
-                                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">CDP / Detalle</th>
-                                <SortableHeader label="Total" sortKey="total_pagar" currentOrdering={ordering} onSort={handleSort} className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right" />
-                                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Acciones</th>
+                                <SortableHeader label="Folio" sortKey="id" currentOrdering={ordering} onSort={handleSort} className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400" />
+                                <SortableHeader label="Fecha" sortKey="fecha_recepcion" currentOrdering={ordering} onSort={handleSort} className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400" />
+                                <SortableHeader label="Proveedor" sortKey="proveedor__nombre" currentOrdering={ordering} onSort={handleSort} className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400" />
+                                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">CDP / Detalle</th>
+                                <SortableHeader label="Total" sortKey="total_pagar" currentOrdering={ordering} onSort={handleSort} className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right" />
+                                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -252,12 +252,12 @@ const FacturasAdquisicionDashboard = () => {
                                         transition={{ delay: index * 0.05 }}
                                         className="hover:bg-blue-50/20 transition-all group"
                                     >
-                                        <td className="p-4">
+                                        <td className="px-4 py-2.5">
                                             <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200">
                                                 {item.folio || `#${item.id}`}
                                             </span>
                                         </td>
-                                        <td className="p-4">
+                                        <td className="px-4 py-2.5">
                                             <div className="flex items-center gap-2">
                                                 <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
                                                     <Calendar className="w-3.5 h-3.5 text-blue-600" />
@@ -265,13 +265,13 @@ const FacturasAdquisicionDashboard = () => {
                                                 <span className="text-[11px] font-bold text-slate-700">{formatDate(item.fecha_recepcion)}</span>
                                             </div>
                                         </td>
-                                        <td className="p-4">
+                                        <td className="px-4 py-2.5">
                                             <div className="flex flex-col">
                                                 <span className="text-xs font-bold text-slate-800 leading-tight">{item.proveedor_nombre}</span>
                                                 <span className="text-[9px] font-semibold text-slate-400 tracking-wider font-mono">{item.proveedor_rut}</span>
                                             </div>
                                         </td>
-                                        <td className="p-4">
+                                        <td className="px-4 py-2.5">
                                             <div className="flex flex-col gap-0.5 max-w-xs">
                                                 <div className="flex items-center gap-1 flex-wrap">
                                                     <Hash className="w-2.5 h-2.5 text-blue-500" />
@@ -291,17 +291,17 @@ const FacturasAdquisicionDashboard = () => {
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="p-6 text-right">
+                                        <td className="px-4 py-2.5 text-right">
                                             <div className="text-sm font-bold text-slate-900 leading-none">{formatCurrency(item.total_pagar)}</div>
                                             <span className="text-[10px] font-bold text-slate-400">Net: {formatCurrency(item.total_neto)}</span>
                                         </td>
-                                        <td className="p-6 text-right">
+                                        <td className="px-4 py-2.5 text-right">
                                             <div className="flex justify-end gap-1">
                                                 <motion.button
                                                     whileHover={{ scale: 1.1 }}
                                                     whileTap={{ scale: 0.9 }}
                                                     onClick={() => handleDownloadPDF(item)}
-                                                    className="p-2 text-blue-500 hover:bg-blue-100 rounded-xl transition-all"
+                                                    className="p-1.5 text-blue-500 hover:bg-blue-100 rounded-xl transition-all"
                                                     title="Generar Recepción Conforme"
                                                 >
                                                     <Download className="w-4 h-4" />
@@ -310,7 +310,7 @@ const FacturasAdquisicionDashboard = () => {
                                                     whileHover={{ scale: 1.1 }}
                                                     whileTap={{ scale: 0.9 }}
                                                     onClick={() => handleEdit(item)}
-                                                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
                                                     title="Editar"
                                                 >
                                                     <Edit2 className="w-4 h-4" />
@@ -319,7 +319,7 @@ const FacturasAdquisicionDashboard = () => {
                                                     whileHover={{ scale: 1.1, rotate: 5 }}
                                                     whileTap={{ scale: 0.9 }}
                                                     onClick={() => handleDelete(item.id)}
-                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
                                                     title="Eliminar"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
@@ -356,7 +356,7 @@ const FacturasAdquisicionDashboard = () => {
                     </div>
                 )}
 
-                <div className="p-6 bg-slate-50/50 border-t border-slate-100">
+                <div className="p-4 bg-slate-50/50 border-t border-slate-100">
                     <Pagination
                         currentPage={currentPage}
                         totalPages={totalPages}

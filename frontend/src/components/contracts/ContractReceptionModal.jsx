@@ -165,8 +165,8 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                             name="folio"
                             placeholder="Automático..."
                             value={formData.folio}
-                            onChange={handleChange}
-                            inputClassName="bg-slate-50 font-mono"
+                            readOnly
+                            inputClassName="bg-slate-50 font-mono opacity-60 cursor-not-allowed"
                         />
                         <FormInput
                             label="Nº CDP"

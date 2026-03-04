@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
-import { Search, Calendar, FileText, CheckCircle, Clock, Filter, ArrowLeft } from 'lucide-react';
+import { Search, Calendar, FileText, CheckCircle2, Clock, Filter, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Pagination from '../../components/common/Pagination';
@@ -171,6 +171,7 @@ const LoanHistory = () => {
                                     onSort={handleSort}
                                     className="p-2.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]"
                                 />
+                                <th className="p-2.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Observación</th>
                                 <SortableHeader
                                     label="Fecha Préstamo"
                                     sortKey="fecha_prestamo"
@@ -199,7 +200,7 @@ const LoanHistory = () => {
                                     <td className="p-2.5 pl-8">
                                         {loan.fecha_devolucion ? (
                                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-green-50 text-green-600 border border-green-100">
-                                                <CheckCircle className="w-2.5 h-2.5" /> Devuelto
+                                                <CheckCircle2 className="w-2.5 h-2.5" /> Devuelto
                                             </span>
                                         ) : (
                                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 border border-blue-100">
@@ -214,6 +215,11 @@ const LoanHistory = () => {
                                     <td className="p-2.5">
                                         <div className="text-[11px] font-bold text-slate-700 leading-tight">{loan.solicitante_obj?.nombre} {loan.solicitante_obj?.apellido}</div>
                                         <div className="text-[9px] text-slate-400 font-medium font-mono">ID: {loan.solicitante_obj?.rut}</div>
+                                    </td>
+                                    <td className="p-2.5">
+                                        <div className="text-[10px] text-slate-500 line-clamp-2 max-w-[200px]" title={loan.observacion}>
+                                            {loan.observacion || '-'}
+                                        </div>
                                     </td>
                                     <td className="p-2.5">
                                         {formatDate(loan.fecha_prestamo)}

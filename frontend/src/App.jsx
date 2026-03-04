@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 import GlobalDashboard from './pages/dashboard/GlobalDashboard';
 import LoansDashboard from './pages/loans/LoansDashboard';
 import LoanForm from './pages/loans/LoanForm';
@@ -31,6 +32,10 @@ import ImpresorasDashboard from './pages/impresoras/ImpresorasDashboard';
 import VehiculosDashboard from './pages/vehiculos/VehiculosDashboard';
 import Login from './pages/Login';
 
+// Admin
+import UserManagement from './pages/admin/UserManagement';
+import RolesManagement from './pages/admin/RolesManagement';
+
 // Private Route Wrapper
 const PrivateRoute = () => {
   const { user, loading } = useAuth();
@@ -51,36 +56,84 @@ function App() {
           <Route element={<PrivateRoute />}>
             <Route path="/" element={<Layout />}>
               <Route index element={<GlobalDashboard />} />
-              <Route path="loans" element={<LoansDashboard />} />
-              <Route path="loans/new" element={<LoanForm />} />
-              <Route path="history" element={<LoanHistory />} />
-              <Route path="applicants" element={<Applicants />} />
-              <Route path="keys" element={<Keys />} />
-              <Route path="establishments" element={<Establishments />} />
-              <Route path="contracts" element={<Contracts />} />
-              <Route path="contracts/:id" element={<ContractDetail />} />
+
+              {/* Préstamo de Llaves */}
+              <Route element={<ProtectedRoute permission="prestamo_llaves.view_prestamo" />}>
+                <Route path="loans" element={<LoansDashboard />} />
+                <Route path="loans/new" element={<LoanForm />} />
+                <Route path="history" element={<LoanHistory />} />
+              </Route>
+
+              <Route element={<ProtectedRoute permission="prestamo_llaves.view_solicitante" />}>
+                <Route path="applicants" element={<Applicants />} />
+              </Route>
+
+              <Route element={<ProtectedRoute permission="prestamo_llaves.view_llave" />}>
+                <Route path="keys" element={<Keys />} />
+              </Route>
+
+              {/* Establecimientos */}
+              <Route element={<ProtectedRoute permission="establecimientos.view_establecimiento" />}>
+                <Route path="establishments" element={<Establishments />} />
+              </Route>
+
+              {/* Contratos y Finanzas */}
+              <Route element={<ProtectedRoute permission="contratos.view_contrato" />}>
+                <Route path="contracts" element={<Contracts />} />
+                <Route path="contracts/:id" element={<ContractDetail />} />
+              </Route>
+
               <Route path="services" element={<ServicesDashboard />} />
-              <Route path="services/providers" element={<Providers />} />
-              <Route path="services/payments" element={<PaymentsDashboard />} />
-              <Route path="services/rc" element={<RecepcionConformeList />} />
-              <Route path="services/cdp" element={<CDPManager />} />
-              <Route path="services/adquisiciones" element={<FacturasAdquisicionDashboard />} />
+
+              <Route element={<ProtectedRoute permission="servicios.view_proveedor" />}>
+                <Route path="services/providers" element={<Providers />} />
+              </Route>
+
+              <Route element={<ProtectedRoute permission="servicios.view_registropago" />}>
+                <Route path="services/payments" element={<PaymentsDashboard />} />
+              </Route>
+
+              <Route element={<ProtectedRoute permission="servicios.view_recepcionconforme" />}>
+                <Route path="services/rc" element={<RecepcionConformeList />} />
+              </Route>
+
+              <Route element={<ProtectedRoute permission="servicios.view_cdp" />}>
+                <Route path="services/cdp" element={<CDPManager />} />
+              </Route>
+
+              <Route element={<ProtectedRoute permission="servicios.view_facturaadquisicion" />}>
+                <Route path="services/adquisiciones" element={<FacturasAdquisicionDashboard />} />
+              </Route>
 
               {/* Funcionarios */}
-              <Route path="funcionarios" element={<FuncionariosDashboard />} />
-              <Route path="funcionarios/list" element={<FuncionariosList />} />
-              {/* <Route path="funcionarios/new" element={<FuncionarioForm />} />
-              <Route path="funcionarios/edit/:id" element={<FuncionarioForm />} /> */}
-              <Route path="funcionarios/subdirecciones" element={<Subdirecciones />} />
-              <Route path="funcionarios/departamentos" element={<Departamentos />} />
-              <Route path="funcionarios/unidades" element={<Unidades />} />
-              <Route path="funcionarios/grupos" element={<Grupos />} />
+              <Route element={<ProtectedRoute permission="funcionarios.view_funcionario" />}>
+                <Route path="funcionarios" element={<FuncionariosDashboard />} />
+                <Route path="funcionarios/list" element={<FuncionariosList />} />
+                <Route path="funcionarios/subdirecciones" element={<Subdirecciones />} />
+                <Route path="funcionarios/departamentos" element={<Departamentos />} />
+                <Route path="funcionarios/unidades" element={<Unidades />} />
+                <Route path="funcionarios/grupos" element={<Grupos />} />
+              </Route>
+
               {/* Telecomunicaciones */}
-              <Route path="telecomunicaciones" element={<AnexosDashboard />} />
+              <Route element={<ProtectedRoute permission="servicios.view_servicio" />}>
+                <Route path="telecomunicaciones" element={<AnexosDashboard />} />
+              </Route>
+
               {/* Impresoras */}
-              <Route path="impresoras" element={<ImpresorasDashboard />} />
-              {/* Vehiculos */}
-              <Route path="vehiculos" element={<VehiculosDashboard />} />
+              <Route element={<ProtectedRoute permission="impresoras.view_printer" />}>
+                <Route path="impresoras" element={<ImpresorasDashboard />} />
+              </Route>
+
+              <Route element={<ProtectedRoute permission="vehiculos.view_registromensual" />}>
+                <Route path="vehiculos" element={<VehiculosDashboard />} />
+              </Route>
+
+              {/* Administración */}
+              <Route element={<ProtectedRoute permission="auth.view_user" />}>
+                <Route path="admin/users" element={<UserManagement />} />
+                <Route path="admin/roles" element={<RolesManagement />} />
+              </Route>
             </Route>
           </Route>
         </Routes>
