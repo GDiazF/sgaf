@@ -693,6 +693,13 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
     filterset_fields = ['proveedor', 'establecimiento', 'tipo_entrega', 'cdp']
     search_fields = ['descripcion', 'proveedor__nombre', 'id', 'folio', 'cdp', 'total_pagar']
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        sin_contrato = self.request.query_params.get('sin_contrato')
+        if sin_contrato == 'true':
+            queryset = queryset.filter(contrato__isnull=True)
+        return queryset
+
     @action(detail=True, methods=['get'])
     def generate_pdf(self, request, pk=None):
         import io

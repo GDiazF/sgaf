@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://10.0.100.25:8000/api/';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/';
 
 const api = axios.create({
     baseURL: BASE_URL,
@@ -10,7 +10,10 @@ const api = axios.create({
 api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('access_token');
-        if (token) {
+        // No enviar token en peticiones de login o refresh
+        const isAuthPath = config.url.includes('token/');
+
+        if (token && !isAuthPath) {
             config.headers.Authorization = `Bearer ${token}`;
         }
         return config;

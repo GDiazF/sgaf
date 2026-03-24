@@ -373,8 +373,8 @@ const CoberturaTab = ({ onAsignar }) => {
                             key={f.id}
                             onClick={() => setFiltro(f.id)}
                             className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${filtro === f.id
-                                    ? `bg-white text-slate-900 shadow-sm`
-                                    : `${f.color || 'text-slate-500'} hover:text-slate-700 hover:bg-white/50`
+                                ? `bg-white text-slate-900 shadow-sm`
+                                : `${f.color || 'text-slate-500'} hover:text-slate-700 hover:bg-white/50`
                                 }`}
                         >
                             {f.label}
@@ -389,8 +389,8 @@ const CoberturaTab = ({ onAsignar }) => {
                     <div className="w-10 h-10 rounded-full border-4 border-slate-100 border-t-indigo-600 animate-spin" />
                 </div>
             ) : (
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                    <table className="w-full">
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-x-auto">
+                    <table className="w-full whitespace-nowrap">
                         <thead>
                             <tr className="border-b border-slate-100 bg-slate-50/80">
                                 {['RBD', 'Establecimiento', 'Coordinadores', 'Técnicos', 'Total Personal', 'Estado', 'Acción'].map(h => (
@@ -406,10 +406,10 @@ const CoberturaTab = ({ onAsignar }) => {
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: i * 0.02 }}
                                     className={`border-b border-slate-100 group transition-colors ${!e.tiene_personal
-                                            ? 'bg-red-50/40 hover:bg-red-50/70'
-                                            : e.tecnicos === 0
-                                                ? 'bg-amber-50/40 hover:bg-amber-50/70'
-                                                : 'hover:bg-slate-50'
+                                        ? 'bg-red-50/40 hover:bg-red-50/70'
+                                        : e.tecnicos === 0
+                                            ? 'bg-amber-50/40 hover:bg-amber-50/70'
+                                            : 'hover:bg-slate-50'
                                         }`}
                                 >
                                     <td className="px-4 py-3 text-xs font-bold text-slate-400">{e.rbd || '—'}</td>

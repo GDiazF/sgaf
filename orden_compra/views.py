@@ -143,7 +143,7 @@ def mp_oc_request(params, user_ticket=None):
     tickets_pool = [t for t in tickets_pool if t and len(t) > 10]
     
     session = requests.Session()
-    max_retries = 5 # Aumentamos reintentos
+    max_retries = 3 
     
     url = "https://api.mercadopublico.cl/servicios/v1/publico/ordenesdecompra.json"
     
@@ -157,7 +157,7 @@ def mp_oc_request(params, user_ticket=None):
             if attempt > 0:
                 time.sleep(attempt * 2) 
 
-            res = session.get(url, params=request_params, timeout=15, verify=False)
+            res = session.get(url, params=request_params, timeout=10, verify=False)
             
             if res.status_code == 200:
                 js = res.json()

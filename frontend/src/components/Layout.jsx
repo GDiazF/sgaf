@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Key, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShoppingCart, Calendar, FileStack, MonitorSmartphone } from 'lucide-react';
+import { Key, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Box, Globe } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../hooks/usePermission';
@@ -15,11 +15,31 @@ const Layout = () => {
     const [isSSGGOpen, setSSGGOpen] = useState(true); // Main SSGG group
     const [isTesoreriaOpen, setTesoreriaOpen] = useState(false); // Tesoreria group
     const [activeSubMenu, setActiveSubMenu] = useState(null); // 'services' or 'loans'
+    const [isMPOpen, setMPOpen] = useState(false); // Mercado Público group
     const [isProfileOpen, setIsProfileOpen] = useState(false); // Header profile dropdown
     const [isOnline, setIsOnline] = useState(true); // Backend status
     const profileRef = useRef(null);
+    const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
     const isActive = (path) => location.pathname === path;
+
+    // Track window resize for responsive sidebar
+    useEffect(() => {
+        const handleResize = () => {
+            setWindowWidth(window.innerWidth);
+            if (window.innerWidth < 768) {
+                setSidebarOpen(false); // Automatically collapse standard sidebar on small screens
+            } else {
+                setSidebarOpen(true);
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+        // Initial setup
+        handleResize();
+
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Close mobile menu when route changes
     useEffect(() => {
@@ -40,6 +60,37 @@ const Layout = () => {
         }
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isProfileOpen]);
+
+    // Update document title based on route
+    useEffect(() => {
+        const routeTitles = {
+            '/': 'Dashboard',
+            '/establishments': 'Establecimientos',
+            '/funcionarios': 'Personal',
+            '/reservas-externas': 'Reservas Externas',
+            '/contracts': 'Contratos',
+            '/services/providers': 'Proveedores',
+            '/services/adquisiciones': 'Factura sin OC',
+            '/services': 'Servicios',
+            '/services/payments': 'Pagos',
+            '/services/rc': 'Recepciones',
+            '/services/cdp': 'CDPs',
+            '/telecomunicaciones': 'Teléfonos',
+            '/impresoras': 'Impresoras',
+            '/vehiculos': 'Vehículos',
+            '/loans': 'Panel de Activos',
+            '/keys': 'Inventario Activos',
+            '/tesoreria': 'Tesorería',
+            '/orden-compra': 'Visor OC',
+            '/licitaciones': 'Visor Licitaciones',
+            '/reservas': 'Reservas',
+            '/personal-ti': 'Personal TI'
+        };
+
+        const baseTitle = 'SGAF - SLEP Iquique';
+        const pageTitle = routeTitles[location.pathname] || '';
+        document.title = pageTitle ? `${pageTitle} | ${baseTitle}` : baseTitle;
+    }, [location.pathname]);
 
     // Check backend status
     useEffect(() => {
@@ -88,8 +139,8 @@ const Layout = () => {
                 initial={false}
                 animate={{
                     width: sidebarOpen || mobileMenuOpen ? 256 : 0,
-                    x: mobileMenuOpen || (sidebarOpen && window.innerWidth >= 768) ? 0 : (window.innerWidth < 768 ? -256 : 0),
-                    opacity: sidebarOpen || mobileMenuOpen || window.innerWidth >= 768 ? 1 : 0
+                    x: mobileMenuOpen || (sidebarOpen && windowWidth >= 768) ? 0 : (windowWidth < 768 ? -256 : 0),
+                    opacity: sidebarOpen || mobileMenuOpen || windowWidth >= 768 ? 1 : 0
                 }}
                 transition={{
                     type: 'spring',
@@ -99,7 +150,7 @@ const Layout = () => {
                 }}
                 className={`
                     fixed md:relative inset-y-0 left-0 z-40 bg-slate-900 text-slate-200 flex flex-col shadow-2xl overflow-hidden h-full
-                    ${!mobileMenuOpen && window.innerWidth < 768 ? '-translate-x-full' : ''}
+                    ${!mobileMenuOpen && windowWidth < 768 ? '-translate-x-full' : ''}
                 `}
             >
                 <div className="p-4 flex items-center justify-center h-28 overflow-hidden">
@@ -119,7 +170,7 @@ const Layout = () => {
                     </motion.div>
                 </div>
 
-                <nav className="flex-1 px-3 space-y-1 py-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-slate-700">
+                <nav className="flex-1 px-3 space-y-1 py-1 overflow-y-auto overflow-x-hidden sidebar-scrollbar">
                     {/* Section: BASE (Outside SSGG) */}
                     <Link
                         to="/"
@@ -167,6 +218,22 @@ const Layout = () => {
                         </Link>
                     )}
 
+                    <Link
+                        to="/reservas-externas"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/reservas-externas') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                    >
+                        <Calendar className="w-5 h-5 flex-shrink-0" />
+                        <motion.span
+                            initial={false}
+                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                            className="font-medium whitespace-nowrap"
+                        >
+                            Reservas Externas
+                        </motion.span>
+                    </Link>
+
                     {(can('establecimientos.view_establecimiento') || can('funcionarios.view_funcionario')) && (
                         <div className="py-2 px-4">
                             <div className="border-t border-slate-700/50" />
@@ -178,10 +245,10 @@ const Layout = () => {
                         <div>
                             <button
                                 onClick={() => setSSGGOpen(!isSSGGOpen)}
-                                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${isSSGGOpen ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
+                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${isSSGGOpen ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
                             >
                                 <div className="flex items-center gap-3">
-                                    <Cog className="w-6 h-6 flex-shrink-0" />
+                                    <Cog className="w-5 h-5 flex-shrink-0" />
                                     <motion.span
                                         initial={false}
                                         animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
@@ -251,7 +318,7 @@ const Layout = () => {
                                         )}
 
                                         {/* Section: RECURSOS */}
-                                        {(can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('prestamo_llaves.view_prestamo') || can('servicios.view_servicio')) && (
+                                        {(can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo') || can('personal_ti.view_personalti') || can('solicitudes_reservas.view_reserva')) && (
                                             <div className="space-y-0.5 pt-2">
                                                 <div className="px-4 mb-1">
                                                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Recursos</span>
@@ -274,20 +341,39 @@ const Layout = () => {
                                                         <span className="font-medium whitespace-nowrap">Vehículos</span>
                                                     </Link>
                                                 )}
-                                                {can('prestamo_llaves.view_prestamo') && (
+                                                {can('solicitudes_reservas.view_reserva') && (
+                                                    <Link to="/reservas" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/reservas') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+                                                        <Calendar className="w-4 h-4 flex-shrink-0" />
+                                                        <span className="font-medium whitespace-nowrap">Reservas</span>
+                                                    </Link>
+                                                )}
+                                                {can('personal_ti.view_personalti') && (
+                                                    <Link to="/personal-ti" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/personal-ti') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+                                                        <MonitorSmartphone className="w-4 h-4 flex-shrink-0" />
+                                                        <span className="font-medium whitespace-nowrap">Personal TI</span>
+                                                    </Link>
+                                                )}
+                                                {(can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo')) && (
                                                     <div>
-                                                        <button onClick={() => setActiveSubMenu(activeSubMenu === 'loans' ? null : 'loans')} className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'loans' || (isActive('/loans') || isActive('/loans/new') || isActive('/history')) ? 'text-blue-400' : ''}`}>
+                                                        <button onClick={() => setActiveSubMenu(activeSubMenu === 'loans' ? null : 'loans')} className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'loans' || (isActive('/loans') || isActive('/loans/new') || isActive('/history') || isActive('/keys')) ? 'text-blue-400' : ''}`}>
                                                             <div className="flex items-center gap-3">
-                                                                <Key className="w-4 h-4 flex-shrink-0" />
-                                                                <span className="font-medium whitespace-nowrap">Llaves</span>
+                                                                <Box className="w-4 h-4 flex-shrink-0" />
+                                                                <span className="font-medium whitespace-nowrap">Préstamos</span>
                                                             </div>
                                                             {activeSubMenu === 'loans' ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                                                         </button>
                                                         {activeSubMenu === 'loans' && (
                                                             <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
-                                                                <Link to="/loans" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/loans') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Panel</Link>
-                                                                <Link to="/loans/new" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/loans/new') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Nuevo Préstamo</Link>
-                                                                <Link to="/history" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/history') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Historial</Link>
+                                                                {can('prestamo_llaves.view_activo') && (
+                                                                    <Link to="/keys" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/keys') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Inventario Activos</Link>
+                                                                )}
+                                                                {can('prestamo_llaves.view_prestamo') && (
+                                                                    <>
+                                                                        <Link to="/loans" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/loans') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Panel Activos</Link>
+                                                                        <Link to="/loans/new" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/loans/new') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Nuevo Préstamo</Link>
+                                                                        <Link to="/history" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/history') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Historial</Link>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         )}
                                                     </div>
@@ -305,84 +391,101 @@ const Layout = () => {
                     </div>
 
                     {/* Tesorería Submenu */}
-                    <div>
-                        <button
-                            onClick={() => setTesoreriaOpen(!isTesoreriaOpen)}
-                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${isTesoreriaOpen ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <DollarSign className="w-6 h-6 flex-shrink-0" />
-                                <motion.span
-                                    initial={false}
-                                    animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                                    className="font-medium whitespace-nowrap"
-                                >
-                                    TESORERÍA
-                                </motion.span>
-                            </div>
-                            <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
-                                {isTesoreriaOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                            </motion.div>
-                        </button>
-
-                        <AnimatePresence>
-                            {isTesoreriaOpen && (sidebarOpen || mobileMenuOpen) && (
-                                <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: "auto", opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    className="overflow-hidden space-y-3 mt-2 pl-2 border-l border-slate-700/50 ml-6"
-                                >
-                                    <div className="space-y-0.5">
-                                        <Link
-                                            to="/tesoreria"
-                                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/tesoreria') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                                        >
-                                            <FileText className="w-4 h-4 flex-shrink-0" />
-                                            <span className="font-medium whitespace-nowrap">Remuneraciones</span>
-                                        </Link>
-                                    </div>
+                    {can('remuneraciones.view_remuneracion') && (
+                        <div>
+                            <button
+                                onClick={() => setTesoreriaOpen(!isTesoreriaOpen)}
+                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${isTesoreriaOpen ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <DollarSign className="w-5 h-5 flex-shrink-0" />
+                                    <motion.span
+                                        initial={false}
+                                        animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                                        className="font-medium whitespace-nowrap"
+                                    >
+                                        Tesorería
+                                    </motion.span>
+                                </div>
+                                <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
+                                    {isTesoreriaOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                 </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
+                            </button>
+
+                            <AnimatePresence>
+                                {isTesoreriaOpen && (sidebarOpen || mobileMenuOpen) && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="overflow-hidden space-y-3 mt-2 pl-2 border-l border-slate-700/50 ml-6"
+                                    >
+                                        <div className="space-y-0.5">
+                                            <Link
+                                                to="/tesoreria"
+                                                className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/tesoreria') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                            >
+                                                <FileText className="w-4 h-4 flex-shrink-0" />
+                                                <span className="font-medium whitespace-nowrap">Remuneraciones</span>
+                                            </Link>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
 
                     <div className="py-2 px-4">
                         <div className="border-t border-slate-700/50" />
                     </div>
 
-                    {/* Labs / Beta */}
-                    <div className="px-4 py-2">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 px-2">Beta / Pruebas</p>
-                        <Link
-                            to="/orden-compra"
-                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm mb-1 ${isActive('/orden-compra') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-                        >
-                            <ShoppingCart className="w-4 h-4 flex-shrink-0" />
-                            <span className="font-medium whitespace-nowrap">Visor OC</span>
-                        </Link>
-                        <Link
-                            to="/licitaciones"
-                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm mb-1 ${isActive('/licitaciones') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-                        >
-                            <FileStack className="w-4 h-4 flex-shrink-0" />
-                            <span className="font-medium whitespace-nowrap">Visor Licitaciones</span>
-                        </Link>
-                        <Link
-                            to="/reservas"
-                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm mb-1 ${isActive('/reservas') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-                        >
-                            <Calendar className="w-4 h-4 flex-shrink-0" />
-                            <span className="font-medium whitespace-nowrap">Reservas</span>
-                        </Link>
-                        <Link
-                            to="/personal-ti"
-                            className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/personal-ti') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-                        >
-                            <MonitorSmartphone className="w-4 h-4 flex-shrink-0" />
-                            <span className="font-medium whitespace-nowrap">Personal TI</span>
-                        </Link>
-                    </div>
+                    {/* Mercado Público Submenu */}
+                    {(can('orden_compra.view_ordencompramp') || can('licitaciones.view_licitacionmp')) && (
+                        <div>
+                            <button
+                                onClick={() => setMPOpen(!isMPOpen)}
+                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${isMPOpen ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <ShoppingCart className="w-5 h-5 flex-shrink-0" />
+                                    <motion.span
+                                        initial={false}
+                                        animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                                        className="font-medium whitespace-nowrap"
+                                    >
+                                        Mercado Público
+                                    </motion.span>
+                                </div>
+                                <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
+                                    {isMPOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                </motion.div>
+                            </button>
+
+                            <AnimatePresence>
+                                {isMPOpen && (sidebarOpen || mobileMenuOpen) && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="overflow-hidden space-y-1 mt-2 pl-2 border-l border-slate-700/50 ml-6"
+                                    >
+                                        {can('orden_compra.view_ordencompramp') && (
+                                            <Link to="/orden-compra" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/orden-compra') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+                                                <FileText className="w-4 h-4 flex-shrink-0" />
+                                                <span className="font-medium whitespace-nowrap">Visor OC</span>
+                                            </Link>
+                                        )}
+                                        {can('licitaciones.view_licitacionmp') && (
+                                            <Link to="/licitaciones" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/licitaciones') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+                                                <FileStack className="w-4 h-4 flex-shrink-0" />
+                                                <span className="font-medium whitespace-nowrap">Visor Licitaciones</span>
+                                            </Link>
+                                        )}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
                 </nav >
 
                 {/* Sidebar Footer: Server Status */}
@@ -409,12 +512,12 @@ const Layout = () => {
 
             {/* Main Content */}
             < main className="flex-1 overflow-auto bg-slate-50 relative w-full" >
-                <header className="bg-white/80 backdrop-blur-md sticky top-0 z-10 border-b border-slate-200 px-4 md:px-8 py-4 flex justify-between items-center gap-4">
+                <header className="bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b border-slate-200 px-4 md:px-8 py-4 flex justify-between items-center gap-4">
                     <div className="flex items-center gap-4 cursor-pointer">
                         {/* Sidebar Toggle (Mobile & Desktop) */}
                         <button
                             onClick={() => {
-                                if (window.innerWidth >= 768) {
+                                if (windowWidth >= 768) {
                                     setSidebarOpen(!sidebarOpen);
                                 } else {
                                     setMobileMenuOpen(true);

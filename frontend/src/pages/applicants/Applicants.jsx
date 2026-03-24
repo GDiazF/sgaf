@@ -138,64 +138,69 @@ const Applicants = () => {
 
             {/* Table Area */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <table className="w-full text-left">
-                    <thead className="bg-slate-50 border-b border-slate-200">
-                        <tr>
-                            <th className="p-2 text-[9px] font-black text-slate-400 uppercase tracking-widest pl-8">Solicitante</th>
-                            <th className="p-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">RUT</th>
-                            <th className="p-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">Contacto</th>
-                            <th className="p-2 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right pr-8">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {applicants.map(app => (
-                            <tr key={app.id} className="hover:bg-slate-50/50 transition-colors group">
-                                <td className="p-1.5 pl-8">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-black text-[10px]">
-                                            {app.nombre.charAt(0)}
-                                        </div>
-                                        <div>
-                                            <div className="font-extrabold text-slate-900 text-[12px] leading-none">
-                                                {app.nombre} {app.apellido}
-                                            </div>
-                                            <div className="text-[8px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">Autorizado</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="p-1.5 px-3">
-                                    <span className="font-mono text-[10px] text-slate-600 font-bold">{app.rut}</span>
-                                </td>
-                                <td className="p-1.5">
-                                    <div className="text-[10px] text-slate-600 flex flex-col leading-tight">
-                                        <span className="font-medium truncate max-w-[150px]">{app.email || 'Sin email'}</span>
-                                        <span className="text-[9px] text-slate-400 font-bold">{app.telefono || 'Sin tfno'}</span>
-                                    </div>
-                                </td>
-                                <td className="p-1.5 text-right pr-8">
-                                    <button
-                                        onClick={() => handleEdit(app)}
-                                        className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                    >
-                                        <Edit2 className="w-3.5 h-3.5" />
-                                    </button>
-                                </td>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left whitespace-nowrap">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                                <th className="p-2 text-[9px] font-black text-slate-400 uppercase tracking-widest pl-8">Solicitante</th>
+                                <th className="p-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">RUT</th>
+                                <th className="p-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">Contacto</th>
+                                <th className="p-2 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right pr-8">Acciones</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {filteredApplicants.length === 0 && !loading && (
-                    <div className="p-12 text-center text-slate-400">
-                        <UserPlus className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                        <p>No se encontraron resultados.</p>
-                    </div>
-                )}
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={handlePageChange}
-                    totalCount={totalCount}
-                />
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {applicants.map(app => (
+                                <tr key={app.id} className="hover:bg-slate-50/50 transition-colors group">
+                                    <td className="p-1.5 pl-8">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-black text-[10px]">
+                                                {app.nombre.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <div className="font-extrabold text-slate-900 text-[12px] leading-none">
+                                                    {app.nombre} {app.apellido}
+                                                </div>
+                                                <div className="text-[8px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">Autorizado</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="p-1.5 px-3">
+                                        <span className="font-mono text-[10px] text-slate-600 font-bold">{app.rut}</span>
+                                    </td>
+                                    <td className="p-1.5">
+                                        <div className="text-[10px] text-slate-600 flex flex-col leading-tight">
+                                            <span className="font-medium truncate max-w-[150px]">{app.email || 'Sin email'}</span>
+                                            <span className="text-[9px] text-slate-400 font-bold">{app.telefono || 'Sin tfno'}</span>
+                                        </div>
+                                    </td>
+                                    <td className="p-1.5 text-right pr-8">
+                                        <button
+                                            onClick={() => handleEdit(app)}
+                                            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                        >
+                                            <Edit2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {filteredApplicants.length === 0 && !loading && (
+                        <div className="p-12 text-center text-slate-400">
+                            <UserPlus className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                            <p>No se encontraron resultados.</p>
+                        </div>
+                    )}
+                </div>
+
+                <div className="p-4 border-t border-slate-100 bg-slate-50/30">
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={handlePageChange}
+                        totalCount={totalCount}
+                    />
+                </div>
             </div>
         </div>
     );

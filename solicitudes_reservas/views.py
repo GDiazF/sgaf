@@ -1,12 +1,13 @@
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import RecursoReservable, SolicitudReserva, BloqueoHorario
+from .models import RecursoReservable, SolicitudReserva, BloqueoHorario, ReservaSetting
 from .serializers import (
     RecursoReservableSerializer,
     SolicitudReservaSerializer,
     PublicSolicitudReservaSerializer,
     BloqueoHorarioSerializer,
+    ReservaSettingSerializer,
 )
 from .emails import (
     enviar_correo_nueva_solicitud,
@@ -113,3 +114,18 @@ class BloqueoHorarioViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(creado_por=self.request.user)
+
+class ReservaSettingViewSet(viewsets.ModelViewSet):
+    """Configuración global única para el sistema de reservas."""
+    queryset = ReservaSetting.objects.all()
+    serializer_class = ReservaSettingSerializer
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated(), permissions.IsAdminUser()]
+
+    def list(self, request, *args, **kwargs):
+        setting, _ = ReservaSetting.objects.get_or_create(id=1)
+        serializer = self.get_serializer(setting)
+        return Response(serializer.data)

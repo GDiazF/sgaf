@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import RecursoReservable, SolicitudReserva, BloqueoHorario
+from .models import RecursoReservable, SolicitudReserva, BloqueoHorario, ReservaSetting
 from datetime import time
 
 class RecursoReservableSerializer(serializers.ModelSerializer):
@@ -41,10 +41,13 @@ class SolicitudReservaSerializer(serializers.ModelSerializer):
         if fi and ff and ff <= fi:
             raise serializers.ValidationError({'fecha_fin': 'La hora de término debe ser posterior a la de inicio.'})
 
-        # ─ Validación: hora de fin no puede pasar de las 17:30 ─
-        if ff and ff.time() > time(17, 30):
+        # ─ Validación: hora de fin contra configuración global ─
+        setting = ReservaSetting.objects.first()
+        h_fin_limite = setting.hora_fin if setting else time(17, 30)
+        
+        if ff and ff.time() > h_fin_limite:
             raise serializers.ValidationError(
-                {'fecha_fin': 'Las reservas no pueden terminar después de las 17:30 hrs.'}
+                {'fecha_fin': f'Las reservas no pueden terminar después de las {h_fin_limite.strftime("%H:%M")} hrs.'}
             )
 
         if fi and ff and recurso:
@@ -116,4 +119,9 @@ class PublicSolicitudReservaSerializer(serializers.ModelSerializer):
     """Muestra solo lo mínimo para el calendario público."""
     class Meta:
         model = SolicitudReserva
-        fields = ['id', 'recurso', 'fecha_inicio', 'fecha_fin', 'estado']
+        fields = ['id', 'recurso', 'titulo', 'nombre_funcionario', 'fecha_inicio', 'fecha_fin', 'estado']
+
+class ReservaSettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReservaSetting
+        fields = '__all__'

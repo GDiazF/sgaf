@@ -178,7 +178,7 @@ const RolesManagement = () => {
             {/* Table View */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left whitespace-nowrap table-fixed">
+                    <table className="w-full text-left whitespace-nowrap">
                         <colgroup>
                             <col style={{ width: '60px' }} />  {/* Icon */}
                             <col style={{ width: '40%' }} />   {/* Nombre */}

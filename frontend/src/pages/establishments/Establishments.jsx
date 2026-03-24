@@ -362,17 +362,7 @@ const Establishments = () => {
             {/* Table List */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left whitespace-nowrap table-fixed">
-                        <colgroup>
-                            <col style={{ width: '110px' }} /> {/* Estado */}
-                            <col style={{ width: '80px' }} />  {/* RBD */}
-                            <col style={{ width: '25%' }} />   {/* Nombre */}
-                            <col style={{ width: '130px' }} /> {/* Tipo */}
-                            <col style={{ width: '15%' }} />   {/* Director */}
-                            <col style={{ width: '25%' }} />   {/* Email */}
-                            <col style={{ width: '180px' }} /> {/* Teléfonos */}
-                            <col style={{ width: '100px' }} /> {/* Acciones */}
-                        </colgroup>
+                    <table className="w-full text-left whitespace-nowrap">
                         <thead className="bg-slate-50 border-b border-slate-200">
                             <tr>
                                 <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
@@ -388,7 +378,6 @@ const Establishments = () => {
                         <tbody className="divide-y divide-slate-100">
                             {filteredData.map(item => {
                                 const principalPhone = item.telefonos?.find(p => p.es_principal) || item.telefonos?.[0];
-                                const hasMorePhones = item.telefonos?.length > 1;
 
                                 return (
                                     <tr key={item.id} className="hover:bg-slate-50 transition-colors text-xs">
@@ -402,7 +391,7 @@ const Establishments = () => {
                                                     {item.activo ? 'ACTIVO' : 'INACTIVO'}
                                                 </button>
                                             ) : (
-                                                <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold ${item.activo ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}>
+                                                <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold ${item.activo ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}>
                                                     {item.activo ? 'ACTIVO' : 'INACTIVO'}
                                                 </span>
                                             )}
@@ -504,6 +493,9 @@ const Establishments = () => {
                             <p>No se encontraron establecimientos.</p>
                         </div>
                     )}
+                </div>
+
+                <div className="p-4 border-t border-slate-100 bg-slate-50/30">
                     <Pagination
                         currentPage={currentPage}
                         totalPages={totalPages}

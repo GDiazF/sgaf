@@ -176,7 +176,7 @@ const Grupos = () => {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left whitespace-nowrap table-fixed">
+                        <table className="w-full text-left whitespace-nowrap">
                             <colgroup>
                                 <col style={{ width: '120px' }} /> {/* Estado */}
                                 <col style={{ width: '40%' }} />   {/* Grupo */}

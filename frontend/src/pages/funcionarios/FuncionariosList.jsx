@@ -189,15 +189,7 @@ const FuncionariosList = () => {
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left whitespace-nowrap table-fixed">
-                            <colgroup>
-                                <col style={{ width: '120px' }} /> {/* Estado */}
-                                <col style={{ width: '25%' }} />   {/* Nombre */}
-                                <col style={{ width: '130px' }} /> {/* RUT */}
-                                <col style={{ width: '100px' }} /> {/* Anexo */}
-                                <col style={{ width: '20%' }} />   {/* Subdireccion */}
-                                <col style={{ width: '15%' }} />   {/* Cargo */}
-                                <col style={{ width: '100px' }} /> {/* Acciones */}
-                            </colgroup>
+                            <colgroup><col style={{ width: '120px' }} /><col style={{ width: '25%' }} /><col style={{ width: '130px' }} /><col style={{ width: '100px' }} /><col style={{ width: '20%' }} /><col style={{ width: '15%' }} /><col style={{ width: '100px' }} /></colgroup>
                             <thead className="bg-slate-50 border-b border-slate-200">
                                 <tr>
                                     <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estado</th>

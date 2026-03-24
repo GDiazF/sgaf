@@ -3,11 +3,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Establecimiento, Solicitante, Llave, Prestamo
+from .models import Establecimiento, Solicitante, Activo, Prestamo
 from .serializers import (
     EstablecimientoSerializer, 
     SolicitanteSerializer, 
-    LlaveSerializer, 
+    ActivoSerializer, 
     PrestamoSerializer
 )
 
@@ -22,22 +22,23 @@ class SolicitanteViewSet(viewsets.ModelViewSet):
     ordering_fields = ['rut', 'nombre', 'apellido']
     search_fields = ['rut', 'nombre', 'apellido']
 
-class LlaveViewSet(viewsets.ModelViewSet):
-    queryset = Llave.objects.all()
-    serializer_class = LlaveSerializer
+class ActivoViewSet(viewsets.ModelViewSet):
+    queryset = Activo.objects.all()
+    serializer_class = ActivoSerializer
     pagination_class = LargeResultsSetPagination
     filterset_fields = {
         'establecimiento': ['exact', 'in'],
+        'tipo': ['exact', 'in'],
     }
     ordering_fields = ['nombre', 'establecimiento__nombre']
-    search_fields = ['nombre', 'establecimiento__nombre']
+    search_fields = ['nombre', 'establecimiento__nombre', 'codigo_inventario']
 
     def get_queryset(self):
         queryset = super().get_queryset()
         disponible = self.request.query_params.get('disponible')
         if disponible is not None:
-            # Keys with no active loans (return date is null) are considered available
-            active_loans = Prestamo.objects.filter(fecha_devolucion__isnull=True).values_list('llave_id', flat=True)
+            # Assets with no active loans (return date is null) are considered available
+            active_loans = Prestamo.objects.filter(fecha_devolucion__isnull=True).values_list('activo_id', flat=True)
             if disponible.lower() == 'true':
                 queryset = queryset.exclude(id__in=active_loans)
             elif disponible.lower() == 'false':
@@ -49,15 +50,15 @@ class PrestamoViewSet(viewsets.ModelViewSet):
     serializer_class = PrestamoSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = {
-        'llave': ['exact'],
+        'activo': ['exact'],
         'solicitante': ['exact'],
         'fecha_prestamo': ['date', 'gte', 'lte'],
         'fecha_devolucion': ['isnull']
     }
-    ordering_fields = ['fecha_prestamo', 'fecha_devolucion', 'llave__nombre', 'solicitante__nombre']
+    ordering_fields = ['fecha_prestamo', 'fecha_devolucion', 'activo__nombre', 'solicitante__nombre']
     search_fields = [
-        'llave__nombre', 
-        'llave__establecimiento__nombre', 
+        'activo__nombre', 
+        'activo__establecimiento__nombre', 
         'solicitante__nombre', 
         'solicitante__apellido', 
         'solicitante__rut'
@@ -71,14 +72,14 @@ class PrestamoViewSet(viewsets.ModelViewSet):
         return qs
 
     def create(self, request, *args, **kwargs):
-        llaves_ids = request.data.get('llaves', [])
+        activos_ids = request.data.get('activos', [])
         
-        # If single key (legacy support or direct usage), use standard behavior but wrap in list
-        if not llaves_ids and 'llave' in request.data:
-            llaves_ids = [request.data['llave']]
+        # If single asset (legacy support or direct usage), use standard behavior but wrap in list
+        if not activos_ids and 'activo' in request.data:
+            activos_ids = [request.data['activo']]
             
-        if not llaves_ids:
-             return Response({'error': 'Debe seleccionar al menos una llave'}, status=status.HTTP_400_BAD_REQUEST)
+        if not activos_ids:
+             return Response({'error': 'Debe seleccionar al menos un artículo/activo'}, status=status.HTTP_400_BAD_REQUEST)
 
         solicitante_id = request.data.get('solicitante')
         funcionario_id = request.data.get('funcionario') # New: if linked to a staff
@@ -109,9 +110,13 @@ class PrestamoViewSet(viewsets.ModelViewSet):
         # Or better: Create loop.
         
         try:
-            for llave_id in llaves_ids:
+            for activo_id in activos_ids:
+                # Validate availability to prevent overlapping active loans
+                if Prestamo.objects.filter(activo_id=activo_id, fecha_devolucion__isnull=True).exists():
+                    return Response({'error': f'El activo (ID {activo_id}) ya se encuentra en préstamo activo.'}, status=status.HTTP_400_BAD_REQUEST)
+
                 data = {
-                    'llave': llave_id,
+                    'activo': activo_id,
                     'solicitante': solicitante_id,
                     'observacion': observacion,
                     # 'usuario_entrega': request.user.id # Uncomment if auth is active
@@ -145,14 +150,14 @@ class PrestamoViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def traspasar(self, request):
-        llaves_ids = request.data.get('llaves', [])
+        activos_ids = request.data.get('activos', [])
         nuevo_solicitante_id = request.data.get('solicitante')
         nuevo_funcionario_id = request.data.get('funcionario')
         director_est_id = request.data.get('director_establecimiento_id')
-        observacion = request.data.get('observacion', 'Traspaso de llaves')
+        observacion = request.data.get('observacion', 'Traspaso de activos')
 
-        if not llaves_ids:
-            return Response({'error': 'Debe seleccionar llaves para traspasar'}, status=status.HTTP_400_BAD_REQUEST)
+        if not activos_ids:
+            return Response({'error': 'Debe seleccionar activos para traspasar'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Determine destination solicitante
         dest_solicitante_id = nuevo_solicitante_id
@@ -186,9 +191,9 @@ class PrestamoViewSet(viewsets.ModelViewSet):
         results = []
 
         try:
-            for lid in llaves_ids:
+            for aid in activos_ids:
                 # 1. Close current active loan
-                active_loan = Prestamo.objects.filter(llave_id=lid, fecha_devolucion__isnull=True).first()
+                active_loan = Prestamo.objects.filter(activo_id=aid, fecha_devolucion__isnull=True).first()
                 if active_loan:
                     active_loan.fecha_devolucion = now
                     active_loan.observacion += f" | Traspasado a {dest_solicitante.nombre} {dest_solicitante.apellido}"
@@ -196,7 +201,7 @@ class PrestamoViewSet(viewsets.ModelViewSet):
 
                 # 2. Create new loan
                 new_loan = Prestamo.objects.create(
-                    llave_id=lid,
+                    activo_id=aid,
                     solicitante_id=dest_solicitante_id,
                     observacion=f"Recibida por traspaso. {observacion}",
                     # usuario_entrega=request.user # Uncomment if auth

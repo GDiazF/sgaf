@@ -7,19 +7,11 @@ import {
 import api from '../../api';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
-const HOUR_START = 7;
-const HOUR_END = 18;          // calendario hasta 17:30
-const MAX_MINS_FIN = 17 * 60 + 30; // límite de término: 17:30
+// ─── Constantes de Fallback ──────────────────────────────────────────────────
+const DEFAULT_HOUR_START = 7;
+const DEFAULT_HOUR_END = 18;
 const SLOT_MIN = 30;
 const SLOT_HEIGHT = 44; // px por franja de 30 min
-
-// Slots de INICIO válidos: máx. 17:00 (para terminar a las 17:30)
-const TIME_SLOTS = [];
-for (let h = HOUR_START; h < HOUR_END; h++) {
-    if (h * 60 < MAX_MINS_FIN) TIME_SLOTS.push(`${String(h).padStart(2, '0')}:00`);
-    if (h * 60 + 30 < MAX_MINS_FIN) TIME_SLOTS.push(`${String(h).padStart(2, '0')}:30`);
-}
-if (!TIME_SLOTS.includes('17:00')) TIME_SLOTS.push('17:00');
 
 const RECURSO_ICONS = { SALA: Building2, VEHICULO: Truck, PROYECTOR: Monitor, OTRO: Package };
 const TYPE_ORDER = { SALA: 0, VEHICULO: 1, PROYECTOR: 2, OTRO: 3 };
@@ -114,10 +106,27 @@ const bloqueoAppliesToDate = (b, dateStr) => {
 const ReservasDashboard = () => {
     const [recursos, setRecursos] = useState([]);
     const [reservas, setReservas] = useState([]);
+    const [settings, setSettings] = useState({ hora_inicio: '07:00', hora_fin: '18:00' });
     const [loading, setLoading] = useState(true);
 
+    const configStart = parseInt(settings.hora_inicio.split(':')[0]) || DEFAULT_HOUR_START;
+    const configEnd = parseInt(settings.hora_fin.split(':')[0]) || DEFAULT_HOUR_END;
+    const [hFinal, mFinal] = settings.hora_fin.split(':').map(Number);
+    const MAX_MINS_FIN = hFinal * 60 + mFinal;
+
+    const TIME_SLOTS = React.useMemo(() => {
+        const slots = [];
+        for (let h = configStart; h <= configEnd; h++) {
+            const m0 = h * 60;
+            const m30 = h * 60 + 30;
+            if (m0 < MAX_MINS_FIN) slots.push(`${String(h).padStart(2, '0')}:00`);
+            if (m30 < MAX_MINS_FIN) slots.push(`${String(h).padStart(2, '0')}:30`);
+        }
+        return slots;
+    }, [configStart, configEnd, MAX_MINS_FIN]);
+
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [viewMode, setViewMode] = useState('day');
+    const [viewMode, setViewMode] = useState('week');
     const [filtroRecurso, setFiltroRecurso] = useState('all');
 
     // Modal nueva reserva
@@ -151,23 +160,26 @@ const ReservasDashboard = () => {
     const [bloqueoTab, setBloqueoTab] = useState(false); // true = mostrando pestaña de bloqueos
 
     const scrollRef = useRef(null);
+    const headerScrollRef = useRef(null);
 
     // ── Data ──────────────────────────────────────────────────────────────────
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [rRes, sRes] = await Promise.all([
+            const [rRes, sRes, tRes] = await Promise.all([
                 api.get('reservas/recursos/'),
                 api.get('reservas/solicitudes/'),
+                api.get('reservas/settings/').catch(() => ({ data: { hora_inicio: '07:00', hora_fin: '18:00' } }))
             ]);
-            setRecursos(rRes.data);
-            setReservas(sRes.data);
+            setRecursos(rRes.data.results || rRes.data || []);
+            setReservas(sRes.data.results || sRes.data || []);
+            if (tRes.data) setSettings(tRes.data);
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
         // Bloqueos: fetch separado para no bloquear si falla auth
         try {
             const bRes = await api.get('reservas/bloqueos/');
-            setBloqueos(bRes.data);
+            setBloqueos(bRes.data.results || bRes.data || []);
         } catch (e) { console.warn('Bloqueos no disponibles:', e); }
     };
 
@@ -181,12 +193,16 @@ const ReservasDashboard = () => {
         return `${month} ${year}`;
     };
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => {
+        fetchData();
+        const interval = setInterval(fetchData, 30000);
+        return () => clearInterval(interval);
+    }, [currentDate, viewMode, filtroRecurso]);
 
     useEffect(() => {
         if (!loading && scrollRef.current) {
             const now = new Date();
-            const px = Math.max(0, ((now.getHours() * 60 + now.getMinutes() - HOUR_START * 60) / SLOT_MIN) * SLOT_HEIGHT - 120);
+            const px = Math.max(0, ((now.getHours() * 60 + now.getMinutes() - configStart * 60) / SLOT_MIN) * SLOT_HEIGHT - 120);
             scrollRef.current.scrollTop = px;
         }
     }, [loading]);
@@ -270,7 +286,7 @@ const ReservasDashboard = () => {
     const getEventPos = (ev) => {
         const startMin = dtMinutes(ev.fecha_inicio);
         const endMin = dtMinutes(ev.fecha_fin);
-        const top = ((startMin - HOUR_START * 60) / SLOT_MIN) * SLOT_HEIGHT;
+        const top = ((startMin - configStart * 60) / SLOT_MIN) * SLOT_HEIGHT;
         const height = Math.max(((endMin - startMin) / SLOT_MIN) * SLOT_HEIGHT, 24);
         return { top, height };
     };
@@ -283,43 +299,49 @@ const ReservasDashboard = () => {
     };
 
     const handleSlotClick = (day, slotTime, recursoId) => {
-        const [h, m] = slotTime.split(':').map(Number);
-        const slotStartMin = h * 60 + m;
-        const slotEndMin = slotStartMin + SLOT_MIN;
-        const endH = m === 30 ? h + 1 : h, endM = m === 30 ? 0 : 30;
-
-        // ¿Hay alguna reserva APROBADA que cubra este slot exacto para este recurso?
         const dayStr = toDateStr(day);
-        const ocupado = recursoId && reservas.some(r =>
-            parseInt(r.recurso) === parseInt(recursoId) &&
-            r.estado === 'APROBADA' &&
-            toDateStr(r.fecha_inicio) === dayStr &&
-            dtMinutes(r.fecha_inicio) < slotEndMin &&
-            dtMinutes(r.fecha_fin) > slotStartMin
-        );
 
-        // ¿Hay algún bloqueo manual (admin)?
-        const bloqueadoManual = recursoId && bloqueos.some(b => {
-            if (parseInt(b.recurso) !== parseInt(recursoId)) return false;
-            if (!bloqueoAppliesToDate(b, dayStr)) return false;
-            const bStart = parseInt(b.hora_inicio.split(':')[0]) * 60 + parseInt(b.hora_inicio.split(':')[1]);
-            const bEnd = parseInt(b.hora_fin.split(':')[0]) * 60 + parseInt(b.hora_fin.split(':')[1]);
-            return bStart < slotEndMin && bEnd > slotStartMin;
-        });
+        // 1. Si no hay slotTime (o es el default), intentamos buscar el primer hueco libre del día
+        let actualSlot = slotTime || '09:00';
 
-        if (ocupado || bloqueadoManual) {
-            const rec = recursos.find(r => r.id === recursoId);
-            setSlotBloqueadoMsg(bloqueadoManual
-                ? `🔒 "${rec?.nombre || 'Recurso'}" está bloqueado por administración en este horario.`
-                : `🔒 "${rec?.nombre || 'Recurso'}" ya tiene una reserva aprobada en este horario.`
+        if (recursoId) {
+            const dayEvents = reservas.filter(r =>
+                parseInt(r.recurso) === parseInt(recursoId) &&
+                r.estado === 'APROBADA' &&
+                toDateStr(r.fecha_inicio) === dayStr
             );
-            setTimeout(() => setSlotBloqueadoMsg(''), 3500);
-            return;
+
+            const dayBloqueos = bloqueos.filter(b =>
+                parseInt(b.recurso) === parseInt(recursoId) &&
+                bloqueoAppliesToDate(b, dayStr)
+            );
+
+            const isOccupied = (time) => {
+                const [h, m] = time.split(':').map(Number);
+                const sStart = h * 60 + m;
+                const sEnd = sStart + SLOT_MIN;
+                const hasReserva = dayEvents.some(r => dtMinutes(r.fecha_inicio) < sEnd && dtMinutes(r.fecha_fin) > sStart);
+                const hasBloqueo = dayBloqueos.some(b => {
+                    const bStart = parseInt(b.hora_inicio.split(':')[0]) * 60 + parseInt(b.hora_inicio.split(':')[1]);
+                    const bEnd = parseInt(b.hora_fin.split(':')[0]) * 60 + parseInt(b.hora_fin.split(':')[1]);
+                    return bStart < sEnd && bEnd > sStart;
+                });
+                return hasReserva || hasBloqueo;
+            };
+
+            // Solo si el slot por defecto está ocupado, buscamos otro
+            if (isOccupied(actualSlot)) {
+                const firstFree = TIME_SLOTS.find(s => !isOccupied(s));
+                if (firstFree) actualSlot = firstFree;
+            }
         }
+
+        const [h, m] = actualSlot.split(':').map(Number);
+        const endH = m === 30 ? h + 1 : h, endM = m === 30 ? 0 : 30;
 
         const rec = recursos.find(r => r.id === recursoId);
         setFormTipo(rec?.tipo || '');
-        setFormData({ recurso: recursoId || '', titulo: '', nombre_funcionario: '', descripcion: '', fecha: toDateStr(day), horaInicio: slotTime, horaFin: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}` });
+        setFormData({ recurso: recursoId || '', titulo: '', nombre_funcionario: '', descripcion: '', fecha: toDateStr(day), horaInicio: actualSlot, horaFin: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}` });
         setFormError('');
         setModalOpen(true);
     };
@@ -466,21 +488,12 @@ const ReservasDashboard = () => {
      * Recursos que tienen AL MENOS UNA reserva ese día, ordenados por tipo.
      */
     const getDayResources = (day) => {
-        const dayStr = toDateStr(day);
-        return recursosFiltrados
-            .filter(rec =>
-                reservas.some(r =>
-                    toDateStr(r.fecha_inicio) === dayStr &&
-                    parseInt(r.recurso) === parseInt(rec.id) &&
-                    !['FINALIZADA', 'RECHAZADA', 'CANCELADA'].includes(r.estado)
-                )
-            )
-            .sort(sortByType);
+        return recursosFiltrados;
     };
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
-        <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
+        <div className="flex flex-col h-[calc(100vh-140px)] bg-white overflow-hidden rounded-3xl border border-slate-200/60 shadow-xl shadow-slate-200/20">
 
             {/* TOP BAR */}
             <div className="flex-shrink-0 bg-white border-b border-slate-100 px-4 py-2.5 flex items-center gap-3 shadow-sm z-20">
@@ -614,222 +627,302 @@ const ReservasDashboard = () => {
 
             {/* CALENDAR GRID */}
             <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-
-                {/* Day headers + sub-resource labels */}
-                <div className="flex-shrink-0 bg-white border-b border-slate-100">
-                    {/* Fila de días */}
-                    <div className="flex">
-                        <div className="w-14 flex-shrink-0" />
-                        {visibleDays.map(day => {
-                            const isToday = toDateStr(day) === todayStr;
-                            const dayRes = getDayResources(day);
-                            return (
-                                <div key={toDateStr(day)} className={`flex-1 text-center border-l border-slate-100 ${isToday ? 'bg-indigo-50' : ''}`}>
-                                    <div className={`text-[9px] font-black uppercase tracking-wider pt-2 ${isToday ? 'text-indigo-400' : 'text-slate-400'}`}>{fmtDay(day).split(' ')[0]}</div>
-                                    <div className={`text-lg font-black leading-tight pb-1 ${isToday ? 'text-indigo-600' : 'text-slate-700'}`}>{day.getDate()}</div>
-                                    {/* Sub-cabeceras de recursos (solo si hay >1) */}
-                                    {dayRes.length > 1 && (
-                                        <div className="flex border-t border-slate-100">
-                                            {dayRes.map(rec => (
-                                                <div key={rec.id} className="flex-1 py-1 px-0.5 text-center truncate"
-                                                    style={{ borderRight: '1px solid #f1f5f9' }}>
-                                                    <div className="w-2 h-2 rounded-full mx-auto mb-0.5" style={{ background: rec.color || '#6366f1' }} />
-                                                    <span className="text-[8px] font-black truncate block leading-none" style={{ color: rec.color || '#6366f1' }}>
-                                                        {rec.nombre.length > 8 ? rec.nombre.slice(0, 7) + '…' : rec.nombre}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                    {/* Sub-cabecera única (1 recurso) */}
-                                    {dayRes.length === 1 && (
-                                        <div className="flex justify-center items-center gap-1 py-0.5 border-t border-slate-100">
-                                            <div className="w-2 h-2 rounded-full" style={{ background: dayRes[0].color || '#6366f1' }} />
-                                            <span className="text-[8px] font-black" style={{ color: dayRes[0].color || '#6366f1' }}>{dayRes[0].nombre}</span>
-                                        </div>
-                                    )}
+                {viewMode === 'week' ? (
+                    /* MODO MATRIZ (RECURSOS EN FILAS, DÍAS EN COLUMNAS) */
+                    <div className="flex-1 overflow-auto bg-slate-50/20">
+                        <div className="min-w-max">
+                            {/* Cabecera de Días */}
+                            <div className="flex sticky top-0 z-30 bg-white border-b border-slate-200">
+                                <div className="w-48 flex-shrink-0 p-4 font-black text-slate-400 text-[10px] uppercase tracking-widest bg-slate-50 border-r border-slate-200">
+                                    RECURSO / FECHA
                                 </div>
-                            );
-                        })}
-                    </div>
-                </div>
+                                {visibleDays.map(day => (
+                                    <div key={toDateStr(day)} className={`flex-1 min-w-[110px] p-3 text-center border-r border-slate-100 ${toDateStr(day) === todayStr ? 'bg-indigo-50/50' : ''}`}>
+                                        <div className="text-[10px] font-black text-indigo-500 uppercase tracking-wider">{fmtDay(day).split(' ')[0]}</div>
+                                        <div className={`text-xl font-black ${toDateStr(day) === todayStr ? 'text-indigo-600' : 'text-slate-700'}`}>{day.getDate()}</div>
+                                    </div>
+                                ))}
+                            </div>
 
-                {/* Scrollable area */}
-                <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
-                    <div className="flex relative" style={{ minHeight: `${TIME_SLOTS.length * SLOT_HEIGHT}px` }}>
+                            {/* Filas de Recursos */}
+                            {recursosFiltrados.map(rec => {
+                                const Icon = RECURSO_ICONS[rec.tipo] || Package;
+                                const color = rec.color || '#6366f1';
 
-                        {/* Time gutter */}
-                        <div className="w-14 flex-shrink-0 relative bg-white border-r border-slate-100">
-                            {TIME_SLOTS.map((slot, idx) => (
-                                <div key={slot} className="absolute right-2 flex items-start" style={{ top: `${idx * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px` }}>
-                                    {slot.endsWith(':00') && <span className="text-[9px] font-bold text-slate-400 leading-none pt-1">{slot}</span>}
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Day columns */}
-                        {visibleDays.map(day => {
-                            const isToday = toDateStr(day) === todayStr;
-                            // Recursos activos ESTE DÍA (dinámico)
-                            const dayRes = getDayResources(day);
-                            const nRes = dayRes.length || 1; // mínimo 1 para no dividir entre 0
-
-                            return (
-                                <div key={toDateStr(day)} className={`flex-1 border-l border-slate-100 relative ${isToday ? 'bg-indigo-50/20' : 'bg-white'}`}>
-
-                                    {/* Líneas divisorias entre sub-columnas de recursos */}
-                                    {dayRes.length > 1 && dayRes.slice(0, -1).map((_, rIdx) => (
-                                        <div key={rIdx} className="absolute top-0 bottom-0 z-10 pointer-events-none"
-                                            style={{ left: `${(rIdx + 1) * (100 / nRes)}%`, borderLeft: '1px dashed #e2e8f0' }} />
-                                    ))}
-
-                                    {/* Grid lines */}
-                                    {TIME_SLOTS.map((slot, idx) => {
-                                        const isHour = slot.endsWith(':00');
-                                        return (
-                                            <div key={slot} className="absolute left-0 right-0 cursor-pointer group"
-                                                style={{
-                                                    top: `${idx * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px`,
-                                                    borderTop: isHour ? '1px solid #e2e8f0' : '1px dashed #f1f5f9'
-                                                }}
-                                                onClick={() => handleSlotClick(day, slot, recursosFiltrados[0]?.id)}>
-                                                <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute inset-0" style={{ background: 'rgba(99,102,241,0.05)' }} />
-                                                <span className="opacity-0 group-hover:opacity-100 transition-opacity absolute left-2 top-0.5 text-[9px] font-bold text-indigo-400">{slot}</span>
+                                return (
+                                    <div key={rec.id} className="flex border-b border-slate-100 group bg-white hover:bg-slate-50/30 transition-colors">
+                                        {/* Info de Recurso (Sticky Left) */}
+                                        <div className="w-48 sticky left-0 z-20 flex-shrink-0 p-4 bg-white border-r border-slate-200 flex items-start gap-3 shadow-[4px_0_12px_rgba(0,0,0,0.03)]">
+                                            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm border border-slate-100" style={{ background: hexToRgba(color, 0.08), color }}>
+                                                <Icon className="w-5 h-5" />
                                             </div>
-                                        );
-                                    })}
-
-                                    {/* Now indicator */}
-                                    {isToday && (() => {
-                                        const now = new Date();
-                                        const top = ((now.getHours() * 60 + now.getMinutes() - HOUR_START * 60) / SLOT_MIN) * SLOT_HEIGHT;
-                                        if (top < 0 || top > TIME_SLOTS.length * SLOT_HEIGHT) return null;
-                                        return (
-                                            <div className="absolute left-0 right-0 z-30 flex items-center pointer-events-none" style={{ top: `${top}px` }}>
-                                                <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-md shadow-rose-500/50 -ml-1.5 flex-shrink-0" />
-                                                <div className="flex-1 h-0.5 bg-rose-400 shadow-sm" />
+                                            <div className="min-w-0">
+                                                <h4 className="font-bold text-slate-800 text-[11px] leading-tight mb-1 truncate" title={rec.nombre}>{rec.nombre}</h4>
+                                                <span className="text-[8px] font-black uppercase tracking-wider text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded">
+                                                    {TYPE_LABELS[rec.tipo]}
+                                                </span>
                                             </div>
-                                        );
-                                    })()}
+                                        </div>
 
-                                    {/* Eventos — por recurso activo ESE DÍA */}
-                                    {dayRes.map((recurso, rIdx) => {
-                                        const color = recurso.color || '#6366f1';
-                                        const events = getReservasForDayAndRecurso(day, recurso.id);
-                                        const laid = layoutEvents(events);
-
-                                        // Sub-columna de este recurso dentro del día
-                                        const colW = 100 / nRes;
-                                        const colLeft = rIdx * colW;
-
-                                        return laid.map(({ ev, colIndex, colCount }) => {
-                                            const { top, height } = getEventPos(ev);
-                                            const isPending = ev.estado === 'PENDIENTE';
-                                            const isApproved = ev.estado === 'APROBADA';
-                                            const isRejected = ev.estado === 'RECHAZADA' || ev.estado === 'CANCELADA';
-
-                                            // Sub-sub-columna por solapamiento dentro del mismo recurso
-                                            const subW = colW / colCount;
-                                            const subLeft = colLeft + colIndex * subW;
+                                        {/* Celdas de Días */}
+                                        {visibleDays.map(day => {
+                                            const dayS = toDateStr(day);
+                                            const dayEvents = getReservasForDayAndRecurso(day, rec.id);
+                                            const dayBloqueos = bloqueos.filter(b => Number(b.recurso) === Number(rec.id) && bloqueoAppliesToDate(b, dayS));
 
                                             return (
-                                                <div key={ev.id}
-                                                    className="absolute z-20 cursor-pointer group transition-all hover:z-40"
-                                                    style={{
-                                                        top: `${top}px`, height: `${height}px`,
-                                                        left: `${subLeft}%`, width: `calc(${subW}% - 3px)`,
-                                                        opacity: isRejected ? 0.35 : 1
-                                                    }}
-                                                    onClick={e => { e.stopPropagation(); setDetailReserva(ev); }}>
+                                                <div key={dayS}
+                                                    onClick={() => handleSlotClick(day, '', rec.id)}
+                                                    className={`flex-1 min-w-[110px] p-2 border-r border-slate-50 min-h-[140px] transition-colors relative cursor-pointer hover:bg-indigo-50/10 ${dayS === todayStr ? 'bg-indigo-50/5' : ''}`}>
 
-                                                    <div className="h-full rounded-lg overflow-hidden flex flex-col"
-                                                        style={{
-                                                            background: isApproved
-                                                                ? hexToRgba(color, 0.15)
-                                                                : hexToRgba(color, 0.10),
-                                                            borderLeft: `4px solid ${color}`,
-                                                            borderTop: `1px solid ${hexToRgba(color, isApproved ? 0.5 : 0.25)}`,
-                                                            borderRight: `1px solid ${hexToRgba(color, isApproved ? 0.5 : 0.25)}`,
-                                                            borderBottom: `1px solid ${hexToRgba(color, isApproved ? 0.5 : 0.25)}`,
-                                                            boxShadow: isApproved ? `0 2px 10px ${hexToRgba(color, 0.35)}` : 'none',
-                                                        }}>
+                                                    <div className="space-y-1.5 relative z-10">
+                                                        {/* Bloqueos */}
+                                                        {dayBloqueos.map(b => (
+                                                            <div key={b.id} className="p-2 rounded-xl border border-amber-200 flex items-center gap-2 group/block"
+                                                                style={{ background: 'repeating-linear-gradient(45deg,rgba(251,191,36,0.05) 0,rgba(251,191,36,0.05) 4px,white 4px,white 10px)' }}>
+                                                                <Lock className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                                                                <div className="min-w-0 flex-1">
+                                                                    <p className="text-[9px] font-black text-amber-700 leading-none">{b.hora_inicio.slice(0, 5)} - {b.hora_fin.slice(0, 5)}</p>
+                                                                    <p className="text-[8px] font-bold text-amber-600 truncate mt-0.5">{b.motivo || 'Bloqueado'}</p>
+                                                                </div>
+                                                            </div>
+                                                        ))}
 
-                                                        {/* Header del evento */}
-                                                        <div className="flex-shrink-0 px-2 py-1 flex items-center gap-1"
-                                                            style={{ background: hexToRgba(color, isPending ? 0.35 : isApproved ? 0.85 : 0.5) }}>
-                                                            {isApproved && <Lock className="w-2.5 h-2.5 text-white flex-shrink-0 opacity-90" />}
-                                                            {isPending && <AlertCircle className="w-2.5 h-2.5 text-white flex-shrink-0 opacity-90" />}
-                                                            <p className="text-[10px] font-black truncate leading-tight text-white drop-shadow-sm flex-1">
-                                                                {ev.titulo}
-                                                                {isPending && <span className="ml-1 opacity-80 font-bold border border-white/30 rounded px-1 py-0 text-[8px]">POR APROBAR</span>}
-                                                            </p>
-                                                        </div>
+                                                        {/* Reservas */}
+                                                        {dayEvents.sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio)).map(ev => {
+                                                            const isApproved = ev.estado === 'APROBADA';
+                                                            const isPending = ev.estado === 'PENDIENTE';
 
-                                                        {height > 40 && (
-                                                            <div className="px-2 py-0.5 flex-1">
-                                                                <p className="text-[9px] font-bold truncate" style={{ color }}>
-                                                                    {new Date(ev.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(ev.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                                </p>
-                                                                {height > 65 && <p className="text-[9px] text-slate-500 truncate">{recurso.nombre}</p>}
+                                                            return (
+                                                                <div key={ev.id}
+                                                                    onClick={(e) => { e.stopPropagation(); setDetailReserva(ev); }}
+                                                                    className="p-2.5 rounded-xl border flex flex-col gap-1 transition-all hover:translate-x-1 group/item shadow-sm mb-1.5 last:mb-0"
+                                                                    style={{
+                                                                        background: isApproved ? hexToRgba(color, 0.15) : 'white',
+                                                                        borderColor: hexToRgba(color, 0.2),
+                                                                        borderLeft: `4px solid ${color}`,
+                                                                        opacity: ev.estado === 'CANCELADA' || ev.estado === 'RECHAZADA' ? 0.5 : 1
+                                                                    }}>
+                                                                    <div className="flex items-center justify-between gap-1">
+                                                                        <span className="text-[9px] font-black" style={{ color }}>
+                                                                            {new Date(ev.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                            {' - '}
+                                                                            {new Date(ev.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                        </span>
+                                                                        {isApproved && <Lock className="w-2.5 h-2.5 opacity-60" style={{ color }} />}
+                                                                        {isPending && <AlertCircle className="w-2.5 h-2.5 text-amber-500 animate-pulse" />}
+                                                                    </div>
+                                                                    <p className={`text-[10px] font-black leading-tight line-clamp-2 ${isApproved ? 'text-slate-800' : 'text-slate-500'}`}>
+                                                                        {ev.titulo}
+                                                                    </p>
+                                                                    <p className="text-[8px] font-bold text-slate-400 truncate">
+                                                                        {ev.nombre_funcionario}
+                                                                    </p>
+                                                                </div>
+                                                            );
+                                                        })}
+
+                                                        {/* Icono + siempre visible para nuevas reservas */}
+                                                        {!dayBloqueos.some(b => b.hora_inicio <= '09:00' && b.hora_fin >= '18:00') && (
+                                                            <div className="flex justify-center pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all">
+                                                                    <Plus className="w-4 h-4" />
+                                                                </div>
                                                             </div>
                                                         )}
                                                     </div>
-
-                                                    {/* Borde punteado en PENDIENTE */}
-                                                    {isPending && (
-                                                        <div className="absolute inset-0 rounded-lg pointer-events-none" style={{ border: `2px dashed ${hexToRgba(color, 0.6)}` }} />
-                                                    )}
-                                                    {/* Patrón rayado en APROBADA para indicar bloqueo */}
-                                                    {isApproved && (
-                                                        <div className="absolute inset-0 rounded-lg pointer-events-none opacity-10"
-                                                            style={{ backgroundImage: `repeating-linear-gradient(45deg, ${color} 0, ${color} 1px, transparent 0, transparent 50%)`, backgroundSize: '6px 6px' }} />
-                                                    )}
                                                 </div>
                                             );
-                                        });
-                                    })}
-
-                                    {/* Bloqueos de horario — overlay ámbar */}
-                                    {bloqueos
-                                        .filter(b => bloqueoAppliesToDate(b, toDateStr(day)))
-                                        .filter(b => filtroRecurso === 'all' || filtroRecurso === `tipo_${recursosFiltrados.find(r => r.id === b.recurso)?.tipo}` || filtroRecurso === String(b.recurso))
-                                        .map(b => {
-                                            const hiMins = parseInt(b.hora_inicio.split(':')[0]) * 60 + parseInt(b.hora_inicio.split(':')[1]);
-                                            const hfMins = parseInt(b.hora_fin.split(':')[0]) * 60 + parseInt(b.hora_fin.split(':')[1]);
-                                            const top = ((hiMins - HOUR_START * 60) / SLOT_MIN) * SLOT_HEIGHT;
-                                            const height = ((hfMins - hiMins) / SLOT_MIN) * SLOT_HEIGHT;
-                                            if (top < 0 || height <= 0) return null;
-                                            const rec = recursos.find(r => r.id === b.recurso);
-                                            return (
-                                                <div key={`bloqueo-${b.id}`} className="absolute z-25 pointer-events-none left-0 right-0"
-                                                    style={{ top: `${top}px`, height: `${height}px` }}>
-                                                    <div className="h-full mx-0.5 rounded-md flex items-center gap-1 px-2 overflow-hidden"
-                                                        style={{
-                                                            background: 'repeating-linear-gradient(45deg,rgba(251,191,36,0.18) 0,rgba(251,191,36,0.18) 4px,rgba(254,243,199,0.5) 4px,rgba(254,243,199,0.5) 10px)',
-                                                            border: '1.5px solid rgba(251,191,36,0.55)',
-                                                        }}>
-                                                        <Lock className="w-2.5 h-2.5 text-amber-500 flex-shrink-0" />
-                                                        {height > 28 && (
-                                                            <span className="text-[9px] font-black text-amber-700 truncate">
-                                                                {rec?.nombre} {b.motivo ? `· ${b.motivo}` : '· Bloqueado'}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })
-                                    }
-                                </div>
-                            );
-                        })}
+                                        })}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
-                </div>
+                ) : (
+                    /* MODO DÍA (CALENDARIO DE TIEMPO CLÁSICO) */
+                    <>
+                        {/* Day headers + sub-resource labels con scroll coordinado */}
+                        <div className="flex-shrink-0 bg-white border-b border-slate-100 overflow-x-auto no-scrollbar"
+                            ref={headerScrollRef}
+                            onScroll={(e) => { if (scrollRef.current) scrollRef.current.scrollLeft = e.target.scrollLeft; }}>
+                            <div className="flex" style={{ minWidth: 'min-content' }}>
+                                <div className="w-14 flex-shrink-0 bg-white" />
+                                {visibleDays.map(day => {
+                                    const isToday = toDateStr(day) === todayStr;
+                                    const dayRes = getDayResources(day);
+                                    const dayMinWidth = '100%'; // En modo día ocupa todo el ancho
+
+                                    return (
+                                        <div key={toDateStr(day)} className={`flex-1 text-center border-l border-slate-100 ${isToday ? 'bg-indigo-50/30' : ''}`} style={{ minWidth: dayMinWidth }}>
+                                            <div className={`text-[9px] font-black uppercase tracking-wider pt-2 ${isToday ? 'text-indigo-400' : 'text-slate-400'}`}>{fmtDay(day).split(' ')[0]}</div>
+                                            <div className={`text-lg font-black leading-tight pb-1 ${isToday ? 'text-indigo-600' : 'text-slate-700'}`}>{day.getDate()}</div>
+                                            {/* Sub-cabeceras de recursos */}
+                                            {dayRes.length > 0 && (
+                                                <div className="flex border-t border-slate-100 bg-slate-50/30">
+                                                    {dayRes.map(rec => (
+                                                        <div key={rec.id} className="flex-1 py-1 px-1 text-center truncate border-r border-slate-100 last:border-0">
+                                                            <div className="w-2 h-2 rounded-full mx-auto mb-0.5" style={{ background: rec.color || '#6366f1' }} />
+                                                            <span className="text-[8px] font-black truncate block leading-none" style={{ color: rec.color || '#6366f1' }}>
+                                                                {rec.nombre}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Calendar Grid Container */}
+                        <div ref={scrollRef} className="flex-1 overflow-auto scroll-smooth"
+                            style={{ scrollbarGutter: 'stable' }}
+                            onScroll={(e) => { if (headerScrollRef.current) headerScrollRef.current.scrollLeft = e.target.scrollLeft; }}>
+                            <div className="flex relative" style={{ minHeight: `${TIME_SLOTS.length * SLOT_HEIGHT}px`, minWidth: 'min-content' }}>
+
+                                {/* Time gutter — sticky left */}
+                                <div className="w-14 flex-shrink-0 relative bg-white border-r border-slate-100 sticky left-0 z-40">
+                                    {TIME_SLOTS.map((slot, idx) => (
+                                        <div key={slot} className="absolute right-2 flex items-start" style={{ top: `${idx * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px` }}>
+                                            {slot.endsWith(':00') && <span className="text-[9px] font-bold text-slate-400 leading-none pt-1">{slot}</span>}
+                                        </div>
+                                    ))}
+                                    {/* Final time label */}
+                                    <div className="absolute right-2 flex items-start" style={{ top: `${TIME_SLOTS.length * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px` }}>
+                                        <span className="text-[9px] font-bold text-slate-400 leading-none pt-1">{settings.hora_fin.slice(0, 5)}</span>
+                                    </div>
+                                </div>
+
+                                {/* Day columns */}
+                                {visibleDays.map(day => {
+                                    const isToday = toDateStr(day) === todayStr;
+                                    const dayRes = getDayResources(day);
+                                    const nRes = dayRes.length || 1;
+                                    const dayMinWidth = '100%';
+
+                                    return (
+                                        <div key={toDateStr(day)} className={`flex-1 border-l border-slate-100 relative ${isToday ? 'bg-indigo-50/10' : 'bg-white'}`} style={{ minWidth: dayMinWidth }}>
+                                            <div className="flex h-full">
+                                                {dayRes.map((recurso, rIdx) => (
+                                                    <div key={recurso.id} className="flex-1 relative border-r border-slate-100 last:border-r-0">
+                                                        {TIME_SLOTS.map((slot, idx) => {
+                                                            const isHour = slot.endsWith(':00');
+                                                            return (
+                                                                <div key={slot} className="absolute inset-x-0 cursor-pointer group"
+                                                                    style={{
+                                                                        top: `${idx * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px`,
+                                                                        borderTop: isHour ? '1px solid #f1f5f9' : '1px dashed #f8fafc'
+                                                                    }}
+                                                                    onClick={() => handleSlotClick(day, slot, recurso.id)}>
+                                                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute inset-0" style={{ background: 'rgba(99,102,241,0.03)' }} />
+                                                                    <span className="opacity-0 group-hover:opacity-100 transition-opacity absolute left-1 top-0.5 text-[7px] font-bold text-indigo-400">{slot}</span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* Final grid line base */}
+                                            <div className="absolute left-0 right-0 border-t border-slate-200" style={{ top: `${TIME_SLOTS.length * SLOT_HEIGHT}px` }} />
+
+                                            {/* Now indicator */}
+                                            {isToday && (() => {
+                                                const now = new Date();
+                                                const top = ((now.getHours() * 60 + now.getMinutes() - configStart * 60) / SLOT_MIN) * SLOT_HEIGHT;
+                                                if (top < 0 || top > TIME_SLOTS.length * SLOT_HEIGHT) return null;
+                                                return (
+                                                    <div className="absolute left-0 right-0 z-30 flex items-center pointer-events-none" style={{ top: `${top}px` }}>
+                                                        <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-md shadow-rose-500/50 -ml-1.5 flex-shrink-0" />
+                                                        <div className="flex-1 h-0.5 bg-rose-400 shadow-sm" />
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            {dayRes.map((recurso, rIdx) => {
+                                                const color = recurso.color || '#6366f1';
+                                                const events = getReservasForDayAndRecurso(day, recurso.id);
+                                                const laid = layoutEvents(events);
+                                                const colW = 100 / nRes;
+                                                const colLeft = rIdx * colW;
+
+                                                return laid.map(({ ev, colIndex, colCount }) => {
+                                                    const { top, height } = getEventPos(ev);
+                                                    const isPending = ev.estado === 'PENDIENTE';
+                                                    const isApproved = ev.estado === 'APROBADA';
+                                                    const isRejected = ev.estado === 'RECHAZADA' || ev.estado === 'CANCELADA';
+                                                    const subW = colW / colCount;
+                                                    const subLeft = colLeft + colIndex * subW;
+
+                                                    return (
+                                                        <div key={ev.id} className="absolute z-20 cursor-pointer group transition-all hover:z-40"
+                                                            style={{
+                                                                top: `${top}px`, height: `${height}px`,
+                                                                left: `${subLeft}%`, width: `calc(${subW}% - 3px)`,
+                                                                opacity: isRejected ? 0.35 : 1
+                                                            }}
+                                                            onClick={e => { e.stopPropagation(); setDetailReserva(ev); }}>
+                                                            <div className="h-full rounded-lg overflow-hidden flex flex-col"
+                                                                style={{
+                                                                    background: isApproved ? hexToRgba(color, 0.15) : hexToRgba(color, 0.10),
+                                                                    borderLeft: `4px solid ${color}`,
+                                                                    borderTop: `1px solid ${hexToRgba(color, 0.25)}`,
+                                                                    borderRight: `1px solid ${hexToRgba(color, 0.25)}`,
+                                                                    borderBottom: `1px solid ${hexToRgba(color, 0.25)}`,
+                                                                }}>
+                                                                <div className="flex-shrink-0 px-2 py-1 flex items-center gap-1" style={{ background: hexToRgba(color, isPending ? 0.35 : isApproved ? 0.85 : 0.5) }}>
+                                                                    {isApproved && <Lock className="w-2.5 h-2.5 text-white flex-shrink-0 opacity-90" />}
+                                                                    {isPending && <AlertCircle className="w-2.5 h-2.5 text-white flex-shrink-0 opacity-90" />}
+                                                                    <p className="text-[10px] font-black truncate leading-tight text-white drop-shadow-sm flex-1">{ev.titulo}</p>
+                                                                </div>
+                                                                {height > 40 && (
+                                                                    <div className="px-2 py-0.5 flex-1">
+                                                                        <p className="text-[9px] font-bold truncate" style={{ color }}>{new Date(ev.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(ev.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                });
+                                            })}
+
+                                            {dayRes.map((recurso, rIdx) => {
+                                                const colW = 100 / nRes;
+                                                const colLeft = rIdx * colW;
+                                                return bloqueos
+                                                    .filter(b => Number(b.recurso) === Number(recurso.id) && bloqueoAppliesToDate(b, toDateStr(day)))
+                                                    .map(b => {
+                                                        const hiMins = (b.hora_inicio || '00:00').split(':').slice(0, 2).reduce((h, m) => h * 60 + Number(m), 0);
+                                                        const hfMins = (b.hora_fin || '00:00').split(':').slice(0, 2).reduce((h, m) => h * 60 + Number(m), 0);
+                                                        const top = ((hiMins - configStart * 60) / SLOT_MIN) * SLOT_HEIGHT;
+                                                        const height = ((hfMins - hiMins) / SLOT_MIN) * SLOT_HEIGHT;
+                                                        if (top < 0 || height <= 0) return null;
+                                                        return (
+                                                            <div key={`bloqueo-${b.id}`} className="absolute z-25 pointer-events-none"
+                                                                style={{ top: `${top}px`, height: `${height}px`, left: `${colLeft}%`, width: `${colW}%` }}>
+                                                                <div className="h-full mx-0.5 rounded-md flex items-center gap-1 px-1 overflow-hidden" style={{ background: 'repeating-linear-gradient(45deg,rgba(251,191,36,0.18) 0,rgba(251,191,36,0.18) 4px,rgba(254,243,199,0.5) 4px,rgba(254,243,199,0.5) 10px)', border: '1.5px solid rgba(251,191,36,0.55)' }}>
+                                                                    <Lock className="w-2.5 h-2.5 text-amber-500" />
+                                                                    {height > 28 && <span className="text-[9px] font-black text-amber-700 truncate">{b.motivo || 'Bloqueado'}</span>}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    });
+                                            })}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* ── MODAL NUEVA RESERVA ── */}
             {modalOpen && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-[6vh]" onClick={() => setModalOpen(false)}>
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col" style={{ maxHeight: '88vh' }} onClick={e => e.stopPropagation()}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden" style={{ maxHeight: '88vh' }} onClick={e => e.stopPropagation()}>
                         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-indigo-700">
                             <div>
                                 <h3 className="font-black text-white text-sm">Nueva Reserva</h3>
@@ -972,17 +1065,30 @@ const ReservasDashboard = () => {
 
                                         // 4. Filtrar slots para "Hasta" basado en el "Desde" seleccionado
                                         const mDesde = getMins(formData.horaInicio);
-                                        const slotsHasta = TIME_SLOTS.filter(s => {
-                                            const m = getMins(s);
-                                            if (m <= mDesde) return false; // Debe ser posterior
-                                            // No puede saltar por encima de una reserva que empiece después de mDesde
-                                            const sigReserva = resDía
-                                                .filter(r => dtMinutes(r.fecha_inicio) >= mDesde)
-                                                .sort((a, b) => dtMinutes(a.fecha_inicio) - dtMinutes(b.fecha_inicio))[0];
+                                        const horaFinLimit = settings.hora_fin.slice(0, 5);
+                                        const slotsHasta = [...TIME_SLOTS, horaFinLimit]
+                                            .filter((s, idx, self) => self.indexOf(s) === idx)
+                                            .filter(s => {
+                                                const m = getMins(s);
+                                                if (m <= mDesde) return false; // Debe ser posterior
+                                                // No puede saltar por encima de una reserva que empiece después de mDesde
+                                                const sigReserva = resDía
+                                                    .filter(r => dtMinutes(r.fecha_inicio) >= mDesde)
+                                                    .sort((a, b) => dtMinutes(a.fecha_inicio) - dtMinutes(b.fecha_inicio))[0];
 
-                                            if (sigReserva && m > dtMinutes(sigReserva.fecha_inicio)) return false;
-                                            return true;
-                                        });
+                                                if (sigReserva && m > dtMinutes(sigReserva.fecha_inicio)) return false;
+
+                                                const saltandoBloqueo = bloqueos.some(b => {
+                                                    const matchRec = Number(b.recurso) === Number(formData.recurso);
+                                                    const matchDate = bloqueoAppliesToDate(b, formData.fecha);
+                                                    if (!matchRec || !matchDate) return false;
+                                                    const hiB = (b.hora_inicio || '00:00').split(':').slice(0, 2).reduce((h, ms) => h * 60 + Number(ms), 0);
+                                                    return hiB < m && hiB >= mDesde;
+                                                });
+                                                if (saltandoBloqueo) return false;
+
+                                                return true;
+                                            });
 
                                         return (
                                             <>
@@ -1164,12 +1270,25 @@ const ReservasDashboard = () => {
                                         );
                                     })}
                                 </div>
+                                <div className="p-3 border-t border-slate-100 mt-2 bg-slate-50/50">
+                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 pb-2">Configuración General</div>
+                                    <button onClick={() => setAdminEditing({ id: 'settings', isSettings: true })}
+                                        className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer transition ${adminEditing?.id === 'settings' ? 'bg-white border border-indigo-200 shadow-sm' : 'hover:bg-white border border-transparent'}`}>
+                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${adminEditing?.id === 'settings' ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                                            <Clock className={`w-3.5 h-3.5 ${adminEditing?.id === 'settings' ? 'text-white' : 'text-slate-500'}`} />
+                                        </div>
+                                        <div className="min-w-0 flex-1 text-left">
+                                            <p className={`text-xs font-black truncate ${adminEditing?.id === 'settings' ? 'text-indigo-600' : 'text-slate-700'}`}>Horario Laboral</p>
+                                            <p className="text-[9px] text-slate-400 truncate">Configurar inicio/fin</p>
+                                        </div>
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Formulario */}
                             <div className="flex-1 overflow-y-auto p-6">
                                 <h3 className="font-black text-slate-800 text-sm mb-4">
-                                    {adminEditing ? `Editando: ${adminEditing.nombre}` : 'Crear nuevo recurso'}
+                                    {adminEditing?.id === 'settings' ? 'Configuración de Horario Laboral' : adminEditing ? `Editando: ${adminEditing.nombre}` : 'Crear nuevo recurso'}
                                 </h3>
                                 {adminError && (
                                     <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-4">
@@ -1177,97 +1296,137 @@ const ReservasDashboard = () => {
                                         <span className="text-xs font-bold text-rose-600">{adminError}</span>
                                     </div>
                                 )}
-                                <form onSubmit={handleAdminSave} className="space-y-4">
-                                    {/* Tipo */}
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Tipo *</label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {[{ v: 'SALA', l: 'Sala de Reuniones', I: Building2 }, { v: 'VEHICULO', l: 'Vehículo', I: Truck }, { v: 'PROYECTOR', l: 'Proyector/Equipo', I: Monitor }, { v: 'OTRO', l: 'Otro', I: Package }].map(({ v, l, I }) => (
-                                                <button key={v} type="button" onClick={() => setAdminForm(p => ({ ...p, tipo: v }))}
-                                                    className={`flex items-center gap-2 p-2.5 rounded-xl border-2 text-left transition text-xs font-bold ${adminForm.tipo === v ? 'bg-slate-800 border-slate-800 text-white' : 'border-slate-100 text-slate-600 hover:border-slate-200'}`}>
-                                                    <I className="w-3.5 h-3.5" /> {l}
-                                                </button>
-                                            ))}
+                                {adminEditing?.id === 'settings' ? (
+                                    <form onSubmit={async (e) => {
+                                        e.preventDefault();
+                                        setAdminSaving(true);
+                                        try {
+                                            await api.put('reservas/settings/1/', settings);
+                                            setAdminError('');
+                                            await fetchData();
+                                            // No cerramos el modal para que vea el cambio o pueda seguir ajustando
+                                        } catch (e) {
+                                            setAdminError('Error al guardar la configuración. Revisa los valores.');
+                                        } finally {
+                                            setAdminSaving(false);
+                                        }
+                                    }} className="space-y-6">
+                                        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
+                                            <p className="text-xs text-indigo-700 leading-relaxed">
+                                                Ajusta el rango de horas que se mostrará en el calendario para todos los usuarios.
+                                                Las reservas existentes fuera de este rango seguirán siendo válidas pero podrían no ser visibles en la vista diaria/semanal.
+                                            </p>
                                         </div>
-                                    </div>
-
-                                    {/* Nombre */}
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Nombre *</label>
-                                        <input type="text" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                            value={adminForm.nombre} onChange={e => setAdminForm(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Sala Directorio, Van Toyota..." required />
-                                    </div>
-
-                                    {/* Color RGB */}
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Color en Calendario</label>
-                                        <div className="flex items-center gap-3">
-                                            <input type="color" value={adminForm.color} onChange={e => setAdminForm(p => ({ ...p, color: e.target.value }))}
-                                                className="w-10 h-10 rounded-xl border-2 border-slate-200 cursor-pointer p-0.5 bg-white" />
-                                            <div className="flex-1 grid grid-cols-4 gap-1.5">
-                                                {DEFAULT_COLORS.map(c => (
-                                                    <button key={c} type="button" onClick={() => setAdminForm(p => ({ ...p, color: c }))}
-                                                        className="h-7 rounded-lg border-2 transition"
-                                                        style={{ background: c, borderColor: adminForm.color === c ? '#1e293b' : 'transparent' }}
-                                                        title={c} />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Hora de Inicio</label>
+                                                <input type="time" step="1800" className="w-full rounded-xl border border-slate-200 text-sm px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    value={settings.hora_inicio.slice(0, 5)} onChange={e => setSettings(p => ({ ...p, hora_inicio: e.target.value }))} required />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Hora de Término</label>
+                                                <input type="time" step="1800" className="w-full rounded-xl border border-slate-200 text-sm px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    value={settings.hora_fin.slice(0, 5)} onChange={e => setSettings(p => ({ ...p, hora_fin: e.target.value }))} required />
+                                            </div>
+                                        </div>
+                                        <button type="submit" disabled={adminSaving} className="w-full py-3 bg-slate-800 text-white rounded-xl font-black text-xs hover:bg-slate-900 transition flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg">
+                                            {adminSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                            Guardar Configuración
+                                        </button>
+                                    </form>
+                                ) : (
+                                    <form onSubmit={handleAdminSave} className="space-y-4">
+                                        {/* Tipo */}
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Tipo *</label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {[{ v: 'SALA', l: 'Sala de Reuniones', I: Building2 }, { v: 'VEHICULO', l: 'Vehículo', I: Truck }, { v: 'PROYECTOR', l: 'Proyector/Equipo', I: Monitor }, { v: 'OTRO', l: 'Otro', I: Package }].map(({ v, l, I }) => (
+                                                    <button key={v} type="button" onClick={() => setAdminForm(p => ({ ...p, tipo: v }))}
+                                                        className={`flex items-center gap-2 p-2.5 rounded-xl border-2 text-left transition text-xs font-bold ${adminForm.tipo === v ? 'bg-slate-800 border-slate-800 text-white' : 'border-slate-100 text-slate-600 hover:border-slate-200'}`}>
+                                                        <I className="w-3.5 h-3.5" /> {l}
+                                                    </button>
                                                 ))}
                                             </div>
-                                            <span className="text-xs font-bold text-slate-500 font-mono">{adminForm.color}</span>
                                         </div>
-                                        {/* Preview */}
-                                        <div className="mt-2 rounded-xl overflow-hidden border border-slate-100" style={{ background: hexToRgba(adminForm.color, 0.1) }}>
-                                            <div className="px-3 py-2" style={{ background: hexToRgba(adminForm.color, 0.7) }}>
-                                                <p className="text-[10px] font-black text-white">{adminForm.nombre || 'Nombre del recurso'}</p>
-                                            </div>
-                                            <div className="px-3 py-1">
-                                                <p className="text-[9px] font-bold" style={{ color: adminForm.color }}>09:00 – 10:00</p>
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    {/* Ubicación + Capacidad */}
-                                    <div className="grid grid-cols-2 gap-3">
+                                        {/* Nombre */}
                                         <div>
-                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><MapPin className="w-3 h-3" /> Ubicación</label>
+                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Nombre *</label>
                                             <input type="text" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                value={adminForm.ubicacion} onChange={e => setAdminForm(p => ({ ...p, ubicacion: e.target.value }))} placeholder="Ej: Piso 2" />
+                                                value={adminForm.nombre} onChange={e => setAdminForm(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Sala Directorio, Van Toyota..." required />
                                         </div>
+
+                                        {/* Color RGB */}
                                         <div>
-                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Users className="w-3 h-3" /> Capacidad</label>
-                                            <input type="number" min="1" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                value={adminForm.capacidad} onChange={e => setAdminForm(p => ({ ...p, capacidad: parseInt(e.target.value) || 1 }))} />
+                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Color en Calendario</label>
+                                            <div className="flex items-center gap-3">
+                                                <input type="color" value={adminForm.color} onChange={e => setAdminForm(p => ({ ...p, color: e.target.value }))}
+                                                    className="w-10 h-10 rounded-xl border-2 border-slate-200 cursor-pointer p-0.5 bg-white" />
+                                                <div className="flex-1 grid grid-cols-4 gap-1.5">
+                                                    {DEFAULT_COLORS.map(c => (
+                                                        <button key={c} type="button" onClick={() => setAdminForm(p => ({ ...p, color: c }))}
+                                                            className="h-7 rounded-lg border-2 transition"
+                                                            style={{ background: c, borderColor: adminForm.color === c ? '#1e293b' : 'transparent' }}
+                                                            title={c} />
+                                                    ))}
+                                                </div>
+                                                <span className="text-xs font-bold text-slate-500 font-mono">{adminForm.color}</span>
+                                            </div>
+                                            {/* Preview */}
+                                            <div className="mt-2 rounded-xl overflow-hidden border border-slate-100" style={{ background: hexToRgba(adminForm.color, 0.1) }}>
+                                                <div className="px-3 py-2" style={{ background: hexToRgba(adminForm.color, 0.7) }}>
+                                                    <p className="text-[10px] font-black text-white">{adminForm.nombre || 'Nombre del recurso'}</p>
+                                                </div>
+                                                <div className="px-3 py-1">
+                                                    <p className="text-[9px] font-bold" style={{ color: adminForm.color }}>09:00 – 10:00</p>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    {/* Descripción */}
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Descripción</label>
-                                        <textarea rows={2} className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
-                                            value={adminForm.descripcion} onChange={e => setAdminForm(p => ({ ...p, descripcion: e.target.value }))} placeholder="Equipamiento, notas..." />
-                                    </div>
+                                        {/* Ubicación + Capacidad */}
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><MapPin className="w-3 h-3" /> Ubicación</label>
+                                                <input type="text" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    value={adminForm.ubicacion} onChange={e => setAdminForm(p => ({ ...p, ubicacion: e.target.value }))} placeholder="Ej: Piso 2" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Users className="w-3 h-3" /> Capacidad</label>
+                                                <input type="number" min="1" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    value={adminForm.capacidad} onChange={e => setAdminForm(p => ({ ...p, capacidad: parseInt(e.target.value) || 1 }))} />
+                                            </div>
+                                        </div>
 
-                                    {/* Botones */}
-                                    <div className="flex gap-2 pt-2">
-                                        <button type="submit" disabled={adminSaving}
-                                            className="flex-1 py-2.5 text-white rounded-xl font-black text-xs transition flex items-center justify-center gap-2 disabled:opacity-50"
-                                            style={{ background: adminSaving ? '#94a3b8' : adminForm.color }}>
-                                            {adminSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                                            {adminEditing ? 'Guardar Cambios' : 'Crear Recurso'}
-                                        </button>
-                                        {adminEditing && (
-                                            <>
-                                                <button type="button" onClick={() => handleAdminToggle(adminEditing)}
-                                                    className={`px-3 py-2.5 rounded-xl font-black text-xs transition flex items-center gap-1.5 border ${adminEditing.activo ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}`}>
-                                                    <Power className="w-3.5 h-3.5" /> {adminEditing.activo ? 'Desactivar' : 'Activar'}
-                                                </button>
-                                                <button type="button" onClick={() => handleAdminDelete(adminEditing)}
-                                                    className="px-3 py-2.5 bg-rose-50 text-rose-600 rounded-xl font-black text-xs hover:bg-rose-100 border border-rose-200">
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                </form>
+                                        {/* Descripción */}
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Descripción</label>
+                                            <textarea rows={2} className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                                                value={adminForm.descripcion} onChange={e => setAdminForm(p => ({ ...p, descripcion: e.target.value }))} placeholder="Equipamiento, notas..." />
+                                        </div>
+
+                                        {/* Botones */}
+                                        <div className="flex gap-2 pt-2">
+                                            <button type="submit" disabled={adminSaving}
+                                                className="flex-1 py-2.5 text-white rounded-xl font-black text-xs transition flex items-center justify-center gap-2 disabled:opacity-50"
+                                                style={{ background: adminSaving ? '#94a3b8' : adminForm.color }}>
+                                                {adminSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                                {adminEditing ? 'Guardar Cambios' : 'Crear Recurso'}
+                                            </button>
+                                            {adminEditing && (
+                                                <>
+                                                    <button type="button" onClick={() => handleAdminToggle(adminEditing)}
+                                                        className={`px-3 py-2.5 rounded-xl font-black text-xs transition flex items-center gap-1.5 border ${adminEditing.activo ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}`}>
+                                                        <Power className="w-3.5 h-3.5" /> {adminEditing.activo ? 'Desactivar' : 'Activar'}
+                                                    </button>
+                                                    <button type="button" onClick={() => handleAdminDelete(adminEditing)}
+                                                        className="px-3 py-2.5 bg-rose-50 text-rose-600 rounded-xl font-black text-xs hover:bg-rose-100 border border-rose-200">
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </form>
+                                )}
 
                                 {/* ── PANEL DE BLOQUEOS (solo al editar) ── */}
                                 {adminEditing && (

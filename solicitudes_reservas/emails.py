@@ -4,6 +4,7 @@ import threading
 import json
 import os
 from datetime import date
+import django.utils.timezone
 
 # ── Contador diario de correos ────────────────────────────────────────────────
 _COUNTER_FILE = os.path.join(os.path.dirname(__file__), '.email_counter.json')
@@ -37,9 +38,20 @@ def _increment_daily_count():
 
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _log_event(msg):
+    """Escribe un mensaje en el log de depuración de correos."""
+    log_file = os.path.join(os.path.dirname(__file__), 'email_debug.log')
+    try:
+        timestamp = django.utils.timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+        with open(log_file, 'a', encoding='utf-8') as f:
+            f.write(f"[{timestamp}] {msg}\n")
+    except:
+        pass
+
 def _safe_email(to_list, subject, html_body):
-    """Envía el correo en un thread aparte. Respeta el límite diario."""
+    """Envía el correo de forma asíncrona (threading) y registra el resultado en un log."""
     if not to_list or not any(to_list):
+        _log_event(f"[SKIP] No hay destinatarios para: {subject}")
         return
 
     daily_limit = getattr(settings, 'EMAIL_DAILY_LIMIT', 200)
@@ -48,21 +60,26 @@ def _safe_email(to_list, subject, html_body):
         with _counter_lock:
             current = _get_daily_count()
             if current >= daily_limit:
-                print(f"[EMAIL BLOQUEADO] Límite diario de {daily_limit} correos alcanzado. No se envió: {subject}")
+                _log_event(f"[BLOQUEADO] Límite diario ({daily_limit}) alcanzado. No se envió: {subject}")
                 return
             new_count = _increment_daily_count()
 
+        _log_event(f"[INTENTO] ({new_count}/{daily_limit}) → {to_list} | {subject}")
+        
         try:
+            from django.core.mail import send_mail
             send_mail(
                 subject=subject,
                 message='',
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[r for r in to_list if r],
                 html_message=html_body,
-                fail_silently=True,
+                fail_silently=False,
             )
-            print(f"[EMAIL OK] ({new_count}/{daily_limit}) → {to_list} | {subject}")
+            _log_event(f"[SUCCESS] Enviado a {to_list}")
+            print(f"[EMAIL OK] {to_list} | {subject}")
         except Exception as e:
+            _log_event(f"[ERROR] Falló envío a {to_list}: {str(e)}")
             print(f"[EMAIL ERROR] {e}")
 
     threading.Thread(target=_send, daemon=True).start()

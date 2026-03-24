@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
-import { Save, Search, Plus, X, Key, UserPlus, Check, Building, ArrowLeft, GraduationCap } from 'lucide-react';
+import { Save, Search, Plus, X, Box as Key, UserPlus, Check, Building, ArrowLeft, GraduationCap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ApplicantModal from '../../components/applicants/ApplicantModal';
 import FormInput from '../../components/common/FormInput';
@@ -37,7 +37,7 @@ const LoanForm = () => {
                     api.get('establecimientos/?page_size=1000'),
                     api.get('solicitantes/?page_size=1000'),
                     api.get('funcionarios/?page_size=1000'),
-                    api.get('llaves/?page_size=1000') // Fetch all keys to analyze establishments
+                    api.get('activos/?page_size=1000') // Fetch all assets to analyze establishments
                 ]);
 
                 const allKeys = allKeysRes.data.results || allKeysRes.data || [];
@@ -55,9 +55,9 @@ const LoanForm = () => {
                     };
                 });
 
-                setEstablishments(allEsts);
+                setEstablishments(estsWithKeys);
 
-                // Filter applicants: Only show those who are NOT associated with a funcionario
+                // Filter applicants: Only show those who are NOT associated con un funcionario
                 const allApplicants = appRes.data.results || appRes.data;
                 setApplicants(allApplicants.filter(a => !a.funcionario));
                 setFuncionarios(funcRes.data.results || funcRes.data || []);
@@ -71,7 +71,7 @@ const LoanForm = () => {
     // Search keys when term changes or establishment changes
     useEffect(() => {
         const timeoutId = setTimeout(() => {
-            let query = 'llaves/?';
+            let query = 'activos/?';
             if (selectedEsts.length > 0) {
                 query += `establecimiento__in=${selectedEsts.join(',')}&`;
             }
@@ -158,7 +158,7 @@ const LoanForm = () => {
             solicitante: selectedApplicantId || null,
             funcionario: selectedFuncionarioId || null,
             director_establecimiento_id: selectedDirectorEstId || null,
-            llaves: selectedKeys.map(k => k.id),
+            activos: selectedKeys.map(k => k.id),
             observacion: observacion
         };
 
@@ -186,7 +186,7 @@ const LoanForm = () => {
                     </button>
                     <div>
                         <h1 className="text-xl font-bold text-slate-900 leading-tight">Nuevo Préstamo</h1>
-                        <p className="text-[11px] text-slate-500">Registre la entrega de llaves a funcionarios o externos.</p>
+                        <p className="text-[11px] text-slate-500">Registre la entrega de activos a funcionarios o externos.</p>
                     </div>
                 </div>
             </div>
@@ -201,7 +201,7 @@ const LoanForm = () => {
                                     <Key className="w-4 h-4" />
                                 </div>
                                 <div className="flex flex-col md:flex-row md:items-center gap-2">
-                                    <h2 className="text-sm font-bold text-slate-900">1. Seleccionar Llaves</h2>
+                                    <h2 className="text-sm font-bold text-slate-900">1. Seleccionar Activos</h2>
                                     {foundKeys.some(k => k.disponible) && (
                                         <button
                                             type="button"
@@ -237,7 +237,7 @@ const LoanForm = () => {
                             />
 
                             <FormInput
-                                placeholder="Buscar llave por nombre o código..."
+                                placeholder="Buscar activo por nombre o código..."
                                 icon={Search}
                                 value={keySearchTerm}
                                 onChange={e => setKeySearchTerm(e.target.value)}
@@ -251,7 +251,7 @@ const LoanForm = () => {
                                         <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400">
                                             <Search className="w-10 h-10 mx-auto mb-2 opacity-20" />
                                             <p className="font-medium text-[12px]">
-                                                {selectedEsts.length > 0 || keySearchTerm ? 'No se encontraron llaves' : 'Filtre para comenzar'}
+                                                {selectedEsts.length > 0 || keySearchTerm ? 'No se encontraron activos' : 'Filtre para comenzar'}
                                             </p>
                                         </div>
                                     ) : (

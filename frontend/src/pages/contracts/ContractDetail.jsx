@@ -120,7 +120,7 @@ const ContractDetail = () => {
         }
     };
 
-    const handleCreateReception = async (formData) => {
+    const handleCreateReception = async (formData, isSplit = false) => {
         try {
             if (editingRC) {
                 await api.put(`facturas-adquisicion/${editingRC.id}/`, {
@@ -128,10 +128,38 @@ const ContractDetail = () => {
                     contrato: contract.id
                 });
             } else {
-                await api.post('facturas-adquisicion/', {
-                    ...formData,
-                    contrato: contract.id
-                });
+                if (isSplit && formData.establecimientos && formData.establecimientos.length > 1) {
+                    // Generar RCs individuales
+                    let currentFolio = formData.folio || "";
+
+                    for (const estId of formData.establecimientos) {
+                        const estName = lookups.establishments.find(e => e.id === estId)?.nombre || '';
+
+                        const singlePayload = {
+                            ...formData,
+                            establecimientos: [estId],
+                            contrato: contract.id,
+                            folio: currentFolio,
+                            descripcion: formData.descripcion + (estName ? `\n- ${estName}` : '')
+                        };
+
+                        await api.post('facturas-adquisicion/', singlePayload);
+
+                        // Increment folio if it ends with numbers
+                        if (currentFolio) {
+                            currentFolio = currentFolio.replace(/(\d+)(?!.*\d)/, (match) => {
+                                const num = parseInt(match, 10) + 1;
+                                return num.toString().padStart(match.length, '0');
+                            });
+                        }
+                    }
+                } else {
+                    // Flujo normal (una sola RC)
+                    await api.post('facturas-adquisicion/', {
+                        ...formData,
+                        contrato: contract.id
+                    });
+                }
             }
             setReceptionModalOpen(false);
             setEditingRC(null);

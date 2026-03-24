@@ -118,3 +118,15 @@ class SolicitudReserva(models.Model):
 
     class Meta:
         ordering = ['-fecha_inicio']
+
+class ReservaSetting(models.Model):
+    """Configuración global para el sistema de reservas."""
+    hora_inicio = models.TimeField(default='07:00', verbose_name="Hora de Inicio Jornada")
+    hora_fin = models.TimeField(default='18:00', verbose_name="Hora de Fin Jornada")
+
+    def __str__(self):
+        return f"Configuración: {self.hora_inicio.strftime('%H:%M')} - {self.hora_fin.strftime('%H:%M')}"
+
+    class Meta:
+        verbose_name = "Ajuste de Reservas"
+        verbose_name_plural = "Ajustes de Reservas"

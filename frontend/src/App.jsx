@@ -8,7 +8,7 @@ import LoansDashboard from './pages/loans/LoansDashboard';
 import LoanForm from './pages/loans/LoanForm';
 import LoanHistory from './pages/loans/LoanHistory';
 import Applicants from './pages/applicants/Applicants';
-import Keys from './pages/keys/Keys';
+import Assets from './pages/keys/Assets';
 import Establishments from './pages/establishments/Establishments';
 import ServicesDashboard from './pages/services/ServicesDashboard';
 import Providers from './pages/services/Providers';
@@ -75,8 +75,8 @@ function App() {
                 <Route path="applicants" element={<Applicants />} />
               </Route>
 
-              <Route element={<ProtectedRoute permission="prestamo_llaves.view_llave" />}>
-                <Route path="keys" element={<Keys />} />
+              <Route element={<ProtectedRoute permission="prestamo_llaves.view_activo" />}>
+                <Route path="keys" element={<Assets />} />
               </Route>
 
               {/* Establecimientos */}
@@ -90,7 +90,9 @@ function App() {
                 <Route path="contracts/:id" element={<ContractDetail />} />
               </Route>
 
-              <Route path="services" element={<ServicesDashboard />} />
+              <Route element={<ProtectedRoute permission="servicios.view_proveedor" />}>
+                <Route path="services" element={<ServicesDashboard />} />
+              </Route>
 
               <Route element={<ProtectedRoute permission="servicios.view_proveedor" />}>
                 <Route path="services/providers" element={<Providers />} />
@@ -139,16 +141,26 @@ function App() {
               </Route>
 
               {/* Tesorería */}
-              <Route path="tesoreria" element={<RemuneracionesDashboard />} />
+              <Route element={<ProtectedRoute permission="remuneraciones.view_remuneracion" />}>
+                <Route path="tesoreria" element={<RemuneracionesDashboard />} />
+              </Route>
 
               {/* Otros */}
-              <Route path="licitaciones" element={<LicitacionesDashboard />} />
-              <Route path="orden-compra" element={<OCDashboard />} />
-              <Route path="reservas" element={<ReservasDashboard />} />
-              <Route path="personal-ti" element={<PersonalTIDashboard />} />
+              <Route element={<ProtectedRoute permission="licitaciones.view_licitacionmp" />}>
+                <Route path="licitaciones" element={<LicitacionesDashboard />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="orden_compra.view_ordencompramp" />}>
+                <Route path="orden-compra" element={<OCDashboard />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="solicitudes_reservas.view_reserva" />}>
+                <Route path="reservas" element={<ReservasDashboard />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="personal_ti.view_personalti" />}>
+                <Route path="personal-ti" element={<PersonalTIDashboard />} />
+              </Route>
 
               {/* Administración */}
-              <Route element={<ProtectedRoute permission="auth.view_user" />}>
+              <Route element={<ProtectedRoute permission="auth.view_group" />}>
                 <Route path="admin/users" element={<UserManagement />} />
                 <Route path="admin/roles" element={<RolesManagement />} />
               </Route>

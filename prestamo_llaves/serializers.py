@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Establecimiento, Solicitante, Llave, Prestamo
+from .models import Establecimiento, Solicitante, Activo, Prestamo
 
 from establecimientos.serializers import EstablecimientoSerializer
 
@@ -21,13 +21,13 @@ class SolicitanteSerializer(serializers.ModelSerializer):
             }
         return None
 
-class LlaveSerializer(serializers.ModelSerializer):
+class ActivoSerializer(serializers.ModelSerializer):
     establecimiento_nombre = serializers.ReadOnlyField(source='establecimiento.nombre')
     disponible = serializers.SerializerMethodField()
     solicitante_actual = serializers.SerializerMethodField()
     
     class Meta:
-        model = Llave
+        model = Activo
         fields = '__all__'
 
     def get_disponible(self, obj):
@@ -41,7 +41,7 @@ class LlaveSerializer(serializers.ModelSerializer):
         return None
 
 class PrestamoSerializer(serializers.ModelSerializer):
-    llave_obj = LlaveSerializer(source='llave', read_only=True)
+    activo_obj = ActivoSerializer(source='activo', read_only=True)
     solicitante_obj = SolicitanteSerializer(source='solicitante', read_only=True)
     
     class Meta:

@@ -15,19 +15,7 @@ const FuncionariosDashboard = () => {
     const fetchStats = async () => {
         try {
             const response = await api.get('funcionarios/estadisticas/');
-<<<<<<< HEAD
-            const data = response.data;
-
-            setStats({
-                subdirecciones: data.total_subdirecciones,
-                departamentos: data.total_departamentos,
-                unidades: data.total_unidades,
-                grupos: data.total_grupos,
-                estadisticas: data
-            });
-=======
             setStats(response.data);
->>>>>>> origin/master
         } catch (error) {
             console.error('Error fetching stats:', error);
         } finally {

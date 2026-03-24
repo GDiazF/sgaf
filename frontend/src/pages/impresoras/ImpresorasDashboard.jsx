@@ -73,7 +73,6 @@ const PrinterCard = ({ printer, onRefresh, onEdit, onDelete }) => {
             {/* Status Accent Line */}
             <div className={`absolute left-0 top-0 bottom-0 w-1 ${status.bg}`} />
 
-<<<<<<< HEAD
             {/* Left: Info & Status Icon */}
             <div className="flex items-center gap-3 min-w-[200px] lg:w-[28%]">
                 <div className={`relative flex-shrink-0 w-8 h-8 rounded-lg ${status.iconBg} flex items-center justify-center transition-transform group-hover:scale-105 duration-500`}>
@@ -98,7 +97,8 @@ const PrinterCard = ({ printer, onRefresh, onEdit, onDelete }) => {
                         </div>
                     </div>
                 </div>
-=======
+            </div>
+
             {/* Hover Actions - More Integrated */}
             <div className="absolute top-4 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all z-20 translate-x-4 group-hover:translate-x-0">
                 {can('impresoras.change_printer') && (
@@ -107,7 +107,6 @@ const PrinterCard = ({ printer, onRefresh, onEdit, onDelete }) => {
                 {can('impresoras.delete_printer') && (
                     <button onClick={() => onDelete(printer.id)} className="p-2 bg-white shadow-xl border border-slate-100 text-slate-400 hover:text-rose-600 rounded-xl transition-all hover:scale-110 active:scale-95"><Trash2 className="w-3.5 h-3.5" /></button>
                 )}
->>>>>>> origin/master
             </div>
 
             {/* Middle: Toner Levels */}

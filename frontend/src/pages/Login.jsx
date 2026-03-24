@@ -20,6 +20,7 @@ const Login = () => {
             await login(username, password);
             navigate('/');
         } catch (err) {
+            console.error('Error during login:', err);
             setError('Credenciales inválidas. Intente nuevamente.');
         } finally {
             setIsLoading(false);

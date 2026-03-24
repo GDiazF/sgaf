@@ -21,6 +21,7 @@ const LicitacionesDashboard = () => {
     const [hasSearched, setHasSearched] = useState(false);
     const [apiMeta, setApiMeta] = useState(null); // Metadata de la última búsqueda
     const [showFilters, setShowFilters] = useState(false);
+    const [loadingTime, setLoadingTime] = useState(0);
 
     const [following, setFollowing] = useState(() => {
         const saved = localStorage.getItem('slep_following');
@@ -49,8 +50,31 @@ const LicitacionesDashboard = () => {
         localStorage.setItem('slep_following', JSON.stringify(following));
     }, [following]);
 
+    // Timer para feedback de carga
+    useEffect(() => {
+        let interval;
+        if (loading) {
+            setLoadingTime(0);
+            interval = setInterval(() => {
+                setLoadingTime(prev => prev + 1);
+            }, 1000);
+        } else {
+            setLoadingTime(0);
+        }
+        return () => clearInterval(interval);
+    }, [loading]);
+
+    const getLoadingMessage = () => {
+        if (loadingTime < 5) return "Conectando con Mercado Público...";
+        if (loadingTime < 15) return "Sincronizando registros en paralelo...";
+        if (loadingTime < 30) return "MP está respondiendo más lento de lo habitual...";
+        if (loadingTime < 60) return "Saturación detectada en MP, reintentando canales...";
+        return "Conexión extendida, por favor espere unos segundos más...";
+    };
+
     const fetchData = async (params = {}) => {
         setLoading(true);
+        setLoadingTime(0);
         setError(null);
         setLics([]); // Limpiar resultados anteriores para dar feedback visual
         setFilterState('todos');
@@ -81,7 +105,7 @@ const LicitacionesDashboard = () => {
 
             const response = await api.get('licitaciones/visor/', {
                 params: requestParams,
-                timeout: 300000
+                timeout: 180000 // 180 segundos (3 minutos)
             });
 
             const data = response.data;
@@ -222,17 +246,17 @@ const LicitacionesDashboard = () => {
     ];
 
     return (
-        <div className="max-w-[1600px] mx-auto px-4 py-8 space-y-10">
+        <div className="max-w-7xl mx-auto px-4 py-4 space-y-8">
             {/* Header */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-slate-200/60 pb-10">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-slate-200/60 pb-5">
                 <div className="flex items-center gap-5">
-                    <div className="p-5 bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[2rem] shadow-2xl shadow-indigo-200 text-white relative overflow-hidden">
+                    <div className="p-2.5 bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl shadow-2xl shadow-indigo-200 text-white relative overflow-hidden">
                         <motion.div animate={{ rotate: 360 }} transition={{ duration: 20, repeat: Infinity, ease: "linear" }} className="absolute -top-4 -right-4 w-12 h-12 bg-white/10 rounded-full blur-xl" />
-                        <FileStack className="w-9 h-9 relative z-10" />
+                        <FileStack className="w-5 h-5 relative z-10" />
                     </div>
                     <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">Visor de Licitaciones</h1>
-                        <p className="text-xs font-bold text-slate-400 mt-2 uppercase tracking-[0.3em]">SLEP Iquique • Centro de Inteligencia Técnica</p>
+                        <h1 className="text-base font-bold text-slate-900 tracking-tighter uppercase leading-none">Visor de Licitaciones</h1>
+                        <p className="text-[10px] font-medium text-slate-400 mt-2 uppercase tracking-[0.3em]">SLEP Iquique • Centro de Inteligencia Técnica</p>
                     </div>
                 </div>
 
@@ -241,23 +265,23 @@ const LicitacionesDashboard = () => {
 
             {/* Search Panel */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                <div className="xl:col-span-2 bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-2xl space-y-8 relative overflow-hidden">
+                <div className="xl:col-span-2 bg-white p-5 rounded-2xl border border-slate-100 shadow-2xl space-y-6 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50/50 rounded-full blur-[100px] -mr-32 -mt-32" />
 
                     <div className="flex flex-col md:flex-row items-end gap-6 relative z-10">
                         <div className="flex-1 flex gap-4">
                             <div className="flex-1 space-y-3">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Fecha Inicio</label>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-4">Fecha Inicio</label>
                                 <div className="relative">
                                     <Calendar className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-500" />
-                                    <input type="date" value={selectedStartDate} onChange={(e) => setSelectedStartDate(e.target.value)} className="w-full pl-16 pr-8 py-5 bg-slate-50 rounded-3xl border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-bold text-[13px] text-slate-700" />
+                                    <input type="date" value={selectedStartDate} onChange={(e) => setSelectedStartDate(e.target.value)} className="w-full pl-16 pr-8 py-5 bg-slate-50 rounded-3xl border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-medium text-xs text-slate-700" />
                                 </div>
                             </div>
                             <div className="flex-1 space-y-3">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Fecha Fin</label>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-4">Fecha Fin</label>
                                 <div className="relative">
                                     <Calendar className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-500" />
-                                    <input type="date" value={selectedEndDate} onChange={(e) => setSelectedEndDate(e.target.value)} className="w-full pl-16 pr-8 py-5 bg-slate-50 rounded-3xl border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-bold text-[13px] text-slate-700" />
+                                    <input type="date" value={selectedEndDate} onChange={(e) => setSelectedEndDate(e.target.value)} className="w-full pl-16 pr-8 py-5 bg-slate-50 rounded-3xl border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-medium text-xs text-slate-700" />
                                 </div>
                             </div>
                         </div>
@@ -265,32 +289,32 @@ const LicitacionesDashboard = () => {
                         <button
                             onClick={() => fetchData()}
                             disabled={loading}
-                            className="w-full px-12 py-5 bg-indigo-600 text-white rounded-3xl font-black text-[12px] uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0 flex items-center justify-center gap-3"
+                            className="w-full px-12 py-3 bg-indigo-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0 flex items-center justify-center gap-3"
                         >
                             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
                             Consultar Panel
                         </button>
                     </div>
 
-                    <div className="p-6 bg-amber-50 border border-amber-100 rounded-[2rem] flex items-center gap-5">
+                    <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl flex items-center gap-5">
                         <div className="p-3 bg-amber-500 rounded-2xl text-white shrink-0">
                             <AlertCircle className="w-6 h-6" />
                         </div>
-                        <p className="text-[10px] font-black text-amber-900 uppercase leading-loose italic">
+                        <p className="text-[10px] font-bold text-amber-900 uppercase leading-loose italic">
                             ATENCIÓN: LA SINCRONIZACIÓN POR RANGO ESCANEA FECHA POR FECHA. ESTO PUEDE TARDAR UNOS MINUTOS SEGÚN EL PERIODO.
                         </p>
                     </div>
                 </div>
 
-                <div className="bg-slate-900 p-10 rounded-[3.5rem] shadow-2xl flex flex-col justify-center space-y-6 relative overflow-hidden">
+                <div className="bg-slate-900 p-5 rounded-2xl shadow-2xl flex flex-col justify-center space-y-6 relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-violet-500" />
                     <div>
-                        <h3 className="text-white text-xl font-black uppercase tracking-tighter mb-2">Búsqueda Directa</h3>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Localice una ficha por su ID técnico</p>
+                        <h3 className="text-white text-lg font-bold uppercase tracking-tighter mb-2">Búsqueda Directa</h3>
+                        <p className="text-[10px] text-slate-500 font-medium uppercase tracking-widest">Localice una ficha por su ID técnico</p>
                     </div>
                     <form onSubmit={handleSearchByCode} className="space-y-4">
-                        <input type="text" value={searchCode} onChange={(e) => setSearchCode(e.target.value)} placeholder="EJ: 1820906-6-LP26" className="w-full px-8 py-5 bg-white/5 rounded-3xl border border-white/10 text-white font-bold outline-none focus:border-indigo-500/50 transition-all placeholder:text-slate-600" />
-                        <button type="submit" disabled={loading} className="w-full py-5 bg-white text-slate-900 rounded-3xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-slate-100 transition-all flex items-center justify-center gap-3 disabled:opacity-50">
+                        <input type="text" value={searchCode} onChange={(e) => setSearchCode(e.target.value)} placeholder="EJ: 1820906-6-LP26" className="w-full px-4 py-3 bg-white/5 rounded-xl border border-white/10 text-white font-medium outline-none focus:border-indigo-500/50 transition-all placeholder:text-slate-600" />
+                        <button type="submit" disabled={loading} className="w-full py-3 bg-white text-slate-900 rounded-xl font-bold text-[8px] uppercase tracking-[0.2em] hover:bg-slate-100 transition-all flex items-center justify-center gap-3 disabled:opacity-50">
                             Consultar Código <ArrowUpRight className="w-4 h-4" />
                         </button>
                     </form>
@@ -307,16 +331,16 @@ const LicitacionesDashboard = () => {
                         { label: 'Adjudicadas', value: stats.adjudicadas, icon: <CheckCircle2 className="w-4 h-4" />, accent: 'violet' },
                         { label: 'Con Detalle', value: stats.conDetalle, icon: <Zap className="w-4 h-4" />, accent: 'rose' },
                     ].map((s, i) => (
-                        <div key={i} className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm hover:shadow-md transition-all flex flex-col gap-4 relative overflow-hidden group">
+                        <div key={i} className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col gap-4 relative overflow-hidden group">
                             <div className="flex items-center gap-3">
                                 <div className={`p-2.5 rounded-xl bg-slate-50 text-slate-400 group-hover:bg-${s.accent}-50 group-hover:text-${s.accent}-600 transition-colors`}>
                                     {s.icon}
                                 </div>
-                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{s.label}</span>
+                                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">{s.label}</span>
                             </div>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-4xl font-black text-slate-900 tracking-tighter">{s.value}</span>
-                                <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Registros</span>
+                                <span className="text-xl font-bold text-slate-900 tracking-tighter">{s.value}</span>
+                                <span className="text-[10px] font-medium text-slate-300 uppercase tracking-widest">Registros</span>
                             </div>
                             <div className={`absolute bottom-0 left-0 h-1 bg-${s.accent}-500 w-0 group-hover:w-full transition-all duration-500`} />
                         </div>
@@ -327,27 +351,27 @@ const LicitacionesDashboard = () => {
 
 
             {/* Dashboard Content */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 {/* Panel lateral: Siguiendo */}
-                <div className="lg:col-span-1 border-r border-slate-100 pr-10 space-y-8">
+                <div className="lg:col-span-1 border-r border-slate-100 pr-5 space-y-8">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-tighter flex items-center gap-2">
+                        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-tighter flex items-center gap-2">
                             <Star className="w-4 h-4 text-amber-500 fill-amber-500" /> Siguiendo
                         </h3>
-                        <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-[10px] font-bold">{following.length}</span>
+                        <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-[10px] font-medium">{following.length}</span>
                     </div>
 
                     <div className="space-y-4">
                         {following.length === 0 ? (
                             <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 text-center">
                                 <Star className="w-8 h-8 text-slate-200 mx-auto mb-3" />
-                                <p className="text-[10px] font-bold text-slate-400 uppercase leading-loose">Marca licitaciones con ★ para seguirlas aquí.</p>
+                                <p className="text-[9px] font-medium text-slate-400 uppercase leading-loose">Marca licitaciones con ★ para seguirlas aquí.</p>
                             </div>
                         ) : (
                             following.map(lic => (
-                                <div key={lic.CodigoExterno} onClick={() => fetchDetail(lic.CodigoExterno)} className="p-5 bg-white border border-slate-100 rounded-3xl shadow-sm hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group relative">
+                                <div key={lic.CodigoExterno} onClick={() => fetchDetail(lic.CodigoExterno)} className="p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group relative">
                                     <div className="flex justify-between items-start mb-1">
-                                        <p className="text-[8px] font-black text-indigo-600 uppercase">{lic.CodigoExterno}</p>
+                                        <p className="text-[8px] font-bold text-indigo-600 uppercase">{lic.CodigoExterno}</p>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -358,8 +382,8 @@ const LicitacionesDashboard = () => {
                                             <Star className="w-3.5 h-3.5 fill-amber-500" />
                                         </button>
                                     </div>
-                                    <h4 className="text-[11px] font-black text-slate-800 uppercase line-clamp-2 mb-2 group-hover:text-indigo-600 leading-tight pr-4">{lic.Nombre}</h4>
-                                    <div className="flex items-center justify-between text-[8px] font-bold text-slate-400 uppercase">
+                                    <h4 className="text-[11px] font-bold text-slate-800 uppercase line-clamp-2 mb-2 group-hover:text-indigo-600 leading-tight pr-4">{lic.Nombre}</h4>
+                                    <div className="flex items-center justify-between text-[8px] font-medium text-slate-400 uppercase">
                                         <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {formatDate(lic.Fechas?.FechaCierre || lic.FechaCierre)}</span>
                                         <span className={`px-2 py-0.5 rounded-full border text-[8px] ${getStatusConfig(lic.Estado, lic.CodigoEstado).color}`}>{lic.Estado || getStatusConfig(lic.Estado, lic.CodigoEstado).label}</span>
                                     </div>
@@ -374,7 +398,7 @@ const LicitacionesDashboard = () => {
                     {/* Filtros de estado local */}
                     {hasSearched && lics.length > 0 && (
                         <div className="flex flex-col space-y-4">
-                            <div className="flex items-center justify-between flex-wrap gap-4 bg-slate-50/50 p-4 rounded-[2rem] border border-slate-100">
+                            <div className="flex items-center justify-between flex-wrap gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
                                 <div className="flex items-center gap-3 flex-wrap">
                                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 ml-2">
                                         <Filter className="w-3 h-3" /> Filtrar resultados:
@@ -425,8 +449,18 @@ const LicitacionesDashboard = () => {
                                 </p>
                                 <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-2 text-[9px] font-bold text-slate-300 uppercase italic">
-                                        <Hash className="w-3 h-3" /> Ticket: {ticket.substring(0, 12)}...
+                                        <Hash className="w-3 h-3" /> Ticket: {ticket ? String(ticket).substring(0, 12) : '---'}...
                                     </div>
+                                    <button
+                                        onClick={() => {
+                                            localStorage.removeItem('mp_ticket');
+                                            window.location.reload();
+                                        }}
+                                        className="text-[8px] font-black text-indigo-400 hover:text-indigo-600 uppercase underline decoration-dotted"
+                                        title="Limpiar ticket guardado y usar el pool por defecto"
+                                    >
+                                        Reset
+                                    </button>
                                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                 </div>
                             </div>
@@ -437,13 +471,17 @@ const LicitacionesDashboard = () => {
                         <div className="py-40 flex flex-col items-center justify-center space-y-6">
                             <div className="relative">
                                 <RefreshCcw className="w-12 h-12 text-indigo-600 animate-spin" />
-                                <div className="absolute inset-0 w-12 h-12 rounded-full bg-indigo-100 animate-ping opacity-30" />
+                                <div className="absolute -bottom-2 -right-2 bg-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg">
+                                    {loadingTime}s
+                                </div>
                             </div>
-                            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Sincronizando con Mercado Público...</h3>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Enriqueciendo fichas técnicas en paralelo</p>
+                            <div className="text-center space-y-2">
+                                <h3 className="text-lg font-bold text-slate-800 uppercase tracking-tighter">{getLoadingMessage()}</h3>
+                                <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">Enriqueciendo fichas técnicas • Canal Seguro</p>
+                            </div>
                         </div>
                     ) : filteredLics.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {filteredLics.map(lic => {
                                 const status = getStatusConfig(lic.Estado, lic.CodigoEstado);
                                 const isFollowing = following.some(f => f.CodigoExterno === lic.CodigoExterno);
@@ -455,7 +493,7 @@ const LicitacionesDashboard = () => {
                                         key={lic.CodigoExterno}
                                         initial={{ opacity: 0, y: 20 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        className="bg-white rounded-[3rem] border border-slate-100 shadow-xl overflow-hidden group hover:border-indigo-300 hover:shadow-2xl transition-all duration-500 flex flex-col relative"
+                                        className="bg-white rounded-xl border border-slate-100 shadow-xl overflow-hidden group hover:border-indigo-300 hover:shadow-2xl transition-all duration-500 flex flex-col relative"
                                     >
                                         {/* Indicador de enriquecimiento */}
                                         {lic._has_full_detail && (
@@ -482,15 +520,15 @@ const LicitacionesDashboard = () => {
                                             </button>
                                         </div>
 
-                                        <div className="p-9 pb-6 flex-1 flex flex-col">
+                                        <div className="p-5 pb-4 flex-1 flex flex-col">
                                             {/* Badges */}
                                             <div className="flex gap-2 mb-5 flex-wrap pr-24">
-                                                <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border flex items-center gap-1.5 ${status.color}`}>
+                                                <span className={`px-3 py-1 rounded-xl text-[9px] font-bold uppercase tracking-widest border flex items-center gap-1.5 ${status.color}`}>
                                                     <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
                                                     {status.label}
                                                 </span>
                                                 {lic._has_full_detail && (
-                                                    <span className="px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center gap-1">
+                                                    <span className="px-3 py-1 rounded-xl text-[9px] font-bold uppercase tracking-widest bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center gap-1">
                                                         <Zap className="w-3 h-3" /> Full
                                                     </span>
                                                 )}
@@ -498,13 +536,13 @@ const LicitacionesDashboard = () => {
 
                                             {/* Título */}
                                             <div className="flex-1">
-                                                <h3 className="text-lg font-black text-slate-900 uppercase leading-[1.15] mb-3 group-hover:text-indigo-600 transition-colors line-clamp-2">
+                                                <h3 className="text-sm font-bold text-slate-900 uppercase leading-[1.15] mb-3 group-hover:text-indigo-600 transition-colors line-clamp-2">
                                                     {lic.Nombre}
                                                 </h3>
 
                                                 {/* Código e Institución */}
                                                 <div className="flex items-center gap-3 mb-6">
-                                                    <div className="text-[10px] font-black text-indigo-600 uppercase flex items-center gap-1.5 tracking-tighter bg-indigo-50 px-3 py-1 rounded-lg">
+                                                    <div className="text-[10px] font-bold text-indigo-600 uppercase flex items-center gap-1.5 tracking-tighter bg-indigo-50 px-3 py-1 rounded-lg">
                                                         {lic.CodigoExterno}
                                                     </div>
                                                     <div className="text-[9px] font-bold text-slate-400 uppercase truncate max-w-[150px]">
@@ -518,14 +556,14 @@ const LicitacionesDashboard = () => {
                                                 <div className="flex justify-between items-end">
                                                     <div>
                                                         <p className="text-[7px] font-black text-slate-300 uppercase tracking-widest mb-1">Creación</p>
-                                                        <p className="text-[10px] font-black text-slate-600 flex items-center gap-1.5">
+                                                        <p className="text-[10px] font-bold text-slate-600 flex items-center gap-1.5">
                                                             <Calendar className="w-3 h-3 text-indigo-300" />
                                                             {formatDate(lic.Fechas?.FechaCreacion)}
                                                         </p>
                                                     </div>
                                                     <div className="text-right">
                                                         <p className="text-[7px] font-black text-amber-400 uppercase tracking-widest mb-1 text-right">Cierre</p>
-                                                        <p className="text-[10px] font-black text-slate-900 flex items-center justify-end gap-1.5">
+                                                        <p className="text-[10px] font-bold text-slate-900 flex items-center justify-end gap-1.5">
                                                             {formatDate(lic.Fechas?.FechaCierre || lic.FechaCierre)}
                                                             <Clock className="w-3 h-3 text-amber-500" />
                                                         </p>
@@ -534,7 +572,7 @@ const LicitacionesDashboard = () => {
 
                                                 <button
                                                     onClick={() => fetchDetail(lic.CodigoExterno)}
-                                                    className="w-full py-5 bg-slate-900 text-white rounded-[2rem] text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all flex items-center justify-center gap-3 shadow-xl hover:shadow-indigo-200 group-hover:-translate-y-1"
+                                                    className="w-full py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-600 transition-all flex items-center justify-center gap-3 shadow-xl hover:shadow-indigo-200 group-hover:-translate-y-1"
                                                 >
                                                     Ver Detalles Full <ArrowUpRight className="w-4 h-4" />
                                                 </button>
@@ -545,9 +583,9 @@ const LicitacionesDashboard = () => {
                             })}
                         </div>
                     ) : (
-                        <div className="py-40 flex flex-col items-center justify-center text-center space-y-6 bg-slate-50/50 rounded-[4rem] border border-dashed border-slate-200">
+                        <div className="py-20 flex flex-col items-center justify-center text-center space-y-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
                             <Search className="w-12 h-12 text-slate-300" />
-                            <h3 className="text-2xl font-black text-slate-300 uppercase tracking-tighter">
+                            <h3 className="text-xl font-bold text-slate-300 uppercase tracking-tighter">
                                 {error ? "Error al Sincronizar" :
                                     hasSearched ? "Sin Resultados" : "Visor Listo"}
                             </h3>
@@ -574,23 +612,23 @@ const LicitacionesDashboard = () => {
                             initial={{ opacity: 0, scale: 0.92, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.92, y: 20 }}
-                            className="relative w-full max-w-6xl bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+                            className="relative w-full max-w-6xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
                         >
                             {/* Modal Header */}
                             <div className="p-8 border-b border-slate-100 flex items-start justify-between gap-6 shrink-0">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex gap-3 mb-3 flex-wrap">
-                                        <span className="bg-indigo-600 text-white px-4 py-1.5 rounded-xl text-[10px] font-black font-mono">{selectedLic.CodigoExterno}</span>
-                                        <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black border ${getStatusConfig(selectedLic.Estado, selectedLic.CodigoEstado).color}`}>
+                                        <span className="bg-indigo-600 text-white px-4 py-1.5 rounded-xl text-[10px] font-bold font-mono">{selectedLic.CodigoExterno}</span>
+                                        <span className={`px-4 py-1.5 rounded-xl text-[10px] font-bold border ${getStatusConfig(selectedLic.Estado, selectedLic.CodigoEstado).color}`}>
                                             {getStatusConfig(selectedLic.Estado, selectedLic.CodigoEstado).label}
                                         </span>
                                         {selectedLic._has_full_detail && (
-                                            <span className="bg-violet-100 text-violet-700 border border-violet-200 px-4 py-1.5 rounded-xl text-[10px] font-black flex items-center gap-1.5">
+                                            <span className="bg-violet-100 text-violet-700 border border-violet-200 px-4 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1.5">
                                                 <Zap className="w-3 h-3" /> Ficha Enriquecida
                                             </span>
                                         )}
                                     </div>
-                                    <h2 className="text-2xl font-black text-slate-900 uppercase leading-tight mb-2">{selectedLic.Nombre || 'Cargando Técnica...'}</h2>
+                                    <h2 className="text-lg font-bold text-slate-900 uppercase leading-tight mb-2">{selectedLic.Nombre || 'Cargando Técnica...'}</h2>
                                     <p className="text-xs text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
                                         <Landmark className="w-4 h-4" />
                                         {selectedLic.Comprador?.NombreOrganismo || selectedLic.OrganismoNombre || '---'}
@@ -606,7 +644,7 @@ const LicitacionesDashboard = () => {
                                 {selectedLic._loading ? (
                                     <div className="py-40 flex flex-col items-center justify-center space-y-6">
                                         <RefreshCcw className="w-12 h-12 text-indigo-600 animate-spin" />
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recuperando Ficha Técnica desde Mercado Público...</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recuperando Ficha Técnica desde Mercado Público...</p>
                                     </div>
                                 ) : (
                                     <>
@@ -731,8 +769,8 @@ const LicitacionesDashboard = () => {
                                                 <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
                                                     <Package className="w-4 h-4" /> Productos/Servicios Solicitados ({selectedLic.Items.Cantidad})
                                                 </h3>
-                                                <div className="overflow-hidden border border-slate-100 rounded-3xl">
-                                                    <table className="w-full text-left text-xs">
+                                                <div className="overflow-x-auto border border-slate-100 rounded-3xl">
+                                                    <table className="w-full text-left text-xs whitespace-nowrap">
                                                         <thead className="bg-slate-50 text-slate-400 uppercase text-[9px]">
                                                             <tr>
                                                                 <th className="p-4 font-black tracking-widest">Código</th>
@@ -765,8 +803,8 @@ const LicitacionesDashboard = () => {
                                                 <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
                                                     <Package className="w-4 h-4" /> Productos/Servicios Solicitados
                                                 </h3>
-                                                <div className="overflow-hidden border border-slate-100 rounded-3xl">
-                                                    <table className="w-full text-left text-xs">
+                                                <div className="overflow-x-auto border border-slate-100 rounded-3xl">
+                                                    <table className="w-full text-left text-xs whitespace-nowrap">
                                                         <thead className="bg-slate-50 text-slate-400 uppercase text-[9px]">
                                                             <tr>
                                                                 <th className="p-4 font-black tracking-widest">Código</th>

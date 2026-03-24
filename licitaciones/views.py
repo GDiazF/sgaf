@@ -143,7 +143,7 @@ def mercado_publico_request(endpoint, params, user_ticket=None):
     
     import random
     current_ticket_idx = random.randint(0, len(tickets_pool) - 1)
-    max_retries = 5 
+    max_retries = 3 
     
     # --- LOGICA DE CACHE PERSISTENTE ---
     cache_key = None
@@ -185,7 +185,7 @@ def mercado_publico_request(endpoint, params, user_ticket=None):
             url = f"https://api.mercadopublico.cl/servicios/v1/publico/{endpoint}.json"
             print(f"DEBUG API: {endpoint} | Ticket {active_ticket[:8]} | Attempt {attempt+1}")
             
-            res = session.get(url, params=request_params, timeout=15, verify=False)
+            res = session.get(url, params=request_params, timeout=10, verify=False)
             
             if res.status_code == 500 or (res.status_code == 200 and '"Codigo":10500' in res.text):
                 current_ticket_idx += 1

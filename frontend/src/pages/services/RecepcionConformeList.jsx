@@ -29,6 +29,7 @@ const RecepcionConformeList = () => {
 
     // History Modal State
     const [historyRC, setHistoryRC] = useState(null);
+    const [processingIds, setProcessingIds] = useState([]);
 
     const fetchData = async (page = 1, search = '', order = ordering) => {
         setLoading(true);
@@ -43,10 +44,13 @@ const RecepcionConformeList = () => {
                 api.get('grupos/', { params: { page_size: 1000 } })
             ]);
 
-            setRcs(rcRes.data.results);
-            setTotalCount(rcRes.data.count);
-            setTotalPages(Math.ceil(rcRes.data.count / 10));
-            setGroups(grpRes.data.results || grpRes.data);
+            const rcData = rcRes.data.results || rcRes.data;
+            const rcCount = rcRes.data.count || (Array.isArray(rcRes.data) ? rcRes.data.length : 0);
+
+            setRcs(Array.isArray(rcData) ? rcData : []);
+            setTotalCount(rcCount);
+            setTotalPages(Math.ceil(rcCount / 10) || 1);
+            setGroups(grpRes.data.results || grpRes.data || []);
 
         } catch (error) {
             console.error("Error fetching RCs:", error);
@@ -120,7 +124,7 @@ const RecepcionConformeList = () => {
         setEditingRC(rc);
         setEditForm({
             observaciones: rc.observaciones || '',
-            registros_ids: rc.registros.map(r => r.id),
+            registros_ids: (rc.registros || []).map(r => r.id),
             grupo_firmante: rc.grupo_firmante || '',
             firmante: rc.firmante || '',
             folio: rc.folio || ''
@@ -167,22 +171,32 @@ const RecepcionConformeList = () => {
     };
 
     const handleAnulate = async (rc) => {
-        if (!window.confirm(`¿Está seguro de que desea ANULAR la RC ${rc.folio}?\n\nEsta acción liberará todos los pagos asociados para que puedan ser utilizados en otro documento.\nEl folio quedará marcado como ANULADA.`)) {
+        const confirmMsg = `¿Está seguro de que desea ANULAR la RC ${rc.folio || rc.id}?\n\nEsta acción liberará todos los pagos asociados para que puedan ser utilizados en otro documento.\nEl folio quedará marcado como ANULADA.`;
+
+        if (!window.confirm(confirmMsg)) {
             return;
         }
 
+        setProcessingIds(prev => [...prev, rc.id]);
         try {
             await api.post(`recepciones-conformes/${rc.id}/anular/`);
-            fetchData(currentPage, searchQuery);
+            await fetchData(currentPage, searchQuery, ordering);
             alert("RC anulada exitosamente.");
         } catch (error) {
             console.error(error);
-            alert("Error al anular la RC: " + (error.response?.data?.error || "Error desconocido"));
+            const errorMsg = error.response?.data?.error || error.response?.data?.detail || "Error desconocido";
+            alert("Error al anular la RC: " + errorMsg);
+        } finally {
+            setProcessingIds(prev => prev.filter(id => id !== rc.id));
         }
     };
 
-    // No client-side filtering anymore
-    const filteredData = rcs;
+    // Handle frontend-side pagination if the backend returns a plain array (non-paginated)
+    const filteredData = Array.isArray(rcs)
+        ? (rcs.length > 10 && !rcs.some(r => r === undefined) && totalCount === rcs.length
+            ? rcs.slice((currentPage - 1) * 10, currentPage * 10)
+            : rcs)
+        : [];
 
     const formatDate = (dateString) => {
         if (!dateString) return '-';
@@ -234,7 +248,7 @@ const RecepcionConformeList = () => {
                                         <div className="flex flex-col">
                                             <div className="font-mono text-xs font-bold text-slate-800 flex items-center gap-2">
                                                 <FileText className={`w-3.5 h-3.5 ${item.estado === 'ANULADA' ? 'text-red-400' : 'text-slate-400'}`} />
-                                                <span className={item.estado === 'ANULADA' ? 'line-through text-slate-500' : ''}>{item.folio}</span>
+                                                <span className={item.estado === 'ANULADA' ? 'line-through text-slate-500' : ''}>{item.folio || 'S/F'}</span>
                                             </div>
                                             {item.estado === 'ANULADA' && (
                                                 <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider mt-1">ANULADA</span>
@@ -251,7 +265,7 @@ const RecepcionConformeList = () => {
                                         <div className="flex flex-col">
                                             <div className="flex items-center gap-2 font-medium text-slate-800">
                                                 <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                                                {item.proveedor_nombre}
+                                                {item.proveedor_nombre || 'S/P'}
                                             </div>
                                             {item.tipo_proveedor_nombre && (
                                                 <div className="text-[10px] text-slate-500 ml-5.5 mt-0.5">
@@ -296,10 +310,11 @@ const RecepcionConformeList = () => {
                                                     {can('servicios.delete_recepcionconforme') && (
                                                         <button
                                                             onClick={() => handleAnulate(item)}
-                                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                            disabled={processingIds.includes(item.id)}
+                                                            className={`p-1.5 rounded-lg transition-all ${processingIds.includes(item.id) ? 'text-slate-300 cursor-not-allowed' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}
                                                             title="Anular RC"
                                                         >
-                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                            <Trash2 className={`w-3.5 h-3.5 ${processingIds.includes(item.id) ? 'animate-pulse' : ''}`} />
                                                         </button>
                                                     )}
                                                 </>
@@ -355,14 +370,14 @@ const RecepcionConformeList = () => {
                             <div className="flex-1 overflow-auto p-6">
                                 <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-300 before:to-transparent">
 
-                                    {historyRC.historial && historyRC.historial.length > 0 ? (
+                                    {historyRC?.historial && historyRC.historial.length > 0 ? (
                                         historyRC.historial.map((ev, i) => (
                                             <div key={i} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                                                 {/* Icon */}
                                                 <div className="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-slate-50 shadow shrink-0 md:order-1 md:group-odd:translate-x-1/2 md:group-even:-translate-x-1/2 z-10">
-                                                    {ev.accion === 'CREACION' ? (
+                                                    {ev?.accion === 'CREACION' ? (
                                                         <div className="w-3 h-3 bg-green-500 rounded-full" />
-                                                    ) : ev.accion === 'MODIFICACION_PAGOS' ? (
+                                                    ) : ev?.accion === 'MODIFICACION_PAGOS' ? (
                                                         <div className="w-3 h-3 bg-red-500 rounded-full" />
                                                     ) : (
                                                         <div className="w-3 h-3 bg-blue-500 rounded-full" />
@@ -372,15 +387,15 @@ const RecepcionConformeList = () => {
                                                 {/* Content */}
                                                 <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
                                                     <div className="flex items-center justify-between space-x-2 mb-1">
-                                                        <div className="font-bold text-slate-900 text-sm capitalize">{ev.accion.replace('_', ' ').toLowerCase()}</div>
-                                                        <time className="font-mono text-xs text-slate-500">{formatDateTime(ev.fecha)}</time>
+                                                        <div className="font-bold text-slate-900 text-sm capitalize">{ev?.accion?.replace('_', ' ').toLowerCase() || 'Acción'}</div>
+                                                        <time className="font-mono text-xs text-slate-500">{formatDateTime(ev?.fecha)}</time>
                                                     </div>
                                                     <div className="text-sm text-slate-600 break-words leading-relaxed">
-                                                        {ev.detalle}
+                                                        {ev?.detalle}
                                                     </div>
                                                     <div className="mt-2 flex items-center gap-1 text-xs text-slate-400">
                                                         <User className="w-3 h-3" />
-                                                        {ev.usuario || 'Sistema'}
+                                                        {ev?.usuario || 'Sistema'}
                                                     </div>
                                                 </div>
                                             </div>
@@ -474,10 +489,13 @@ const RecepcionConformeList = () => {
                                         value={editForm.firmante}
                                         onChange={e => setEditForm({ ...editForm, firmante: e.target.value })}
                                         disabled={!editForm.grupo_firmante}
-                                        options={groups.find(g => g.id.toString() === editForm.grupo_firmante?.toString())?.miembros_detalle?.map(m => ({
-                                            value: m.id,
-                                            label: `${m.nombre} ${m.id === groups.find(g => g.id.toString() === editForm.grupo_firmante.toString())?.jefe ? '(Jefe)' : ''}`
-                                        })) || []}
+                                        options={groups.find(g => g.id.toString() === editForm.grupo_firmante?.toString())?.miembros_detalle?.map(m => {
+                                            const group = groups.find(g => g.id.toString() === editForm.grupo_firmante?.toString());
+                                            return {
+                                                value: m.id,
+                                                label: `${m.nombre} ${m.id === group?.jefe ? '(Jefe)' : ''}`
+                                            };
+                                        }) || []}
                                         placeholder="Seleccione firmante..."
                                         inputClassName="bg-amber-50/50 border-amber-100 text-amber-700"
                                         labelClassName="text-amber-600"
@@ -498,23 +516,23 @@ const RecepcionConformeList = () => {
                                             </div>
                                         ) : (
                                             <div className="divide-y divide-slate-100">
-                                                {currentPayments.map(payment => (
-                                                    <div key={payment.id} className="p-4 flex items-center justify-between hover:bg-white transition-all group/pago">
+                                                {(currentPayments || []).map(payment => (
+                                                    <div key={payment?.id} className="p-4 flex items-center justify-between hover:bg-white transition-all group/pago">
                                                         <div className="flex-1 min-w-0 pr-4">
                                                             <div className="flex items-center gap-2 mb-1.5">
-                                                                <span className="font-mono text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 group-hover/pago:border-blue-200 group-hover/pago:bg-blue-50 transition-colors uppercase tracking-widest">{payment.nro_documento}</span>
+                                                                <span className="font-mono text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 group-hover/pago:border-blue-200 group-hover/pago:bg-blue-50 transition-colors uppercase tracking-widest">{payment?.nro_documento}</span>
                                                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 opacity-60">
                                                                     <Calendar className="w-3 h-3" />
-                                                                    {formatDate(payment.fecha_pago)}
+                                                                    {formatDate(payment?.fecha_pago)}
                                                                 </span>
                                                             </div>
-                                                            <div className="text-xs font-bold text-slate-700 truncate group-hover/pago:text-blue-800 transition-colors">{payment.servicio_detalle}</div>
+                                                            <div className="text-xs font-bold text-slate-700 truncate group-hover/pago:text-blue-800 transition-colors">{payment?.servicio_detalle}</div>
                                                         </div>
                                                         <div className="flex items-center gap-4">
-                                                            <div className="font-black text-sm text-slate-900">{formatCurrency(payment.monto_total)}</div>
+                                                            <div className="font-black text-sm text-slate-900">{formatCurrency(payment?.monto_total || 0)}</div>
                                                             <button
                                                                 type="button"
-                                                                onClick={() => handleRemovePayment(payment.id)}
+                                                                onClick={() => handleRemovePayment(payment?.id)}
                                                                 className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover/pago:opacity-100"
                                                                 title="Quitar pago de esta RC"
                                                             >

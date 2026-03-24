@@ -6,18 +6,26 @@ export const groupPermissions = (permissions) => {
 
     permissions.forEach(perm => {
         let module = 'Otros';
-        const name = perm.name.toLowerCase();
+        // Normalize to remove accents for easier matching
+        const name = perm.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const codename = (perm.codename || '').toLowerCase();
+
+        // Módulos del Navbar (Modelo Dummy eliminado)
 
         // Categorización por palabras clave en el nombre técnico de Django
         if (name.includes('llave') || name.includes('prestamo') || name.includes('solicitante')) module = 'Préstamo de Llaves';
         else if (name.includes('establecimiento')) module = 'Establecimientos';
         else if (name.includes('proveedor')) module = 'Proveedores';
         else if (name.includes('contrato') || name.includes('proceso') || name.includes('licitacion')) module = 'Contratos y Licitaciones';
+        else if (name.includes('orden de compra') || name.includes('ordencompra')) module = 'Órdenes de Compra';
+        else if (name.includes('reserva') || name.includes('bloqueo') || name.includes('recurso')) module = 'Reservas de Espacios';
+        else if (name.includes('personal ti') || name.includes('personalti')) module = 'Personal TI';
         else if (name.includes('servicio contratado') || name.includes('tipo documento') || name.includes('cdp')) module = 'Configuración Servicios';
         else if (name.includes('registro de pago') || name.includes('pago')) module = 'Pagos de Servicios';
         else if (name.includes('recepcion conforme')) module = 'Recepciones Conformes';
         else if (name.includes('factura adquisicion') || name.includes('adquisicion')) module = 'Adquisiciones';
         else if (name.includes('funcionario') || name.includes('subdireccion') || name.includes('departamento') || name.includes('unidad')) module = 'Personal y Estructura';
+        else if (name.includes('tesoreria') || name.includes('remuneracion')) module = 'Tesorería';
         else if (name.includes('impresora') || name.includes('printer')) module = 'Impresoras';
         else if (name.includes('vehiculo') || name.includes('registro mensual')) module = 'Vehículos';
         else if (name.includes('anexo')) module = 'Telecomunicaciones';
@@ -34,11 +42,18 @@ export const groupPermissions = (permissions) => {
  * Translates technical Django permission names to business-friendly labels.
  */
 export const getFriendlyPermName = (perm) => {
-    const codename = perm.codename;
-    const name = perm.name;
+    const codename = perm.codename || '';
+    const name = perm.name || '';
+
+    // Si es un permiso de módulo de Navbar, retornar el nombre directo ("Ver Módulo X") (Deprecado)
 
     // Mapas de traducción por acción
     const translations = {
+        'add_remuneracion': 'Agregar Tesorería',
+        'change_remuneracion': 'Editar Tesorería',
+        'delete_remuneracion': 'Eliminar Tesorería',
+        'view_remuneracion': 'Ver Tesorería',
+
         // Generales
         'view': 'Ver / Consultar',
         'add': 'Crear / Registrar',
@@ -83,7 +98,11 @@ export const getFriendlyPermName = (perm) => {
         'documentocontrato': 'Documentación de Contrato',
         'historialcontrato': 'Historial de Cambios en Contratos',
         'cdp': 'CDPs de Servicios',
-        'anexo': 'Anexos Telefónicos'
+        'anexo': 'Anexos Telefónicos',
+        'solicitudreserva': 'Solicitudes de Reserva',
+        'recursoreservable': 'Recursos (Salas/Vehículos)',
+        'bloqueohorario': 'Bloqueos de Horario',
+        'reservasetting': 'Ajustes de Reservas'
     };
 
     const modelKey = codename.split('_')[1];

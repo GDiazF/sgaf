@@ -49,7 +49,7 @@ const FacturasAdquisicionDashboard = () => {
     const fetchData = async (page = 1, search = '', order = ordering) => {
         setLoading(true);
         try {
-            const params = { page, search, ordering: order };
+            const params = { page, search, ordering: order, sin_contrato: 'true' };
             const [factRes, estRes, provRes, delRes, grpRes, typRes] = await Promise.all([
                 api.get('facturas-adquisicion/', { params }),
                 api.get('establecimientos/', { params: { page_size: 1000, activo: true } }),
@@ -231,7 +231,7 @@ const FacturasAdquisicionDashboard = () => {
             {/* Main Table with Premium Layout */}
             <div className="bg-white rounded-[1.5rem] shadow-lg shadow-slate-200/40 border border-slate-100 overflow-hidden">
                 <div className="overflow-x-auto overflow-y-hidden custom-scrollbar">
-                    <table className="w-full text-left">
+                    <table className="w-full text-left whitespace-nowrap">
                         <thead>
                             <tr className="bg-slate-50/50 border-b border-slate-100">
                                 <SortableHeader label="Folio" sortKey="id" currentOrdering={ordering} onSort={handleSort} className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400" />

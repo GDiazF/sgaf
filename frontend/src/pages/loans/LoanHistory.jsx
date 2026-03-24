@@ -131,7 +131,7 @@ const LoanHistory = () => {
                 <div className="flex-1">
                     <FilterBar
                         onSearch={handleSearch}
-                        placeholder="Buscar por llave, establecimiento o solicitante..."
+                        placeholder="Buscar por activo, establecimiento o solicitante..."
                         inputClassName="!shadow-none"
                     />
                 </div>
@@ -144,7 +144,7 @@ const LoanHistory = () => {
                     >
                         <option value="-fecha_prestamo">Recientes</option>
                         <option value="fecha_prestamo">Antiguos</option>
-                        <option value="llave__nombre">Llave</option>
+                        <option value="activo__nombre">Activo</option>
                         <option value="solicitante__nombre">Responsable</option>
                     </select>
                 </div>
@@ -158,8 +158,8 @@ const LoanHistory = () => {
                             <tr className="bg-slate-50/50 border-b border-slate-100">
                                 <th className="p-2.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] pl-8">Estado</th>
                                 <SortableHeader
-                                    label="Llave / Establecimiento"
-                                    sortKey="llave__nombre"
+                                    label="Activo / Establecimiento"
+                                    sortKey="activo__nombre"
                                     currentOrdering={ordering}
                                     onSort={handleSort}
                                     className="p-2.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]"
@@ -209,8 +209,8 @@ const LoanHistory = () => {
                                         )}
                                     </td>
                                     <td className="p-2.5">
-                                        <div className="font-bold text-slate-900 text-[11px] leading-tight">{loan.llave_obj?.nombre}</div>
-                                        <div className="text-[9px] text-slate-400 font-black uppercase tracking-wider mt-0">{loan.llave_obj?.establecimiento_nombre}</div>
+                                        <div className="font-bold text-slate-900 text-[11px] leading-tight">{loan.activo_obj?.nombre}</div>
+                                        <div className="text-[9px] text-slate-400 font-black uppercase tracking-wider mt-0">{loan.activo_obj?.establecimiento_nombre}</div>
                                     </td>
                                     <td className="p-2.5">
                                         <div className="text-[11px] font-bold text-slate-700 leading-tight">{loan.solicitante_obj?.nombre} {loan.solicitante_obj?.apellido}</div>

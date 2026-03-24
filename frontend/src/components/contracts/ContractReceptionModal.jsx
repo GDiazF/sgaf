@@ -29,10 +29,12 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
     };
 
     const [formData, setFormData] = useState(initialData);
+    const [isSplit, setIsSplit] = useState(false);
 
     useEffect(() => {
         if (isOpen && contract) {
             if (editingRC) {
+                setIsSplit(false);
                 setFormData({
                     ...editingRC,
                     periodo: editingRC.periodo ? editingRC.periodo.substring(0, 7) : '',
@@ -44,6 +46,7 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                     folio: editingRC.folio || ''
                 });
             } else {
+                setIsSplit(false);
                 setFormData({
                     ...initialData,
                     cdp: contract.cdp || '',
@@ -138,7 +141,7 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
             finalData.establecimientos = [];
         }
 
-        onSave(finalData);
+        onSave(finalData, isSplit);
     };
 
     return (
@@ -163,10 +166,10 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                             label="Folio RC"
                             icon={<FileText />}
                             name="folio"
-                            placeholder="Automático..."
+                            placeholder="Opcional (Manual)..."
                             value={formData.folio}
-                            readOnly
-                            inputClassName="bg-slate-50 font-mono opacity-60 cursor-not-allowed"
+                            onChange={handleChange}
+                            inputClassName="font-mono"
                         />
                         <FormInput
                             label="Nº CDP"
@@ -254,6 +257,28 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                                 Limpiar
                             </button>
                         </div>
+
+                        {/* Split Option Checkbox */}
+                        {!editingRC && formData.establecimientos?.length > 1 && (
+                            <div className="md:col-span-2 mt-2">
+                                <label className="flex items-start gap-3 p-3 bg-amber-50/50 rounded-xl border border-amber-100 cursor-pointer hover:bg-amber-50 transition-colors">
+                                    <input
+                                        type="checkbox"
+                                        checked={isSplit}
+                                        onChange={(e) => setIsSplit(e.target.checked)}
+                                        className="mt-0.5 rounded text-amber-600 focus:ring-amber-500 bg-white border-amber-300 w-4 h-4 cursor-pointer"
+                                    />
+                                    <div className="flex flex-col">
+                                        <span className="text-[11px] font-black text-amber-800 uppercase tracking-tight">
+                                            Generar recepciones individuales por establecimiento ({formData.establecimientos.length} RCs separadas)
+                                        </span>
+                                        <span className="text-[10px] text-amber-700/80 font-medium leading-tight mt-0.5">
+                                            Si se especifica un folio manual (ej. RCI-01), este se incrementará automáticamente (ej. RCI-02, RCI-03) por cada registro generado.
+                                        </span>
+                                    </div>
+                                </label>
+                            </div>
+                        )}
                     </div>
                 </div>
 

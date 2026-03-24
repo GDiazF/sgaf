@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, Key as KeyIcon, ChevronRight, Clock, User, Building, Calendar, ArrowRight, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, Search, Box as KeyIcon, ChevronRight, Clock, User, Building, Calendar, ArrowRight, CheckCircle2, XCircle } from 'lucide-react';
 import { usePermission } from '../../hooks/usePermission';
 import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '../../components/common/Pagination';
@@ -22,7 +22,7 @@ const Dashboard = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
-    const [totalKeys, setTotalKeys] = useState(0);
+    const [totalAssets, setTotalAssets] = useState(0);
     const [ordering, setOrdering] = useState('-fecha_prestamo');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -35,15 +35,15 @@ const Dashboard = () => {
                 active: 'true',
                 ordering: order
             };
-            const [loansRes, keysRes] = await Promise.all([
+            const [loansRes, assetsRes] = await Promise.all([
                 api.get('prestamos/', { params }),
-                api.get('llaves/')
+                api.get('activos/')
             ]);
 
             setLoans(loansRes.data.results || []);
             setTotalCount(loansRes.data.count || 0);
             setTotalPages(Math.ceil((loansRes.data.count || 0) / 10));
-            setTotalKeys(keysRes.data.count || 0);
+            setTotalAssets(assetsRes.data.count || 0);
         } catch (error) {
             console.error("Error fetching loans:", error);
             setLoans([]);
@@ -97,7 +97,7 @@ const Dashboard = () => {
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Gestión de Préstamos</h1>
-                    <p className="text-slate-500 font-medium text-xs mt-1.5">Monitoreo y control de llaves institucionales en circulación.</p>
+                    <p className="text-slate-500 font-medium text-xs mt-1.5">Monitoreo y control de activos institucionales en circulación.</p>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -139,18 +139,18 @@ const Dashboard = () => {
 
                 <div className="bg-white rounded-[1.5rem] p-6 border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-slate-300 transition-all">
                     <div className="flex items-center justify-between mb-4">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Total Llaves</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Total Activos</span>
                         <div className="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 flex items-center justify-center">
                             <KeyIcon className="w-4 h-4" />
                         </div>
                     </div>
                     <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-black text-slate-900 leading-none">{totalKeys}</span>
+                        <span className="text-4xl font-black text-slate-900 leading-none">{totalAssets}</span>
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">En Inventario</span>
                     </div>
                 </div>
 
-                {can('prestamo_llaves.view_llave') && (
+                {can('prestamo_llaves.view_activo') && (
                     <Link to="/keys" className="bg-white rounded-[1.5rem] p-6 border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-blue-500 transition-all hover:shadow-lg hover:shadow-blue-500/5">
                         <div className="flex items-center justify-between mb-4">
                             <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none">Gestión Inventario</span>
@@ -171,7 +171,7 @@ const Dashboard = () => {
                 <div className="flex-1">
                     <FilterBar
                         onSearch={handleSearch}
-                        placeholder="Buscar préstamos activos por RUT, responsable o llave..."
+                        placeholder="Buscar préstamos activos por RUT, responsable o activo..."
                         inputClassName="!shadow-none"
                     />
                 </div>
@@ -184,7 +184,7 @@ const Dashboard = () => {
                     >
                         <option value="-fecha_prestamo">Recientes</option>
                         <option value="fecha_prestamo">Antiguos</option>
-                        <option value="llave__nombre">Nombre Llave</option>
+                        <option value="activo__nombre">Nombre Activo</option>
                         <option value="solicitante__nombre">Responsable</option>
                     </select>
                 </div>
@@ -203,7 +203,7 @@ const Dashboard = () => {
                             <CheckCircle2 className="w-8 h-8 text-emerald-500" />
                         </div>
                         <h3 className="text-lg font-black text-slate-900">Todo en Orden</h3>
-                        <p className="text-slate-400 font-medium text-xs max-w-[240px] mt-1">No hay llaves en circulación. Todo el inventario está bajo resguardo.</p>
+                        <p className="text-slate-400 font-medium text-xs max-w-[240px] mt-1">No hay activos en circulación. Todo el inventario está bajo resguardo.</p>
                     </motion.div>
                 ) : (
                     <motion.div
@@ -268,10 +268,10 @@ const Dashboard = () => {
                                                             </div>
                                                             <div className="min-w-0">
                                                                 <p className="text-[13px] font-bold text-slate-800 leading-tight">
-                                                                    {loan.llave_obj?.nombre}
+                                                                    {loan.activo_obj?.nombre}
                                                                 </p>
                                                                 <p className="text-[8px] text-slate-400 font-black uppercase tracking-wider mt-0 truncate">
-                                                                    {loan.llave_obj?.establecimiento_nombre}
+                                                                    {loan.activo_obj?.establecimiento_nombre}
                                                                 </p>
                                                             </div>
                                                         </div>

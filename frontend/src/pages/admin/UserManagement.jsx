@@ -3,32 +3,11 @@ import api from '../../api';
 import { Users, Search, Edit2, Shield, ShieldCheck, X, Save, AlertCircle, Check, Loader2, ChevronDown, ChevronRight, UserCircle2, Mail, BadgeCheck, Activity, Trash2, Power, User, UserPlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePermission } from '../../hooks/usePermission';
+import { groupPermissions, getFriendlyPermName } from '../../utils/permissionUtils';
 import Pagination from '../../components/common/Pagination';
 import SortableHeader from '../../components/common/SortableHeader';
 import { formatRut, validateRut } from '../../utils/rutValidator';
 
-/**
- * Groups permissions by their predicted module for better UX
- */
-const groupPermissions = (permissions) => {
-    const groups = {};
-    permissions.forEach(perm => {
-        let module = 'General';
-        const name = perm.name.toLowerCase();
-        if (name.includes('llave') || name.includes('prestamo')) module = 'Préstamo de Llaves';
-        else if (name.includes('establecimiento')) module = 'Establecimientos';
-        else if (name.includes('servicio') || name.includes('proveedor')) module = 'Servicios y Proveedores';
-        else if (name.includes('contrato') || name.includes('factura') || name.includes('recepcion conforme')) module = 'Contratos y Facturación';
-        else if (name.includes('funcionario') || name.includes('persona')) module = 'Personal';
-        else if (name.includes('impresora')) module = 'Impresoras';
-        else if (name.includes('vehiculo') || name.includes('registro mensual')) module = 'Vehículos';
-        else if (name.includes('user') || name.includes('group') || name.includes('permission')) module = 'Seguridad y Usuarios';
-
-        if (!groups[module]) groups[module] = [];
-        groups[module].push(perm);
-    });
-    return groups;
-};
 
 const UserManagement = () => {
     const { can } = usePermission();
@@ -237,18 +216,9 @@ const UserManagement = () => {
                 </div>
             </div>
 
-            {/* Table View */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left whitespace-nowrap table-fixed">
-                        <colgroup>
-                            <col style={{ width: '120px' }} /> {/* Estado */}
-                            <col style={{ width: '150px' }} /> {/* Username */}
-                            <col style={{ width: '25%' }} />   {/* Nombre Completo */}
-                            <col style={{ width: '25%' }} />   {/* Email */}
-                            <col style={{ width: '20%' }} />   {/* Roles */}
-                            <col style={{ width: '120px' }} /> {/* Acciones */}
-                        </colgroup>
+                    <table className="w-full text-left whitespace-nowrap">
                         <thead className="bg-slate-50 border-b border-slate-200">
                             <tr>
                                 <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
@@ -334,7 +304,9 @@ const UserManagement = () => {
                             <p>No se encontraron usuarios.</p>
                         </div>
                     )}
+                </div>
 
+                <div className="p-4 border-t border-slate-100 bg-slate-50/30">
                     <Pagination
                         currentPage={currentPage}
                         totalPages={totalPages}
@@ -570,7 +542,7 @@ const UserManagement = () => {
                                                                         <div className={`w-4 h-4 rounded-md flex items-center justify-center shrink-0 ${selectedUser.user_permissions.includes(perm.id) ? 'bg-white/20 text-white' : 'bg-slate-100'}`}>
                                                                             {selectedUser.user_permissions.includes(perm.id) && <Check className="w-2.5 h-2.5" />}
                                                                         </div>
-                                                                        <span className="text-[10px] font-bold truncate leading-tight">{perm.name}</span>
+                                                                        <span className="text-[10px] font-bold truncate leading-tight">{getFriendlyPermName(perm)}</span>
                                                                     </button>
                                                                 ))}
                                                             </div>

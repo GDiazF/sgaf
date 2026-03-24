@@ -274,3 +274,4 @@ class FacturaAdquisicion(models.Model):
         verbose_name = "Factura de Adquisición"
         verbose_name_plural = "Facturas de Adquisición"
         ordering = ['-fecha_recepcion']
+
