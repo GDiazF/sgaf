@@ -12,10 +12,8 @@ const Layout = () => {
     const { can, hasRole } = usePermission();
     const [sidebarOpen, setSidebarOpen] = useState(true); // Desktop: Collapsed/Expanded
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // Mobile: Open/Closed
-    const [isSSGGOpen, setSSGGOpen] = useState(true); // Main SSGG group
-    const [isTesoreriaOpen, setTesoreriaOpen] = useState(false); // Tesoreria group
+    const [activeMainGroup, setActiveMainGroup] = useState(null); // 'ssgg', 'tesoreria', 'mp'
     const [activeSubMenu, setActiveSubMenu] = useState(null); // 'services' or 'loans'
-    const [isMPOpen, setMPOpen] = useState(false); // Mercado Público group
     const [isProfileOpen, setIsProfileOpen] = useState(false); // Header profile dropdown
     const [isOnline, setIsOnline] = useState(true); // Backend status
     const profileRef = useRef(null);
@@ -244,8 +242,11 @@ const Layout = () => {
                     {(can('contratos.view_contrato') || can('servicios.view_proveedor') || can('servicios.view_facturaadquisicion') || can('prestamo_llaves.view_prestamo') || can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('servicios.view_servicio') || can('servicios.view_registropago') || can('servicios.view_recepcionconforme') || can('servicios.view_cdp')) && (
                         <div>
                             <button
-                                onClick={() => setSSGGOpen(!isSSGGOpen)}
-                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${isSSGGOpen ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
+                                onClick={() => {
+                                    setActiveMainGroup(activeMainGroup === 'ssgg' ? null : 'ssgg');
+                                    setActiveSubMenu(null);
+                                }}
+                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'ssgg' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
                             >
                                 <div className="flex items-center gap-3">
                                     <Cog className="w-5 h-5 flex-shrink-0" />
@@ -258,12 +259,12 @@ const Layout = () => {
                                     </motion.span>
                                 </div>
                                 <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
-                                    {isSSGGOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                    {activeMainGroup === 'ssgg' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                 </motion.div>
                             </button>
 
                             <AnimatePresence>
-                                {isSSGGOpen && (sidebarOpen || mobileMenuOpen) && (
+                                {activeMainGroup === 'ssgg' && (sidebarOpen || mobileMenuOpen) && (
                                     <motion.div
                                         initial={{ height: 0, opacity: 0 }}
                                         animate={{ height: "auto", opacity: 1 }}
@@ -394,8 +395,11 @@ const Layout = () => {
                     {can('remuneraciones.view_remuneracion') && (
                         <div>
                             <button
-                                onClick={() => setTesoreriaOpen(!isTesoreriaOpen)}
-                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${isTesoreriaOpen ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
+                                onClick={() => {
+                                    setActiveMainGroup(activeMainGroup === 'tesoreria' ? null : 'tesoreria');
+                                    setActiveSubMenu(null);
+                                }}
+                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'tesoreria' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
                             >
                                 <div className="flex items-center gap-3">
                                     <DollarSign className="w-5 h-5 flex-shrink-0" />
@@ -408,12 +412,12 @@ const Layout = () => {
                                     </motion.span>
                                 </div>
                                 <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
-                                    {isTesoreriaOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                    {activeMainGroup === 'tesoreria' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                 </motion.div>
                             </button>
 
                             <AnimatePresence>
-                                {isTesoreriaOpen && (sidebarOpen || mobileMenuOpen) && (
+                                {activeMainGroup === 'tesoreria' && (sidebarOpen || mobileMenuOpen) && (
                                     <motion.div
                                         initial={{ height: 0, opacity: 0 }}
                                         animate={{ height: "auto", opacity: 1 }}
@@ -443,8 +447,11 @@ const Layout = () => {
                     {(can('orden_compra.view_ordencompramp') || can('licitaciones.view_licitacionmp')) && (
                         <div>
                             <button
-                                onClick={() => setMPOpen(!isMPOpen)}
-                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${isMPOpen ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
+                                onClick={() => {
+                                    setActiveMainGroup(activeMainGroup === 'mp' ? null : 'mp');
+                                    setActiveSubMenu(null);
+                                }}
+                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'mp' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
                             >
                                 <div className="flex items-center gap-3">
                                     <ShoppingCart className="w-5 h-5 flex-shrink-0" />
@@ -457,12 +464,12 @@ const Layout = () => {
                                     </motion.span>
                                 </div>
                                 <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
-                                    {isMPOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                    {activeMainGroup === 'mp' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                 </motion.div>
                             </button>
 
                             <AnimatePresence>
-                                {isMPOpen && (sidebarOpen || mobileMenuOpen) && (
+                                {activeMainGroup === 'mp' && (sidebarOpen || mobileMenuOpen) && (
                                     <motion.div
                                         initial={{ height: 0, opacity: 0 }}
                                         animate={{ height: "auto", opacity: 1 }}

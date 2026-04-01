@@ -46,6 +46,7 @@ urlpatterns = [
     path('api/orden_compra/', include('orden_compra.urls')),
     path('api/reservas/', include('solicitudes_reservas.urls')),
     path('api/', include('personal_ti.urls')),
+    path('api/tesoreria/', include('tesoreria.urls')),
 ]
 
 from django.conf import settings

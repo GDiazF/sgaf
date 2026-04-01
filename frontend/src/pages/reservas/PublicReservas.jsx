@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     Calendar, ChevronLeft, ChevronRight, Plus, X, Check,
     Clock, Truck, Monitor, Package, User, AlertCircle, Lock,
@@ -654,13 +654,14 @@ const PublicReservas = () => {
                                     </div>
 
                                     {visibleDays.map(day => {
+                                        const dayStr = toDateStr(day);
                                         const dayRes = getDayResources(day);
                                         const nRes = dayRes.length || 1;
-                                        const isToday = toDateStr(day) === todayStr;
+                                        const isToday = dayStr === todayStr;
                                         const dayMinWidth = '100%';
 
                                         return (
-                                            <div key={toDateStr(day)} className="flex-1 border-l border-slate-100 relative bg-white" style={{ minWidth: dayMinWidth }}>
+                                            <div key={dayStr} className="flex-1 border-l border-slate-100 relative bg-white" style={{ minWidth: dayMinWidth }}>
                                                 <div className="flex h-full">
                                                     {dayRes.map((recurso, rIdx) => (
                                                         <div key={recurso.id} className="flex-1 relative border-r border-slate-50 last:border-r-0">

@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'orden_compra',
     'solicitudes_reservas',
     'personal_ti',
+    'tesoreria',
 ]
 
 # REST_FRAMEWORK, SIMPLE_JWT y CORS se configuran al final del archivo para evitar duplicados.
