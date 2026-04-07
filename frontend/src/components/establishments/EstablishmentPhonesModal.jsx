@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Phone, Plus, Trash2, X, Check, Search, Building } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { usePermission } from '../../hooks/usePermission';
 import api from '../../api';
 
 const EstablishmentPhonesModal = ({ isOpen, onClose, establishment }) => {
+    const { can } = usePermission();
     const [phones, setPhones] = useState([]);
     const [loading, setLoading] = useState(false);
     const [newPhone, setNewPhone] = useState({ numero: '', etiqueta: '', es_principal: false });
@@ -93,70 +95,72 @@ const EstablishmentPhonesModal = ({ isOpen, onClose, establishment }) => {
 
                 <div className="p-8">
                     {/* Add Phone Section */}
-                    <div className="mb-8">
-                        {!isAdding ? (
-                            <button
-                                onClick={() => setIsAdding(true)}
-                                className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center gap-2 text-slate-500 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/30 transition-all font-bold group"
-                            >
-                                <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                                Añadir nuevo número
-                            </button>
-                        ) : (
-                            <motion.div
-                                initial={{ opacity: 0, y: -10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="bg-slate-50 p-6 rounded-2xl border border-blue-100 space-y-4 shadow-sm"
-                            >
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Número</label>
-                                        <input
-                                            type="text"
-                                            placeholder="Ej: +56 9..."
-                                            value={newPhone.numero}
-                                            onChange={e => setNewPhone({ ...newPhone, numero: e.target.value })}
-                                            className="w-full px-4 py-3 bg-white rounded-xl border-none text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-100 placeholder:text-slate-300"
-                                        />
+                    {can('establecimientos.add_telefonoestablecimiento') && (
+                        <div className="mb-8">
+                            {!isAdding ? (
+                                <button
+                                    onClick={() => setIsAdding(true)}
+                                    className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center gap-2 text-slate-500 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/30 transition-all font-bold group"
+                                >
+                                    <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                    Añadir nuevo número
+                                </button>
+                            ) : (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="bg-slate-50 p-6 rounded-2xl border border-blue-100 space-y-4 shadow-sm"
+                                >
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Número</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Ej: +56 9..."
+                                                value={newPhone.numero}
+                                                onChange={e => setNewPhone({ ...newPhone, numero: e.target.value })}
+                                                className="w-full px-4 py-3 bg-white rounded-xl border-none text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-100 placeholder:text-slate-300"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Etiqueta</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Ej: Secretaría"
+                                                value={newPhone.etiqueta}
+                                                onChange={e => setNewPhone({ ...newPhone, etiqueta: e.target.value })}
+                                                className="w-full px-4 py-3 bg-white rounded-xl border-none text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-100 placeholder:text-slate-300"
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Etiqueta</label>
+                                    <div className="flex items-center gap-3 px-1">
                                         <input
-                                            type="text"
-                                            placeholder="Ej: Secretaría"
-                                            value={newPhone.etiqueta}
-                                            onChange={e => setNewPhone({ ...newPhone, etiqueta: e.target.value })}
-                                            className="w-full px-4 py-3 bg-white rounded-xl border-none text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-100 placeholder:text-slate-300"
+                                            type="checkbox"
+                                            id="is_principal"
+                                            checked={newPhone.es_principal}
+                                            onChange={e => setNewPhone({ ...newPhone, es_principal: e.target.checked })}
+                                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                                         />
+                                        <label htmlFor="is_principal" className="text-sm font-bold text-slate-600 cursor-pointer">Marcar como principal</label>
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-3 px-1">
-                                    <input
-                                        type="checkbox"
-                                        id="is_principal"
-                                        checked={newPhone.es_principal}
-                                        onChange={e => setNewPhone({ ...newPhone, es_principal: e.target.checked })}
-                                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                    />
-                                    <label htmlFor="is_principal" className="text-sm font-bold text-slate-600 cursor-pointer">Marcar como principal</label>
-                                </div>
-                                <div className="flex gap-2 pt-2">
-                                    <button
-                                        onClick={handleAddPhone}
-                                        className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
-                                    >
-                                        Guardar Teléfono
-                                    </button>
-                                    <button
-                                        onClick={() => setIsAdding(false)}
-                                        className="px-6 bg-white text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-100 transition-colors"
-                                    >
-                                        Cancelar
-                                    </button>
-                                </div>
-                            </motion.div>
-                        )}
-                    </div>
+                                    <div className="flex gap-2 pt-2">
+                                        <button
+                                            onClick={handleAddPhone}
+                                            className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
+                                        >
+                                            Guardar Teléfono
+                                        </button>
+                                        <button
+                                            onClick={() => setIsAdding(false)}
+                                            className="px-6 bg-white text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-100 transition-colors"
+                                        >
+                                            Cancelar
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Phones List */}
                     <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
@@ -210,7 +214,7 @@ const EstablishmentPhonesModal = ({ isOpen, onClose, establishment }) => {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            {!phone.es_principal && (
+                                            {!phone.es_principal && can('establecimientos.change_telefonoestablecimiento') && (
                                                 <button
                                                     onClick={() => handleSetPrincipal(phone.id)}
                                                     className="p-2 hover:bg-blue-600 hover:text-white text-slate-300 rounded-xl transition-all shadow-sm hover:shadow-blue-200"
@@ -219,13 +223,15 @@ const EstablishmentPhonesModal = ({ isOpen, onClose, establishment }) => {
                                                     <Check className="w-4 h-4" />
                                                 </button>
                                             )}
-                                            <button
-                                                onClick={() => handleDeletePhone(phone.id)}
-                                                className="p-2 hover:bg-red-500 hover:text-white text-slate-300 rounded-xl transition-all"
-                                                title="Eliminar"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                            {can('establecimientos.delete_telefonoestablecimiento') && (
+                                                <button
+                                                    onClick={() => handleDeletePhone(phone.id)}
+                                                    className="p-2 hover:bg-red-500 hover:text-white text-slate-300 rounded-xl transition-all"
+                                                    title="Eliminar"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
                                     </motion.div>
                                 ))

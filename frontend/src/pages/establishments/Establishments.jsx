@@ -11,6 +11,7 @@ import EstablishmentModal from '../../components/establishments/EstablishmentMod
 import EstablishmentPhonesModal from '../../components/establishments/EstablishmentPhonesModal';
 import EstablishmentCardsView from '../../components/establishments/EstablishmentCardsView';
 import EstablishmentMapModal from '../../components/establishments/EstablishmentMapModal';
+import EstablishmentDetailModal from '../../components/establishments/EstablishmentDetailModal';
 
 const Establishments = () => {
     const { can } = usePermission();
@@ -34,6 +35,8 @@ const Establishments = () => {
     const [isCardsViewOpen, setIsCardsViewOpen] = useState(false);
     const [isMapModalOpen, setIsMapModalOpen] = useState(false);
     const [selectedEstForMap, setSelectedEstForMap] = useState(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [selectedEstForDetail, setSelectedEstForDetail] = useState(null);
 
     const [filterType, setFilterType] = useState('');
 
@@ -166,6 +169,11 @@ const Establishments = () => {
     const handleOpenMap = (item) => {
         setSelectedEstForMap(item);
         setIsMapModalOpen(true);
+    };
+
+    const handleOpenDetail = (item) => {
+        setSelectedEstForDetail(item);
+        setIsDetailModalOpen(true);
     };
 
     const handleExportExcel = () => {
@@ -359,6 +367,14 @@ const Establishments = () => {
                 allEstablishments={allEstablishments}
             />
 
+            {/* Detail Modal */}
+            <EstablishmentDetailModal
+                isOpen={isDetailModalOpen}
+                onClose={() => setIsDetailModalOpen(false)}
+                establishment={selectedEstForDetail}
+                allEstablishments={allEstablishments}
+            />
+
             {/* Table List */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="overflow-x-auto">
@@ -408,7 +424,13 @@ const Establishments = () => {
                                                         </div>
                                                     )}
                                                 </div>
-                                                <span className="font-medium text-slate-900 truncate" title={item.nombre}>{item.nombre}</span>
+                                                <span
+                                                    className="font-medium text-slate-900 truncate hover:text-blue-600 hover:underline cursor-pointer transition-all"
+                                                    title={item.nombre}
+                                                    onClick={() => handleOpenDetail(item)}
+                                                >
+                                                    {item.nombre}
+                                                </span>
                                             </div>
                                         </td>
                                         <td className="p-2.5">
@@ -456,13 +478,7 @@ const Establishments = () => {
                                         </td>
                                         <td className="p-2.5 text-right">
                                             <div className="flex justify-end gap-2">
-                                                <button
-                                                    onClick={() => handleOpenMap(item)}
-                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                                    title="Ver Ubicación en Mapa"
-                                                >
-                                                    <MapPin className="w-3.5 h-3.5" />
-                                                </button>
+
                                                 <button
                                                     onClick={() => handleOpenPhones(item)}
                                                     className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
