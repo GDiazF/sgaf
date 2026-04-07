@@ -142,6 +142,10 @@ const ReservasDashboard = () => {
     const [motivoRechazo, setMotivoRechazo] = useState('');
     // Log/Historial
     const [historyOpen, setHistoryOpen] = useState(false);
+    const [historySearch, setHistorySearch] = useState('');
+    const [historyFilterEstado, setHistoryFilterEstado] = useState('HISTORIAL'); // 'HISTORIAL' (todos los cerrados) o estados específicos
+    const [historyFilterRecurso, setHistoryFilterRecurso] = useState('all');
+    const [historySort, setHistorySort] = useState('-fecha_inicio');
     // Aviso cuando sl slot está bloqueado
     const [slotBloqueadoMsg, setSlotBloqueadoMsg] = useState('');
 
@@ -1576,22 +1580,126 @@ const ReservasDashboard = () => {
             {historyOpen && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex justify-end" onClick={() => setHistoryOpen(false)}>
                     <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col animate-in slide-in-from-right" onClick={e => e.stopPropagation()}>
-                        <div className="px-6 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                        <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                             <div>
                                 <h2 className="text-xl font-black text-slate-900">Historial de Reservas</h2>
-                                <p className="text-sm text-slate-500">Registros finalizados, rechazados o cancelados</p>
+                                <p className="text-sm text-slate-500">Busca y filtra entre todos los registros</p>
                             </div>
                             <button onClick={() => setHistoryOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition"><X className="w-6 h-6 text-slate-400" /></button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/30">
-                            {reservas.filter(r => ['FINALIZADA', 'RECHAZADA', 'CANCELADA'].includes(r.estado))
-                                .sort((a, b) => new Date(b.fecha_inicio) - new Date(a.fecha_inicio))
-                                .map(r => {
+
+                        {/* BARRA DE FILTROS */}
+                        <div className="p-4 bg-white border-b border-slate-100 space-y-3">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por título, funcionario, código..."
+                                    value={historySearch}
+                                    onChange={e => setHistorySearch(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 transition outline-none"
+                                />
+                                <Clock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                                <select 
+                                    value={historyFilterEstado} 
+                                    onChange={e => setHistoryFilterEstado(e.target.value)}
+                                    className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                                >
+                                    <option value="HISTORIAL">Todos (Cerrados)</option>
+                                    <option value="ALL_RECORDS">Todos (Incluso Activos)</option>
+                                    <option value="PENDIENTE">Solo Pendientes</option>
+                                    <option value="APROBADA">Solo Aprobadas</option>
+                                    <option value="FINALIZADA">Solo Finalizadas</option>
+                                    <option value="RECHAZADA">Solo Rechazadas</option>
+                                    <option value="CANCELADA">Solo Canceladas</option>
+                                </select>
+
+                                <select 
+                                    value={historyFilterRecurso} 
+                                    onChange={e => setHistoryFilterRecurso(e.target.value)}
+                                    className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                                >
+                                    <option value="all">Todos los Recursos</option>
+                                    {recursos.slice().sort((a,b) => a.nombre.localeCompare(b.nombre)).map(r => (
+                                        <option key={r.id} value={r.id}>{r.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ordenar por:</span>
+                                <div className="flex bg-slate-100 p-0.5 rounded-lg flex-1">
+                                    {[
+                                        { v: '-fecha_inicio', l: 'Recientes' },
+                                        { v: 'fecha_inicio', l: 'Antiguos' },
+                                        { v: 'titulo', l: 'Título' }
+                                    ].map(opt => (
+                                        <button 
+                                            key={opt.v} 
+                                            onClick={() => setHistorySort(opt.v)}
+                                            className={`flex-1 py-1 px-2 text-[10px] font-bold rounded-md transition ${historySort === opt.v ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            {opt.l}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/10">
+                            {(() => {
+                                let filtered = [...reservas];
+                                
+                                // 1. Filtro por Estado
+                                if (historyFilterEstado === 'HISTORIAL') {
+                                    filtered = filtered.filter(r => ['FINALIZADA', 'RECHAZADA', 'CANCELADA'].includes(r.estado));
+                                } else if (historyFilterEstado !== 'ALL_RECORDS') {
+                                    filtered = filtered.filter(r => r.estado === historyFilterEstado);
+                                }
+
+                                // 2. Filtro por Recurso
+                                if (historyFilterRecurso !== 'all') {
+                                    filtered = filtered.filter(r => parseInt(r.recurso) === parseInt(historyFilterRecurso));
+                                }
+
+                                // 3. Búsqueda Texto
+                                if (historySearch.trim()) {
+                                    const q = historySearch.toLowerCase();
+                                    filtered = filtered.filter(r => 
+                                        r.titulo.toLowerCase().includes(q) || 
+                                        (r.nombre_funcionario && r.nombre_funcionario.toLowerCase().includes(q)) ||
+                                        (r.codigo_reserva && r.codigo_reserva.toLowerCase().includes(q)) ||
+                                        (r.descripcion && r.descripcion.toLowerCase().includes(q))
+                                    );
+                                }
+
+                                // 4. Orden
+                                filtered.sort((a, b) => {
+                                    if (historySort === '-fecha_inicio') return new Date(b.fecha_inicio) - new Date(a.fecha_inicio);
+                                    if (historySort === 'fecha_inicio') return new Date(a.fecha_inicio) - new Date(b.fecha_inicio);
+                                    if (historySort === 'titulo') return a.titulo.localeCompare(b.titulo);
+                                    return 0;
+                                });
+
+                                if (filtered.length === 0) {
+                                    return (
+                                        <div className="text-center py-20">
+                                            <AlertCircle className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                                            <p className="text-slate-400 font-bold">No se encontraron resultados</p>
+                                            <p className="text-[10px] text-slate-300 mt-1">Prueba con otros criterios de búsqueda</p>
+                                        </div>
+                                    );
+                                }
+
+                                return filtered.map(r => {
                                     const rec = recursos.find(rec => rec.id === r.recurso);
                                     const cfg = ESTADO_CFG[r.estado] || ESTADO_CFG.PENDIENTE;
                                     const color = rec?.color || '#6366f1';
                                     return (
-                                        <div key={r.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col gap-3">
+                                        <div key={r.id} className="group bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col gap-3 hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer"
+                                             onClick={() => { setDetailReserva(r); /* Podríamos abrir el detalle si quisiéramos */ }}>
                                             <div className="flex justify-between items-start">
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
@@ -1600,28 +1708,31 @@ const ReservasDashboard = () => {
                                                 <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase border" style={{ background: cfg.bg, color: cfg.text, borderColor: cfg.border }}>{cfg.label}</span>
                                             </div>
                                             <div>
-                                                <h4 className="font-black text-slate-800 text-sm">{r.titulo}</h4>
-                                                <p className="text-[11px] text-slate-500 mt-1">{r.nombre_funcionario || r.solicitante_email}</p>
+                                                <h4 className="font-black text-slate-800 text-sm group-hover:text-indigo-600 transition-colors uppercase">{r.titulo}</h4>
+                                                <div className="flex items-center gap-1.5 mt-1">
+                                                    <User className="w-3 h-3 text-slate-300" />
+                                                    <p className="text-[11px] font-bold text-slate-500">{r.nombre_funcionario || 'Sin nombre'}</p>
+                                                </div>
                                             </div>
                                             <div className="flex items-center gap-4 pt-2 border-t border-slate-50">
-                                                <div className="flex items-center gap-1.5 text-slate-500">
+                                                <div className="flex items-center gap-1.5 text-slate-400">
                                                     <Calendar className="w-3 h-3" />
                                                     <span className="text-[10px] font-bold">{toDateStr(r.fecha_inicio)}</span>
                                                 </div>
-                                                <div className="flex items-center gap-1.5 text-slate-500">
+                                                <div className="flex items-center gap-1.5 text-slate-400">
                                                     <Clock className="w-3 h-3" />
-                                                    <span className="text-[10px] font-bold">{dtMinutes(r.fecha_inicio) / 60 | 0}:{String(dtMinutes(r.fecha_inicio) % 60).padStart(2, '0')} - {dtMinutes(r.fecha_fin) / 60 | 0}:{String(dtMinutes(r.fecha_fin) % 60).padStart(2, '0')}</span>
+                                                    <span className="text-[10px] font-bold">
+                                                        {new Date(r.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(r.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                                <div className="ml-auto text-[9px] font-black text-slate-300 font-mono" title="Código de Reserva">
+                                                    #{r.codigo_reserva || '---'}
                                                 </div>
                                             </div>
                                         </div>
                                     );
-                                })}
-                            {reservas.filter(r => ['FINALIZADA', 'RECHAZADA', 'CANCELADA'].includes(r.estado)).length === 0 && (
-                                <div className="text-center py-20">
-                                    <Clock className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-                                    <p className="text-slate-400 font-bold">No hay registros históricos aún</p>
-                                </div>
-                            )}
+                                });
+                            })()}
                         </div>
                     </div>
                 </div>

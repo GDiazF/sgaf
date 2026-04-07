@@ -1,4 +1,5 @@
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, filters
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import RecursoReservable, SolicitudReserva, BloqueoHorario, ReservaSetting
@@ -38,6 +39,11 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
     queryset = SolicitudReserva.objects.all()
     serializer_class = SolicitudReservaSerializer
     pagination_class = None
+
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['estado', 'recurso', 'solicitante']
+    search_fields = ['titulo', 'nombre_funcionario', 'descripcion', 'codigo_reserva', 'email_contacto']
+    ordering_fields = ['fecha_inicio', 'fecha_fin', 'created_at', 'estado']
 
     def get_permissions(self):
         if self.action in ('list', 'retrieve', 'create', 'public_manage'):
