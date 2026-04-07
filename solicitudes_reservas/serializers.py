@@ -16,11 +16,11 @@ class SolicitudReservaSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'recurso', 'recurso_nombre', 'solicitante', 'solicitante_email',
             'titulo', 'descripcion', 'nombre_funcionario', 'email_contacto',
-            'fecha_inicio', 'fecha_fin', 'estado', 
+            'fecha_inicio', 'fecha_fin', 'estado', 'codigo_reserva',
             'aprobado_por', 'fecha_aprobacion', 'motivo_rechazo',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['solicitante', 'aprobado_por', 'fecha_aprobacion', 'created_at', 'updated_at']
+        read_only_fields = ['solicitante', 'aprobado_por', 'fecha_aprobacion', 'created_at', 'updated_at', 'codigo_reserva']
 
     def get_solicitante_email(self, obj):
         if obj.solicitante:

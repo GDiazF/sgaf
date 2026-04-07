@@ -110,8 +110,23 @@ class SolicitudReserva(models.Model):
     fecha_aprobacion = models.DateTimeField(null=True, blank=True)
     motivo_rechazo = models.TextField(blank=True, null=True)
 
+    codigo_reserva = models.CharField(max_length=10, unique=True, blank=True, null=True, verbose_name="Código de Reserva")
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.codigo_reserva:
+            import random
+            import string
+            # Generar un código aleatorio de 6 caracteres (mayúsculas y números)
+            characters = string.ascii_uppercase + string.digits
+            while True:
+                new_code = ''.join(random.choices(characters, k=6))
+                if not SolicitudReserva.objects.filter(codigo_reserva=new_code).exists():
+                    self.codigo_reserva = new_code
+                    break
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.titulo} - {self.recurso}"

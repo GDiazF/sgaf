@@ -71,7 +71,7 @@ const bloqueoAppliesToDate = (b, dateStr) => {
 };
 
 import axios from 'axios';
-const publicApi = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/' });
+const publicApi = axios.create({ baseURL: '/api/' });
 
 const PublicReservas = () => {
     const [recursos, setRecursos] = useState([]);
@@ -114,6 +114,15 @@ const PublicReservas = () => {
     const [slotBloqueadoMsg, setSlotBloqueadoMsg] = useState('');
     const scrollRef = useRef(null);
 
+    // Gestión de reserva existente
+    const [manageOpen, setManageOpen] = useState(false);
+    const [manageCode, setManageCode] = useState('');
+    const [manageLoading, setManageLoading] = useState(false);
+    const [manageError, setManageError] = useState('');
+    const [manageReserva, setManageReserva] = useState(null);
+    const [manageSuccess, setManageSuccess] = useState('');
+    const [isEditing, setIsEditing] = useState(false);
+
     const todayStr = toDateStr(new Date());
     const fmtDay = d => new Intl.DateTimeFormat('es-CL', { weekday: 'short', day: 'numeric' }).format(d);
     const fmtMonth = () => {
@@ -135,7 +144,9 @@ const PublicReservas = () => {
             ]);
             console.log("Resources:", rRes.data);
             setRecursos(rRes.data?.results || (Array.isArray(rRes.data) ? rRes.data : []));
-            setReservas(sRes.data?.results || (Array.isArray(sRes.data) ? sRes.data : []));
+            const rList = sRes.data?.results || (Array.isArray(sRes.data) ? sRes.data : []);
+            console.log("Reservas loaded:", rList.length);
+            setReservas(rList);
             const bList = bRes.data?.results || (Array.isArray(bRes.data) ? bRes.data : []);
             setBloqueos(bList);
             if (tRes.data) setSettings(tRes.data);
@@ -204,11 +215,12 @@ const PublicReservas = () => {
     const getReservasForDayAndRecurso = (day, recursoId) => {
         const dayStr = toDateStr(day);
         if (!Array.isArray(reservas)) return [];
-        return reservas.filter(r =>
-            toDateStr(r.fecha_inicio) === dayStr &&
-            parseInt(r.recurso) === parseInt(recursoId) &&
-            r.estado !== 'FINALIZADA' && r.estado !== 'RECHAZADA' && r.estado !== 'CANCELADA'
-        );
+        return reservas.filter(r => {
+            const rEstado = (r.estado || "").toUpperCase();
+            return toDateStr(r.fecha_inicio) === dayStr &&
+                parseInt(r.recurso) === parseInt(recursoId) &&
+                (rEstado === 'PENDIENTE' || rEstado === 'APROBADA');
+        });
     };
 
     const getEventPos = (ev) => {
@@ -415,6 +427,20 @@ const PublicReservas = () => {
                 >
                     <Plus className="w-3.5 h-3.5" /> Solicitar Reserva
                 </button>
+
+                <button
+                    onClick={() => {
+                        setManageOpen(true);
+                        setManageCode('');
+                        setManageReserva(null);
+                        setManageError('');
+                        setManageSuccess('');
+                        setIsEditing(false);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-black hover:bg-slate-900 transition shadow-md"
+                >
+                    <Lock className="w-3.5 h-3.5" /> Gestionar Mi Reserva
+                </button>
             </div>
 
             {/* FILTROS — grupos por tipo + recursos individuales */}
@@ -552,10 +578,19 @@ const PublicReservas = () => {
 
                                                             {/* Reservas */}
                                                             {dayEvents.sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio)).map(ev => {
-                                                                const isApproved = ev.estado === 'APROBADA';
+                                                                const evEstado = (ev.estado || "").toUpperCase();
+                                                                const isApproved = evEstado === 'APROBADA';
                                                                 return (
                                                                     <div key={ev.id}
-                                                                        onClick={(e) => { e.stopPropagation(); setDetailReserva(ev); }}
+                                                                        onClick={(e) => { 
+                                                                            e.stopPropagation(); 
+                                                                            setManageReserva(ev); 
+                                                                            setManageCode(''); 
+                                                                            setManageError(''); 
+                                                                            setManageSuccess('');
+                                                                            setIsEditing(false);
+                                                                            setManageOpen(true); 
+                                                                        }}
                                                                         className="p-2 mr-2 rounded-xl border flex flex-col gap-1 transition-all hover:translate-x-1 group/item shadow-sm mb-1.5 last:mb-0"
                                                                         style={{
                                                                             background: isApproved ? hexToRgba(rec.color || '#6366f1', 0.15) : 'white',
@@ -995,6 +1030,196 @@ const PublicReservas = () => {
                     </div>
                 )
             }
+
+            {/* ── MODAL GESTIÓN DE RESERVA (EDITAR/ELIMINAR CON CÓDIGO) ── */}
+            {manageOpen && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-[10vh]" onClick={() => setManageOpen(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="p-5 border-b bg-slate-800 text-white flex justify-between items-center">
+                            <div>
+                                <h3 className="text-lg font-black">{isEditing ? 'Editar Reserva' : 'Gestionar Reserva'}</h3>
+                                <p className="text-slate-300 text-[10px] uppercase tracking-wider font-bold">Usa tu código de reserva</p>
+                            </div>
+                            <button onClick={() => setManageOpen(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            {manageError && <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-600 text-[11px] font-bold flex items-center gap-2"><AlertCircle className="w-4 h-4" />{manageError}</div>}
+                            {manageSuccess && <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-600 text-[11px] font-bold flex items-center gap-2"><Check className="w-4 h-4" />{manageSuccess}</div>}
+
+                            {!manageSuccess && (
+                                <div className="space-y-4">
+                                    {/* Info si ya hay reserva seleccionada (desde click calendario) */}
+                                    {manageReserva && !manageReserva.verificado && !manageLoading && (
+                                        <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl space-y-2">
+                                            <p className="text-[10px] font-black text-indigo-600 uppercase">Reserva Seleccionada</p>
+                                            <h4 className="text-xs font-bold text-slate-800 leading-tight">{manageReserva.titulo}</h4>
+                                            <div className="flex items-center gap-2 text-[9px] text-slate-500 font-bold">
+                                                <Clock className="w-2.5 h-2.5" />
+                                                {new Date(manageReserva.fecha_inicio).toLocaleDateString('es-CL')} | {new Date(manageReserva.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {(!manageReserva || !manageReserva.verificado) && (
+                                        <div className="space-y-4">
+                                            <p className="text-xs text-slate-500 leading-relaxed">
+                                                {manageReserva 
+                                                    ? 'Para gestionar esta reserva, por favor ingresa el código de 6 caracteres que recibiste en tu correo.'
+                                                    : 'Ingresa el código de 6 caracteres que recibiste en tu correo electrónico.'
+                                                }
+                                            </p>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5">Código de Reserva</label>
+                                                <input
+                                                    type="text"
+                                                    maxLength={6}
+                                                    value={manageCode}
+                                                    onChange={e => setManageCode(e.target.value.toUpperCase())}
+                                                    placeholder="EJ: XJ82K1"
+                                                    className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl text-center text-xl font-black tracking-[0.5em] text-indigo-600 focus:border-indigo-500 outline-none transition"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={async () => {
+                                                    if (manageCode.length < 6) return setManageError('El código debe tener 6 caracteres.');
+                                                    setManageLoading(true); setManageError('');
+                                                    try {
+                                                        const resp = await publicApi.post('reservas/solicitudes/public_manage/', { 
+                                                            codigo_reserva: manageCode, 
+                                                            accion: 'VIEW' 
+                                                        });
+                                                        setManageReserva({ ...resp.data, verificado: true });
+                                                    } catch (err) {
+                                                        setManageError('Código inválido o no encontrado.');
+                                                    } finally { setManageLoading(false); }
+                                                }}
+                                                disabled={manageLoading || manageCode.length < 6}
+                                                className="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-black text-sm shadow-lg shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
+                                            >
+                                                {manageLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
+                                                Verificar y Gestionar
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {manageReserva && manageReserva.verificado && !isEditing && !manageSuccess && (
+                                <div className="space-y-4">
+                                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-3">
+                                        <div className="flex justify-between items-start">
+                                            <div className="px-2 py-0.5 bg-indigo-100 text-indigo-600 rounded text-[9px] font-black uppercase">{recursos.find(r => r.id === manageReserva.recurso)?.nombre}</div>
+                                            <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${manageReserva.estado === 'APROBADA' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>{manageReserva.estado}</div>
+                                        </div>
+                                        <h4 className="font-black text-slate-800 text-sm leading-tight">{manageReserva.titulo}</h4>
+                                        <div className="flex items-center gap-2 text-[11px] text-slate-500 font-bold">
+                                            <Clock className="w-3.5 h-3.5" />
+                                            {new Date(manageReserva.fecha_inicio).toLocaleDateString('es-CL')} | {new Date(manageReserva.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(manageReserva.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            onClick={() => {
+                                                setFormData({
+                                                    ...manageReserva,
+                                                    fecha: toDateStr(manageReserva.fecha_inicio),
+                                                    horaInicio: new Date(manageReserva.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                                    horaFin: new Date(manageReserva.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                                });
+                                                setFormTipo(recursos.find(r => r.id === manageReserva.recurso)?.tipo || '');
+                                                setIsEditing(true);
+                                            }}
+                                            className="py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-black text-xs hover:bg-slate-50 transition"
+                                        >Editar Reserva</button>
+                                        <button
+                                            onClick={async () => {
+                                                if (!window.confirm('¿Estás seguro de que deseas anular esta reserva?')) return;
+                                                setManageLoading(true);
+                                                try {
+                                                    await publicApi.post('reservas/solicitudes/public_manage/', { codigo_reserva: manageCode, accion: 'DELETE' });
+                                                    setManageSuccess('Tu reserva ha sido anulada correctamente.');
+                                                    setManageReserva(null);
+                                                    fetchData();
+                                                } catch (err) {
+                                                    setManageError('Error al anular la reserva.');
+                                                } finally { setManageLoading(false); }
+                                            }}
+                                            className="py-3 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl font-black text-xs hover:bg-rose-100 transition"
+                                        >Anular Reserva</button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {isEditing && !manageSuccess && (
+                                <div className="space-y-4">
+                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                                        <p className="text-[10px] text-amber-700 leading-tight font-bold">Nota: Si modificas la reserva, el estado volverá a "Pendiente de Aprobación" y deberá ser revisada nuevamente por un administrador.</p>
+                                    </div>
+                                    
+                                    {/* Campos de edición simplificados */}
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-[9px] font-black text-slate-400 uppercase">Título</label>
+                                            <input type="text" className="w-full p-2 border-b-2 border-slate-100 text-sm outline-none focus:border-indigo-500 font-bold transition"
+                                                value={formData.titulo} onChange={e => setFormData({ ...formData, titulo: e.target.value })} />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-[9px] font-black text-slate-400 uppercase">Fecha</label>
+                                                <input type="date" className="w-full p-2 border-b-2 border-slate-100 text-sm outline-none focus:border-indigo-500 font-bold transition"
+                                                    value={formData.fecha} onChange={e => setFormData({ ...formData, fecha: e.target.value })} />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-1">
+                                                <div>
+                                                    <label className="block text-[9px] font-black text-slate-400 uppercase">Desde</label>
+                                                    <select className="w-full p-2 text-xs font-bold bg-transparent outline-none"
+                                                        value={formData.horaInicio} onChange={e => setFormData({ ...formData, horaInicio: e.target.value })}>
+                                                        {TIME_SLOTS.map(s => <option key={s} value={s}>{s}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[9px] font-black text-slate-400 uppercase">Hasta</label>
+                                                    <select className="w-full p-2 text-xs font-bold bg-transparent outline-none"
+                                                        value={formData.horaFin} onChange={e => setFormData({ ...formData, horaFin: e.target.value })}>
+                                                        {TIME_SLOTS.map(s => <option key={s} value={s}>{s}</option>)}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3 pt-2">
+                                        <button onClick={() => setIsEditing(false)} className="flex-1 py-3 text-xs font-bold text-slate-500 transition">Regresar</button>
+                                        <button
+                                            onClick={async () => {
+                                                setManageLoading(true); setManageError('');
+                                                try {
+                                                    await publicApi.post('reservas/solicitudes/public_manage/', {
+                                                        codigo_reserva: manageCode,
+                                                        accion: 'UPDATE',
+                                                        titulo: formData.titulo,
+                                                        fecha_inicio: `${formData.fecha}T${formData.horaInicio}:00`,
+                                                        fecha_fin: `${formData.fecha}T${formData.horaFin}:00`,
+                                                    });
+                                                    setManageSuccess('Reserva actualizada. Volverá a ser revisada por administración.');
+                                                    setManageReserva(null);
+                                                    fetchData();
+                                                } catch (err) {
+                                                    setManageError('Error al guardar los cambios. Revisa el horario.');
+                                                } finally { setManageLoading(false); }
+                                            }}
+                                            disabled={manageLoading}
+                                            className="flex-2 py-3 px-6 bg-indigo-600 text-white rounded-xl font-black text-xs shadow-lg hover:bg-indigo-700 disabled:opacity-50 transition"
+                                        >Guardar Cambios</button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 };

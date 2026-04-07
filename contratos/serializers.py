@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import ProcesoCompra, EstadoContrato, CategoriaContrato, Contrato, OrientacionLicitacion, DocumentoContrato, HistorialContrato
+from core.serializers import MediaRelativeFileField
 from establecimientos.serializers import EstablecimientoSerializer
 
 class ProcesoCompraSerializer(serializers.ModelSerializer):
@@ -23,6 +24,7 @@ class OrientacionLicitacionSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class DocumentoContratoSerializer(serializers.ModelSerializer):
+    archivo = MediaRelativeFileField(required=False)
     class Meta:
         model = DocumentoContrato
         fields = '__all__'

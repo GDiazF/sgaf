@@ -11,6 +11,7 @@ build/
 .Python
 .venv/
 venv/
+venv_tmp/
 env/
 ENV/
 pip-log.txt

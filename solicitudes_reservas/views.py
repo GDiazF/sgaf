@@ -20,6 +20,7 @@ from django.utils import timezone
 class RecursoReservableViewSet(viewsets.ModelViewSet):
     queryset = RecursoReservable.objects.all()
     serializer_class = RecursoReservableSerializer
+    pagination_class = None
 
     def get_permissions(self):
         """Lectura: cualquier usuario. Escritura: solo staff."""
@@ -36,9 +37,10 @@ class RecursoReservableViewSet(viewsets.ModelViewSet):
 class SolicitudReservaViewSet(viewsets.ModelViewSet):
     queryset = SolicitudReserva.objects.all()
     serializer_class = SolicitudReservaSerializer
+    pagination_class = None
 
     def get_permissions(self):
-        if self.action in ('list', 'retrieve', 'create'):
+        if self.action in ('list', 'retrieve', 'create', 'public_manage'):
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
 
@@ -95,10 +97,51 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
         enviar_correo_rechazo(solicitud)
         return Response(SolicitudReservaSerializer(solicitud, context={'request': request}).data)
 
+    # ─── Acción: Gestión Pública (con código de reserva) ──────────────────────
+    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
+    def public_manage(self, request):
+        """Permite borrar o editar una reserva si se conoce su código secreto."""
+        # En DRF es mejor buscarlo manualmente o usar un mixin si es común.
+        codigo = request.data.get('codigo_reserva', '').strip()
+        accion = request.data.get('accion', '').strip() # 'UPDATE' o 'DELETE'
+        
+        if not codigo:
+            return Response({"detail": "Código de reserva requerido."}, status=400)
+            
+        print(f"--- public_manage SEARCH: code input='{codigo}' ---")
+        # Logueamos una muestra para ver qué hay en la DB
+        sample = list(SolicitudReserva.objects.values_list('codigo_reserva', flat=True)[:5])
+        print(f"--- public_manage SAMPLE DB: {sample} ---")
+
+        solicitud = SolicitudReserva.objects.filter(codigo_reserva__iexact=codigo).first()
+        if not solicitud:
+            return Response({"detail": "Código de reserva inválido o no encontrado."}, status=404)
+
+        if accion == 'VIEW':
+            return Response(SolicitudReservaSerializer(solicitud, context={'request': request}).data)
+            
+        elif accion == 'DELETE':
+            solicitud.delete()
+            return Response({"detail": "Reserva eliminada con éxito."})
+            
+        elif accion == 'UPDATE':
+            # Aplicar cambios y resetear estado a PENDIENTE
+            serializer = SolicitudReservaSerializer(solicitud, data=request.data, partial=True)
+            if serializer.is_valid():
+                # Forzar estado a PENDIENTE si se edita (como requiere el usuario)
+                instance = serializer.save(estado='PENDIENTE', aprobado_por=None, fecha_aprobacion=None)
+                # Opcional: Re-enviar correo de nueva solicitud
+                enviar_correo_nueva_solicitud(instance)
+                return Response(serializer.data)
+            return Response(serializer.errors, status=400)
+            
+        return Response({"detail": "Acción no permitida."}, status=400)
+
 
 class BloqueoHorarioViewSet(viewsets.ModelViewSet):
     """CRUD para bloqueos de horario por recurso."""
     serializer_class = BloqueoHorarioSerializer
+    pagination_class = None
 
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):

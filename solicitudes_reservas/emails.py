@@ -170,7 +170,12 @@ def enviar_correo_nueva_solicitud(solicitud):
               <tr style="background:#f8fafc;"><td style="padding:10px 16px;color:#94a3b8;font-size:12px;">Motivo</td><td style="padding:10px 16px;color:#1e293b;font-size:13px;font-weight:700;">{solicitud.titulo}</td></tr>
               <tr><td style="padding:10px 16px;color:#94a3b8;font-size:12px;">Horario</td><td style="padding:10px 16px;color:#1e293b;font-size:13px;font-weight:700;">{fi} – {ff} hrs</td></tr>
               <tr style="background:#f8fafc;"><td style="padding:10px 16px;color:#94a3b8;font-size:12px;">Estado</td><td style="padding:10px 16px;"><span style="background:#fef3c7;color:#d97706;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:900;">PENDIENTE</span></td></tr>
+              <tr><td style="padding:10px 16px;color:#4f46e5;font-size:12px;font-weight:900;">CÓDIGO DE GESTIÓN</td><td style="padding:10px 16px;"><span style="background:#e0e7ff;color:#4338ca;padding:4px 12px;border-radius:8px;font-size:14px;font-weight:900;letter-spacing:1px;border:1px dashed #c7d2fe;">{solicitud.codigo_reserva}</span></td></tr>
             </table>
+            <div style="background:#eff6ff;border-radius:12px;padding:16px;margin-bottom:24px;border:1px solid #dbeafe;">
+              <p style="margin:0 0 8px;color:#1e40af;font-size:12px;font-weight:900;">¿Necesitas modificar o anular tu reserva?</p>
+              <p style="margin:0;color:#3b82f6;font-size:13px;line-height:1.5;">Usa tu <strong>Código de Gestión</strong> en el portal público para realizar cambios. Si editas una reserva ya aprobada, esta volverá a estado pendiente de aprobación.</p>
+            </div>
             <p style="color:#64748b;font-size:13px;">Te notificaremos por este mismo correo cuando haya una resolución.</p>
             """
         )
@@ -201,10 +206,11 @@ def enviar_correo_aprobacion(solicitud):
           <tr style="background:#dcfce7;"><th colspan="2" style="padding:12px 16px;color:#15803d;font-size:11px;font-weight:900;text-align:left;letter-spacing:1px;text-transform:uppercase;">Detalle de tu Reserva Confirmada</th></tr>
           <tr><td style="padding:10px 16px;color:#94a3b8;font-size:12px;width:40%;">Recurso</td><td style="padding:10px 16px;color:#1e293b;font-size:13px;font-weight:700;">{recurso.nombre}</td></tr>
           <tr style="background:#f0fdf4;"><td style="padding:10px 16px;color:#94a3b8;font-size:12px;">Motivo</td><td style="padding:10px 16px;color:#1e293b;font-size:13px;font-weight:700;">{solicitud.titulo}</td></tr>
-          <tr><td style="padding:10px 16px;color:#94a3b8;font-size:12px;">Horario</td><td style="padding:10px 16px;color:#1e293b;font-size:13px;font-weight:700;">{fi} – {ff} hrs</td></tr>
+          <tr><td style="padding:10px 16px;color:#94a3b8;font-size:12px;width:40%;">Horario</td><td style="padding:10px 16px;color:#1e293b;font-size:13px;font-weight:700;">{fi} – {ff} hrs</td></tr>
           {"<tr style='background:#f0fdf4;'><td style='padding:10px 16px;color:#94a3b8;font-size:12px;'>Ubicación</td><td style='padding:10px 16px;color:#1e293b;font-size:13px;font-weight:700;'>" + recurso.ubicacion + "</td></tr>" if recurso.ubicacion else ""}
+          <tr style="background:#dcfce7;"><td style="padding:10px 16px;color:#15803d;font-size:11px;font-weight:900;">CÓDIGO DE GESTIÓN</td><td style="padding:10px 16px;"><span style="background:#fff;color:#047857;padding:4px 12px;border-radius:8px;font-size:14px;font-weight:900;letter-spacing:1px;border:1px solid #6ee7b7;">{solicitud.codigo_reserva}</span></td></tr>
         </table>
-        <p style="color:#64748b;font-size:13px;text-align:center;">Recuerda presentarte puntualmente y dejar el espacio en las mismas condiciones.</p>
+        <p style="color:#64748b;font-size:13px;text-align:center;">Para cualquier cambio posterior utiliza este código en el sistema.</p>
         """
     )
     _safe_email([email_sol], f'✅ Reserva Aprobada: {recurso.nombre}', body)

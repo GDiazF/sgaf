@@ -1,6 +1,25 @@
 from django.contrib.auth.models import User, Group, Permission
 from rest_framework import serializers
 
+class MediaRelativeFileField(serializers.FileField):
+    """Garantiza que la URL siempre sea relativa al dominio (comience con /media/)"""
+    def to_representation(self, value):
+        if not value:
+            return None
+        url = value.url
+        import re
+        # Remover el esquema y el host si existen (ej. http://localhost:8000/media/...)
+        return re.sub(r'^https?://[^/]+', '', url)
+
+class MediaRelativeImageField(serializers.ImageField):
+    """Garantiza que la URL de imagen siempre sea relativa al dominio"""
+    def to_representation(self, value):
+        if not value:
+            return None
+        url = value.url
+        import re
+        return re.sub(r'^https?://[^/]+', '', url)
+
 class PermissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Permission

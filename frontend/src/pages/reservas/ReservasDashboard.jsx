@@ -274,13 +274,13 @@ const ReservasDashboard = () => {
 
     const getReservasForDayAndRecurso = (day, recursoId) => {
         const dayStr = toDateStr(day);
-        return reservas.filter(r =>
-            toDateStr(r.fecha_inicio) === dayStr &&
-            parseInt(r.recurso) === parseInt(recursoId) &&
-            r.estado !== 'FINALIZADA' &&
-            r.estado !== 'RECHAZADA' &&
-            r.estado !== 'CANCELADA'
-        );
+        if (!Array.isArray(reservas)) return [];
+        return reservas.filter(r => {
+            const rEstado = (r.estado || "").toUpperCase();
+            return toDateStr(r.fecha_inicio) === dayStr &&
+                parseInt(r.recurso) === parseInt(recursoId) &&
+                (rEstado === 'PENDIENTE' || rEstado === 'APROBADA');
+        });
     };
 
     const getEventPos = (ev) => {
@@ -1412,7 +1412,7 @@ const ReservasDashboard = () => {
                                                 {adminSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                                                 {adminEditing ? 'Guardar Cambios' : 'Crear Recurso'}
                                             </button>
-                                            {adminEditing && (
+                                            {adminEditing && !adminEditing.isSettings && (
                                                 <>
                                                     <button type="button" onClick={() => handleAdminToggle(adminEditing)}
                                                         className={`px-3 py-2.5 rounded-xl font-black text-xs transition flex items-center gap-1.5 border ${adminEditing.activo ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}`}>
@@ -1429,7 +1429,7 @@ const ReservasDashboard = () => {
                                 )}
 
                                 {/* ── PANEL DE BLOQUEOS (solo al editar) ── */}
-                                {adminEditing && (
+                                {adminEditing && !adminEditing.isSettings && (
                                     <div className="mt-6 border-t border-slate-100 pt-5">
                                         <button
                                             type="button"

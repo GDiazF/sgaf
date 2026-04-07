@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Establecimiento, TelefonoEstablecimiento, TipoEstablecimiento
+from core.serializers import MediaRelativeImageField
 
 class TipoEstablecimientoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -16,6 +17,7 @@ class EstablecimientoSerializer(serializers.ModelSerializer):
     tipo_nombre = serializers.ReadOnlyField(source='tipo.nombre')
     telefonos_json = serializers.JSONField(write_only=True, required=False)
     telefono_principal = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    logo = MediaRelativeImageField(required=False)
 
     class Meta:
         model = Establecimiento
