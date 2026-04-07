@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const BASE_URL = '/api/';
+// En desarrollo usa la variable de entorno o el proxy local. En producción prefiere la ruta relativa /api/
+const BASE_URL = (import.meta.env.DEV ? import.meta.env.VITE_API_URL : null) || '/api/';
 
 const api = axios.create({
     baseURL: BASE_URL,
