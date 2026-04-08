@@ -50,6 +50,7 @@ class UserProfileView(APIView):
             'is_superuser': user.is_superuser,
             'avatar': avatar_url,
             'funcionario_data': funcionario_data,
+            'role': user.groups.first().name if user.groups.exists() else 'Sin Rol',
             'groups': list(user.groups.values_list('name', flat=True)),
             'user_permissions': list(user.get_all_permissions())
         })

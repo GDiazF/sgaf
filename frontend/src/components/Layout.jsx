@@ -495,6 +495,11 @@ const Layout = () => {
                             </AnimatePresence>
                         </div>
                     )}
+
+                    <div className="py-2 px-4">
+                        <div className="border-t border-slate-700/50" />
+                    </div>
+
                 </nav >
 
                 {/* Sidebar Footer: Server Status */}
@@ -567,7 +572,11 @@ const Layout = () => {
 
                     <div className="flex items-center gap-3 relative" ref={profileRef}>
                         <div className="hidden md:flex flex-col items-end">
-                            <span className="text-sm font-semibold text-slate-700">{user?.username || 'Administrador'}</span>
+                            <span className="text-sm font-semibold text-slate-700">
+                                {user?.funcionario_data?.nombre_funcionario ||
+                                    (user?.first_name ? `${user.first_name} ${user.last_name}` : user?.username) ||
+                                    'Administrador'}
+                            </span>
                             <span className="text-[10px] font-bold text-slate-400 uppercase">SLEP Iquique</span>
                         </div>
 
@@ -601,7 +610,12 @@ const Layout = () => {
                                     >
                                         <div className="px-3 py-2 border-b border-slate-50 mb-1">
                                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cuenta</p>
-                                            <p className="text-sm font-bold text-slate-700 truncate">{user?.username}</p>
+                                            <p className="text-sm font-bold text-slate-700 truncate">
+                                                {user?.funcionario_data?.nombre_funcionario || (user?.first_name ? `${user.first_name} ${user.last_name}` : user?.username)}
+                                            </p>
+                                            {user?.funcionario_data?.nombre_funcionario && (
+                                                <p className="text-[10px] text-slate-400 truncate opacity-80">@{user?.username}</p>
+                                            )}
                                         </div>
 
                                         <div className="py-1 border-b border-slate-50 mb-1">
@@ -617,6 +631,31 @@ const Layout = () => {
                                                 </div>
                                                 Mi Perfil
                                             </button>
+
+                                            {can('auth.view_group') && (
+                                                <>
+                                                    <Link
+                                                        to="/admin/users"
+                                                        onClick={() => setIsProfileOpen(false)}
+                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                    >
+                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                            <Users className="w-4 h-4" />
+                                                        </div>
+                                                        Gestión Usuarios
+                                                    </Link>
+                                                    <Link
+                                                        to="/admin/roles"
+                                                        onClick={() => setIsProfileOpen(false)}
+                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                    >
+                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                            <Shield className="w-4 h-4" />
+                                                        </div>
+                                                        Gestión Roles
+                                                    </Link>
+                                                </>
+                                            )}
                                         </div>
 
                                         <button

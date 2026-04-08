@@ -69,7 +69,32 @@ const FileUploader = ({ title, description, endpoint, buttonLabel }) => {
             setFile(null);
         } catch (err) {
             console.error("Error processing file:", err);
-            setError("Hubo un error al procesar. Revisa el formato e intenta nuevamente.");
+
+            // Try to extract a useful error message from the backend
+            let errorMessage = "Hubo un error al procesar. Revisa el formato e intenta nuevamente.";
+
+            if (err.response) {
+                if (err.response.status === 403) {
+                    errorMessage = "No tienes permisos suficientes para realizar esta acción.";
+                } else if (err.response.data instanceof Blob) {
+                    // If it's a blob, we need to read it as text to find the error JSON
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        try {
+                            const errorData = JSON.parse(reader.result);
+                            setError(errorData.error || errorMessage);
+                        } catch (e) {
+                            setError(errorMessage);
+                        }
+                    };
+                    reader.readAsText(err.response.data);
+                    return; // Early exit since we'll set the error in the onload
+                } else if (err.response.data?.error) {
+                    errorMessage = err.response.data.error;
+                }
+            }
+
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }

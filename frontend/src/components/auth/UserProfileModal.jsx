@@ -86,7 +86,7 @@ const UserProfileModal = ({ isOpen, onClose }) => {
             </div>
             <div className="flex-1 min-w-0">
                 <p className="text-[9px] font-medium text-slate-400 uppercase tracking-wider mb-0.5">{label}</p>
-                <p className="text-sm font-medium text-slate-600 truncate">{value || 'No especificado'}</p>
+                <p className="text-sm font-medium text-slate-600 break-words">{value || 'No especificado'}</p>
             </div>
         </div>
     );
@@ -104,7 +104,7 @@ const UserProfileModal = ({ isOpen, onClose }) => {
             cancelLabel={isChangingPassword ? "Regresar" : "Cerrar"}
             onCancel={isChangingPassword ? () => setIsChangingPassword(false) : onClose}
             hideFooter={!isChangingPassword}
-            maxWidth="max-w-xl"
+            maxWidth="max-w-2xl"
         >
             <div className="space-y-3 py-0.5">
                 {/* Compact Header */}
@@ -132,7 +132,7 @@ const UserProfileModal = ({ isOpen, onClose }) => {
                         </div>
                         <p className="text-xs font-medium text-slate-400">@{user?.username}</p>
                         <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] uppercase font-semibold">
-                            {user?.is_superuser ? 'Super Administrador' : 'Usuario Sistema'}
+                            {user?.is_superuser ? 'Super Administrador' : (user?.role || 'Usuario Sistema')}
                         </div>
                     </div>
                 </div>

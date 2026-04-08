@@ -145,7 +145,7 @@ const FuncionariosList = () => {
                 {can('funcionarios.add_funcionario') && (
                     <button
                         onClick={handleCreate}
-                        className="group relative inline-flex items-center gap-2 px-6 py-3 bg-sky-600 text-white text-sm font-semibold rounded-xl overflow-hidden transition-all hover:bg-sky-700 hover:shadow-lg hover:shadow-sky-900/20 active:scale-95 shadow-xl shadow-sky-500/20"
+                        className="btn-primary"
                     >
                         <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
                         <span>Nuevo Funcionario</span>
