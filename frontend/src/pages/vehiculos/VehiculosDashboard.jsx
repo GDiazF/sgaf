@@ -8,26 +8,30 @@ import { usePermission } from '../../hooks/usePermission';
 const VehiculosDashboard = () => {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [year, setYear] = useState(2025);
+    const [year, setYear] = useState(new Date().getFullYear());
     const [registros, setRegistros] = useState([]);
+    const [flota, setFlota] = useState([]);
+    const [viewMode, setViewMode] = useState('individual'); // 'individual' or 'general'
+    const [selectedVehicles, setSelectedVehicles] = useState([]); // Array of IDs for filtering/export
     const { can } = usePermission();
 
     // Modal State
     const [isModalOpen, setModalOpen] = useState(false);
+    const [isFlotaModalOpen, setFlotaModalOpen] = useState(false);
+    const [isExportModalOpen, setExportModalOpen] = useState(false);
     const [editingRecord, setEditingRecord] = useState(null);
     const [formData, setFormData] = useState({
-        anio: 2025,
-        mes: 1,
-        numero_vehiculos: 2,
+        anio: new Date().getFullYear(),
+        mes: new Date().getMonth() + 1,
+        vehiculo: '',
         kilometros_recorridos: '',
         gasto_bencina: '',
         gasto_peajes: '',
         gasto_seguros: ''
     });
 
-    // Individual vehicle inputs state
-    const [vehicleDetails, setVehicleDetails] = useState([]);
-    const [showVehicleDetails, setShowVehicleDetails] = useState(false);
+    // Flota Form State
+    const [flotaFormData, setFlotaFormData] = useState({ marca: '', modelo: '', patente: '' });
     const [submitting, setSubmitting] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -42,52 +46,20 @@ const VehiculosDashboard = () => {
         fetchData();
     }, [year]);
 
-    // Initialize vehicle details when modal opens or number of vehicles changes
-    useEffect(() => {
-        const num = parseInt(formData.numero_vehiculos) || 0;
-        if (isModalOpen && num !== vehicleDetails.length && !editingRecord) {
-            setVehicleDetails(prev => {
-                const newDetails = [...prev];
-                if (num > prev.length) {
-                    for (let i = prev.length; i < num; i++) {
-                        newDetails.push({ kms: '', fuel: '', tolls: '', insurance: '' });
-                    }
-                } else {
-                    newDetails.splice(num);
-                }
-                return newDetails;
-            });
-        }
-    }, [formData.numero_vehiculos, isModalOpen, editingRecord]);
 
-    // Auto-calculate totals from vehicle details
-    useEffect(() => {
-        if (vehicleDetails.length > 0 && showVehicleDetails) {
-            const totals = vehicleDetails.reduce((acc, curr) => ({
-                kms: acc.kms + (parseInt(curr.kms) || 0),
-                fuel: acc.fuel + (parseInt(curr.fuel) || 0),
-                tolls: acc.tolls + (parseInt(curr.tolls) || 0),
-                insurance: acc.insurance + (parseInt(curr.insurance) || 0),
-            }), { kms: 0, fuel: 0, tolls: 0, insurance: 0 });
-
-            setFormData(prev => ({
-                ...prev,
-                kilometros_recorridos: totals.kms === 0 ? '' : totals.kms,
-                gasto_bencina: totals.fuel === 0 ? '' : totals.fuel,
-                gasto_peajes: totals.tolls === 0 ? '' : totals.tolls,
-                gasto_seguros: totals.insurance === 0 ? '' : totals.insurance
-            }));
-        }
-    }, [vehicleDetails, showVehicleDetails]);
 
     const fetchData = async () => {
         try {
-            const statsRes = await api.get(`vehiculos/registros/estadisticas_anuales/?anio=${year}`);
-            const listRes = await api.get(`vehiculos/registros/?anio=${year}`);
-            const sortedRegistros = listRes.data.sort((a, b) => a.mes - b.mes);
+            // Fetch Flota
+            const flotaRes = await api.get('vehiculos/flota/');
+            setFlota(flotaRes.data.results || flotaRes.data);
 
+            const params = { anio: year };
+            const statsRes = await api.get(`vehiculos/registros/estadisticas_anuales/`, { params });
+            const listRes = await api.get(`vehiculos/registros/`, { params });
+            
             setStats(statsRes.data);
-            setRegistros(sortedRegistros);
+            setRegistros(listRes.data.results || listRes.data);
         } catch (error) {
             console.error("Error fetching vehicle data:", error);
         } finally {
@@ -103,30 +75,50 @@ const VehiculosDashboard = () => {
         }));
     };
 
-    const handleVehicleDetailChange = (index, field, value) => {
-        setVehicleDetails(prev => {
-            const newDetails = [...prev];
-            newDetails[index] = {
-                ...newDetails[index],
-                [field]: value === '' ? '' : parseInt(value)
-            };
-            return newDetails;
-        });
+
+    const handleSaveFlota = async (e) => {
+        e.preventDefault();
+        setSubmitting(true);
+        try {
+            await api.post('vehiculos/flota/', flotaFormData);
+            setFlotaFormData({ marca: '', modelo: '', patente: '' });
+            fetchData();
+        } catch (error) {
+            console.error("Error saving vehicle:", error);
+            if (error.response && error.response.data) {
+                const message = typeof error.response.data === 'object' 
+                    ? Object.values(error.response.data).join('\n') 
+                    : error.response.data;
+                alert(`Error al guardar vehículo:\n${message}`);
+            } else {
+                alert("Error al guardar vehículo. Verifique si la patente ya existe o revise su conexión.");
+            }
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleDeleteFlota = async (id) => {
+        if (!window.confirm("¿Está seguro de eliminar este vehículo?")) return;
+        try {
+            await api.delete(`vehiculos/flota/${id}/`);
+            fetchData();
+        } catch (error) {
+            alert("No se puede eliminar un vehículo que tiene registros asociados. Marque como inactivo en su lugar.");
+        }
     };
 
     const handleOpenCreateModal = () => {
         setEditingRecord(null);
         setFormData({
             anio: year,
-            mes: registros.length > 0 ? (registros[registros.length - 1].mes % 12) + 1 : 1,
-            numero_vehiculos: 2,
+            mes: registros.length > 0 ? (registros[registros.length - 1].mes % 12) + 1 : new Date().getMonth() + 1,
+            vehiculo: flota.length > 0 ? flota[0].id : '',
             kilometros_recorridos: '',
             gasto_bencina: '',
             gasto_peajes: '',
             gasto_seguros: ''
         });
-        setVehicleDetails([]);
-        setShowVehicleDetails(false);
         setModalOpen(true);
     };
 
@@ -135,14 +127,12 @@ const VehiculosDashboard = () => {
         setFormData({
             anio: registro.anio,
             mes: registro.mes,
-            numero_vehiculos: registro.numero_vehiculos,
+            vehiculo: registro.vehiculo,
             kilometros_recorridos: registro.kilometros_recorridos,
             gasto_bencina: registro.gasto_bencina,
             gasto_peajes: registro.gasto_peajes,
             gasto_seguros: registro.gasto_seguros
         });
-        setVehicleDetails([]);
-        setShowVehicleDetails(false);
         setModalOpen(true);
     };
 
@@ -190,23 +180,37 @@ const VehiculosDashboard = () => {
         }
     };
 
-    const handleExportExcel = async () => {
+    const handleExportExcel = async (shouldSum = false) => {
         try {
-            const response = await api.get(`vehiculos/registros/exportar_excel/?anio=${year}`, {
+            const params = { anio: year, sumar: shouldSum };
+            // DRF QueryParams for list of IDs
+            selectedVehicles.forEach(id => {
+                params['vehiculos[]'] = params['vehiculos[]'] || [];
+                params['vehiculos[]'].push(id);
+            });
+
+            // Note: Use URLSearchParams for correct array encoding in GET
+            const searchParams = new URLSearchParams();
+            searchParams.append('anio', year);
+            searchParams.append('sumar', shouldSum);
+            selectedVehicles.forEach(id => searchParams.append('vehiculos[]', id));
+
+            const response = await api.get(`vehiculos/registros/exportar_excel/?${searchParams.toString()}`, {
                 responseType: 'blob',
             });
-            const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8-sig' });
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `reporte_flota_${year}.xlsx`);
+            link.setAttribute('download', `reporte_flota.csv`);
             document.body.appendChild(link);
             link.click();
             link.parentNode.removeChild(link);
             window.URL.revokeObjectURL(url);
+            setExportModalOpen(false);
         } catch (error) {
-            console.error("Error exporting excel:", error);
-            alert("Error al descargar el archivo Excel.");
+            console.error("Error exporting csv:", error);
+            alert("Error al descargar el archivo CSV.");
         }
     };
 
@@ -253,8 +257,30 @@ const VehiculosDashboard = () => {
 
     if (loading) return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div></div>;
 
-    const chartData = registros.map(r => ({
-        mes: r.mes_nombre,
+    const summedRegistros = Object.values(registros.reduce((acc, curr) => {
+        const key = `${curr.anio}-${curr.mes}`;
+        if (!acc[key]) {
+            acc[key] = { 
+                ...curr, 
+                id: `sum-${key}`,
+                kilometros_recorridos: 0, 
+                gasto_bencina: 0, 
+                gasto_peajes: 0, 
+                gasto_seguros: 0, 
+                vehiculo_detalle: { display_name: 'RESUMEN MENSUAL (SUMA)', patente: 'FLOTA' } 
+            };
+        }
+        acc[key].kilometros_recorridos += curr.kilometros_recorridos;
+        acc[key].gasto_bencina += curr.gasto_bencina;
+        acc[key].gasto_peajes += curr.gasto_peajes;
+        acc[key].gasto_seguros += curr.gasto_seguros;
+        return acc;
+    }, {})).sort((a, b) => a.mes - b.mes);
+
+    const displayRegistros = viewMode === 'general' ? summedRegistros : registros;
+
+    const chartData = (viewMode === 'general' ? summedRegistros : registros).map(r => ({
+        mes: viewMode === 'general' ? r.mes_nombre : `${r.mes_nombre} (${r.vehiculo_detalle?.patente})`,
         gasto_bencina: r.gasto_bencina,
         gasto_peajes: r.gasto_peajes,
         gasto_seguros: r.gasto_seguros,
@@ -272,21 +298,47 @@ const VehiculosDashboard = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 pb-2 gap-2">
                 <div>
                     <h1 className="text-xl font-bold text-slate-900 tracking-tight">Gestión de Flota</h1>
-                    <p className="text-xs font-medium text-slate-500">Control Vehicular {year}</p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-xs font-medium text-slate-500">Control Vehicular {year}</p>
+                        <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-bold border border-indigo-100 uppercase">
+                            Vista: {viewMode === 'individual' ? 'Por Vehículo' : 'General (Sumado)'}
+                        </span>
+                    </div>
                 </div>
                 <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                    <div className="flex bg-slate-100 p-1 rounded-xl">
+                        <button 
+                            onClick={() => setViewMode('individual')}
+                            className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${viewMode === 'individual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            INDIVIDUAL
+                        </button>
+                        <button 
+                            onClick={() => setViewMode('general')}
+                            className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${viewMode === 'general' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            GENERAL
+                        </button>
+                    </div>
+
                     <select
                         value={year}
-                        onChange={(e) => setYear(e.target.value)}
+                        onChange={(e) => setYear(parseInt(e.target.value))}
                         className="bg-white border border-slate-200 text-slate-700 text-xs rounded-xl px-3 py-1.5 shadow-sm font-medium outline-none flex-1 sm:flex-none"
                     >
-                        <option value="2024">2024</option>
-                        <option value="2025">2025</option>
-                        <option value="2026">2026</option>
+                        {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
 
                     <button
-                        onClick={handleExportExcel}
+                        onClick={() => setFlotaModalOpen(true)}
+                        className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center gap-2 flex-1 sm:flex-none"
+                    >
+                        <Car className="w-4 h-4 text-indigo-500" />
+                        Flota
+                    </button>
+
+                    <button
+                        onClick={() => setExportModalOpen(true)}
                         className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center gap-2 flex-1 sm:flex-none"
                     >
                         <Download className="w-4 h-4 text-emerald-600" />
@@ -394,54 +446,49 @@ const VehiculosDashboard = () => {
                     <motion.div variants={itemVariants} className="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden flex flex-col h-full border-b-[6px] border-b-slate-900/5">
                         <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center whitespace-nowrap">
                             <h3 className="text-sm font-bold text-slate-800">Registros {year}</h3>
-                            <span className="text-[9px] font-bold text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-100 uppercase tracking-tighter">{registros.length} MESES</span>
+                            <span className="text-[9px] font-bold text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-100 uppercase tracking-tighter">{displayRegistros.length} REGISTROS</span>
                         </div>
                         <div className="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar scroll-smooth">
                             <div className="min-w-[700px] lg:min-w-0">
                                 <table className="w-full text-sm text-left border-collapse table-fixed">
                                     <thead className="sticky top-0 z-10 text-[10px] text-slate-500 uppercase bg-slate-50 border-b border-slate-100 shadow-sm">
                                         <tr>
-                                            <th className="px-4 py-3 font-black w-[15%]">Mes</th>
-                                            <th className="px-1 py-3 font-black text-center w-[5%]">UN</th>
-                                            <th className="px-3 py-3 font-black text-right w-[30%]">KMS</th>
-                                            <th className="px-3 py-3 font-black text-right w-[42%]">Desglose Gastos Detallado</th>
-                                            <th className="px-3 py-3 font-black text-center w-[8%]"></th>
+                                            <th className="px-4 py-3 font-black w-[20%]">Mes / Vehículo</th>
+                                            <th className="px-3 py-3 font-black text-right w-[20%]">KMS</th>
+                                            <th className="px-3 py-3 font-black text-right w-[50%]">Gasto Detallado</th>
+                                            <th className="px-3 py-3 font-black text-center w-[10%]"></th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {registros.map((registro) => {
+                                        {displayRegistros.map((registro) => {
                                             return (
-                                                <tr key={registro.id} className="hover:bg-slate-50/80 transition-all duration-200 group h-[68px]">
-                                                    <td className="px-4 py-1 font-medium text-slate-800 text-[14px] leading-tight truncate">
-                                                        {windowWidth < 1440 ? registro.mes_nombre.substring(0, 3) : registro.mes_nombre}
+                                                <tr key={registro.id} className="hover:bg-slate-50/80 transition-all duration-200 group">
+                                                    <td className="px-4 py-3">
+                                                       <div className="flex flex-col">
+                                                            <span className="font-bold text-slate-800 text-[13px]">{registro.mes_nombre}</span>
+                                                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">{registro.vehiculo_detalle?.display_name || registro.vehiculo_detalle?.patente}</span>
+                                                       </div>
                                                     </td>
-                                                    <td className="px-1 py-1 text-center font-medium text-slate-400 text-[10px]">{registro.numero_vehiculos}</td>
-                                                    <td className="px-3 py-1 text-right tabular-nums text-slate-600 font-medium text-[12px] tracking-tight leading-tight">{registro.kilometros_recorridos.toLocaleString()}</td>
-                                                    <td className="px-3 py-1 text-right tabular-nums leading-tight">
+                                                    <td className="px-3 py-3 text-right tabular-nums text-slate-600 font-medium text-[12px] tracking-tight">{registro.kilometros_recorridos.toLocaleString()}</td>
+                                                    <td className="px-3 py-3 text-right tabular-nums">
                                                         <div className="flex flex-col items-end gap-1">
-                                                            <div className="flex flex-wrap justify-end gap-x-6 text-[13px] font-medium tracking-tight w-full leading-none">
-                                                                <div className="flex items-center">
-                                                                    <span className="text-amber-600 font-mono">{formatCurrency(registro.gasto_bencina)}</span>
-                                                                </div>
-                                                                <div className="flex items-center">
-                                                                    <span className="text-violet-500 font-mono">{formatCurrency(registro.gasto_peajes)}</span>
-                                                                </div>
-                                                                <div className="flex items-center">
-                                                                    <span className="text-emerald-600 font-mono">{formatCurrency(registro.gasto_seguros)}</span>
-                                                                </div>
+                                                            <div className="flex flex-wrap justify-end gap-x-4 text-[12px] font-medium tracking-tight leading-none">
+                                                                <span className="text-amber-600 font-mono" title="Bencina">{formatCurrency(registro.gasto_bencina)}</span>
+                                                                <span className="text-violet-500 font-mono" title="Peajes">{formatCurrency(registro.gasto_peajes)}</span>
+                                                                <span className="text-emerald-600 font-mono" title="Seguros">{formatCurrency(registro.gasto_seguros)}</span>
                                                             </div>
-                                                            <div className="flex items-center gap-2 text-[15px] font-medium text-slate-900 border-t border-slate-100 pt-1 mt-0.5 leading-none">
-                                                                <span className="text-[10px] text-slate-400 uppercase tracking-widest">Total:</span>
+                                                            <div className="flex items-center gap-2 text-[14px] font-bold text-slate-900 border-t border-slate-100 pt-1 mt-0.5 leading-none">
+                                                                <span className="text-[9px] text-slate-400 uppercase tracking-widest">Total:</span>
                                                                 {formatCurrency(registro.gasto_bencina + registro.gasto_peajes + registro.gasto_seguros)}
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td className="px-3 py-1 text-center">
-                                                        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            {can('vehiculos.change_registromensual') && (
+                                                    <td className="px-3 py-3 text-center">
+                                                        <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            {viewMode === 'individual' && can('vehiculos.change_registromensual') && (
                                                                 <button onClick={() => handleOpenEditModal(registro)} className="text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
                                                             )}
-                                                            {can('vehiculos.delete_registromensual') && (
+                                                            {viewMode === 'individual' && can('vehiculos.delete_registromensual') && (
                                                                 <button onClick={() => handleDelete(registro.id, registro.mes_nombre)} disabled={isDeleting} className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                                                             )}
                                                         </div>
@@ -484,26 +531,26 @@ const VehiculosDashboard = () => {
                             </div>
 
                             <form onSubmit={handleSubmit} className="p-8 space-y-8">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                    <div className="space-y-2">
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+                                    <div className="space-y-2 md:col-span-3">
                                         <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Año Fiscal</label>
                                         <input
                                             type="number"
                                             name="anio"
                                             value={formData.anio}
                                             onChange={handleInputChange}
-                                            className="w-full px-6 py-4 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none font-bold text-slate-700 bg-slate-50 transition-all"
+                                            className="w-full px-6 h-14 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none font-bold text-slate-700 bg-slate-50 transition-all"
                                             required
                                             disabled={!!editingRecord}
                                         />
                                     </div>
-                                    <div className="space-y-2">
+                                    <div className="space-y-2 md:col-span-4">
                                         <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Mes de Operación</label>
                                         <select
                                             name="mes"
                                             value={formData.mes}
                                             onChange={handleInputChange}
-                                            className="w-full px-6 py-4 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none font-bold text-slate-700 bg-slate-50 transition-all appearance-none"
+                                            className="w-full px-6 h-14 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none font-bold text-slate-700 bg-slate-50 transition-all"
                                             disabled={!!editingRecord}
                                         >
                                             {Array.from({ length: 12 }, (_, i) => (
@@ -511,98 +558,56 @@ const VehiculosDashboard = () => {
                                             ))}
                                         </select>
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-black text-indigo-600 uppercase tracking-widest ml-1 flex items-center gap-2"><Car className="w-4 h-4" /> Flota Activa</label>
-                                        <input type="number" name="numero_vehiculos" value={formData.numero_vehiculos} onChange={handleInputChange} className="w-full px-6 py-4 rounded-2xl border-2 border-indigo-100 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none font-black text-indigo-700 bg-indigo-50/30 transition-all" min="1" max="50" />
+                                    <div className="space-y-2 md:col-span-5">
+                                        <label className="text-xs font-black text-indigo-600 uppercase tracking-widest ml-1 flex items-center gap-2"><Car className="w-4 h-4" /> Vehículo</label>
+                                        <select
+                                            name="vehiculo"
+                                            value={formData.vehiculo}
+                                            onChange={handleInputChange}
+                                            className="w-full px-6 h-14 rounded-2xl border-2 border-indigo-100 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none font-black text-indigo-700 bg-indigo-50/30 transition-all"
+                                            required
+                                            disabled={!!editingRecord}
+                                        >
+                                            <option value="">Seleccionar Vehículo...</option>
+                                            {flota.map(v => (
+                                                <option key={v.id} value={v.id}>{v.marca} {v.modelo} ({v.patente})</option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
 
-                                {!editingRecord && (
-                                    <div className="flex items-center justify-between bg-gradient-to-r from-slate-900 to-slate-800 p-6 rounded-[32px] shadow-xl shadow-slate-900/10">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 bg-white/10 text-white rounded-2xl flex items-center justify-center backdrop-blur-sm border border-white/10"><Calculator className="w-6 h-6" /></div>
-                                            <div><p className="text-lg font-bold text-white">Modo Inteligente</p><p className="text-xs text-white/50">Carga detallada por patente y vehículo.</p></div>
-                                        </div>
-                                        <button type="button" onClick={() => setShowVehicleDetails(!showVehicleDetails)} className={`px-6 py-3 rounded-2xl text-xs font-black transition-all shadow-lg ${showVehicleDetails ? 'bg-indigo-500 text-white shadow-indigo-500/30' : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'}`}>{showVehicleDetails ? 'ACTIVADO' : 'DESACTIVADO'}</button>
-                                    </div>
-                                )}
-
-                                {showVehicleDetails && !editingRecord && (
-                                    <div className="space-y-6 animate-in slide-in-from-top-4 duration-500">
-                                        {/* Running Totals Preview Bar */}
-                                        <div className="grid grid-cols-4 gap-4 bg-indigo-50/50 p-4 rounded-3xl border border-indigo-100 shadow-sm">
-                                            <div className="text-center">
-                                                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-tighter">Total KM</p>
-                                                <p className="text-lg font-black text-indigo-700 font-mono tracking-tight">{formData.kilometros_recorridos || 0}</p>
-                                            </div>
-                                            <div className="text-center">
-                                                <p className="text-[10px] font-black text-amber-500 uppercase tracking-tighter">Total Bencina</p>
-                                                <p className="text-lg font-black text-amber-600 font-mono tracking-tight">{formatCurrency(formData.gasto_bencina || 0)}</p>
-                                            </div>
-                                            <div className="text-center">
-                                                <p className="text-[10px] font-black text-violet-500 uppercase tracking-tighter">Total Peajes</p>
-                                                <p className="text-lg font-black text-violet-600 font-mono tracking-tight">{formatCurrency(formData.gasto_peajes || 0)}</p>
-                                            </div>
-                                            <div className="text-center">
-                                                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-tighter">Total Seguros</p>
-                                                <p className="text-lg font-black text-emerald-600 font-mono tracking-tight">{formatCurrency(formData.gasto_seguros || 0)}</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-4 max-h-[300px] overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-slate-200 custom-scroll">
-                                            <div className="grid grid-cols-12 gap-4 px-4 mb-2 sticky top-0 bg-white z-10 py-3 border-b border-slate-100 text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">
-                                                <div className="col-span-2">Vehículo</div><div className="col-span-3 text-center">KM</div><div className="col-span-2 text-center">Bencina</div><div className="col-span-2 text-center">Peajes</div><div className="col-span-3 text-center">Seguros</div>
-                                            </div>
-                                            {vehicleDetails.map((v, idx) => (
-                                                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.05 }} key={idx} className="grid grid-cols-12 gap-4 items-center bg-slate-50/50 hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 rounded-2xl p-3 border border-slate-100 transition-all group">
-                                                    <div className="col-span-2 flex items-center gap-3">
-                                                        <span className="w-8 h-8 bg-white border border-slate-200 text-slate-400 text-xs font-black rounded-xl flex items-center justify-center shadow-sm group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-all">{idx + 1}</span>
-                                                        <span className="text-xs font-black text-slate-500 tracking-tighter">MOV-{100 + idx}</span>
-                                                    </div>
-                                                    <div className="col-span-3"><input type="number" value={v.kms} onChange={(e) => handleVehicleDetailChange(idx, 'kms', e.target.value)} className="w-full px-4 py-2 bg-white rounded-xl border-2 border-slate-100 focus:border-indigo-500 outline-none text-sm text-center font-bold" placeholder="0" /></div>
-                                                    <div className="col-span-2"><input type="number" value={v.fuel} onChange={(e) => handleVehicleDetailChange(idx, 'fuel', e.target.value)} className="w-full px-4 py-2 bg-white rounded-xl border-2 border-slate-100 focus:border-indigo-500 outline-none text-sm text-center font-bold" placeholder="0" /></div>
-                                                    <div className="col-span-2"><input type="number" value={v.tolls} onChange={(e) => handleVehicleDetailChange(idx, 'tolls', e.target.value)} className="w-full px-4 py-2 bg-white rounded-xl border-2 border-slate-100 focus:border-indigo-500 outline-none text-sm text-center font-bold" placeholder="0" /></div>
-                                                    <div className="col-span-3"><input type="number" value={v.insurance} onChange={(e) => handleVehicleDetailChange(idx, 'insurance', e.target.value)} className="w-full px-4 py-2 bg-white rounded-xl border-2 border-slate-100 focus:border-indigo-500 outline-none text-sm text-center font-bold" placeholder="0" /></div>
-                                                </motion.div>
-                                            ))}
+                                <div className="space-y-8 animate-in fade-in duration-500">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Lectura de Odómetro Mensual</label>
+                                        <div className="relative">
+                                            <input type="number" name="kilometros_recorridos" value={formData.kilometros_recorridos} onChange={handleInputChange} className="w-full px-8 py-5 rounded-[24px] border-2 border-slate-100 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none font-black text-2xl text-slate-800 bg-slate-50 transition-all pr-20" placeholder="000,000" />
+                                            <span className="absolute right-8 top-1/2 -translate-y-1/2 font-black text-slate-300">KM</span>
                                         </div>
                                     </div>
-                                )}
-
-                                {(editingRecord || !showVehicleDetails) && (
-                                    <div className="space-y-8 animate-in fade-in duration-500">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div className="space-y-2">
-                                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Lectura de Odómetro Mensual</label>
+                                            <label className="text-xs font-black text-amber-600 uppercase tracking-widest ml-1">Combustible</label>
                                             <div className="relative">
-                                                <input type="number" name="kilometros_recorridos" value={formData.kilometros_recorridos} onChange={handleInputChange} className="w-full px-8 py-5 rounded-[24px] border-2 border-slate-100 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none font-black text-2xl text-slate-800 bg-slate-50 transition-all pr-20" placeholder="000,000" />
-                                                <span className="absolute right-8 top-1/2 -translate-y-1/2 font-black text-slate-300">KM</span>
+                                                <input type="number" name="gasto_bencina" value={formData.gasto_bencina} onChange={handleInputChange} style={{ paddingLeft: '3rem' }} className="w-full pr-6 h-14 rounded-2xl border-2 border-amber-100 focus:border-amber-500 outline-none font-bold text-slate-700 bg-amber-50/10 transition-all" />
+                                                <DollarSign className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-amber-500" />
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-black text-amber-600 uppercase tracking-widest ml-1">Combustible</label>
-                                                <div className="relative">
-                                                    <input type="number" name="gasto_bencina" value={formData.gasto_bencina} onChange={handleInputChange} className="w-full px-6 py-4 rounded-2xl border-2 border-amber-100 focus:border-amber-500 outline-none font-bold text-slate-700 bg-amber-50/10 transition-all pl-10" />
-                                                    <DollarSign className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-amber-500" />
-                                                </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-violet-600 uppercase tracking-widest ml-1">Peajes / TAG</label>
+                                            <div className="relative">
+                                                <input type="number" name="gasto_peajes" value={formData.gasto_peajes} onChange={handleInputChange} style={{ paddingLeft: '3rem' }} className="w-full pr-6 h-14 rounded-2xl border-2 border-violet-100 focus:border-violet-500 outline-none font-bold text-slate-700 bg-violet-50/10 transition-all" />
+                                                <DollarSign className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-violet-500" />
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-black text-violet-600 uppercase tracking-widest ml-1">Peajes / TAG</label>
-                                                <div className="relative">
-                                                    <input type="number" name="gasto_peajes" value={formData.gasto_peajes} onChange={handleInputChange} className="w-full px-6 py-4 rounded-2xl border-2 border-violet-100 focus:border-violet-500 outline-none font-bold text-slate-700 bg-violet-50/10 transition-all pl-10" />
-                                                    <DollarSign className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-violet-500" />
-                                                </div>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-black text-emerald-600 uppercase tracking-widest ml-1">Seguros / Otros</label>
-                                                <div className="relative">
-                                                    <input type="number" name="gasto_seguros" value={formData.gasto_seguros} onChange={handleInputChange} className="w-full px-6 py-4 rounded-2xl border-2 border-emerald-100 focus:border-emerald-500 outline-none font-bold text-slate-700 bg-emerald-50/10 transition-all pl-10" />
-                                                    <DollarSign className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" />
-                                                </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-emerald-600 uppercase tracking-widest ml-1">Seguros / Otros</label>
+                                            <div className="relative">
+                                                <input type="number" name="gasto_seguros" value={formData.gasto_seguros} onChange={handleInputChange} style={{ paddingLeft: '3rem' }} className="w-full pr-6 h-14 rounded-2xl border-2 border-emerald-100 focus:border-emerald-500 outline-none font-bold text-slate-700 bg-emerald-50/10 transition-all" />
+                                                <DollarSign className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" />
                                             </div>
                                         </div>
                                     </div>
-                                )}
+                                </div>
 
                                 <div className="pt-8 flex justify-end gap-4 border-t border-slate-100">
                                     <button type="button" onClick={() => setModalOpen(false)} className="px-8 py-4 rounded-2xl text-slate-400 font-black hover:text-slate-600 hover:bg-slate-100 transition-all text-sm tracking-widest uppercase">Cancelar</button>
@@ -614,7 +619,104 @@ const VehiculosDashboard = () => {
                         </motion.div>
                     </div>
                 )}
-            </AnimatePresence >
+            </AnimatePresence>
+            {/* Flota Modal */}
+            <AnimatePresence>
+                {isFlotaModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={() => setFlotaModalOpen(false)}>
+                        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-white rounded-[32px] shadow-2xl w-full max-w-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                                <h3 className="text-xl font-black text-slate-800 flex items-center gap-2"><Car className="text-indigo-600" /> Mantenedor de Flota</h3>
+                                <button onClick={() => setFlotaModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X /></button>
+                            </div>
+                            <div className="p-6">
+                                <form onSubmit={handleSaveFlota} className="grid grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                    <input placeholder="Marca" className="px-3 py-2 border rounded-xl" value={flotaFormData.marca} onChange={e => setFlotaFormData({...flotaFormData, marca: e.target.value})} required />
+                                    <input placeholder="Modelo" className="px-3 py-2 border rounded-xl" value={flotaFormData.modelo} onChange={e => setFlotaFormData({...flotaFormData, modelo: e.target.value})} required />
+                                    <input placeholder="Patente" className="px-3 py-2 border rounded-xl" value={flotaFormData.patente} onChange={e => setFlotaFormData({...flotaFormData, patente: e.target.value.toUpperCase()})} required />
+                                    <button type="submit" disabled={submitting} className="col-span-3 bg-indigo-600 text-white py-2 rounded-xl font-bold hover:bg-indigo-700 transition-colors uppercase text-xs tracking-widest">Agregar Vehículo</button>
+                                </form>
+                                <div className="max-h-[300px] overflow-y-auto space-y-2">
+                                    {flota.map(v => (
+                                        <div key={v.id} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-2xl hover:bg-slate-50 transition-colors group">
+                                            <div>
+                                                <p className="font-bold text-slate-800 text-sm">{v.marca} {v.modelo}</p>
+                                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{v.patente}</p>
+                                            </div>
+                                            <button onClick={() => handleDeleteFlota(v.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Custom Export Modal */}
+            <AnimatePresence>
+                {isExportModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={() => setExportModalOpen(false)}>
+                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                            <div className="p-6 border-b border-slate-100">
+                                <h3 className="text-xl font-black text-slate-800">Exportar Reporte</h3>
+                                <p className="text-xs text-slate-400">Seleccione los vehículos y el formato de salida.</p>
+                            </div>
+                            <div className="p-6 space-y-6">
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Selección de Flota</label>
+                                    <div className="max-h-[200px] overflow-y-auto space-y-2 pr-2 scrollbar-thin">
+                                        <div 
+                                            key="all" 
+                                            className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center gap-3 ${selectedVehicles.length === 0 ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100'}`}
+                                            onClick={() => setSelectedVehicles([])}
+                                        >
+                                            <div className={`w-4 h-4 rounded-full border-2 ${selectedVehicles.length === 0 ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300'}`} />
+                                            <span className="text-sm font-bold">Todos los Vehículos</span>
+                                        </div>
+                                        {flota.map(v => (
+                                            <div 
+                                                key={v.id} 
+                                                className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center gap-3 ${selectedVehicles.includes(v.id) ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100'}`}
+                                                onClick={() => {
+                                                    if(selectedVehicles.includes(v.id)) {
+                                                        setSelectedVehicles(selectedVehicles.filter(i => i !== v.id));
+                                                    } else {
+                                                        setSelectedVehicles([...selectedVehicles, v.id]);
+                                                    }
+                                                }}
+                                            >
+                                                <div className={`w-4 h-4 rounded-full border-2 ${selectedVehicles.includes(v.id) ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300'}`} />
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-bold">{v.marca} {v.modelo}</span>
+                                                    <span className="text-[9px] text-slate-400">{v.patente}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <button 
+                                        onClick={() => handleExportExcel(false)}
+                                        className="flex flex-col items-center justify-center p-4 bg-slate-50 border-2 border-slate-100 rounded-3xl hover:border-indigo-500 transition-all group gap-2"
+                                    >
+                                        <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform"><Activity className="text-slate-400 group-hover:text-indigo-600" /></div>
+                                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">Detallado</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => handleExportExcel(true)}
+                                        className="flex flex-col items-center justify-center p-4 bg-slate-50 border-2 border-slate-100 rounded-3xl hover:border-emerald-500 transition-all group gap-2"
+                                    >
+                                        <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform"><Plus className="text-slate-400 group-hover:text-emerald-600" /></div>
+                                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">Sumado</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </motion.div >
     );
 };

@@ -166,7 +166,7 @@ const RolesManagement = () => {
                     {can('auth.add_group') && (
                         <button
                             onClick={handleNew}
-                            className="btn-primary"
+                            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
                         >
                             <Plus className="w-5 h-5" />
                             <span>Nuevo Rol</span>
