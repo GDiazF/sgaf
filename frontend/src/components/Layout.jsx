@@ -1,20 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Key, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Box, Globe } from 'lucide-react';
+import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Box, Globe, UserCircle2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../hooks/usePermission';
 import api from '../api';
+import UserProfileModal from './auth/UserProfileModal';
 
 const Layout = () => {
     const location = useLocation();
-    const { user, logout } = useAuth();
+    const { user, logout, checkUserStatus } = useAuth();
     const { can, hasRole } = usePermission();
     const [sidebarOpen, setSidebarOpen] = useState(true); // Desktop: Collapsed/Expanded
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // Mobile: Open/Closed
     const [activeMainGroup, setActiveMainGroup] = useState(null); // 'ssgg', 'tesoreria', 'mp'
     const [activeSubMenu, setActiveSubMenu] = useState(null); // 'services' or 'loans'
     const [isProfileOpen, setIsProfileOpen] = useState(false); // Header profile dropdown
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isOnline, setIsOnline] = useState(true); // Backend status
     const profileRef = useRef(null);
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -64,7 +66,7 @@ const Layout = () => {
         const routeTitles = {
             '/': 'Dashboard',
             '/establishments': 'Establecimientos',
-            '/funcionarios': 'Personal',
+            '/funcionarios': 'Funcionarios',
             '/reservas-externas': 'Reservas Externas',
             '/contracts': 'Contratos',
             '/services/providers': 'Proveedores',
@@ -211,7 +213,7 @@ const Layout = () => {
                                 animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
                                 className="font-medium whitespace-nowrap"
                             >
-                                Personal
+                                Funcionarios
                             </motion.span>
                         </Link>
                     )}
@@ -574,10 +576,19 @@ const Layout = () => {
                                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                                 className="relative group transition-transform active:scale-95"
                             >
-                                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow">
-                                    {user?.username?.charAt(0).toUpperCase() || 'U'}
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow overflow-hidden border-2 border-white">
+                                    {user?.avatar ? (
+                                        <img
+                                            src={user.avatar}
+                                            alt="Avatar"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        user?.username?.charAt(0).toUpperCase() || 'U'
+                                    )}
                                 </div>
                             </button>
+
 
                             {/* Dropdown Menu */}
                             <AnimatePresence>
@@ -593,34 +604,20 @@ const Layout = () => {
                                             <p className="text-sm font-bold text-slate-700 truncate">{user?.username}</p>
                                         </div>
 
-                                        {(can('auth.view_user') || can('auth.view_group')) && (
-                                            <div className="py-1 border-b border-slate-50 mb-1">
-                                                {can('auth.view_user') && (
-                                                    <Link
-                                                        to="/admin/users"
-                                                        onClick={() => setIsProfileOpen(false)}
-                                                        className="flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                    >
-                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                            <Users className="w-4 h-4" />
-                                                        </div>
-                                                        Gestionar Usuarios
-                                                    </Link>
-                                                )}
-                                                {can('auth.view_group') && (
-                                                    <Link
-                                                        to="/admin/roles"
-                                                        onClick={() => setIsProfileOpen(false)}
-                                                        className="flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                    >
-                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                            <Shield className="w-4 h-4" />
-                                                        </div>
-                                                        Gestionar Roles
-                                                    </Link>
-                                                )}
-                                            </div>
-                                        )}
+                                        <div className="py-1 border-b border-slate-50 mb-1">
+                                            <button
+                                                onClick={() => {
+                                                    setIsProfileOpen(false);
+                                                    setIsProfileModalOpen(true);
+                                                }}
+                                                className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                            >
+                                                <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                    <UserCircle2 className="w-4 h-4" />
+                                                </div>
+                                                Mi Perfil
+                                            </button>
+                                        </div>
 
                                         <button
                                             onClick={() => {
@@ -652,6 +649,11 @@ const Layout = () => {
                         <Outlet />
                     </motion.div>
                 </div>
+
+                <UserProfileModal
+                    isOpen={isProfileModalOpen}
+                    onClose={() => setIsProfileModalOpen(false)}
+                />
             </main >
         </div >
     );

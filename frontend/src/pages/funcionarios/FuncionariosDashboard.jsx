@@ -63,7 +63,7 @@ const FuncionariosDashboard = () => {
             {/* Header */}
             <div className="flex justify-between items-end border-b border-slate-200/60 pb-6">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Portal de Personal</h1>
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Portal de Funcionarios</h1>
                     <p className="text-sm font-medium text-slate-500 mt-1 flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                         Gestión Institucional y Recursos Humanos

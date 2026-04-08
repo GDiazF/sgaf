@@ -82,8 +82,8 @@ const PaymentsDashboard = () => {
 
             const [payRes, servRes, estRes] = await Promise.all([
                 api.get('registros-pagos/', { params }),
-                api.get('servicios/'),
-                api.get('establecimientos/')
+                api.get('servicios/', { params: { page_size: 1000 } }),
+                api.get('establecimientos/', { params: { page_size: 1000 } })
             ]);
 
             // Handle Pagination
@@ -107,8 +107,8 @@ const PaymentsDashboard = () => {
         const fetchFilters = async () => {
             try {
                 const [typesRes, provRes] = await Promise.all([
-                    api.get('tipos-proveedores/'),
-                    api.get('proveedores/')
+                    api.get('tipos-proveedores/', { params: { page_size: 1000 } }),
+                    api.get('proveedores/', { params: { page_size: 1000 } })
                 ]);
                 setProviderTypes(typesRes.data.results || typesRes.data);
                 setProviders(provRes.data.results || provRes.data);
@@ -132,14 +132,14 @@ const PaymentsDashboard = () => {
 
         if (typeId) {
             try {
-                const res = await api.get(`proveedores/?tipo_proveedor=${typeId}`);
+                const res = await api.get(`proveedores/?tipo_proveedor=${typeId}`, { params: { page_size: 1000 } });
                 setProviders(res.data.results || res.data);
             } catch (error) {
                 console.error("Error fetching filtered providers:", error);
             }
         } else {
             // If cleared, fetch all providers again
-            const res = await api.get('proveedores/');
+            const res = await api.get('proveedores/', { params: { page_size: 1000 } });
             setProviders(res.data.results || res.data);
         }
     };

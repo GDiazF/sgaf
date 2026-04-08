@@ -148,7 +148,11 @@ const CDPManager = () => {
                             </div>
                             <div className="flex gap-1">
                                 <button
-                                    onClick={() => setPreviewUrl(cdp.archivo)}
+                                    onClick={() => {
+                                        // Ensure we use a relative URL if it's absolute to avoid Cors/X-Frame issues via the proxy
+                                        const cleanUrl = cdp.archivo?.replace(/^https?:\/\/[^/]+/, '');
+                                        setPreviewUrl(cleanUrl);
+                                    }}
                                     className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                                     title="Ver Documento"
                                 >
@@ -325,11 +329,17 @@ const CDPManager = () => {
                                 </button>
                             </div>
                             <div className="flex-1 bg-slate-100 p-2">
-                                <iframe
-                                    src={previewUrl}
-                                    className="w-full h-full rounded-lg border border-slate-200"
-                                    title="PDF Preview"
-                                />
+                                {previewUrl?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                                    <div className="w-full h-full flex items-center justify-center p-4">
+                                        <img src={previewUrl} className="max-w-full max-h-full rounded-lg shadow-lg" alt="Preview" />
+                                    </div>
+                                ) : (
+                                    <iframe
+                                        src={previewUrl}
+                                        className="w-full h-full rounded-lg border border-slate-200"
+                                        title="PDF Preview"
+                                    />
+                                )}
                             </div>
                             <div className="p-4 border-t border-slate-100 flex justify-end bg-white">
                                 <a

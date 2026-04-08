@@ -1,7 +1,12 @@
 from rest_framework import serializers
-from .models import Establecimiento, Solicitante, Activo, Prestamo
+from .models import Establecimiento, Solicitante, Activo, Prestamo, TipoActivo
 
 from establecimientos.serializers import EstablecimientoSerializer
+
+class TipoActivoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TipoActivo
+        fields = '__all__'
 
 class SolicitanteSerializer(serializers.ModelSerializer):
     funcionario_detalle = serializers.SerializerMethodField()
@@ -23,6 +28,7 @@ class SolicitanteSerializer(serializers.ModelSerializer):
 
 class ActivoSerializer(serializers.ModelSerializer):
     establecimiento_nombre = serializers.ReadOnlyField(source='establecimiento.nombre')
+    tipo_nombre = serializers.ReadOnlyField(source='tipo.nombre')
     disponible = serializers.SerializerMethodField()
     solicitante_actual = serializers.SerializerMethodField()
     

@@ -97,3 +97,19 @@
     background: rgba(100, 116, 139, 0.7);
   }
 }
+
+/* Hide Browser Default Password Reveal Button (Edge/IE) */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
+/* Hide Webkit/Chrome Auto-fill and reveal icons if necessary to avoid overlap */
+input::-webkit-contacts-auto-fill-button,
+input::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}

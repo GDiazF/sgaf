@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'corsheaders',
     # Local apps
     'prestamo_llaves',
+    'core',
     'establecimientos',
     'servicios',
     'contratos',
@@ -195,7 +196,11 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:5173',
     'http://10.0.100.25',
     'http://10.0.100.25:5173',
+    'http://10.0.100.119',
+    'http://10.0.100.119:5173',
 ]
+
+FRONTEND_URL = config('FRONTEND_URL', default='http://10.0.100.119:5173')
 
 
 # ────────────────────────────────────────────────────────────

@@ -37,6 +37,8 @@ import ReservasDashboard from './pages/reservas/ReservasDashboard';
 import PublicReservas from './pages/reservas/PublicReservas';
 import PersonalTIDashboard from './pages/personal_ti/PersonalTIDashboard';
 import Login from './pages/Login';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
 
 // Admin
 import UserManagement from './pages/admin/UserManagement';
@@ -57,6 +59,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
           <Route path="/reservas-externas" element={<PublicReservas />} />
 
           {/* Protected Routes */}

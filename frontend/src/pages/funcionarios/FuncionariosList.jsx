@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Edit2, Power, Filter, Phone, Plus, ArrowLeft } from 'lucide-react';
+import { Users, Search, Edit2, Power, Filter, Phone, Plus, ArrowLeft, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api';
@@ -110,6 +110,17 @@ const FuncionariosList = () => {
     const handleEdit = (id) => {
         setSelectedId(id);
         setIsModalOpen(true);
+    };
+
+    const handleDelete = async (id) => {
+        if (!window.confirm('¿Estás seguro de eliminar este funcionario? Esta acción no se puede deshacer.')) return;
+        try {
+            await api.delete(`funcionarios/${id}/`);
+            fetchData(currentPage);
+        } catch (error) {
+            console.error('Error deleting funcionario:', error);
+            alert('Error al eliminar funcionario. Podría estar vinculado a otros registros.');
+        }
     };
 
     return (
@@ -256,6 +267,15 @@ const FuncionariosList = () => {
                                                         title="Editar"
                                                     >
                                                         <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                                {can('funcionarios.delete_funcionario') && (
+                                                    <button
+                                                        onClick={() => handleDelete(item.id)}
+                                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
+                                                        title="Eliminar"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
                                                     </button>
                                                 )}
                                             </div>

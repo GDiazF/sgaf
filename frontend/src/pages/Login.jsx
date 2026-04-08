@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Lock, User, AlertCircle } from 'lucide-react';
+import { Lock, User, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const Login = () => {
@@ -9,6 +9,7 @@ const Login = () => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const { login } = useAuth();
     const navigate = useNavigate();
 
@@ -69,7 +70,7 @@ const Login = () => {
                             <input
                                 type="text"
                                 id="username"
-                                className="peer w-full px-4 py-3 bg-white border-2 border-slate-100 rounded-xl !focus:border-slate-900 !focus:ring-[6px] !focus:ring-slate-900/5 outline-none transition-all placeholder:text-transparent text-slate-900 font-bold text-sm"
+                                className="peer w-full !pl-12 !pr-4 py-3 bg-white border-2 border-slate-100 rounded-xl !focus:border-slate-900 !focus:ring-[6px] !focus:ring-slate-900/5 outline-none transition-all placeholder:text-transparent text-slate-900 font-bold text-sm"
                                 placeholder=" "
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
@@ -77,20 +78,20 @@ const Login = () => {
                             />
                             <label
                                 htmlFor="username"
-                                className="absolute left-4 -top-2 bg-white px-2 text-[8px] font-black text-slate-400 uppercase tracking-widest transition-all 
+                                className="absolute !left-12 -top-2 bg-white px-2 text-[8px] font-black text-slate-400 uppercase tracking-widest transition-all 
                                 peer-placeholder-shown:text-[11px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:top-3.5 peer-placeholder-shown:bg-transparent peer-placeholder-shown:font-bold
                                 peer-focus:-top-2 peer-focus:text-[8px] peer-focus:text-slate-900 peer-focus:bg-white pointer-events-none"
                             >
                                 Usuario
                             </label>
-                            <User className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 peer-focus:text-slate-900 transition-colors pointer-events-none" />
+                            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 peer-focus:text-slate-900 transition-colors pointer-events-none" />
                         </div>
 
                         <div className="relative">
                             <input
-                                type="password"
+                                type={showPassword ? "text" : "password"}
                                 id="password"
-                                className="peer w-full px-4 py-3 bg-white border-2 border-slate-100 rounded-xl !focus:border-slate-900 !focus:ring-[6px] !focus:ring-slate-900/5 outline-none transition-all placeholder:text-transparent text-slate-900 font-bold text-sm"
+                                className="peer w-full !pl-12 !pr-12 py-3 bg-white border-2 border-slate-100 rounded-xl !focus:border-slate-900 !focus:ring-[6px] !focus:ring-slate-900/5 outline-none transition-all placeholder:text-transparent text-slate-900 font-bold text-sm"
                                 placeholder=" "
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -98,19 +99,40 @@ const Login = () => {
                             />
                             <label
                                 htmlFor="password"
-                                className="absolute left-4 -top-2 bg-white px-2 text-[8px] font-black text-slate-400 uppercase tracking-widest transition-all 
+                                className="absolute !left-12 -top-2 bg-white px-2 text-[8px] font-black text-slate-400 uppercase tracking-widest transition-all 
                                 peer-placeholder-shown:text-[11px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:top-3.5 peer-placeholder-shown:bg-transparent peer-placeholder-shown:font-bold
                                 peer-focus:-top-2 peer-focus:text-[8px] peer-focus:text-slate-900 peer-focus:bg-white pointer-events-none"
                             >
                                 Contraseña
                             </label>
-                            <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 peer-focus:text-slate-900 transition-colors pointer-events-none" />
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 peer-focus:text-slate-900 transition-colors pointer-events-none" />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600 transition-colors outline-none"
+                            >
+                                {showPassword ? (
+                                    <EyeOff className="w-4 h-4" />
+                                ) : (
+                                    <Eye className="w-4 h-4" />
+                                )}
+                            </button>
+                        </div>
+
+                        <div className="text-right">
+                            <button
+                                type="button"
+                                onClick={() => navigate('/forgot-password')}
+                                className="text-[10px] font-black text-slate-400 hover:text-slate-900 uppercase tracking-widest transition-colors"
+                            >
+                                ¿Olvidaste tu contraseña?
+                            </button>
                         </div>
 
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-3.5 rounded-xl shadow-xl shadow-slate-900/10 transition-all transform active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center mt-4 uppercase text-[11px] tracking-widest"
+                            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-3.5 rounded-xl shadow-xl shadow-slate-900/10 transition-all transform active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center mt-2 uppercase text-[11px] tracking-widest"
                         >
                             {isLoading ? (
                                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>

@@ -69,6 +69,110 @@ class ServicioViewSet(viewsets.ModelViewSet):
     ordering_fields = ['establecimiento__nombre', 'proveedor__nombre', 'numero_cliente']
     search_fields = ['numero_cliente', 'establecimiento__nombre', 'proveedor__nombre']
 
+    @action(detail=False, methods=['get'])
+    def download_template(self, request):
+        """Genera una plantilla de Excel para la carga masiva de servicios."""
+        cols = ['RBD', 'Proveedor', 'Nro Cliente', 'Nro Servicio', 'Tipo Documento']
+        df = pd.DataFrame(columns=cols)
+        # Sample data
+        df.loc[0] = [11475, 'AGUAS ALTIPLANO', '12345678', '9999', 'BOLETA']
+        
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Servicios')
+        
+        buffer.seek(0)
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="plantilla_servicios.xlsx"'
+        return response
+
+    @action(detail=False, methods=['post'])
+    def bulk_upload(self, request):
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'No se proporcionó ningún archivo.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            df = pd.read_excel(file)
+        except Exception as e:
+            return Response({'error': f'Error al leer el archivo Excel: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        errors = []
+        servicios_to_create = []
+
+        cols_required = ['RBD', 'Proveedor', 'Nro Cliente', 'Tipo Documento']
+        missing_cols = [c for c in cols_required if c not in df.columns]
+        if missing_cols:
+            return Response({'error': f'Faltan las siguientes columnas: {", ".join(missing_cols)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        for index, row in df.iterrows():
+            # Clean values
+            rbd_raw = str(row['RBD']).split('.')[0].strip() if not pd.isna(row['RBD']) else ''
+            prov_name = str(row['Proveedor']).strip() if not pd.isna(row['Proveedor']) else ''
+            nro_cli = str(row['Nro Cliente']).strip() if not pd.isna(row['Nro Cliente']) else ''
+            nro_srv = str(row['Nro Servicio']).strip() if 'Nro Servicio' in df.columns and not pd.isna(row['Nro Servicio']) else None
+            tipo_doc_name = str(row['Tipo Documento']).strip() if not pd.isna(row['Tipo Documento']) else ''
+
+            if not rbd_raw or not prov_name or not nro_cli:
+                errors.append(f"Fila {index + 2}: RBD, Proveedor y Nro Cliente son obligatorios.")
+                continue
+
+            # 1. Finding Establishment (Exact)
+            try:
+                est = Establecimiento.objects.get(rbd=int(rbd_raw))
+            except (ValueError, Establecimiento.DoesNotExist):
+                errors.append(f"Fila {index + 2}: No se encontró establecimiento con RBD '{rbd_raw}'.")
+                continue
+
+            # 2. Finding Provider (Robust: RUT first, then Name exact, then Name contains)
+            prov = Proveedor.objects.filter(rut__iexact=prov_name).first()
+            if not prov:
+                prov = Proveedor.objects.filter(nombre__iexact=prov_name).first()
+            if not prov:
+                prov = Proveedor.objects.filter(nombre__icontains=prov_name).first()
+            
+            if not prov:
+                errors.append(f"Fila {index + 2}: No se encontró el proveedor '{prov_name}' (por nombre o RUT).")
+                continue
+
+            # 3. Finding Document Type (Robust)
+            tipo_doc = TipoDocumento.objects.filter(nombre__iexact=tipo_doc_name).first()
+            if not tipo_doc:
+                tipo_doc = TipoDocumento.objects.filter(nombre__icontains=tipo_doc_name).first()
+            
+            if not tipo_doc:
+                errors.append(f"Fila {index + 2}: No se encontró tipo de documento '{tipo_doc_name}'.")
+                continue
+
+            # 4. Check if service already exists (Globally unique Nro Cliente as requested)
+            if Servicio.objects.filter(numero_cliente=nro_cli).exists():
+                 errors.append(f"Fila {index + 2}: El Nro Cliente '{nro_cli}' ya está registrado en el sistema. Debe ser único y no pertenecer a varios establecimientos.")
+                 continue
+
+            servicios_to_create.append(Servicio(
+                proveedor=prov,
+                establecimiento=est,
+                numero_cliente=nro_cli,
+                numero_servicio=nro_srv,
+                tipo_documento=tipo_doc
+            ))
+
+        if errors:
+            return Response({'errors': errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not servicios_to_create:
+            return Response({'error': 'No se encontraron servicios válidos para subir.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                Servicio.objects.bulk_create(servicios_to_create)
+            return Response({'message': f'Se han cargado exitosamente {len(servicios_to_create)} servicios.'}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': f'Error al guardar en la base de datos: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class RegistroPagoViewSet(viewsets.ModelViewSet):
     queryset = RegistroPago.objects.all().order_by('-fecha_pago')
     serializer_class = RegistroPagoSerializer
