@@ -386,14 +386,12 @@ const Establishments = () => {
                                 <SortableHeader label="Nombre" sortKey="nombre" currentOrdering={ordering} onSort={handleSort} />
                                 <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Tipo</th>
                                 <SortableHeader label="Director" sortKey="director" currentOrdering={ordering} onSort={handleSort} />
-                                <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</th>
-                                <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Teléfonos</th>
                                 <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filteredData.map(item => {
-                                const principalPhone = item.telefonos?.find(p => p.es_principal) || item.telefonos?.[0];
+
 
                                 return (
                                     <tr key={item.id} className="hover:bg-slate-50 transition-colors text-xs">
@@ -439,43 +437,7 @@ const Establishments = () => {
                                             </span>
                                         </td>
                                         <td className="p-2.5 text-slate-600 truncate" title={item.director || ''}>{item.director || '-'}</td>
-                                        <td className="p-2.5">
-                                            {item.email ? (
-                                                <a
-                                                    href={`mailto:${item.email}`}
-                                                    className="flex items-center gap-2 text-slate-600 hover:text-blue-600 transition-colors group"
-                                                    title={item.email}
-                                                >
-                                                    <div className="w-7 h-7 bg-slate-100 rounded-lg flex items-center justify-center group-hover:bg-blue-50 transition-colors">
-                                                        <Mail className="w-3.5 h-3.5" />
-                                                    </div>
-                                                    <span className="font-medium truncate">{item.email}</span>
-                                                </a>
-                                            ) : (
-                                                <span className="text-slate-300 italic">No registrado</span>
-                                            )}
-                                        </td>
-                                        <td className="p-2.5">
-                                            {principalPhone ? (
-                                                <div className="flex items-center gap-3">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-xs font-black text-slate-900 tracking-tight">{principalPhone.numero}</span>
-                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{principalPhone.etiqueta}</span>
-                                                    </div>
-                                                    {item.telefonos.length > 1 && (
-                                                        <button
-                                                            onClick={() => handleOpenPhones(item)}
-                                                            className="flex items-center justify-center px-1.5 h-5 rounded-lg bg-blue-600 text-white text-[9px] font-black hover:bg-blue-700 transition-all shadow-sm shadow-blue-100 border border-blue-500 whitespace-nowrap"
-                                                            title="Ver todos los teléfonos"
-                                                        >
-                                                            +{item.telefonos.length - 1} MÁS
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <span className="text-slate-300 italic">Sin teléfonos</span>
-                                            )}
-                                        </td>
+
                                         <td className="p-2.5 text-right">
                                             <div className="flex justify-end gap-2">
 

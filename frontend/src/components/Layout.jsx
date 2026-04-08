@@ -218,21 +218,21 @@ const Layout = () => {
                         </Link>
                     )}
 
-                    <Link
-                        to="/reservas-externas"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/reservas-externas') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                    >
-                        <Calendar className="w-5 h-5 flex-shrink-0" />
-                        <motion.span
-                            initial={false}
-                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                            className="font-medium whitespace-nowrap"
+                    {can('solicitudes_reservas.view_solicitudreserva') && (
+                        <Link
+                            to="/reservas"
+                            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/reservas') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
                         >
-                            Reservas Externas
-                        </motion.span>
-                    </Link>
+                            <Calendar className="w-5 h-5 flex-shrink-0" />
+                            <motion.span
+                                initial={false}
+                                animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                                className="font-medium whitespace-nowrap"
+                            >
+                                Reservas
+                            </motion.span>
+                        </Link>
+                    )}
 
                     {(can('establecimientos.view_establecimiento') || can('funcionarios.view_funcionario')) && (
                         <div className="py-2 px-4">
@@ -321,7 +321,7 @@ const Layout = () => {
                                         )}
 
                                         {/* Section: RECURSOS */}
-                                        {(can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo') || can('personal_ti.view_personalti') || can('solicitudes_reservas.view_reserva')) && (
+                                        {(can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo') || can('personal_ti.view_personalti') || can('solicitudes_reservas.view_solicitudreserva')) && (
                                             <div className="space-y-0.5 pt-2">
                                                 <div className="px-4 mb-1">
                                                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Recursos</span>
@@ -344,12 +344,7 @@ const Layout = () => {
                                                         <span className="font-medium whitespace-nowrap">Vehículos</span>
                                                     </Link>
                                                 )}
-                                                {can('solicitudes_reservas.view_reserva') && (
-                                                    <Link to="/reservas" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/reservas') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                                                        <Calendar className="w-4 h-4 flex-shrink-0" />
-                                                        <span className="font-medium whitespace-nowrap">Reservas</span>
-                                                    </Link>
-                                                )}
+
                                                 {can('personal_ti.view_personalti') && (
                                                     <Link to="/personal-ti" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/personal-ti') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
                                                         <MonitorSmartphone className="w-4 h-4 flex-shrink-0" />
@@ -567,8 +562,12 @@ const Layout = () => {
 
                     <div className="flex items-center gap-3 relative" ref={profileRef}>
                         <div className="hidden md:flex flex-col items-end">
-                            <span className="text-sm font-semibold text-slate-700">{user?.username || 'Administrador'}</span>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase">SLEP Iquique</span>
+                            <span className="text-sm font-semibold text-slate-700">
+                                {user?.funcionario_data?.nombre_funcionario || user?.username || 'Cargando...'}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">
+                                {user?.is_superuser ? 'Super Administrador' : (user?.groups?.[0] || 'Usuario Sistema')}
+                            </span>
                         </div>
 
                         <div className="relative">
@@ -601,7 +600,9 @@ const Layout = () => {
                                     >
                                         <div className="px-3 py-2 border-b border-slate-50 mb-1">
                                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cuenta</p>
-                                            <p className="text-sm font-bold text-slate-700 truncate">{user?.username}</p>
+                                            <p className="text-sm font-bold text-slate-700 truncate">
+                                                {user?.funcionario_data?.nombre_funcionario || user?.username}
+                                            </p>
                                         </div>
 
                                         <div className="py-1">

@@ -156,7 +156,7 @@ function App() {
               <Route element={<ProtectedRoute permission="orden_compra.view_ordencompramp" />}>
                 <Route path="orden-compra" element={<OCDashboard />} />
               </Route>
-              <Route element={<ProtectedRoute permission="solicitudes_reservas.view_reserva" />}>
+              <Route element={<ProtectedRoute permission="solicitudes_reservas.view_solicitudreserva" />}>
                 <Route path="reservas" element={<ReservasDashboard />} />
               </Route>
               <Route element={<ProtectedRoute permission="personal_ti.view_personalti" />}>

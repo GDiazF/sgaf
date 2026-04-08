@@ -66,7 +66,6 @@ const FileUploader = ({ title, description, endpoint, buttonLabel }) => {
             link.remove();
 
             setMessage("Archivos procesados y descargados correctamente.");
-            setFile(null);
         } catch (err) {
             console.error("Error processing file:", err);
             setError("Hubo un error al procesar. Revisa el formato e intenta nuevamente.");
