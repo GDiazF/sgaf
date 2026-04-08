@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import RecursoReservable, SolicitudReserva, BloqueoHorario, ReservaSetting
-from datetime import time
+from datetime import time, timedelta
+from django.utils import timezone
 
 class RecursoReservableSerializer(serializers.ModelSerializer):
     class Meta:
@@ -40,6 +41,17 @@ class SolicitudReservaSerializer(serializers.ModelSerializer):
 
         if fi and ff and ff <= fi:
             raise serializers.ValidationError({'fecha_fin': 'La hora de término debe ser posterior a la de inicio.'})
+
+        # ─ Validación: no permitir reservas en el pasado ─
+        now = timezone.now()
+        if fi:
+            # Primero comparamos solo la fecha para dar un mensaje específico si es otro día
+            if fi.date() < now.date():
+                raise serializers.ValidationError({'fecha_inicio': 'No se pueden realizar reservas para días anteriores a hoy.'})
+            # Margen relax: permitimos reservar desde el inicio de la hora actual
+            limite_hora = now.replace(minute=0, second=0, microsecond=0)
+            if fi < limite_hora:
+                raise serializers.ValidationError({'fecha_inicio': 'No se pueden realizar reservas para un horario anterior al inicio de la hora actual.'})
 
         # ─ Validación: hora de fin contra configuración global ─
         setting = ReservaSetting.objects.first()
@@ -112,6 +124,10 @@ class BloqueoHorarioSerializer(serializers.ModelSerializer):
             data['fecha_fin'] = None  # aseguramos que no quede fecha_fin
         elif modo == 'DIA':
             data['fecha_fin'] = None  # solo fecha_inicio aplica
+
+        # ─ Validación: no bloquear el pasado ─
+        if fi and fi < timezone.now().date():
+            raise serializers.ValidationError({'fecha_inicio': 'No se pueden crear bloqueos para fechas pasadas.'})
 
         return data
 

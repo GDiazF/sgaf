@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     Calendar, ChevronLeft, ChevronRight, Plus, X, Check,
     Clock, Truck, Monitor, Package, User, AlertCircle, Lock,
@@ -166,6 +166,18 @@ const ReservasDashboard = () => {
     const scrollRef = useRef(null);
     const headerScrollRef = useRef(null);
 
+    // Responsividad: Forzar modo día en móviles
+    useEffect(() => {
+        const checkMobile = () => {
+            if (window.innerWidth < 768 && viewMode === 'week') {
+                setViewMode('day');
+            }
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, [viewMode]);
+
     // ── Data ──────────────────────────────────────────────────────────────────
     const fetchData = async () => {
         setLoading(true);
@@ -222,18 +234,19 @@ const ReservasDashboard = () => {
         );
 
         const getMins = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
-        const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+        const now = new Date();
+        const nowHourStart = now.getHours() * 60;
         const esHoy = formData.fecha === todayStr;
 
         // 1. Validar "Desde"
         const mInicio = getMins(formData.horaInicio);
         const estaOcupadoI = resDía.some(r => mInicio >= dtMinutes(r.fecha_inicio) && mInicio < dtMinutes(r.fecha_fin));
-        const esPasado = esHoy && mInicio < nowMins - 15;
+        const esPasado = esHoy && mInicio < nowHourStart;
 
         if (estaOcupadoI || esPasado) {
             const primerLibre = TIME_SLOTS.find(s => {
                 const m = getMins(s);
-                if (esHoy && m < nowMins - 15) return false;
+                if (esHoy && m < nowHourStart) return false;
                 return !resDía.some(r => m >= dtMinutes(r.fecha_inicio) && m < dtMinutes(r.fecha_fin));
             });
             if (primerLibre) setFormData(p => ({ ...p, horaInicio: primerLibre }));
@@ -263,6 +276,24 @@ const ReservasDashboard = () => {
         })
         : [currentDate];
 
+    // Optimización: Agrupar reservas por recurso y día una sola vez
+    const reservasBuckets = useMemo(() => {
+        const buckets = {};
+        if (!Array.isArray(reservas)) return buckets;
+        
+        reservas.forEach(r => {
+            const dayStr = toDateStr(r.fecha_inicio);
+            const key = `${r.recurso}_${dayStr}`;
+            const rEstado = (r.estado || "").toUpperCase();
+            
+            if (rEstado === 'PENDIENTE' || rEstado === 'APROBADA' || rEstado === 'FINALIZADA') {
+                if (!buckets[key]) buckets[key] = [];
+                buckets[key].push(r);
+            }
+        });
+        return buckets;
+    }, [reservas]);
+
     const recursosFiltrados = (() => {
         let list;
         if (filtroRecurso === 'all') {
@@ -278,13 +309,7 @@ const ReservasDashboard = () => {
 
     const getReservasForDayAndRecurso = (day, recursoId) => {
         const dayStr = toDateStr(day);
-        if (!Array.isArray(reservas)) return [];
-        return reservas.filter(r => {
-            const rEstado = (r.estado || "").toUpperCase();
-            return toDateStr(r.fecha_inicio) === dayStr &&
-                parseInt(r.recurso) === parseInt(recursoId) &&
-                (rEstado === 'PENDIENTE' || rEstado === 'APROBADA');
-        });
+        return reservasBuckets[`${recursoId}_${dayStr}`] || [];
     };
 
     const getEventPos = (ev) => {
@@ -303,6 +328,7 @@ const ReservasDashboard = () => {
     };
 
     const handleSlotClick = (day, slotTime, recursoId) => {
+        if (day < todayStr) return; // BLOQUEAR RESERVAS EN EL PASADO
         const dayStr = toDateStr(day);
 
         // 1. Si no hay slotTime (o es el default), intentamos buscar el primer hueco libre del día
@@ -499,50 +525,60 @@ const ReservasDashboard = () => {
     return (
         <div className="flex flex-col h-[calc(100vh-140px)] bg-white overflow-hidden rounded-3xl border border-slate-200/60 shadow-xl shadow-slate-200/20">
 
-            {/* TOP BAR */}
-            <div className="flex-shrink-0 bg-white border-b border-slate-100 px-4 py-2.5 flex items-center gap-3 shadow-sm z-20">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Calendar className="w-4 h-4 text-white" />
+            {/* TOP BAR - Responsive */}
+            <div className="flex-shrink-0 bg-white border-b border-slate-100 px-4 py-3 flex flex-col md:flex-row md:items-center gap-3 shadow-sm z-20">
+                <div className="flex items-center justify-between w-full md:w-auto">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-100">
+                            <Calendar className="w-4 h-4 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="font-black text-slate-900 text-sm md:text-base leading-none">Reservas</h1>
+                            <p className="text-[10px] text-indigo-500 font-bold capitalize mt-0.5">{fmtMonth()}</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="font-black text-slate-900 text-sm leading-none">Reservas</h1>
-                        <p className="text-[10px] text-indigo-500 font-bold capitalize mt-0.5">{fmtMonth()}</p>
+                    {/* Botones de nav en móvil */}
+                    <div className="flex md:hidden items-center gap-1">
+                        <button onClick={() => handleNav(-1)} className="p-2 rounded-lg hover:bg-slate-100 transition"><ChevronLeft className="w-5 h-5 text-slate-600" /></button>
+                        <button onClick={() => handleNav(1)} className="p-2 rounded-lg hover:bg-slate-100 transition"><ChevronRight className="w-5 h-5 text-slate-600" /></button>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1">
-                    <button onClick={() => handleNav(-1)} className="p-1.5 rounded-lg hover:bg-slate-100 transition"><ChevronLeft className="w-4 h-4 text-slate-600" /></button>
-                    <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition">Hoy</button>
-                    <button onClick={() => handleNav(1)} className="p-1.5 rounded-lg hover:bg-slate-100 transition"><ChevronRight className="w-4 h-4 text-slate-600" /></button>
+                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
+                    <div className="hidden md:flex items-center gap-1 mr-2">
+                        <button onClick={() => handleNav(-1)} className="p-1.5 rounded-lg hover:bg-slate-100 transition"><ChevronLeft className="w-4 h-4 text-slate-600" /></button>
+                        <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition">Hoy</button>
+                        <button onClick={() => handleNav(1)} className="p-1.5 rounded-lg hover:bg-slate-100 transition"><ChevronRight className="w-4 h-4 text-slate-600" /></button>
+                    </div>
+
+                    <div className="flex items-center bg-slate-100 rounded-lg p-0.5 flex-shrink-0">
+                        {['day', 'week'].map(v => (
+                            <button key={v} onClick={() => setViewMode(v)} className={`px-4 py-1.5 text-[11px] font-bold rounded-md transition ${viewMode === v ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
+                                {v === 'day' ? 'Día' : 'Semana'}
+                            </button>
+                        ))}
+                    </div>
+
+                    <button onClick={() => setHistoryOpen(true)} className="flex items-center gap-2 px-3 py-1.5 text-slate-500 hover:text-slate-800 transition text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50">
+                        <Clock className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Log</span>
+                    </button>
+                    
+                    <button onClick={fetchData} className="p-2 hover:bg-slate-100 rounded-lg transition" title="Actualizar">
+                        <RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
                 </div>
 
-                <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
-                    {['day', 'week'].map(v => (
-                        <button key={v} onClick={() => setViewMode(v)} className={`px-3 py-1.5 text-[11px] font-bold rounded-md transition ${viewMode === v ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
-                            {v === 'day' ? 'Día' : 'Semana'}
+                <div className="flex items-center gap-2 ml-auto w-full md:w-auto mt-1 md:mt-0">
+                    <button onClick={() => { openAdminCreate(); setAdminOpen(true); }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-black hover:bg-slate-200 transition">
+                        <Settings className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Administrar</span>
+                    </button>
+                    {!(viewMode === 'day' && toDateStr(currentDate) < todayStr) && (
+                        <button onClick={() => { setFormTipo(''); setFormData({ recurso: '', titulo: '', nombre_funcionario: '', descripcion: '', fecha: toDateStr(currentDate), horaInicio: '09:00', horaFin: '10:00' }); setFormError(''); setModalOpen(true); }}
+                            className="flex-2 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-indigo-700 transition shadow-md shadow-indigo-500/20">
+                            <Plus className="w-4 h-4" /> Nueva <span className="hidden sm:inline">Reserva</span>
                         </button>
-                    ))}
+                    )}
                 </div>
-
-                <select value={filtroRecurso} onChange={e => setFiltroRecurso(e.target.value)} className="hidden"></select>
-
-                <div className="flex-1" />
-
-                <button onClick={() => setHistoryOpen(true)} className="flex items-center gap-2 px-3 py-1.5 text-slate-500 hover:text-slate-800 transition text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50">
-                    <Clock className="w-3.5 h-3.5" /> Log
-                </button>
-                <div className="w-px h-4 bg-slate-200 mx-1" />
-                <button onClick={fetchData} className="p-1.5 hover:bg-slate-100 rounded-lg transition" title="Actualizar">
-                    <RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
-                </button>
-                <button onClick={() => { openAdminCreate(); setAdminOpen(true); }} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-black hover:bg-slate-200 transition">
-                    <Settings className="w-3.5 h-3.5" /> Administrar
-                </button>
-                <button onClick={() => { setFormTipo(''); setFormData({ recurso: '', titulo: '', nombre_funcionario: '', descripcion: '', fecha: toDateStr(currentDate), horaInicio: '09:00', horaFin: '10:00' }); setFormError(''); setModalOpen(true); }}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-indigo-700 transition shadow-md shadow-indigo-500/20">
-                    <Plus className="w-3.5 h-3.5" /> Nueva Reserva
-                </button>
             </div>
 
             {/* FILTER BAR — grupos por tipo + recursos individuales */}
@@ -676,8 +712,8 @@ const ReservasDashboard = () => {
 
                                             return (
                                                 <div key={dayS}
-                                                    onClick={() => handleSlotClick(day, '', rec.id)}
-                                                    className={`flex-1 min-w-[110px] p-2 border-r border-slate-50 min-h-[140px] transition-colors relative cursor-pointer hover:bg-indigo-50/10 ${dayS === todayStr ? 'bg-indigo-50/5' : ''}`}>
+                                                    onClick={() => dayS >= todayStr && handleSlotClick(day, '', rec.id)}
+                                                    className={`flex-1 min-w-[110px] p-2 border-r border-slate-50 min-h-[140px] transition-colors relative hover:bg-indigo-50/10 ${dayS >= todayStr ? 'cursor-pointer' : ''} ${dayS === todayStr ? 'bg-indigo-50/5' : ''}`}>
 
                                                     <div className="space-y-1.5 relative z-10">
                                                         {/* Bloqueos */}
@@ -726,8 +762,8 @@ const ReservasDashboard = () => {
                                                             );
                                                         })}
 
-                                                        {/* Icono + siempre visible para nuevas reservas */}
-                                                        {!dayBloqueos.some(b => b.hora_inicio <= '09:00' && b.hora_fin >= '18:00') && (
+                                                        {/* Icono + para nuevas reservas: ocultar en días pasados */}
+                                                        {day >= todayStr && !dayBloqueos.some(b => b.hora_inicio <= '09:00' && b.hora_fin >= '18:00') && (
                                                             <div className="flex justify-center pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                 <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all">
                                                                     <Plus className="w-4 h-4" />
@@ -814,12 +850,12 @@ const ReservasDashboard = () => {
                                                         {TIME_SLOTS.map((slot, idx) => {
                                                             const isHour = slot.endsWith(':00');
                                                             return (
-                                                                <div key={slot} className="absolute inset-x-0 cursor-pointer group"
+                                                                <div key={slot} className={`absolute inset-x-0 group ${dayS >= todayStr ? 'cursor-pointer' : ''}`}
                                                                     style={{
                                                                         top: `${idx * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px`,
                                                                         borderTop: isHour ? '1px solid #f1f5f9' : '1px dashed #f8fafc'
                                                                     }}
-                                                                    onClick={() => handleSlotClick(day, slot, recurso.id)}>
+                                                                    onClick={() => dayS >= todayStr && handleSlotClick(day, slot, recurso.id)}>
                                                                     <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute inset-0" style={{ background: 'rgba(99,102,241,0.03)' }} />
                                                                     <span className="opacity-0 group-hover:opacity-100 transition-opacity absolute left-1 top-0.5 text-[7px] font-bold text-indigo-400">{slot}</span>
                                                                 </div>
@@ -1035,6 +1071,7 @@ const ReservasDashboard = () => {
                                 <div className="col-span-3">
                                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Fecha *</label>
                                     <input type="date" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        min={todayStr}
                                         value={formData.fecha} onChange={e => setFormData(p => ({ ...p, fecha: e.target.value }))} required />
                                 </div>
                                 <div className="col-span-3 grid grid-cols-2 gap-3">
@@ -1051,13 +1088,13 @@ const ReservasDashboard = () => {
 
                                         // 3. Filtrar slots para "Desde"
                                         const now = new Date();
-                                        const nowMins = now.getHours() * 60 + now.getMinutes();
+                                        const nowHourStart = now.getHours() * 60;
                                         const esHoy = formData.fecha === todayStr;
 
                                         const slotsDesde = TIME_SLOTS.filter(s => {
                                             const m = getMins(s);
-                                            // Si es hoy, no mostrar horas que ya pasaron
-                                            if (esHoy && m < nowMins - 15) return false; // Buffer de 15 min por si acaso
+                                            // Si es hoy, permitir desde el inicio de la hora actual
+                                            if (esHoy && m < nowHourStart) return false;
 
                                             // Un slot es válido para empezar si no está DENTRO de una reserva (inicio <= m < fin)
                                             return !resDía.some(r => {
@@ -1138,8 +1175,9 @@ const ReservasDashboard = () => {
                 const color = rec?.color || '#6366f1';
                 const cfg = ESTADO_CFG[detailReserva.estado] || ESTADO_CFG.PENDIENTE;
                 const isRechazando = rechazandoId === detailReserva.id;
+                const isPast = new Date(detailReserva.fecha_fin) < new Date();
                 return (
-                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setDetailReserva(null); setRechazandoId(null); setMotivoRechazo(''); }}>
+                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => { setDetailReserva(null); setRechazandoId(null); setMotivoRechazo(''); }}>
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
                             <div className="px-6 py-5" style={{ background: `linear-gradient(135deg, ${color}, ${hexToRgba(color, 0.7)})` }}>
                                 <div className="flex justify-between items-start">
@@ -1151,10 +1189,17 @@ const ReservasDashboard = () => {
                                 </div>
                             </div>
                             <div className="p-5 space-y-4">
-                                <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border"
-                                    style={{ background: cfg.bg, color: cfg.text, borderColor: cfg.border }}>
-                                    {cfg.label}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border"
+                                        style={{ background: cfg.bg, color: cfg.text, borderColor: cfg.border }}>
+                                        {cfg.label}
+                                    </span>
+                                    {isPast && (
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-500 border border-slate-200">
+                                            Finalizada (Pasada)
+                                        </span>
+                                    )}
+                                </div>
                                 <div className="space-y-3">
                                     <div className="flex items-start gap-3 text-sm">
                                         <Clock className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
@@ -1206,7 +1251,7 @@ const ReservasDashboard = () => {
 
                                 {detailReserva.estado === 'PENDIENTE' && !isRechazando && (
                                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-                                        <button onClick={() => handleEstado(detailReserva.id, 'APROBADA')} className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl font-black text-xs hover:bg-emerald-100 border border-emerald-200">
+                                        <button onClick={() => handleEstado(detailReserva.id, 'APROBADA', '')} className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl font-black text-xs hover:bg-emerald-100 border border-emerald-200">
                                             <Check className="w-4 h-4" /> Aprobar
                                         </button>
                                         <button onClick={() => { setRechazandoId(detailReserva.id); setMotivoRechazo(''); }} className="flex items-center justify-center gap-2 py-2.5 bg-rose-50 text-rose-700 rounded-xl font-black text-xs hover:bg-rose-100 border border-rose-200">
@@ -1215,9 +1260,18 @@ const ReservasDashboard = () => {
                                     </div>
                                 )}
                                 {detailReserva.estado === 'APROBADA' && (
-                                    <button onClick={() => handleEstado(detailReserva.id, 'FINALIZADA')} className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-50 text-blue-700 rounded-xl font-black text-xs hover:bg-blue-100 border border-blue-200">
-                                        <Check className="w-4 h-4" /> Marcar como Finalizada
-                                    </button>
+                                    <div className="pt-2 border-t border-slate-100">
+                                        {!isPast ? (
+                                            <button onClick={() => handleEstado(detailReserva.id, 'FINALIZADA', '')} className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-50 text-blue-700 rounded-xl font-black text-xs hover:bg-blue-100 border border-blue-200">
+                                                <Check className="w-4 h-4" /> Marcar como Finalizada
+                                            </button>
+                                        ) : (
+                                            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reserva Completada</p>
+                                                <p className="text-[9px] text-slate-400 mt-0.5">Esta reserva ya ha finalizado su horario.</p>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -1519,6 +1573,7 @@ const ReservasDashboard = () => {
                                                                 {bloqueoForm.modo === 'DIA' ? 'Fecha *' : bloqueoForm.modo === 'INDEFINIDO' ? 'Desde *' : 'Fecha inicio *'}
                                                             </label>
                                                             <input type="date" required
+                                                                min={todayStr}
                                                                 className="w-full rounded-lg border border-slate-200 text-xs px-2 py-2 focus:ring-1 focus:ring-amber-400 outline-none"
                                                                 value={bloqueoForm.fecha_inicio}
                                                                 onChange={e => setBloqueoForm(p => ({ ...p, fecha_inicio: e.target.value }))} />
