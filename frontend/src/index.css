@@ -96,31 +96,6 @@
   .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(100, 116, 139, 0.7);
   }
-
-  /* Standard Button Design System */
-  .btn-base {
-    @apply flex items-center justify-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 font-bold text-sm active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap;
-  }
-
-  .btn-primary {
-    @apply btn-base bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/20;
-  }
-
-  .btn-secondary {
-    @apply btn-base bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900 shadow-sm;
-  }
-
-  .btn-success {
-    @apply btn-base bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/20;
-  }
-
-  .btn-danger {
-    @apply btn-base bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-500/20;
-  }
-
-  .btn-ghost {
-    @apply btn-base bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700;
-  }
 }
 
 /* Hide Browser Default Password Reveal Button (Edge/IE) */

@@ -5,6 +5,7 @@ import {
     RefreshCw, Building2, Settings, Power, Trash2, Users, MapPin
 } from 'lucide-react';
 import api from '../../api';
+import { useAuth } from '../../context/AuthContext';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 // ─── Constantes de Fallback ──────────────────────────────────────────────────
@@ -104,6 +105,10 @@ const bloqueoAppliesToDate = (b, dateStr) => {
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 const ReservasDashboard = () => {
+    const { user } = useAuth();
+    const canChangeName = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_change_reserva_name'));
+    const defaultName = user?.funcionario_data?.nombre_funcionario || (user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : '') || user?.username || '';
+
     const [recursos, setRecursos] = useState([]);
     const [reservas, setReservas] = useState([]);
     const [settings, setSettings] = useState({ hora_inicio: '07:00', hora_fin: '18:00' });
@@ -131,7 +136,7 @@ const ReservasDashboard = () => {
 
     // Modal nueva reserva
     const [modalOpen, setModalOpen] = useState(false);
-    const [formData, setFormData] = useState({ recurso: '', titulo: '', nombre_funcionario: '', descripcion: '', fecha: toDateStr(new Date()), horaInicio: '09:00', horaFin: '10:00' });
+    const [formData, setFormData] = useState({ recurso: '', titulo: '', nombre_funcionario: defaultName, descripcion: '', fecha: toDateStr(new Date()), horaInicio: '09:00', horaFin: '10:00' });
     const [formTipo, setFormTipo] = useState(''); // tipo seleccionado en el modal
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState('');
@@ -371,7 +376,7 @@ const ReservasDashboard = () => {
 
         const rec = recursos.find(r => r.id === recursoId);
         setFormTipo(rec?.tipo || '');
-        setFormData({ recurso: recursoId || '', titulo: '', nombre_funcionario: '', descripcion: '', fecha: toDateStr(day), horaInicio: actualSlot, horaFin: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}` });
+        setFormData({ recurso: recursoId || '', titulo: '', nombre_funcionario: defaultName, descripcion: '', fecha: toDateStr(day), horaInicio: actualSlot, horaFin: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}` });
         setFormError('');
         setModalOpen(true);
     };
@@ -573,7 +578,7 @@ const ReservasDashboard = () => {
                         <Settings className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Administrar</span>
                     </button>
                     {!(viewMode === 'day' && toDateStr(currentDate) < todayStr) && (
-                        <button onClick={() => { setFormTipo(''); setFormData({ recurso: '', titulo: '', nombre_funcionario: '', descripcion: '', fecha: toDateStr(currentDate), horaInicio: '09:00', horaFin: '10:00' }); setFormError(''); setModalOpen(true); }}
+                        <button onClick={() => { setFormTipo(''); setFormData({ recurso: '', titulo: '', nombre_funcionario: defaultName, descripcion: '', fecha: toDateStr(currentDate), horaInicio: '09:00', horaFin: '10:00' }); setFormError(''); setModalOpen(true); }}
                             className="flex-2 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-indigo-700 transition shadow-md shadow-indigo-500/20">
                             <Plus className="w-4 h-4" /> Nueva <span className="hidden sm:inline">Reserva</span>
                         </button>
@@ -1059,11 +1064,12 @@ const ReservasDashboard = () => {
                                 </label>
                                 <input
                                     type="text"
-                                    className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    className={`w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 outline-none ${!canChangeName ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'focus:ring-2 focus:ring-indigo-500'}`}
                                     value={formData.nombre_funcionario}
                                     onChange={e => setFormData(p => ({ ...p, nombre_funcionario: e.target.value }))}
                                     placeholder="Ej: Juan Pérez González"
                                     required
+                                    readOnly={!canChangeName}
                                 />
                             </div>
                             {/* Fecha y horas */}

@@ -133,6 +133,9 @@ class SolicitudReserva(models.Model):
 
     class Meta:
         ordering = ['-fecha_inicio']
+        permissions = [
+            ("can_change_reserva_name", "Puede cambiar el nombre de la reserva"),
+        ]
 
 class ReservaSetting(models.Model):
     """Configuración global para el sistema de reservas."""

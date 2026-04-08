@@ -103,15 +103,15 @@ const Dashboard = () => {
                 <div className="flex items-center gap-2">
                     <Link
                         to="/history"
-                        className="btn-secondary"
+                        className="flex items-center gap-2 bg-white text-slate-600 px-4 py-2 rounded-xl hover:bg-slate-50 transition-all border border-slate-200 font-bold text-[11px] uppercase tracking-wider shadow-sm active:scale-95"
                     >
-                        <Calendar className="w-3.5 h-3.5" />
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
                         Historial
                     </Link>
                     {can('prestamo_llaves.add_prestamo') && (
                         <Link
                             to="/loans/new"
-                            className="btn-primary"
+                            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-500/10 font-black text-[11px] uppercase tracking-[0.1em] active:scale-95"
                         >
                             <Plus className="w-4 h-4" />
                             Nuevo Préstamo

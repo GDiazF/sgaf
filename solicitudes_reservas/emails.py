@@ -132,8 +132,8 @@ def enviar_correo_nueva_solicitud(solicitud):
     2. Al solicitante (si tiene email): confirmación de recepción.
     """
     recurso = solicitud.recurso
-    fi = solicitud.fecha_inicio.strftime('%d/%m/%Y %H:%M')
-    ff = solicitud.fecha_fin.strftime('%H:%M')
+    fi = django.utils.timezone.localtime(solicitud.fecha_inicio).strftime('%d/%m/%Y %H:%M')
+    ff = django.utils.timezone.localtime(solicitud.fecha_fin).strftime('%H:%M')
     nombre = solicitud.nombre_funcionario or 'No especificado'
     email_sol = solicitud.email_contacto or (solicitud.solicitante.email if solicitud.solicitante else None)
 
@@ -185,8 +185,8 @@ def enviar_correo_nueva_solicitud(solicitud):
 def enviar_correo_aprobacion(solicitud):
     """Envía un correo de aprobación al solicitante."""
     recurso = solicitud.recurso
-    fi = solicitud.fecha_inicio.strftime('%d/%m/%Y %H:%M')
-    ff = solicitud.fecha_fin.strftime('%H:%M')
+    fi = django.utils.timezone.localtime(solicitud.fecha_inicio).strftime('%d/%m/%Y %H:%M')
+    ff = django.utils.timezone.localtime(solicitud.fecha_fin).strftime('%H:%M')
     nombre = solicitud.nombre_funcionario or 'Solicitante'
     email_sol = solicitud.email_contacto or (solicitud.solicitante.email if solicitud.solicitante else None)
 
@@ -219,8 +219,8 @@ def enviar_correo_aprobacion(solicitud):
 def enviar_correo_rechazo(solicitud):
     """Envía un correo de rechazo al solicitante con el motivo."""
     recurso = solicitud.recurso
-    fi = solicitud.fecha_inicio.strftime('%d/%m/%Y %H:%M')
-    ff = solicitud.fecha_fin.strftime('%H:%M')
+    fi = django.utils.timezone.localtime(solicitud.fecha_inicio).strftime('%d/%m/%Y %H:%M')
+    ff = django.utils.timezone.localtime(solicitud.fecha_fin).strftime('%H:%M')
     nombre = solicitud.nombre_funcionario or 'Solicitante'
     email_sol = solicitud.email_contacto or (solicitud.solicitante.email if solicitud.solicitante else None)
     motivo = solicitud.motivo_rechazo or 'No especificado.'
