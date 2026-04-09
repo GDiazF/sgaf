@@ -26,9 +26,11 @@ const Layout = () => {
     // Track window resize for responsive sidebar
     useEffect(() => {
         const handleResize = () => {
-            setWindowWidth(window.innerWidth);
-            if (window.innerWidth < 768) {
-                setSidebarOpen(false); // Automatically collapse standard sidebar on small screens
+            const width = window.innerWidth;
+            setWindowWidth(width);
+            // Si la resolución es menor o igual a 1366px hide sidebar by default
+            if (width <= 1366) {
+                setSidebarOpen(false);
             } else {
                 setSidebarOpen(true);
             }
@@ -41,10 +43,13 @@ const Layout = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Close mobile menu when route changes
+    // Close sidebar/mobile menu when route changes
     useEffect(() => {
         setMobileMenuOpen(false);
-    }, [location.pathname]);
+        if (windowWidth <= 1366) {
+            setSidebarOpen(false);
+        }
+    }, [location.pathname, windowWidth]);
 
     // Handle clicks outside profile dropdown
     useEffect(() => {
@@ -138,8 +143,8 @@ const Layout = () => {
             <motion.aside
                 initial={false}
                 animate={{
-                    width: sidebarOpen || mobileMenuOpen ? 256 : 0,
-                    x: mobileMenuOpen || (sidebarOpen && windowWidth >= 768) ? 0 : (windowWidth < 768 ? -256 : 0),
+                    width: sidebarOpen || mobileMenuOpen ? '16rem' : '0',
+                    x: mobileMenuOpen || (sidebarOpen && windowWidth >= 768) ? 0 : (windowWidth < 768 ? '-16rem' : 0),
                     opacity: sidebarOpen || mobileMenuOpen || windowWidth >= 768 ? 1 : 0
                 }}
                 transition={{
@@ -153,7 +158,7 @@ const Layout = () => {
                     ${!mobileMenuOpen && windowWidth < 768 ? '-translate-x-full' : ''}
                 `}
             >
-                <div className="p-4 flex items-center justify-center h-28 overflow-hidden">
+                <div className={`p-4 flex items-center justify-center ${windowWidth <= 1366 ? 'h-20' : 'h-28'} overflow-hidden`}>
                     <motion.div
                         initial={false}
                         animate={{
@@ -664,7 +669,7 @@ const Layout = () => {
                     </div>
                 </header>
 
-                <div className="p-4 md:p-8 md:px-12 max-w-[1800px] mx-auto">
+                <div className={`p-4 md:p-8 ${windowWidth <= 1366 ? 'md:px-6' : 'md:px-12'} max-w-[1800px] mx-auto`}>
                     <motion.div
                         key={location.pathname}
                         initial={{ opacity: 0, x: -10 }}
