@@ -31,6 +31,7 @@ import ImpresorasDashboard from './pages/impresoras/ImpresorasDashboard';
 // Vehiculos
 import VehiculosDashboard from './pages/vehiculos/VehiculosDashboard';
 import RemuneracionesDashboard from './pages/tesoreria/Remuneraciones';
+import TesoreriaMaintainers from './pages/tesoreria/TesoreriaMaintainers';
 import LicitacionesDashboard from './pages/licitaciones/LicitacionesDashboard';
 import OCDashboard from './pages/orden_compra/OCDashboard';
 import ReservasDashboard from './pages/reservas/ReservasDashboard';
@@ -147,6 +148,9 @@ function App() {
               {/* Tesorería */}
               <Route element={<ProtectedRoute permission="remuneraciones.view_remuneracion" />}>
                 <Route path="tesoreria" element={<RemuneracionesDashboard />} />
+              </Route>
+              <Route element={<ProtectedRoute permission="remuneraciones.view_mapeobanco" />}>
+                <Route path="tesoreria/config" element={<TesoreriaMaintainers />} />
               </Route>
 
               {/* Otros */}

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Box, Globe, UserCircle2 } from 'lucide-react';
+import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Box, Globe, UserCircle2, Settings } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../hooks/usePermission';
@@ -434,6 +434,15 @@ const Layout = () => {
                                                 <FileText className="w-4 h-4 flex-shrink-0" />
                                                 <span className="font-medium whitespace-nowrap">Remuneraciones</span>
                                             </Link>
+                                            {can('remuneraciones.view_mapeobanco') && (
+                                                <Link
+                                                    to="/tesoreria/config"
+                                                    className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/tesoreria/config') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                                >
+                                                    <Settings className="w-4 h-4 flex-shrink-0" />
+                                                    <span className="font-medium whitespace-nowrap">Configuración</span>
+                                                </Link>
+                                            )}
                                         </div>
                                     </motion.div>
                                 )}

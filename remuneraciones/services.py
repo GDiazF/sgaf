@@ -5,52 +5,23 @@ import openpyxl
 from openpyxl import Workbook
 
 
-BANK_CODE_MAP = {
-    "BANCO BICE": "028",
-    "BANCO CONSORCIO": "055",
-    "BANCO DE CHILE-A EDWARDS-CITI": "001",
-    "BCI-TBANC": "016",
-    "BANCO ESTADO": "012",
-    "BANCO FALABELLA": "051",
-    "BANCO INTERNACIONAL": "009",
-    "BANK BOSTON - ITAU": "039",
-    "BANCO RIPLEY": "053",
-    "BANCO SANTANDER - SANTIAGO": "037",
-    "BANCO SECURITY": "049",
-    "CAJA DE COMPENSACION LOS HEROES": "729",
-    "BANCO COOPEUCH": "672",
-    "HSBC BANK CHILE": "031",
-    "BANCO SCOTIABANK": "014",
-    "TENPO PREGAGO": "730",
-    "CAJA DE COMPENSACION LOS ANDES-CUEN TAP": "732",
-    "MERCADO PAGO": "875",
-}
+from .models import MapeoBanco, MapeoMedioPago, MapeoBancoDirecto, ValeVistaConfig
 
-PAYMENT_METHOD_MAP = {
-    "CUENTA PRIMA": "01",
-    "CUENTA CORRIENTE / VISTA": "01",
-    "CUENTA RUT": "30",
-    "CUENTA DE AHORRO": "02",
-    "CHEQUERA ELECTRONICA": "22",
-}
 
-DIRECT_BANK_CODE_MAP = {
-    "1": "001",
-    "01": "001",
-    "12": "012",
-    "14": "014",
-    "16": "016",
-    "28": "028",
-    "37": "037",
-    "39": "039",
-    "51": "051",
-    "53": "053",
-    "55": "055",
-    "672": "672",
-    "729": "729",
-    "730": "730",
-    "732": "732",
-}
+def get_bank_code_map():
+    return {m.nombre.strip().upper(): m.codigo for m in MapeoBanco.objects.all()}
+
+
+def get_payment_method_map():
+    return {m.nombre.strip().upper(): m.codigo for m in MapeoMedioPago.objects.all()}
+
+
+def get_direct_bank_code_map():
+    return {m.segmento: m.codigo_completo for m in MapeoBancoDirecto.objects.all()}
+
+
+def get_vale_vista_config():
+    return {m.clave: m.valor for m in ValeVistaConfig.objects.all()}
 
 
 def normalizar_texto(valor):
@@ -102,6 +73,10 @@ def generar_archivo_bancos(archivo):
     sheet = workbook.active
 
     limpiar_hoja(sheet)
+    
+    bank_code_map = get_bank_code_map()
+    payment_method_map = get_payment_method_map()
+    direct_bank_code_map = get_direct_bank_code_map()
 
     nuevo_workbook = Workbook()
     sheet_nuevo = nuevo_workbook.active
@@ -123,15 +98,15 @@ def generar_archivo_bancos(archivo):
 
         sheet_nuevo.cell(row=idx, column=3).value = ""
 
-        codigo_directo = DIRECT_BANK_CODE_MAP.get(str(_safe_value(row, 5)))
+        codigo_directo = direct_bank_code_map.get(str(_safe_value(row, 5)))
         if codigo_directo:
             sheet_nuevo.cell(row=idx, column=4).value = codigo_directo
         else:
-            codigo_por_nombre = BANK_CODE_MAP.get(_normalize_key(_safe_value(row, 6)))
+            codigo_por_nombre = bank_code_map.get(_normalize_key(_safe_value(row, 6)))
             if codigo_por_nombre:
                 sheet_nuevo.cell(row=idx, column=4).value = codigo_por_nombre
 
-        medio_pago = PAYMENT_METHOD_MAP.get(_normalize_key(_safe_value(row, 10)))
+        medio_pago = payment_method_map.get(_normalize_key(_safe_value(row, 10)))
         if medio_pago:
             sheet_nuevo.cell(row=idx, column=5).value = medio_pago
 
@@ -159,6 +134,11 @@ def generar_archivo_vale_vista(archivo):
     nuevo_workbook = Workbook()
     sheet_nuevo = nuevo_workbook.active
 
+    vv_config = get_vale_vista_config()
+    val_7 = vv_config.get("VALE_VISTA_COL_7", "29")
+    val_8 = vv_config.get("VALE_VISTA_COL_8", "012")
+    val_9 = vv_config.get("VALE_VISTA_COL_9", "0")
+
     for row in sheet.iter_rows():
         fila = row[0].row if row else 1
 
@@ -175,9 +155,9 @@ def generar_archivo_vale_vista(archivo):
         apm = normalizar_texto(_safe_value(row, 3))
         sheet_nuevo.cell(row=fila, column=6).value = apm
 
-        sheet_nuevo.cell(row=fila, column=7).value = "29"
-        sheet_nuevo.cell(row=fila, column=8).value = "012"
-        sheet_nuevo.cell(row=fila, column=9).value = "0"
+        sheet_nuevo.cell(row=fila, column=7).value = val_7
+        sheet_nuevo.cell(row=fila, column=8).value = val_8
+        sheet_nuevo.cell(row=fila, column=9).value = val_9
 
         monto = _safe_value(row, 13)
         sheet_nuevo.cell(row=fila, column=10).value = monto
