@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api';
@@ -29,7 +29,15 @@ const ContractDetail = () => {
     const [isDocModalOpen, setDocModalOpen] = useState(false); // Renamed from showUploadModal
     const [isReceptionModalOpen, setReceptionModalOpen] = useState(false); // Renamed from showAdquisicionModal
     const [editingRC, setEditingRC] = useState(null);
-    const [sortConfig, setSortConfig] = useState({ key: 'periodo', direction: 'desc' });
+    const [sortConfig, setSortConfig] = useState({ key: 'fecha_recepcion', direction: 'desc' });
+
+    // Filtros de Recepciones
+    const [rcFilters, setRcFilters] = useState({
+        search: '',
+        periodo: '',
+        año: '',
+        establecimiento: ''
+    });
 
     // Document Upload State
     const [previewDoc, setPreviewDoc] = useState(null);
@@ -215,16 +223,49 @@ const ContractDetail = () => {
         setSortConfig({ key, direction });
     };
 
-    const sortedReceptions = [...receptions].sort((a, b) => {
-        if (!sortConfig.key) return 0;
+    const filteredReceptions = useMemo(() => {
+        return receptions.filter(rc => {
+            // Search filter
+            if (rcFilters.search) {
+                const s = rcFilters.search.toLowerCase();
+                const matches = (rc.folio || '').toLowerCase().includes(s) ||
+                    (rc.descripcion || '').toLowerCase().includes(s) ||
+                    (rc.nro_factura || '').toLowerCase().includes(s);
+                if (!matches) return false;
+            }
 
-        let valA = a[sortConfig.key];
-        let valB = b[sortConfig.key];
+            // Establishment filter
+            if (rcFilters.establecimiento) {
+                const estId = parseInt(rcFilters.establecimiento);
+                if (!rc.establecimientos.includes(estId)) return false;
+            }
 
-        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-    });
+            // Period filter (YYYY-MM)
+            if (rcFilters.periodo) {
+                if (!rc.periodo || !rc.periodo.startsWith(rcFilters.periodo)) return false;
+            }
+
+            // Year filter (from fecha_recepcion)
+            if (rcFilters.año) {
+                if (!rc.fecha_recepcion.startsWith(rcFilters.año)) return false;
+            }
+
+            return true;
+        });
+    }, [receptions, rcFilters]);
+
+    const sortedReceptions = useMemo(() => {
+        return [...filteredReceptions].sort((a, b) => {
+            if (!sortConfig.key) return 0;
+
+            let valA = a[sortConfig.key];
+            let valB = b[sortConfig.key];
+
+            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }, [filteredReceptions, sortConfig]);
 
     const SortIcon = ({ column }) => {
         if (sortConfig.key !== column) return <TrendingUp className="w-2.5 h-2.5 opacity-20" />;
@@ -698,20 +739,66 @@ const ContractDetail = () => {
                                 exit={{ opacity: 0, scale: 0.99 }}
                                 className="p-6 lg:p-8 space-y-6"
                             >
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-black text-slate-800 tracking-tight">Recepciones Conformes relacionadas</h3>
-                                        <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1">Control de entregas y facturación</p>
+                                <div className="space-y-4">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div>
+                                            <h3 className="text-lg font-black text-slate-800 tracking-tight">Recepciones Conformes relacionadas</h3>
+                                            <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1">Control de entregas y facturación</p>
+                                        </div>
+                                        {can('servicios.add_recepcionconforme') && (
+                                            <button
+                                                onClick={() => setReceptionModalOpen(true)}
+                                                className="flex items-center gap-2.5 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/10 active:scale-95"
+                                            >
+                                                <Plus className="w-4 h-4" />
+                                                Nueva Recepción
+                                            </button>
+                                        )}
                                     </div>
-                                    {can('servicios.add_recepcionconforme') && (
-                                        <button
-                                            onClick={() => setReceptionModalOpen(true)}
-                                            className="flex items-center gap-2.5 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/10 active:scale-95"
+
+                                    {/* Barra de Filtros */}
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                        <div className="relative">
+                                            <FileSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar Folio o Glosa..."
+                                                className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                                value={rcFilters.search}
+                                                onChange={e => setRcFilters({ ...rcFilters, search: e.target.value })}
+                                            />
+                                        </div>
+
+                                        <select
+                                            className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                            value={rcFilters.establecimiento}
+                                            onChange={e => setRcFilters({ ...rcFilters, establecimiento: e.target.value })}
                                         >
-                                            <Plus className="w-4 h-4" />
-                                            Nueva Recepción
-                                        </button>
-                                    )}
+                                            <option value="">Todos los Jardines/Escuelas</option>
+                                            {lookups.establishments.filter(e => contract.establecimientos.includes(e.id)).map(est => (
+                                                <option key={est.id} value={est.id}>{est.nombre}</option>
+                                            ))}
+                                        </select>
+
+                                        <input
+                                            type="month"
+                                            className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                            value={rcFilters.periodo}
+                                            onChange={e => setRcFilters({ ...rcFilters, periodo: e.target.value })}
+                                            placeholder="Periodo"
+                                        />
+
+                                        <select
+                                            className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                            value={rcFilters.año}
+                                            onChange={e => setRcFilters({ ...rcFilters, año: e.target.value })}
+                                        >
+                                            <option value="">Cualquier Año</option>
+                                            {[...new Set(receptions.map(r => r.fecha_recepcion.substring(0, 4)))].sort().reverse().map(yr => (
+                                                <option key={yr} value={yr}>{yr}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
 
                                 <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
@@ -823,10 +910,12 @@ const ContractDetail = () => {
                                             ))}
                                         </tbody>
                                     </table>
-                                    {(!receptions || receptions.length === 0) && (
+                                    {sortedReceptions.length === 0 && (
                                         <div className="py-16 text-center">
                                             <ShoppingBag className="w-8 h-8 text-slate-100 mx-auto mb-4" />
-                                            <p className="font-black text-slate-300 uppercase tracking-widest text-[10px]">Sin recepciones registradas</p>
+                                            <p className="font-black text-slate-300 uppercase tracking-widest text-[10px]">
+                                                {receptions.length === 0 ? "Sin recepciones registradas" : "No hay resultados para los filtros aplicados"}
+                                            </p>
                                         </div>
                                     )}
                                 </div>

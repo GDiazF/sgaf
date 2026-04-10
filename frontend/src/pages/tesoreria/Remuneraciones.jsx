@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Upload, FileText, Download, AlertCircle, CheckCircle, Loader2, Clock } from 'lucide-react';
 import api from '../../api';
+import { usePermission } from '../../hooks/usePermission';
 
 const FileUploader = ({ title, description, endpoint, buttonLabel }) => {
+    const { can } = usePermission();
     const [file, setFile] = useState(null);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null);
@@ -176,23 +178,25 @@ const FileUploader = ({ title, description, endpoint, buttonLabel }) => {
                         {!error && !message && !loading && <div className="h-full" />}
                     </div>
 
-                    <button
-                        type="submit"
-                        disabled={filesCount === 0 || loading}
-                        className="w-full py-2.5 px-4 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-slate-900/10 flex items-center justify-center gap-2 mt-auto"
-                    >
-                        {loading ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span>{isMultiple ? `Procesando ${filesCount} archivos...` : 'Procesando archivo...'}</span>
-                            </>
-                        ) : (
-                            <>
-                                <Download className="w-4 h-4" />
-                                {buttonLabel}
-                            </>
-                        )}
-                    </button>
+                    {can('remuneraciones.add_remuneracion') && (
+                        <button
+                            type="submit"
+                            disabled={filesCount === 0 || loading}
+                            className="w-full py-2.5 px-4 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-slate-900/10 flex items-center justify-center gap-2 mt-auto"
+                        >
+                            {loading ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span>{isMultiple ? `Procesando ${filesCount} archivos...` : 'Procesando archivo...'}</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Download className="w-4 h-4" />
+                                    {buttonLabel}
+                                </>
+                            )}
+                        </button>
+                    )}
                 </form>
             </div>
         </div>

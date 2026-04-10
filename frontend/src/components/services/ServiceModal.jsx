@@ -15,7 +15,6 @@ const ServiceModal = ({
         proveedor: '',
         establecimiento: '',
         numero_cliente: '',
-        numero_servicio: '',
         tipo_documento_habitual: 'FACTURA',
         observaciones: ''
     });
@@ -86,16 +85,6 @@ const ServiceModal = ({
                                     onChange={e => setFormData({ ...formData, numero_cliente: e.target.value })}
                                 />
                             </div>
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-600 ml-1">Nº Medidor / Servicio</label>
-                            <input
-                                type="text"
-                                placeholder="Opcional..."
-                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium h-[46px]"
-                                value={formData.numero_servicio}
-                                onChange={e => setFormData({ ...formData, numero_servicio: e.target.value })}
-                            />
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold text-slate-600 ml-1">Documento Habitual</label>

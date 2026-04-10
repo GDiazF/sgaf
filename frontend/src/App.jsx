@@ -14,6 +14,7 @@ import ServicesDashboard from './pages/services/ServicesDashboard';
 import Providers from './pages/services/Providers';
 import PaymentsDashboard from './pages/services/PaymentsDashboard';
 import RecepcionConformeList from './pages/services/RecepcionConformeList';
+import PaymentsReport from './pages/services/PaymentsReport';
 import CDPManager from './pages/services/CDPManager';
 import FacturasAdquisicionDashboard from './pages/services/FacturasAdquisicionDashboard';
 import Contracts from './pages/contracts/Contracts';
@@ -105,6 +106,7 @@ function App() {
 
               <Route element={<ProtectedRoute permission="servicios.view_registropago" />}>
                 <Route path="services/payments" element={<PaymentsDashboard />} />
+                <Route path="services/reporte-consumos" element={<PaymentsReport />} />
               </Route>
 
               <Route element={<ProtectedRoute permission="servicios.view_recepcionconforme" />}>

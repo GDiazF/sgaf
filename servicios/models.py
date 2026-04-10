@@ -43,7 +43,6 @@ class TipoDocumento(models.Model):
 class Servicio(models.Model):
     proveedor = models.ForeignKey(Proveedor, on_delete=models.CASCADE, related_name='servicios')
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE, related_name='servicios')
-    numero_servicio = models.CharField(max_length=100, blank=True, null=True) # Optional
     numero_cliente = models.CharField(max_length=100, unique=True) # Required and unique globally
     tipo_documento = models.ForeignKey(TipoDocumento, on_delete=models.SET_NULL, null=True)
     
@@ -120,15 +119,16 @@ class RecepcionConforme(models.Model):
         ordering = ['-created_at']
 
 class RegistroPago(models.Model):
-    servicio = models.ForeignKey(Servicio, on_delete=models.PROTECT, related_name='pagos')
+    servicio = models.ForeignKey(Servicio, on_delete=models.CASCADE, related_name='pagos')
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.PROTECT, related_name='pagos_servicios')
-    fecha_emision = models.DateField()
+    fecha_emision = models.DateField(null=True, blank=True)
     fecha_vencimiento = models.DateField()
-    fecha_pago = models.DateField(verbose_name="Fecha envío a pago")
+    fecha_pago = models.DateField(null=True, blank=True, verbose_name="Fecha envío a pago")
     nro_documento = models.CharField(max_length=100)
     monto_interes = models.IntegerField(default=0)
     monto_total = models.IntegerField()
     recepcion_conforme = models.ForeignKey(RecepcionConforme, on_delete=models.SET_NULL, null=True, blank=True, related_name='registros')
+    nro_servicio_factura = models.CharField(max_length=100, blank=True, null=True, verbose_name="Cuenta de Facturación / Srv. Corporativo")
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -138,6 +138,9 @@ class RegistroPago(models.Model):
         verbose_name = "Registro de Pago"
         verbose_name_plural = "Registros de Pagos"
         ordering = ['-fecha_pago']
+        permissions = [
+            ("marcar_historico", "Puede marcar pagos como registros históricos (Salto de RC)"),
+        ]
 
 class HistorialRecepcionConforme(models.Model):
     recepcion_conforme = models.ForeignKey(RecepcionConforme, on_delete=models.CASCADE, related_name='historial')

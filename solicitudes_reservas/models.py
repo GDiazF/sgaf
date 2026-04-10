@@ -134,7 +134,10 @@ class SolicitudReserva(models.Model):
     class Meta:
         ordering = ['-fecha_inicio']
         permissions = [
-            ("can_change_reserva_name", "Puede cambiar el nombre de la reserva"),
+            ("aprobar_solicitudreserva", "Puede aprobar o denegar solicitudes de reserva"),
+            ("finalizar_solicitudreserva", "Puede marcar reservas como finalizadas"),
+            ("view_solicitudreserva_logs", "Puede ver el historial de cambios y logs de la reserva"),
+            ("manage_solicitudreserva", "Administración total del módulo de reservas"),
         ]
 
 class ReservaSetting(models.Model):

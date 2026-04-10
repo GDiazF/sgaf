@@ -78,6 +78,7 @@ const Layout = () => {
             '/services/adquisiciones': 'Factura sin OC',
             '/services': 'Servicios',
             '/services/payments': 'Pagos',
+            '/services/reporte-consumos': 'Reporte Consumos',
             '/services/rc': 'Recepciones',
             '/services/cdp': 'CDPs',
             '/telecomunicaciones': 'Teléfonos',
@@ -316,6 +317,7 @@ const Layout = () => {
                                                             <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
                                                                 {can('servicios.view_servicio') && <Link to="/services" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Panel Principal</Link>}
                                                                 {can('servicios.view_registropago') && <Link to="/services/payments" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/payments') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Pagos</Link>}
+                                                                {can('servicios.view_registropago') && <Link to="/services/reporte-consumos" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/reporte-consumos') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Reporte Consumos</Link>}
                                                                 {can('servicios.view_recepcionconforme') && <Link to="/services/rc" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/rc') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Recepciones</Link>}
                                                                 {can('servicios.view_cdp') && <Link to="/services/cdp" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/cdp') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>CDPs</Link>}
                                                             </div>

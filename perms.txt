@@ -1,0 +1,20 @@
+add_bloqueohorario|Can add bloqueo horario
+change_bloqueohorario|Can change bloqueo horario
+delete_bloqueohorario|Can delete bloqueo horario
+view_bloqueohorario|Can view bloqueo horario
+add_recursoreservable|Can add recurso reservable
+change_recursoreservable|Can change recurso reservable
+delete_recursoreservable|Can delete recurso reservable
+view_recursoreservable|Can view recurso reservable
+add_reservasetting|Can add Ajuste de Reservas
+change_reservasetting|Can change Ajuste de Reservas
+delete_reservasetting|Can delete Ajuste de Reservas
+view_reservasetting|Can view Ajuste de Reservas
+add_solicitudreserva|Can add solicitud reserva
+aprobar_solicitudreserva|Puede aprobar o denegar solicitudes de reserva
+change_solicitudreserva|Can change solicitud reserva
+delete_solicitudreserva|Can delete solicitud reserva
+finalizar_solicitudreserva|Puede marcar reservas como finalizadas
+manage_solicitudreserva|Administración total del módulo de reservas
+view_solicitudreserva|Can view solicitud reserva
+view_solicitudreserva_logs|Puede ver el historial de cambios y logs de la reserva

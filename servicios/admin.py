@@ -17,9 +17,9 @@ class TipoDocumentoAdmin(admin.ModelAdmin):
 
 @admin.register(Servicio)
 class ServicioAdmin(admin.ModelAdmin):
-    list_display = ('proveedor', 'establecimiento', 'numero_cliente', 'numero_servicio', 'tipo_documento')
+    list_display = ('proveedor', 'establecimiento', 'numero_cliente', 'tipo_documento')
     list_filter = ('proveedor', 'tipo_documento', 'establecimiento')
-    search_fields = ('numero_cliente', 'numero_servicio', 'proveedor__nombre', 'establecimiento__nombre')
+    search_fields = ('numero_cliente', 'proveedor__nombre', 'establecimiento__nombre')
     autocomplete_fields = ['proveedor', 'establecimiento']
 
 @admin.register(RegistroPago)

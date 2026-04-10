@@ -19,6 +19,7 @@ const PaymentModal = ({
         fecha_vencimiento: '',
         fecha_pago: '',
         nro_documento: '',
+        nro_servicio_factura: '',
         monto_interes: 0,
         monto_total: ''
     });
@@ -114,6 +115,16 @@ const PaymentModal = ({
                                 onChange={e => setFormData({ ...formData, monto_interes: e.target.value })}
                             />
                         </div>
+                        <div className="col-span-full space-y-1.5">
+                            <label className="text-xs font-bold text-slate-600 ml-1">Cuenta de Facturación / Srv. Corporativo (Para trazabilidad histórica)</label>
+                            <input
+                                type="text"
+                                placeholder="Eje: 58967-k. Deje vacío si es igual al ID Cliente."
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium h-[46px]"
+                                value={formData.nro_servicio_factura}
+                                onChange={e => setFormData({ ...formData, nro_servicio_factura: e.target.value })}
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -128,7 +139,6 @@ const PaymentModal = ({
                             <DateInput
                                 value={formData.fecha_emision}
                                 onChange={val => setFormData({ ...formData, fecha_emision: val })}
-                                required
                             />
                         </div>
                         <div className="space-y-1.5">
@@ -144,7 +154,6 @@ const PaymentModal = ({
                             <DateInput
                                 value={formData.fecha_pago}
                                 onChange={val => setFormData({ ...formData, fecha_pago: val })}
-                                required
                             />
                         </div>
                     </div>
