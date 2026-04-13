@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
-import { DollarSign, Search, Plus, Edit2, Trash2, X, Save, Building2, Calendar, FileText, FileCheck, CheckSquare, Square, Power, Download, FileDown, Zap } from 'lucide-react';
+import { DollarSign, Search, Plus, Edit2, Trash2, X, Save, Building2, Calendar, FileText, FileCheck, CheckSquare, Square, Power, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import DateInput from '../../components/common/DateInput';
 import Pagination from '../../components/common/Pagination';
@@ -32,7 +32,6 @@ const PaymentsDashboard = () => {
     const [totalCount, setTotalCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [ordering, setOrdering] = useState('-fecha_pago');
-    const [pageSize, setPageSize] = useState(10);
 
     const [editingId, setEditingId] = useState(null);
     const [selectedIds, setSelectedIds] = useState(new Set());
@@ -42,7 +41,6 @@ const PaymentsDashboard = () => {
     const [providers, setProviders] = useState([]);
     const [selectedType, setSelectedType] = useState('');
     const [selectedProvider, setSelectedProvider] = useState('');
-    const [selectedEstablishment, setSelectedEstablishment] = useState('');
 
     // Initial state for form
     const initialFormState = {
@@ -52,7 +50,6 @@ const PaymentsDashboard = () => {
         fecha_vencimiento: '',
         fecha_pago: '',
         nro_documento: '',
-        nro_servicio_factura: '',
         monto_interes: 0,
         monto_total: ''
     };
@@ -61,14 +58,13 @@ const PaymentsDashboard = () => {
 
     const [statusFilter, setStatusFilter] = useState('all'); // all, paid, pending
 
-    const fetchData = async (page = 1, search = '', status = 'all', order = ordering, size = pageSize, prov = selectedProvider, type = selectedType, est = selectedEstablishment) => {
+    const fetchData = async (page = 1, search = '', status = 'all', order = ordering) => {
         setLoading(true);
         try {
             const params = {
                 page,
                 search,
-                ordering: order,
-                page_size: size
+                ordering: order
             };
 
             if (status === 'paid') {
@@ -77,14 +73,11 @@ const PaymentsDashboard = () => {
                 params.recepcion_conforme__isnull = 'true';
             }
 
-            if (type) {
-                params['servicio__proveedor__tipo_proveedor'] = type;
+            if (selectedType) {
+                params['servicio__proveedor__tipo_proveedor'] = selectedType;
             }
-            if (prov) {
-                params['servicio__proveedor'] = prov;
-            }
-            if (est) {
-                params['establecimiento'] = est;
+            if (selectedProvider) {
+                params['servicio__proveedor'] = selectedProvider;
             }
 
             const [payRes, servRes, estRes] = await Promise.all([
@@ -96,7 +89,7 @@ const PaymentsDashboard = () => {
             // Handle Pagination
             setPayments(payRes.data.results || []);
             setTotalCount(payRes.data.count || 0);
-            setTotalPages(Math.ceil((payRes.data.count || 0) / size));
+            setTotalPages(Math.ceil((payRes.data.count || 0) / 10));
 
             setServices(servRes.data.results || servRes.data);
             setEstablishments(estRes.data.results || estRes.data);
@@ -128,8 +121,8 @@ const PaymentsDashboard = () => {
     }, []);
 
     useEffect(() => {
-        fetchData(currentPage, searchQuery, statusFilter, ordering, pageSize, selectedProvider, selectedType, selectedEstablishment);
-    }, [currentPage, statusFilter, ordering, selectedType, selectedProvider, selectedEstablishment, pageSize]);
+        fetchData(currentPage, searchQuery, statusFilter, ordering);
+    }, [currentPage, statusFilter, ordering, selectedType, selectedProvider]);
 
     const handleTypeChange = async (e) => {
         const typeId = e.target.value;
@@ -184,7 +177,6 @@ const PaymentsDashboard = () => {
             fecha_vencimiento: item.fecha_vencimiento,
             fecha_pago: item.fecha_pago,
             nro_documento: item.nro_documento,
-            nro_servicio_factura: item.nro_servicio_factura,
             monto_interes: item.monto_interes,
             monto_total: item.monto_total
         });
@@ -352,51 +344,6 @@ const PaymentsDashboard = () => {
         }
     };
 
-    const handleExportReport = async (dateRange) => {
-        try {
-            const params = {
-                fecha_inicio: dateRange.inicio,
-                fecha_fin: dateRange.fin,
-                servicio__proveedor: selectedProvider,
-                establecimiento: selectedEstablishment,
-                servicio__proveedor__tipo_proveedor: selectedType
-            };
-
-            const response = await api.get('registros-pagos/export_excel/', {
-                params,
-                responseType: 'blob'
-            });
-
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `reporte_pagos_${new Date().toISOString().split('T')[0]}.xlsx`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            setShowReportModal(false);
-        } catch (error) {
-            console.error("Error al exportar reporte:", error);
-            alert("Hubo un error al generar el reporte.");
-        }
-    };
-
-    const handleMarkHistorical = async () => {
-        if (!window.confirm(`¿Está seguro de marcar ${selectedIds.size} registros como históricos? Esto los vinculará a un folio de control histórico y dejarán de aparecer como pendientes.`)) return;
-
-        try {
-            const response = await api.post('registros-pagos/mark_historical/', {
-                ids: Array.from(selectedIds)
-            });
-            alert(response.data.message);
-            setSelectedIds(new Set());
-            fetchData(currentPage, searchQuery);
-        } catch (error) {
-            console.error("Error al marcar como histórico:", error);
-            alert("Hubo un error al procesar la solicitud.");
-        }
-    };
-
     // No client-side filtering
     const filteredData = payments;
 
@@ -415,82 +362,69 @@ const PaymentsDashboard = () => {
     return (
         <div>
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-800">Pagos de Servicios</h2>
-                    <p className="text-slate-500 text-sm">Registro histórico de pagos realizados.</p>
-                </div>
+            <div className="flex flex-col gap-4 mb-8">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">Pagos de Servicios</h2>
+                        <p className="text-slate-500">Registro histórico de pagos realizados.</p>
+                    </div>
 
-                <div className="flex items-center gap-3">
-                    {can('servicios.add_registropago') && (
-                        <>
-                            <button
-                                onClick={handleNew}
-                                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap text-sm"
-                            >
-                                <Plus className="w-4 h-4" />
-                                <span>Registrar Pago</span>
-                            </button>
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-3 w-full lg:w-auto">
+                        <div className="flex items-center gap-3">
+                            <FormSelect
+                                value={selectedType}
+                                onChange={handleTypeChange}
+                                options={providerTypes.map(t => ({ value: t.id, label: t.nombre }))}
+                                placeholder="Tipos de Proveedor"
+                                inputClassName="!py-2 !h-[38px] !text-xs !w-44"
+                            />
 
-                            <button
-                                onClick={handleBulk}
-                                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 font-medium whitespace-nowrap text-sm"
-                            >
-                                <FileText className="w-4 h-4" />
-                                <span>Carga Masiva</span>
-                            </button>
+                            <FormSelect
+                                value={selectedProvider}
+                                onChange={handleProviderChange}
+                                options={providers.map(p => ({ value: p.id, label: p.nombre }))}
+                                placeholder="Proveedores..."
+                                inputClassName="!py-2 !h-[38px] !text-xs !w-60"
+                            />
 
-                        </>
-                    )}
-                </div>
-            </div>
+                            <FormSelect
+                                value={statusFilter}
+                                onChange={handleStatusChange}
+                                options={[
+                                    { value: 'all', label: 'Todos' },
+                                    { value: 'pending', label: 'Pendientes' },
+                                    { value: 'paid', label: 'Con RC' }
+                                ]}
+                                placeholder="Estado"
+                                inputClassName="!py-2 !h-[38px] !text-xs !w-32"
+                            />
+                        </div>
 
-            {/* Filter Bar Row */}
-            <div className="bg-white/50 backdrop-blur-sm p-3 rounded-2xl border border-slate-200 mb-6 flex flex-wrap items-center gap-4">
-                <div className="flex-1 min-w-[180px]">
-                    <div className="relative">
-                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <select
-                            value={selectedEstablishment}
-                            onChange={(e) => { setSelectedEstablishment(e.target.value); setCurrentPage(1); }}
-                            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all appearance-none cursor-pointer"
-                        >
-                            <option value="">Establecimientos...</option>
-                            {establishments.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-                        </select>
+                        <div className="flex items-center gap-2">
+                            {can('servicios.add_registropago') && (
+                                <>
+                                    <button
+                                        onClick={handleNew}
+                                        className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap text-sm"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        <span>Registrar</span>
+                                    </button>
+
+                                    <button
+                                        onClick={handleBulk}
+                                        className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 font-medium whitespace-nowrap text-sm"
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                        <span>Carga Masiva</span>
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                <div className="flex-1 min-w-[180px]">
-                    <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <select
-                            value={selectedProvider}
-                            onChange={handleProviderChange}
-                            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all appearance-none cursor-pointer"
-                        >
-                            <option value="">Proveedores...</option>
-                            {providers.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                        </select>
-                    </div>
-                </div>
-
-                <div className="w-48">
-                    <div className="relative">
-                        <FileCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <select
-                            value={statusFilter}
-                            onChange={handleStatusChange}
-                            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all appearance-none cursor-pointer"
-                        >
-                            <option value="all">Todos los Estados</option>
-                            <option value="pending">Pendientes (Sin RC)</option>
-                            <option value="paid">Pagados (Con RC)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div className="w-full md:w-80">
+                <div className="w-full md:w-96">
                     <FilterBar onSearch={handleSearch} placeholder="Buscar pago..." />
                 </div>
             </div>
@@ -529,31 +463,19 @@ const PaymentsDashboard = () => {
                                 <th className="p-2.5 w-10">
                                     <button
                                         onClick={() => {
-                                            const selectables = payments.filter(p => !p.recepcion_conforme);
-                                            const selectableIds = selectables.map(p => p.id);
-                                            const allSelectablesSelected = selectableIds.length > 0 && selectableIds.every(id => selectedIds.has(id));
-
-                                            if (allSelectablesSelected) {
-                                                const newSelected = new Set(selectedIds);
-                                                selectableIds.forEach(id => newSelected.delete(id));
-                                                setSelectedIds(newSelected);
+                                            if (selectedIds.size === payments.length) {
+                                                setSelectedIds(new Set());
                                             } else {
-                                                setSelectedIds(new Set([...selectedIds, ...selectableIds]));
+                                                setSelectedIds(new Set(payments.map(p => p.id)));
                                             }
                                         }}
                                         className="text-slate-400 hover:text-blue-600 transition-colors"
                                     >
-                                        {(() => {
-                                            const selectables = payments.filter(p => !p.recepcion_conforme);
-                                            const selectableIds = selectables.map(p => p.id);
-                                            const allSelected = selectableIds.length > 0 && selectableIds.every(id => selectedIds.has(id));
-
-                                            return allSelected ? (
-                                                <CheckSquare className="w-4 h-4 text-blue-600" />
-                                            ) : (
-                                                <Square className="w-4 h-4" />
-                                            );
-                                        })()}
+                                        {selectedIds.size === payments.length && payments.length > 0 ? (
+                                            <CheckSquare className="w-4 h-4 text-blue-600" />
+                                        ) : (
+                                            <Square className="w-4 h-4" />
+                                        )}
                                     </button>
                                 </th>
                                 <SortableHeader label="Documento" sortKey="nro_documento" currentOrdering={ordering} onSort={handleSort} />
@@ -597,11 +519,6 @@ const PaymentsDashboard = () => {
                                         <div className="font-medium text-blue-700 truncate max-w-xs" title={item.servicio_detalle}>
                                             {item.servicio_detalle}
                                         </div>
-                                        {item.nro_servicio_factura && (
-                                            <div className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-tight">
-                                                Cta: {item.nro_servicio_factura}
-                                            </div>
-                                        )}
                                     </td>
                                     <td className="p-2.5">
                                         <div className="flex items-center gap-2 text-slate-700">
@@ -680,12 +597,6 @@ const PaymentsDashboard = () => {
                     totalPages={totalPages}
                     onPageChange={handlePageChange}
                     totalCount={totalCount}
-                    pageSize={pageSize}
-                    onPageSizeChange={(size) => {
-                        setPageSize(size);
-                        setCurrentPage(1);
-                        fetchData(1, searchQuery, statusFilter, ordering, size);
-                    }}
                 />
             </div>
             {/* Floating Bulk Action Bar */}
@@ -720,15 +631,6 @@ const PaymentsDashboard = () => {
                             >
                                 Cancelar
                             </button>
-                            {can('servicios.marcar_historico') && (
-                                <button
-                                    onClick={handleMarkHistorical}
-                                    className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-6 py-2.5 rounded-xl transition-all shadow-lg font-black text-xs uppercase tracking-wider"
-                                >
-                                    <FileCheck className="w-4 h-4" />
-                                    Marcar Histórico
-                                </button>
-                            )}
                             {can('servicios.add_recepcionconforme') && (
                                 <button
                                     onClick={handleGenerateRC}

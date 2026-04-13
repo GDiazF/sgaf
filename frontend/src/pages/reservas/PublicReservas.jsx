@@ -77,7 +77,7 @@ const PublicReservas = () => {
     const [recursos, setRecursos] = useState([]);
     const [reservas, setReservas] = useState([]);
     const [bloqueos, setBloqueos] = useState([]);
-    const [settings, setSettings] = useState({ hora_inicio: '07:00', hora_fin: '18:00' });
+    const [settings, setSettings] = useState({ hora_inicio: '07:00', hora_fin: '18:00', dias_bloqueo_antelacion: 0 });
     const [loading, setLoading] = useState(true);
 
     const configStart = parseInt(settings.hora_inicio.split(':')[0]) || DEFAULT_HOUR_START;
@@ -143,7 +143,7 @@ const PublicReservas = () => {
             const [rRes, sRes, tRes, bRes] = await Promise.all([
                 publicApi.get('reservas/recursos/'),
                 publicApi.get(`reservas/solicitudes/?fecha_inicio__gte=${toDateStr(dStart)}&fecha_inicio__lte=${toDateStr(dEnd)}`),
-                publicApi.get('reservas/settings/').catch(() => ({ data: { hora_inicio: '07:00', hora_fin: '18:00' } })),
+                publicApi.get('reservas/settings/').catch(() => ({ data: { hora_inicio: '07:00', hora_fin: '18:00', dias_bloqueo_antelacion: 0 } })),
                 publicApi.get('reservas/bloqueos/').catch(() => ({ data: [] }))
             ]);
             console.log("Resources:", rRes.data);
@@ -320,8 +320,16 @@ const PublicReservas = () => {
     }, [formData.recurso, formData.fecha, formData.horaInicio, modalOpen, reservas, todayStr, settings.hora_fin]);
 
     const handleSlotClick = (day, slotTime, recursoId) => {
+        const x = settings.dias_bloqueo_antelacion || 0;
+        const limit = new Date(); limit.setHours(0,0,0,0);
+        limit.setDate(limit.getDate() + x);
         const dayStr = toDateStr(day);
-        if (dayStr < todayStr) return; // BLOQUEAR EN EL PASADO
+
+        if (day <= limit) {
+            setSlotBloqueadoMsg(`El sistema requiere ${x} días de antelación. Bloqueado hasta el ${addDays(limit, 1).toLocaleDateString()}.`);
+            setTimeout(() => setSlotBloqueadoMsg(''), 3000);
+            return;
+        }
         let actualSlot = slotTime || '09:00';
 
         if (recursoId) {
@@ -599,10 +607,19 @@ const PublicReservas = () => {
                                                 const dayEvents = getReservasForDayAndRecurso(day, rec.id);
                                                 const dayBloqueos = bloqueos.filter(b => Number(b.recurso) === Number(rec.id) && bloqueoAppliesToDate(b, dayStr));
 
+                                                const x = settings.dias_bloqueo_antelacion || 0;
+                                                const limit = new Date(); limit.setHours(0,0,0,0);
+                                                limit.setDate(limit.getDate() + x);
+                                                const isDayBlocked = day <= limit;
+
                                                 return (
                                                     <div key={dayStr}
-                                                        onClick={() => dayStr >= todayStr && handleSlotClick(day, '', rec.id)}
-                                                        className={`flex-1 min-w-[160px] p-2 border-r border-slate-50 min-h-[120px] transition-colors relative hover:bg-indigo-50/20 ${dayStr >= todayStr ? 'cursor-pointer' : ''} ${dayStr === todayStr ? 'bg-indigo-50/10' : ''}`}>
+                                                        onClick={() => !isDayBlocked && handleSlotClick(day, '', rec.id)}
+                                                        className={`flex-1 min-w-[160px] p-2 border-r border-slate-50 min-h-[120px] transition-colors relative hover:bg-indigo-50/20 ${!isDayBlocked ? 'cursor-pointer' : 'bg-slate-100/50'} ${dayStr === todayStr ? 'bg-indigo-50/10' : ''}`}>
+                                                        
+                                                        {isDayBlocked && (
+                                                            <div className="absolute inset-0 z-0 opacity-40" style={{ background: 'repeating-linear-gradient(45deg, #f1f5f9 0, #f1f5f9 10px, transparent 10px, transparent 20px)' }} />
+                                                        )}
 
                                                         <div className="space-y-1.5 relative z-10">
                                                             {/* Bloqueos */}
@@ -657,8 +674,8 @@ const PublicReservas = () => {
                                                                 );
                                                             })}
 
-                                                            {/* Icono + para nuevas solicitudes: ocultar en días pasados */}
-                                                            {dayStr >= todayStr && !dayBloqueos.some(b => b.hora_inicio <= '09:00' && b.hora_fin >= '18:00') && (
+                                                            {/* Icono + para nuevas solicitudes: ocultar en días bloqueados */}
+                                                            {!isDayBlocked && !dayBloqueos.some(b => b.hora_inicio <= '09:00' && b.hora_fin >= '18:00') && (
                                                                 <div className="flex justify-center pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                     <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all">
                                                                         <Plus className="w-4 h-4" />

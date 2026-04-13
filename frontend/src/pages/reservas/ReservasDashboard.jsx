@@ -2,12 +2,10 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
     Calendar, ChevronLeft, ChevronRight, Plus, X, Check,
     Clock, Truck, Monitor, Package, User, AlertCircle, Lock,
-    RefreshCw, Building2, Settings, Power, Trash2, Users, MapPin,
-    Edit2
+    RefreshCw, Building2, Settings, Power, Trash2, Users, MapPin
 } from 'lucide-react';
 import api from '../../api';
 import { useAuth } from '../../context/AuthContext';
-import { usePermission } from '../../hooks/usePermission';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 // ─── Constantes de Fallback ──────────────────────────────────────────────────
@@ -108,19 +106,13 @@ const bloqueoAppliesToDate = (b, dateStr) => {
 // ─── Componente Principal ─────────────────────────────────────────────────────
 const ReservasDashboard = () => {
     const { user } = useAuth();
-    const { can } = usePermission();
-
-    const canChangeName = can('solicitudes_reservas.can_change_reserva_name');
-    const canApprove = can('solicitudes_reservas.aprobar_solicitudreserva');
-    const canFinish = can('solicitudes_reservas.finalizar_solicitudreserva');
-    const canViewLogs = can('solicitudes_reservas.view_solicitudreserva_logs');
-    const canManage = can('solicitudes_reservas.manage_solicitudreserva');
-
+    const canChangeName = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_change_reserva_name'));
+    const canBypass = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_bypass_antelacion'));
     const defaultName = user?.funcionario_data?.nombre_funcionario || (user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : '') || user?.username || '';
 
     const [recursos, setRecursos] = useState([]);
     const [reservas, setReservas] = useState([]);
-    const [settings, setSettings] = useState({ hora_inicio: '07:00', hora_fin: '18:00' });
+    const [settings, setSettings] = useState({ hora_inicio: '07:00', hora_fin: '18:00', dias_bloqueo_antelacion: 0 });
     const [loading, setLoading] = useState(true);
 
     const configStart = parseInt(settings.hora_inicio.split(':')[0]) || DEFAULT_HOUR_START;
@@ -146,7 +138,6 @@ const ReservasDashboard = () => {
     // Modal nueva reserva
     const [modalOpen, setModalOpen] = useState(false);
     const [formData, setFormData] = useState({ recurso: '', titulo: '', nombre_funcionario: defaultName, descripcion: '', fecha: toDateStr(new Date()), horaInicio: '09:00', horaFin: '10:00' });
-    const [extEditingId, setExtEditingId] = useState(null); // ID de la reserva en edición
     const [formTipo, setFormTipo] = useState(''); // tipo seleccionado en el modal
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState('');
@@ -341,7 +332,15 @@ const ReservasDashboard = () => {
     };
 
     const handleSlotClick = (day, slotTime, recursoId) => {
-        if (day < todayStr) return; // BLOQUEAR RESERVAS EN EL PASADO
+        const x = settings.dias_bloqueo_antelacion || 0;
+        const limit = new Date(); limit.setHours(0, 0, 0, 0);
+        limit.setDate(limit.getDate() + x);
+
+        if (day <= limit && !canBypass) {
+            setSlotBloqueadoMsg(`El sistema requiere ${x} días de antelación. Bloqueado hasta el ${addDays(limit, 1).toLocaleDateString()}.`);
+            setTimeout(() => setSlotBloqueadoMsg(''), 3000);
+            return;
+        }
         const dayStr = toDateStr(day);
 
         // 1. Si no hay slotTime (o es el default), intentamos buscar el primer hueco libre del día
@@ -394,30 +393,18 @@ const ReservasDashboard = () => {
         if (!formData.recurso) { setFormError('Selecciona un recurso'); return; }
         setSubmitting(true); setFormError('');
         try {
-            const payload = {
+            await api.post('reservas/solicitudes/', {
                 recurso: formData.recurso,
                 titulo: formData.titulo,
                 nombre_funcionario: formData.nombre_funcionario,
                 descripcion: formData.descripcion,
                 fecha_inicio: `${formData.fecha}T${formData.horaInicio}:00`,
                 fecha_fin: `${formData.fecha}T${formData.horaFin}:00`,
-            };
-
-            if (extEditingId) {
-                // Durante la edición, forzamos estado a PENDIENTE (según requerimiento) 
-                // a menos que el usuario tenga permiso de gestión directa
-                if (!canApprove) payload.estado = 'PENDIENTE';
-                await api.patch(`reservas/solicitudes/${extEditingId}/`, payload);
-            } else {
-                payload.estado = 'PENDIENTE';
-                await api.post('reservas/solicitudes/', payload);
-            }
-
-            setModalOpen(false);
-            setExtEditingId(null);
-            fetchData();
+                estado: 'PENDIENTE',
+            });
+            setModalOpen(false); fetchData();
         } catch (err) {
-            console.error('Error al guardar reserva:', err.response?.data);
+            console.error('Error al solicitar reserva:', err.response?.data);
             const data = err.response?.data;
             if (data) {
                 if (typeof data === 'string') setFormError(data);
@@ -426,10 +413,10 @@ const ReservasDashboard = () => {
                 else if (data.detail) setFormError(data.detail);
                 else {
                     const msgs = Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
-                    setFormError(msgs || 'Error al procesar solicitud.');
+                    setFormError(msgs || 'Error al crear solicitud.');
                 }
             } else {
-                setFormError('Error de red al procesar la solicitud.');
+                setFormError('Error de red al crear la solicitud.');
             }
         }
         finally { setSubmitting(false); }
@@ -584,11 +571,9 @@ const ReservasDashboard = () => {
                         ))}
                     </div>
 
-                    {canViewLogs && (
-                        <button onClick={() => setHistoryOpen(true)} className="flex items-center gap-2 px-3 py-1.5 text-slate-500 hover:text-slate-800 transition text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50">
-                            <Clock className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Log</span>
-                        </button>
-                    )}
+                    <button onClick={() => setHistoryOpen(true)} className="flex items-center gap-2 px-3 py-1.5 text-slate-500 hover:text-slate-800 transition text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50">
+                        <Clock className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Log</span>
+                    </button>
 
                     <button onClick={fetchData} className="p-2 hover:bg-slate-100 rounded-lg transition" title="Actualizar">
                         <RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
@@ -596,17 +581,21 @@ const ReservasDashboard = () => {
                 </div>
 
                 <div className="flex items-center gap-2 ml-auto w-full md:w-auto mt-1 md:mt-0">
-                    {canManage && (
-                        <button onClick={() => { openAdminCreate(); setAdminOpen(true); }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-black hover:bg-slate-200 transition">
-                            <Settings className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Administrar</span>
-                        </button>
-                    )}
-                    {!(viewMode === 'day' && toDateStr(currentDate) < todayStr) && (
-                        <button onClick={() => { setFormTipo(''); setFormData({ recurso: '', titulo: '', nombre_funcionario: defaultName, descripcion: '', fecha: toDateStr(currentDate), horaInicio: '09:00', horaFin: '10:00' }); setFormError(''); setModalOpen(true); }}
-                            className="flex-2 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-indigo-700 transition shadow-md shadow-indigo-500/20">
-                            <Plus className="w-4 h-4" /> Nueva <span className="hidden sm:inline">Reserva</span>
-                        </button>
-                    )}
+                    <button onClick={() => { openAdminCreate(); setAdminOpen(true); }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-black hover:bg-slate-200 transition">
+                        <Settings className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Administrar</span>
+                    </button>
+                    {(() => {
+                        const x = settings.dias_bloqueo_antelacion || 0;
+                        const limit = new Date(); limit.setHours(0, 0, 0, 0);
+                        limit.setDate(limit.getDate() + x);
+                        const isPast = currentDate <= limit && !canBypass;
+                        return !isPast && (
+                            <button onClick={() => { setFormTipo(''); setFormData({ recurso: '', titulo: '', nombre_funcionario: defaultName, descripcion: '', fecha: toDateStr(currentDate), horaInicio: '09:00', horaFin: '10:00' }); setFormError(''); setModalOpen(true); }}
+                                className="flex-2 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-indigo-700 transition shadow-md shadow-indigo-500/20">
+                                <Plus className="w-4 h-4" /> Nueva <span className="hidden sm:inline">Reserva</span>
+                            </button>
+                        );
+                    })()}
                 </div>
             </div>
 
@@ -739,10 +728,19 @@ const ReservasDashboard = () => {
                                             const dayEvents = getReservasForDayAndRecurso(day, rec.id);
                                             const dayBloqueos = bloqueos.filter(b => Number(b.recurso) === Number(rec.id) && bloqueoAppliesToDate(b, dayS));
 
+                                            const x = settings.dias_bloqueo_antelacion || 0;
+                                            const limit = new Date(); limit.setHours(0, 0, 0, 0);
+                                            limit.setDate(limit.getDate() + x);
+                                            const isDayBlocked = day <= limit && !canBypass;
+
                                             return (
                                                 <div key={dayS}
-                                                    onClick={() => dayS >= todayStr && handleSlotClick(day, '', rec.id)}
-                                                    className={`flex-1 min-w-[110px] p-2 border-r border-slate-50 min-h-[140px] transition-colors relative hover:bg-indigo-50/10 ${dayS >= todayStr ? 'cursor-pointer' : ''} ${dayS === todayStr ? 'bg-indigo-50/5' : ''}`}>
+                                                    onClick={() => !isDayBlocked && handleSlotClick(day, '', rec.id)}
+                                                    className={`flex-1 min-w-[110px] p-2 border-r border-slate-50 min-h-[140px] transition-colors relative hover:bg-indigo-50/10 ${!isDayBlocked ? 'cursor-pointer' : 'bg-slate-100/50'} ${dayS === todayStr ? 'bg-indigo-50/5' : ''}`}>
+
+                                                    {isDayBlocked && (
+                                                        <div className="absolute inset-0 z-0 opacity-40" style={{ background: 'repeating-linear-gradient(45deg, #f1f5f9 0, #f1f5f9 10px, transparent 10px, transparent 20px)' }} />
+                                                    )}
 
                                                     <div className="space-y-1.5 relative z-10">
                                                         {/* Bloqueos */}
@@ -791,8 +789,8 @@ const ReservasDashboard = () => {
                                                             );
                                                         })}
 
-                                                        {/* Icono + para nuevas reservas: ocultar en días pasados */}
-                                                        {day >= todayStr && !dayBloqueos.some(b => b.hora_inicio <= '09:00' && b.hora_fin >= '18:00') && (
+                                                        {/* Icono + para nuevas reservas: ocultar en días bloqueados */}
+                                                        {!isDayBlocked && !dayBloqueos.some(b => b.hora_inicio <= '09:00' && b.hora_fin >= '18:00') && (
                                                             <div className="flex justify-center pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                 <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all">
                                                                     <Plus className="w-4 h-4" />
@@ -1073,10 +1071,10 @@ const ReservasDashboard = () => {
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden" style={{ maxHeight: '88vh' }} onClick={e => e.stopPropagation()}>
                         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-indigo-700">
                             <div>
-                                <h3 className="font-black text-white text-sm">{extEditingId ? 'Editar Reserva' : 'Nueva Reserva'}</h3>
-                                <p className="text-indigo-200 text-[10px]">{extEditingId ? 'Modifica los datos de tu solicitud' : 'Solicitud de uso de recurso'}</p>
+                                <h3 className="font-black text-white text-sm">Nueva Reserva</h3>
+                                <p className="text-indigo-200 text-[10px]">Solicitud de uso de recurso</p>
                             </div>
-                            <button onClick={() => { setModalOpen(false); setExtEditingId(null); }} className="text-indigo-200 hover:text-white"><X className="w-5 h-5" /></button>
+                            <button onClick={() => setModalOpen(false)} className="text-indigo-200 hover:text-white"><X className="w-5 h-5" /></button>
                         </div>
                         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
                             {formError && (
@@ -1085,39 +1083,37 @@ const ReservasDashboard = () => {
                                     <span className="text-xs font-bold text-rose-600">{formError}</span>
                                 </div>
                             )}
-                            {/* ─ PASO 1: Tipo de recurso (Solo si es nueva) ─ */}
-                            {!extEditingId && (
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Tipo de recurso *</label>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                        {Object.entries(TYPE_LABELS).map(([tipo, label]) => {
-                                            const Icon = RECURSO_ICONS[tipo] || Package;
-                                            const tieneRecursos = recursos.some(r => r.tipo === tipo && r.activo !== false);
-                                            const isSelected = formTipo === tipo;
-                                            return (
-                                                <button key={tipo} type="button"
-                                                    disabled={!tieneRecursos}
-                                                    onClick={() => {
-                                                        setFormTipo(tipo);
-                                                        setFormData(p => ({ ...p, recurso: '' })); // reset recurso al cambiar tipo
-                                                    }}
-                                                    className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition ${!tieneRecursos ? 'opacity-30 cursor-not-allowed border-slate-100 bg-slate-50' :
-                                                        isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 bg-slate-50 hover:border-slate-300'
-                                                        }`}
-                                                >
-                                                    <div className={`p-2 rounded-lg ${isSelected ? 'bg-indigo-500' : 'bg-white shadow-sm'}`}>
-                                                        <Icon className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400'}`} />
-                                                    </div>
-                                                    <span className={`text-[10px] font-black leading-tight ${isSelected ? 'text-indigo-600' : 'text-slate-500'}`}>{label}</span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                            {/* ─ PASO 1: Tipo de recurso ─ */}
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Tipo de recurso *</label>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    {Object.entries(TYPE_LABELS).map(([tipo, label]) => {
+                                        const Icon = RECURSO_ICONS[tipo] || Package;
+                                        const tieneRecursos = recursos.some(r => r.tipo === tipo && r.activo !== false);
+                                        const isSelected = formTipo === tipo;
+                                        return (
+                                            <button key={tipo} type="button"
+                                                disabled={!tieneRecursos}
+                                                onClick={() => {
+                                                    setFormTipo(tipo);
+                                                    setFormData(p => ({ ...p, recurso: '' })); // reset recurso al cambiar tipo
+                                                }}
+                                                className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition ${!tieneRecursos ? 'opacity-30 cursor-not-allowed border-slate-100 bg-slate-50' :
+                                                    isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 bg-slate-50 hover:border-slate-300'
+                                                    }`}
+                                            >
+                                                <div className={`p-2 rounded-lg ${isSelected ? 'bg-indigo-500' : 'bg-white shadow-sm'}`}>
+                                                    <Icon className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400'}`} />
+                                                </div>
+                                                <span className={`text-[10px] font-black leading-tight ${isSelected ? 'text-indigo-600' : 'text-slate-500'}`}>{label}</span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
-                            )}
+                            </div>
 
-                            {/* ─ PASO 2: Recurso del tipo seleccionado (O fijo si es edición) ─ */}
-                            {(formTipo || extEditingId) && (() => {
+                            {/* ─ PASO 2: Recurso del tipo seleccionado ─ */}
+                            {formTipo && (() => {
                                 // Solo recursos ACTIVOS del tipo elegido
                                 const recursosDeTipo = recursos.filter(r => r.tipo === formTipo && r.activo !== false).sort(sortByType);
                                 return (
@@ -1312,9 +1308,10 @@ const ReservasDashboard = () => {
                                     )}
                                 </div>
                                 <div className="space-y-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex-1 overflow-hidden">
-                                            <div className="font-bold text-slate-800 capitalize truncate">{new Date(detailReserva.fecha_inicio).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+                                    <div className="flex items-start gap-3 text-sm">
+                                        <Clock className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                            <div className="font-bold text-slate-800 capitalize">{new Date(detailReserva.fecha_inicio).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
                                             <div className="text-slate-500 text-xs">{new Date(detailReserva.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(detailReserva.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                                         </div>
                                     </div>
@@ -1359,7 +1356,7 @@ const ReservasDashboard = () => {
                                     </div>
                                 )}
 
-                                {detailReserva.estado === 'PENDIENTE' && !isRechazando && canApprove && (
+                                {detailReserva.estado === 'PENDIENTE' && !isRechazando && (
                                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
                                         <button onClick={() => handleEstado(detailReserva.id, 'APROBADA', '')} className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl font-black text-xs hover:bg-emerald-100 border border-emerald-200">
                                             <Check className="w-4 h-4" /> Aprobar
@@ -1369,7 +1366,7 @@ const ReservasDashboard = () => {
                                         </button>
                                     </div>
                                 )}
-                                {detailReserva.estado === 'APROBADA' && canFinish && (
+                                {detailReserva.estado === 'APROBADA' && (
                                     <div className="pt-2 border-t border-slate-100">
                                         {!isPast ? (
                                             <button onClick={() => handleEstado(detailReserva.id, 'FINALIZADA', '')} className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-50 text-blue-700 rounded-xl font-black text-xs hover:bg-blue-100 border border-blue-200">
@@ -1383,34 +1380,6 @@ const ReservasDashboard = () => {
                                         )}
                                     </div>
                                 )}
-
-                                {/* Botón EDITAR (más visible) */}
-                                {!isPast && (canApprove || user.id === detailReserva.solicitante) && !isRechazando && (
-                                    <div className="pt-2 border-t border-slate-100">
-                                        <button
-                                            onClick={() => {
-                                                const fi = new Date(detailReserva.fecha_inicio);
-                                                const ff = new Date(detailReserva.fecha_fin);
-                                                setExtEditingId(detailReserva.id);
-                                                setFormData({
-                                                    recurso: detailReserva.recurso,
-                                                    titulo: detailReserva.titulo,
-                                                    nombre_funcionario: detailReserva.nombre_funcionario,
-                                                    descripcion: detailReserva.descripcion || '',
-                                                    fecha: toDateStr(fi),
-                                                    horaInicio: fi.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
-                                                    horaFin: ff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-                                                });
-                                                setFormTipo(rec?.tipo || '');
-                                                setModalOpen(true);
-                                                setDetailReserva(null);
-                                            }}
-                                            className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-50 text-indigo-700 rounded-xl font-black text-xs hover:bg-indigo-100 border border-indigo-200 transition"
-                                        >
-                                            <Edit2 className="w-4 h-4" /> Editar mi Reserva
-                                        </button>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -1418,523 +1387,532 @@ const ReservasDashboard = () => {
             })()}
 
             {/* ── MODAL ADMINISTRACIÓN ── */}
-            {
-                adminOpen && (
-                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setAdminOpen(false)}>
-                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            {adminOpen && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setAdminOpen(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
 
-                            {/* Header */}
-                            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 bg-slate-800 rounded-xl flex items-center justify-center">
-                                        <Settings className="w-4 h-4 text-white" />
-                                    </div>
-                                    <div>
-                                        <h2 className="font-black text-slate-800 text-sm">Administrar Recursos</h2>
-                                        <p className="text-[10px] text-slate-400">Salas, vehículos y equipos reservables</p>
-                                    </div>
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-slate-800 rounded-xl flex items-center justify-center">
+                                    <Settings className="w-4 h-4 text-white" />
                                 </div>
-                                <button onClick={() => setAdminOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+                                <div>
+                                    <h2 className="font-black text-slate-800 text-sm">Administrar Recursos</h2>
+                                    <p className="text-[10px] text-slate-400">Salas, vehículos y equipos reservables</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setAdminOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+                        </div>
+
+                        <div className="flex flex-1 overflow-hidden min-h-0">
+                            {/* Lista */}
+                            <div className="w-60 border-r border-slate-100 overflow-y-auto bg-slate-50/50">
+                                <div className="p-3 space-y-1">
+                                    <button onClick={openAdminCreate}
+                                        className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-black transition mb-3 ${!adminEditing ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
+                                        <Plus className="w-3.5 h-3.5" /> Nuevo Recurso
+                                    </button>
+                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 pb-1">Recursos existentes</div>
+                                    {recursos.length === 0 && <p className="text-xs text-slate-400 italic text-center py-4">Sin recursos.</p>}
+                                    {recursos.map(r => {
+                                        const Icon = RECURSO_ICONS[r.tipo] || Package;
+                                        const isSelected = adminEditing?.id === r.id;
+                                        const color = r.color || '#6366f1';
+                                        return (
+                                            <div key={r.id} onClick={() => openAdminEdit(r)}
+                                                className={`flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer transition ${!r.activo ? 'opacity-40' : ''} ${isSelected ? 'border' : 'hover:bg-white'}`}
+                                                style={{ borderColor: isSelected ? color : 'transparent', background: isSelected ? hexToRgba(color, 0.06) : '' }}>
+                                                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: isSelected ? color : '#f1f5f9' }}>
+                                                    <Icon className="w-3.5 h-3.5" style={{ color: isSelected ? 'white' : '#94a3b8' }} />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-xs font-black truncate" style={{ color: isSelected ? color : '#334155' }}>{r.nombre}</p>
+                                                    <p className="text-[9px] text-slate-400 truncate">{r.tipo}</p>
+                                                </div>
+                                                {!r.activo && <span className="text-[8px] font-black text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full">INACT.</span>}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <div className="p-3 border-t border-slate-100 mt-2 bg-slate-50/50">
+                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 pb-2">Configuración General</div>
+                                    <button onClick={() => setAdminEditing({ id: 'settings', isSettings: true })}
+                                        className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer transition ${adminEditing?.id === 'settings' ? 'bg-white border border-indigo-200 shadow-sm' : 'hover:bg-white border border-transparent'}`}>
+                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${adminEditing?.id === 'settings' ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                                            <Clock className={`w-3.5 h-3.5 ${adminEditing?.id === 'settings' ? 'text-white' : 'text-slate-500'}`} />
+                                        </div>
+                                        <div className="min-w-0 flex-1 text-left">
+                                            <p className={`text-xs font-black truncate ${adminEditing?.id === 'settings' ? 'text-indigo-600' : 'text-slate-700'}`}>Horario Laboral</p>
+                                            <p className="text-[9px] text-slate-400 truncate">Configurar inicio/fin</p>
+                                        </div>
+                                    </button>
+                                </div>
                             </div>
 
-                            <div className="flex flex-1 overflow-hidden min-h-0">
-                                {/* Lista */}
-                                <div className="w-60 border-r border-slate-100 overflow-y-auto bg-slate-50/50">
-                                    <div className="p-3 space-y-1">
-                                        <button onClick={openAdminCreate}
-                                            className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-black transition mb-3 ${!adminEditing ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
-                                            <Plus className="w-3.5 h-3.5" /> Nuevo Recurso
-                                        </button>
-                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 pb-1">Recursos existentes</div>
-                                        {recursos.length === 0 && <p className="text-xs text-slate-400 italic text-center py-4">Sin recursos.</p>}
-                                        {recursos.map(r => {
-                                            const Icon = RECURSO_ICONS[r.tipo] || Package;
-                                            const isSelected = adminEditing?.id === r.id;
-                                            const color = r.color || '#6366f1';
-                                            return (
-                                                <div key={r.id} onClick={() => openAdminEdit(r)}
-                                                    className={`flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer transition ${!r.activo ? 'opacity-40' : ''} ${isSelected ? 'border' : 'hover:bg-white'}`}
-                                                    style={{ borderColor: isSelected ? color : 'transparent', background: isSelected ? hexToRgba(color, 0.06) : '' }}>
-                                                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: isSelected ? color : '#f1f5f9' }}>
-                                                        <Icon className="w-3.5 h-3.5" style={{ color: isSelected ? 'white' : '#94a3b8' }} />
-                                                    </div>
-                                                    <div className="min-w-0 flex-1">
-                                                        <p className="text-xs font-black truncate" style={{ color: isSelected ? color : '#334155' }}>{r.nombre}</p>
-                                                        <p className="text-[9px] text-slate-400 truncate">{r.tipo}</p>
-                                                    </div>
-                                                    {!r.activo && <span className="text-[8px] font-black text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full">INACT.</span>}
-                                                </div>
-                                            );
-                                        })}
+                            {/* Formulario */}
+                            <div className="flex-1 overflow-y-auto p-6">
+                                <h3 className="font-black text-slate-800 text-sm mb-4">
+                                    {adminEditing?.id === 'settings' ? 'Configuración de Horario Laboral' : adminEditing ? `Editando: ${adminEditing.nombre}` : 'Crear nuevo recurso'}
+                                </h3>
+                                {adminError && (
+                                    <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-4">
+                                        <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0" />
+                                        <span className="text-xs font-bold text-rose-600">{adminError}</span>
                                     </div>
-                                    <div className="p-3 border-t border-slate-100 mt-2 bg-slate-50/50">
-                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 pb-2">Configuración General</div>
-                                        <button onClick={() => setAdminEditing({ id: 'settings', isSettings: true })}
-                                            className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer transition ${adminEditing?.id === 'settings' ? 'bg-white border border-indigo-200 shadow-sm' : 'hover:bg-white border border-transparent'}`}>
-                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${adminEditing?.id === 'settings' ? 'bg-indigo-600' : 'bg-slate-200'}`}>
-                                                <Clock className={`w-3.5 h-3.5 ${adminEditing?.id === 'settings' ? 'text-white' : 'text-slate-500'}`} />
-                                            </div>
-                                            <div className="min-w-0 flex-1 text-left">
-                                                <p className={`text-xs font-black truncate ${adminEditing?.id === 'settings' ? 'text-indigo-600' : 'text-slate-700'}`}>Horario Laboral</p>
-                                                <p className="text-[9px] text-slate-400 truncate">Configurar inicio/fin</p>
-                                            </div>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Formulario */}
-                                <div className="flex-1 overflow-y-auto p-6">
-                                    <h3 className="font-black text-slate-800 text-sm mb-4">
-                                        {adminEditing?.id === 'settings' ? 'Configuración de Horario Laboral' : adminEditing ? `Editando: ${adminEditing.nombre}` : 'Crear nuevo recurso'}
-                                    </h3>
-                                    {adminError && (
-                                        <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-4">
-                                            <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0" />
-                                            <span className="text-xs font-bold text-rose-600">{adminError}</span>
+                                )}
+                                {adminEditing?.id === 'settings' ? (
+                                    <form onSubmit={async (e) => {
+                                        e.preventDefault();
+                                        setAdminSaving(true);
+                                        try {
+                                            await api.put('reservas/settings/1/', settings);
+                                            setAdminError('');
+                                            await fetchData();
+                                            // No cerramos el modal para que vea el cambio o pueda seguir ajustando
+                                        } catch (e) {
+                                            setAdminError('Error al guardar la configuración. Revisa los valores.');
+                                        } finally {
+                                            setAdminSaving(false);
+                                        }
+                                    }} className="space-y-6">
+                                        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
+                                            <p className="text-xs text-indigo-700 leading-relaxed">
+                                                Ajusta el rango de horas que se mostrará en el calendario para todos los usuarios.
+                                                Las reservas existentes fuera de este rango seguirán siendo válidas pero podrían no ser visibles en la vista diaria/semanal.
+                                            </p>
                                         </div>
-                                    )}
-                                    {adminEditing?.id === 'settings' ? (
-                                        <form onSubmit={async (e) => {
-                                            e.preventDefault();
-                                            setAdminSaving(true);
-                                            try {
-                                                await api.put('reservas/settings/1/', settings);
-                                                setAdminError('');
-                                                await fetchData();
-                                                // No cerramos el modal para que vea el cambio o pueda seguir ajustando
-                                            } catch (e) {
-                                                setAdminError('Error al guardar la configuración. Revisa los valores.');
-                                            } finally {
-                                                setAdminSaving(false);
-                                            }
-                                        }} className="space-y-6">
-                                            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
-                                                <p className="text-xs text-indigo-700 leading-relaxed">
-                                                    Ajusta el rango de horas que se mostrará en el calendario para todos los usuarios.
-                                                    Las reservas existentes fuera de este rango seguirán siendo válidas pero podrían no ser visibles en la vista diaria/semanal.
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Hora de Inicio</label>
+                                                <input type="time" step="1800" className="w-full rounded-xl border border-slate-200 text-sm px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    value={settings.hora_inicio.slice(0, 5)} onChange={e => setSettings(p => ({ ...p, hora_inicio: e.target.value }))} required />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Hora de Término</label>
+                                                <input type="time" step="1800" className="w-full rounded-xl border border-slate-200 text-sm px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    value={settings.hora_fin.slice(0, 5)} onChange={e => setSettings(p => ({ ...p, hora_fin: e.target.value }))} required />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Días Bloqueo Antelación</label>
+                                            <div className="flex items-center gap-3 bg-slate-100 p-3 rounded-xl border border-slate-200">
+                                                <input type="number" min="0" max="30" className="w-20 rounded-lg border border-slate-200 text-sm px-3 py-2 font-black text-indigo-600 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    value={settings.dias_bloqueo_antelacion} onChange={e => setSettings(p => ({ ...p, dias_bloqueo_antelacion: parseInt(e.target.value) || 0 }))} required />
+                                                <p className="text-[11px] text-slate-500 font-bold leading-tight">
+                                                    Bloquea <span className="text-indigo-600 font-black">{settings.dias_bloqueo_antelacion}</span> días desde hoy hacia atrás. <br />
+                                                    Las nuevas reservas solo podrán pedirse desde el <span className="text-slate-800 font-black underline">
+                                                        {addDays(new Date(), (settings.dias_bloqueo_antelacion || 0) + 1).toLocaleDateString()}
+                                                    </span>.
                                                 </p>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Hora de Inicio</label>
-                                                    <input type="time" step="1800" className="w-full rounded-xl border border-slate-200 text-sm px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                        value={settings.hora_inicio.slice(0, 5)} onChange={e => setSettings(p => ({ ...p, hora_inicio: e.target.value }))} required />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Hora de Término</label>
-                                                    <input type="time" step="1800" className="w-full rounded-xl border border-slate-200 text-sm px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                        value={settings.hora_fin.slice(0, 5)} onChange={e => setSettings(p => ({ ...p, hora_fin: e.target.value }))} required />
-                                                </div>
+                                        </div>
+                                        <button type="submit" disabled={adminSaving} className="w-full py-3 bg-slate-800 text-white rounded-xl font-black text-xs hover:bg-slate-900 transition flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg">
+                                            {adminSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                            Guardar Configuración
+                                        </button>
+                                    </form>
+                                ) : (
+                                    <form onSubmit={handleAdminSave} className="space-y-4">
+                                        {/* Tipo */}
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Tipo *</label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {[{ v: 'SALA', l: 'Sala de Reuniones', I: Building2 }, { v: 'VEHICULO', l: 'Vehículo', I: Truck }, { v: 'PROYECTOR', l: 'Proyector/Equipo', I: Monitor }, { v: 'OTRO', l: 'Otro', I: Package }].map(({ v, l, I }) => (
+                                                    <button key={v} type="button" onClick={() => setAdminForm(p => ({ ...p, tipo: v }))}
+                                                        className={`flex items-center gap-2 p-2.5 rounded-xl border-2 text-left transition text-xs font-bold ${adminForm.tipo === v ? 'bg-slate-800 border-slate-800 text-white' : 'border-slate-100 text-slate-600 hover:border-slate-200'}`}>
+                                                        <I className="w-3.5 h-3.5" /> {l}
+                                                    </button>
+                                                ))}
                                             </div>
-                                            <button type="submit" disabled={adminSaving} className="w-full py-3 bg-slate-800 text-white rounded-xl font-black text-xs hover:bg-slate-900 transition flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg">
-                                                {adminSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                                                Guardar Configuración
-                                            </button>
-                                        </form>
-                                    ) : (
-                                        <form onSubmit={handleAdminSave} className="space-y-4">
-                                            {/* Tipo */}
-                                            <div>
-                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Tipo *</label>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    {[{ v: 'SALA', l: 'Sala de Reuniones', I: Building2 }, { v: 'VEHICULO', l: 'Vehículo', I: Truck }, { v: 'PROYECTOR', l: 'Proyector/Equipo', I: Monitor }, { v: 'OTRO', l: 'Otro', I: Package }].map(({ v, l, I }) => (
-                                                        <button key={v} type="button" onClick={() => setAdminForm(p => ({ ...p, tipo: v }))}
-                                                            className={`flex items-center gap-2 p-2.5 rounded-xl border-2 text-left transition text-xs font-bold ${adminForm.tipo === v ? 'bg-slate-800 border-slate-800 text-white' : 'border-slate-100 text-slate-600 hover:border-slate-200'}`}>
-                                                            <I className="w-3.5 h-3.5" /> {l}
-                                                        </button>
+                                        </div>
+
+                                        {/* Nombre */}
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Nombre *</label>
+                                            <input type="text" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                value={adminForm.nombre} onChange={e => setAdminForm(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Sala Directorio, Van Toyota..." required />
+                                        </div>
+
+                                        {/* Color RGB */}
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Color en Calendario</label>
+                                            <div className="flex items-center gap-3">
+                                                <input type="color" value={adminForm.color} onChange={e => setAdminForm(p => ({ ...p, color: e.target.value }))}
+                                                    className="w-10 h-10 rounded-xl border-2 border-slate-200 cursor-pointer p-0.5 bg-white" />
+                                                <div className="flex-1 grid grid-cols-4 gap-1.5">
+                                                    {DEFAULT_COLORS.map(c => (
+                                                        <button key={c} type="button" onClick={() => setAdminForm(p => ({ ...p, color: c }))}
+                                                            className="h-7 rounded-lg border-2 transition"
+                                                            style={{ background: c, borderColor: adminForm.color === c ? '#1e293b' : 'transparent' }}
+                                                            title={c} />
                                                     ))}
                                                 </div>
+                                                <span className="text-xs font-bold text-slate-500 font-mono">{adminForm.color}</span>
                                             </div>
+                                            {/* Preview */}
+                                            <div className="mt-2 rounded-xl overflow-hidden border border-slate-100" style={{ background: hexToRgba(adminForm.color, 0.1) }}>
+                                                <div className="px-3 py-2" style={{ background: hexToRgba(adminForm.color, 0.7) }}>
+                                                    <p className="text-[10px] font-black text-white">{adminForm.nombre || 'Nombre del recurso'}</p>
+                                                </div>
+                                                <div className="px-3 py-1">
+                                                    <p className="text-[9px] font-bold" style={{ color: adminForm.color }}>09:00 – 10:00</p>
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                            {/* Nombre */}
+                                        {/* Ubicación + Capacidad */}
+                                        <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Nombre *</label>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><MapPin className="w-3 h-3" /> Ubicación</label>
                                                 <input type="text" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                    value={adminForm.nombre} onChange={e => setAdminForm(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Sala Directorio, Van Toyota..." required />
+                                                    value={adminForm.ubicacion} onChange={e => setAdminForm(p => ({ ...p, ubicacion: e.target.value }))} placeholder="Ej: Piso 2" />
                                             </div>
-
-                                            {/* Color RGB */}
                                             <div>
-                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Color en Calendario</label>
-                                                <div className="flex items-center gap-3">
-                                                    <input type="color" value={adminForm.color} onChange={e => setAdminForm(p => ({ ...p, color: e.target.value }))}
-                                                        className="w-10 h-10 rounded-xl border-2 border-slate-200 cursor-pointer p-0.5 bg-white" />
-                                                    <div className="flex-1 grid grid-cols-4 gap-1.5">
-                                                        {DEFAULT_COLORS.map(c => (
-                                                            <button key={c} type="button" onClick={() => setAdminForm(p => ({ ...p, color: c }))}
-                                                                className="h-7 rounded-lg border-2 transition"
-                                                                style={{ background: c, borderColor: adminForm.color === c ? '#1e293b' : 'transparent' }}
-                                                                title={c} />
-                                                        ))}
-                                                    </div>
-                                                    <span className="text-xs font-bold text-slate-500 font-mono">{adminForm.color}</span>
-                                                </div>
-                                                {/* Preview */}
-                                                <div className="mt-2 rounded-xl overflow-hidden border border-slate-100" style={{ background: hexToRgba(adminForm.color, 0.1) }}>
-                                                    <div className="px-3 py-2" style={{ background: hexToRgba(adminForm.color, 0.7) }}>
-                                                        <p className="text-[10px] font-black text-white">{adminForm.nombre || 'Nombre del recurso'}</p>
-                                                    </div>
-                                                    <div className="px-3 py-1">
-                                                        <p className="text-[9px] font-bold" style={{ color: adminForm.color }}>09:00 – 10:00</p>
-                                                    </div>
-                                                </div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Users className="w-3 h-3" /> Capacidad</label>
+                                                <input type="number" min="1" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    value={adminForm.capacidad} onChange={e => setAdminForm(p => ({ ...p, capacidad: parseInt(e.target.value) || 1 }))} />
                                             </div>
+                                        </div>
 
-                                            {/* Ubicación + Capacidad */}
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><MapPin className="w-3 h-3" /> Ubicación</label>
-                                                    <input type="text" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                        value={adminForm.ubicacion} onChange={e => setAdminForm(p => ({ ...p, ubicacion: e.target.value }))} placeholder="Ej: Piso 2" />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Users className="w-3 h-3" /> Capacidad</label>
-                                                    <input type="number" min="1" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                        value={adminForm.capacidad} onChange={e => setAdminForm(p => ({ ...p, capacidad: parseInt(e.target.value) || 1 }))} />
-                                                </div>
-                                            </div>
+                                        {/* Descripción */}
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Descripción</label>
+                                            <textarea rows={2} className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                                                value={adminForm.descripcion} onChange={e => setAdminForm(p => ({ ...p, descripcion: e.target.value }))} placeholder="Equipamiento, notas..." />
+                                        </div>
 
-                                            {/* Descripción */}
-                                            <div>
-                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Descripción</label>
-                                                <textarea rows={2} className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
-                                                    value={adminForm.descripcion} onChange={e => setAdminForm(p => ({ ...p, descripcion: e.target.value }))} placeholder="Equipamiento, notas..." />
-                                            </div>
-
-                                            {/* Botones */}
-                                            <div className="flex gap-2 pt-2">
-                                                <button type="submit" disabled={adminSaving}
-                                                    className="flex-1 py-2.5 text-white rounded-xl font-black text-xs transition flex items-center justify-center gap-2 disabled:opacity-50"
-                                                    style={{ background: adminSaving ? '#94a3b8' : adminForm.color }}>
-                                                    {adminSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                                                    {adminEditing ? 'Guardar Cambios' : 'Crear Recurso'}
-                                                </button>
-                                                {adminEditing && !adminEditing.isSettings && (
-                                                    <>
-                                                        <button type="button" onClick={() => handleAdminToggle(adminEditing)}
-                                                            className={`px-3 py-2.5 rounded-xl font-black text-xs transition flex items-center gap-1.5 border ${adminEditing.activo ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}`}>
-                                                            <Power className="w-3.5 h-3.5" /> {adminEditing.activo ? 'Desactivar' : 'Activar'}
-                                                        </button>
-                                                        <button type="button" onClick={() => handleAdminDelete(adminEditing)}
-                                                            className="px-3 py-2.5 bg-rose-50 text-rose-600 rounded-xl font-black text-xs hover:bg-rose-100 border border-rose-200">
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </form>
-                                    )}
-
-                                    {/* ── PANEL DE BLOQUEOS (solo al editar) ── */}
-                                    {adminEditing && !adminEditing.isSettings && (
-                                        <div className="mt-6 border-t border-slate-100 pt-5">
-                                            <button
-                                                type="button"
-                                                onClick={() => setBloqueoTab(p => !p)}
-                                                className="flex items-center gap-2 w-full text-left mb-3"
-                                            >
-                                                <Lock className="w-3.5 h-3.5 text-amber-500" />
-                                                <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
-                                                    Bloqueos de Horario
-                                                </span>
-                                                <span className="ml-auto text-[10px] text-slate-400">
-                                                    {bloqueoTab ? '▲ ocultar' : '▼ ver/agregar'}
-                                                </span>
+                                        {/* Botones */}
+                                        <div className="flex gap-2 pt-2">
+                                            <button type="submit" disabled={adminSaving}
+                                                className="flex-1 py-2.5 text-white rounded-xl font-black text-xs transition flex items-center justify-center gap-2 disabled:opacity-50"
+                                                style={{ background: adminSaving ? '#94a3b8' : adminForm.color }}>
+                                                {adminSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                                {adminEditing ? 'Guardar Cambios' : 'Crear Recurso'}
                                             </button>
-
-                                            {bloqueoTab && (
-                                                <div className="space-y-4">
-                                                    {/* Lista de bloqueos actuales */}
-                                                    {bloqueos.filter(b => b.recurso === adminEditing.id).length > 0 ? (
-                                                        <div className="space-y-2">
-                                                            {bloqueos
-                                                                .filter(b => b.recurso === adminEditing.id)
-                                                                .map(b => {
-                                                                    const modoCfg = {
-                                                                        DIA: { label: 'Día', color: 'text-amber-700 bg-amber-100' },
-                                                                        RANGO: { label: 'Rango', color: 'text-blue-700 bg-blue-100' },
-                                                                        INDEFINIDO: { label: '∞', color: 'text-rose-700 bg-rose-100' }
-                                                                    };
-                                                                    const mc = modoCfg[b.modo] || modoCfg.DIA;
-                                                                    const period = b.modo === 'DIA' ? b.fecha_inicio
-                                                                        : b.modo === 'RANGO' ? `${b.fecha_inicio} → ${b.fecha_fin}`
-                                                                            : `Desde ${b.fecha_inicio}`;
-                                                                    return (
-                                                                        <div key={b.id} className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                                                                            <div className="min-w-0">
-                                                                                <div className="flex items-center gap-1.5 mb-0.5">
-                                                                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${mc.color}`}>{mc.label}</span>
-                                                                                    <p className="text-xs font-black text-amber-800 truncate">{period}</p>
-                                                                                </div>
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <p className="text-[10px] text-amber-600 font-bold">{b.hora_inicio.slice(0, 5)} – {b.hora_fin.slice(0, 5)}</p>
-                                                                                    {b.motivo && <p className="text-[10px] text-amber-500 italic truncate opacity-70">| {b.motivo}</p>}
-                                                                                </div>
-                                                                            </div>
-                                                                            <button type="button" onClick={() => handleBloqueoDelete(b.id)}
-                                                                                className="text-rose-400 hover:text-rose-600 p-1 transition flex-shrink-0">
-                                                                                <X className="w-3.5 h-3.5" />
-                                                                            </button>
-                                                                        </div>
-                                                                    );
-                                                                })
-                                                            }
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-[11px] text-slate-400 italic">Sin bloqueos para este recurso.</p>
-                                                    )}
-
-                                                    {/* Formulario para nuevo bloqueo */}
-                                                    <form onSubmit={handleBloqueoSave} className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-3">
-                                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Agregar Bloqueo</p>
-                                                        {bloqueoError && (
-                                                            <p className="text-[10px] text-rose-600 font-bold">{bloqueoError}</p>
-                                                        )}
-
-                                                        {/* Modo */}
-                                                        <div>
-                                                            <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Tipo de bloqueo *</label>
-                                                            <div className="grid grid-cols-3 gap-1">
-                                                                {[{ v: 'DIA', l: 'Día' }, { v: 'RANGO', l: 'Rango' }, { v: 'INDEFINIDO', l: 'Indefinido' }].map(({ v, l }) => (
-                                                                    <button key={v} type="button"
-                                                                        onClick={() => setBloqueoForm(p => ({ ...p, modo: v, fecha_fin: '' }))}
-                                                                        className={`py-1.5 rounded-lg text-[10px] font-black transition border ${bloqueoForm.modo === v ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-500 border-slate-200 hover:border-amber-300'}`}>
-                                                                        {l}
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Fechas según modo */}
-                                                        <div className={`grid gap-2 ${bloqueoForm.modo === 'RANGO' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                                                            <div>
-                                                                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">
-                                                                    {bloqueoForm.modo === 'DIA' ? 'Fecha *' : bloqueoForm.modo === 'INDEFINIDO' ? 'Desde *' : 'Fecha inicio *'}
-                                                                </label>
-                                                                <input type="date" required
-                                                                    min={todayStr}
-                                                                    className="w-full rounded-lg border border-slate-200 text-xs px-2 py-2 focus:ring-1 focus:ring-amber-400 outline-none"
-                                                                    value={bloqueoForm.fecha_inicio}
-                                                                    onChange={e => setBloqueoForm(p => ({ ...p, fecha_inicio: e.target.value }))} />
-                                                            </div>
-                                                            {bloqueoForm.modo === 'RANGO' && (
-                                                                <div>
-                                                                    <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Fecha fin *</label>
-                                                                    <input type="date" required
-                                                                        className="w-full rounded-lg border border-slate-200 text-xs px-2 py-2 focus:ring-1 focus:ring-amber-400 outline-none"
-                                                                        value={bloqueoForm.fecha_fin}
-                                                                        min={bloqueoForm.fecha_inicio}
-                                                                        onChange={e => setBloqueoForm(p => ({ ...p, fecha_fin: e.target.value }))} />
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-                                                        {/* Horas y motivo */}
-                                                        <div className="grid grid-cols-2 gap-2">
-                                                            <div>
-                                                                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Hora inicio *</label>
-                                                                <input type="time" required
-                                                                    className="w-full rounded-lg border border-slate-200 text-xs px-2 py-2 focus:ring-1 focus:ring-amber-400 outline-none"
-                                                                    value={bloqueoForm.hora_inicio}
-                                                                    onChange={e => setBloqueoForm(p => ({ ...p, hora_inicio: e.target.value }))} />
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Hora fin *</label>
-                                                                <input type="time" required
-                                                                    className="w-full rounded-lg border border-slate-200 text-xs px-2 py-2 focus:ring-1 focus:ring-amber-400 outline-none"
-                                                                    value={bloqueoForm.hora_fin}
-                                                                    onChange={e => setBloqueoForm(p => ({ ...p, hora_fin: e.target.value }))} />
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Motivo (opcional)</label>
-                                                            <input type="text"
-                                                                className="w-full rounded-lg border border-slate-200 text-xs px-2 py-2 focus:ring-1 focus:ring-amber-400 outline-none"
-                                                                placeholder="Ej: Mantención, feriado..."
-                                                                value={bloqueoForm.motivo}
-                                                                onChange={e => setBloqueoForm(p => ({ ...p, motivo: e.target.value }))} />
-                                                        </div>
-
-                                                        <button type="submit" disabled={bloqueoSaving}
-                                                            className="w-full py-2 bg-amber-500 text-white rounded-lg text-xs font-black hover:bg-amber-600 transition disabled:opacity-50 flex items-center justify-center gap-1">
-                                                            {bloqueoSaving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Lock className="w-3 h-3" />}
-                                                            Agregar Bloqueo
-                                                        </button>
-                                                    </form>
-                                                </div>
+                                            {adminEditing && !adminEditing.isSettings && (
+                                                <>
+                                                    <button type="button" onClick={() => handleAdminToggle(adminEditing)}
+                                                        className={`px-3 py-2.5 rounded-xl font-black text-xs transition flex items-center gap-1.5 border ${adminEditing.activo ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}`}>
+                                                        <Power className="w-3.5 h-3.5" /> {adminEditing.activo ? 'Desactivar' : 'Activar'}
+                                                    </button>
+                                                    <button type="button" onClick={() => handleAdminDelete(adminEditing)}
+                                                        className="px-3 py-2.5 bg-rose-50 text-rose-600 rounded-xl font-black text-xs hover:bg-rose-100 border border-rose-200">
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </>
                                             )}
                                         </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-            {/* ── MODAL LOG / HISTORIAL ── */}
-            {
-                historyOpen && (
-                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex justify-end" onClick={() => setHistoryOpen(false)}>
-                        <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col animate-in slide-in-from-right" onClick={e => e.stopPropagation()}>
-                            <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                                <div>
-                                    <h2 className="text-xl font-black text-slate-900">Historial de Reservas</h2>
-                                    <p className="text-sm text-slate-500">Busca y filtra entre todos los registros</p>
-                                </div>
-                                <button onClick={() => setHistoryOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition"><X className="w-6 h-6 text-slate-400" /></button>
-                            </div>
+                                    </form>
+                                )}
 
-                            {/* BARRA DE FILTROS */}
-                            <div className="p-4 bg-white border-b border-slate-100 space-y-3">
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar por título, funcionario, código..."
-                                        value={historySearch}
-                                        onChange={e => setHistorySearch(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 transition outline-none"
-                                    />
-                                    <Clock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                                </div>
+                                {/* ── PANEL DE BLOQUEOS (solo al editar) ── */}
+                                {adminEditing && !adminEditing.isSettings && (
+                                    <div className="mt-6 border-t border-slate-100 pt-5">
+                                        <button
+                                            type="button"
+                                            onClick={() => setBloqueoTab(p => !p)}
+                                            className="flex items-center gap-2 w-full text-left mb-3"
+                                        >
+                                            <Lock className="w-3.5 h-3.5 text-amber-500" />
+                                            <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                                                Bloqueos de Horario
+                                            </span>
+                                            <span className="ml-auto text-[10px] text-slate-400">
+                                                {bloqueoTab ? '▲ ocultar' : '▼ ver/agregar'}
+                                            </span>
+                                        </button>
 
-                                <div className="grid grid-cols-2 gap-2">
-                                    <select
-                                        value={historyFilterEstado}
-                                        onChange={e => setHistoryFilterEstado(e.target.value)}
-                                        className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                                    >
-                                        <option value="HISTORIAL">Todos (Cerrados)</option>
-                                        <option value="ALL_RECORDS">Todos (Incluso Activos)</option>
-                                        <option value="PENDIENTE">Solo Pendientes</option>
-                                        <option value="APROBADA">Solo Aprobadas</option>
-                                        <option value="FINALIZADA">Solo Finalizadas</option>
-                                        <option value="RECHAZADA">Solo Rechazadas</option>
-                                        <option value="CANCELADA">Solo Canceladas</option>
-                                    </select>
+                                        {bloqueoTab && (
+                                            <div className="space-y-4">
+                                                {/* Lista de bloqueos actuales */}
+                                                {bloqueos.filter(b => b.recurso === adminEditing.id).length > 0 ? (
+                                                    <div className="space-y-2">
+                                                        {bloqueos
+                                                            .filter(b => b.recurso === adminEditing.id)
+                                                            .map(b => {
+                                                                const modoCfg = {
+                                                                    DIA: { label: 'Día', color: 'text-amber-700 bg-amber-100' },
+                                                                    RANGO: { label: 'Rango', color: 'text-blue-700 bg-blue-100' },
+                                                                    INDEFINIDO: { label: '∞', color: 'text-rose-700 bg-rose-100' }
+                                                                };
+                                                                const mc = modoCfg[b.modo] || modoCfg.DIA;
+                                                                const period = b.modo === 'DIA' ? b.fecha_inicio
+                                                                    : b.modo === 'RANGO' ? `${b.fecha_inicio} → ${b.fecha_fin}`
+                                                                        : `Desde ${b.fecha_inicio}`;
+                                                                return (
+                                                                    <div key={b.id} className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                                                                        <div className="min-w-0">
+                                                                            <div className="flex items-center gap-1.5 mb-0.5">
+                                                                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${mc.color}`}>{mc.label}</span>
+                                                                                <p className="text-xs font-black text-amber-800 truncate">{period}</p>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <p className="text-[10px] text-amber-600 font-bold">{b.hora_inicio.slice(0, 5)} – {b.hora_fin.slice(0, 5)}</p>
+                                                                                {b.motivo && <p className="text-[10px] text-amber-500 italic truncate opacity-70">| {b.motivo}</p>}
+                                                                            </div>
+                                                                        </div>
+                                                                        <button type="button" onClick={() => handleBloqueoDelete(b.id)}
+                                                                            className="text-rose-400 hover:text-rose-600 p-1 transition flex-shrink-0">
+                                                                            <X className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                    </div>
+                                                                );
+                                                            })
+                                                        }
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-[11px] text-slate-400 italic">Sin bloqueos para este recurso.</p>
+                                                )}
 
-                                    <select
-                                        value={historyFilterRecurso}
-                                        onChange={e => setHistoryFilterRecurso(e.target.value)}
-                                        className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                                    >
-                                        <option value="all">Todos los Recursos</option>
-                                        {recursos.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)).map(r => (
-                                            <option key={r.id} value={r.id}>{r.nombre}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                                {/* Formulario para nuevo bloqueo */}
+                                                <form onSubmit={handleBloqueoSave} className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-3">
+                                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Agregar Bloqueo</p>
+                                                    {bloqueoError && (
+                                                        <p className="text-[10px] text-rose-600 font-bold">{bloqueoError}</p>
+                                                    )}
 
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ordenar por:</span>
-                                    <div className="flex bg-slate-100 p-0.5 rounded-lg flex-1">
-                                        {[
-                                            { v: '-fecha_inicio', l: 'Recientes' },
-                                            { v: 'fecha_inicio', l: 'Antiguos' },
-                                            { v: 'titulo', l: 'Título' }
-                                        ].map(opt => (
-                                            <button
-                                                key={opt.v}
-                                                onClick={() => setHistorySort(opt.v)}
-                                                className={`flex-1 py-1 px-2 text-[10px] font-bold rounded-md transition ${historySort === opt.v ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-                                            >
-                                                {opt.l}
-                                            </button>
-                                        ))}
+                                                    {/* Modo */}
+                                                    <div>
+                                                        <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Tipo de bloqueo *</label>
+                                                        <div className="grid grid-cols-3 gap-1">
+                                                            {[{ v: 'DIA', l: 'Día' }, { v: 'RANGO', l: 'Rango' }, { v: 'INDEFINIDO', l: 'Indefinido' }].map(({ v, l }) => (
+                                                                <button key={v} type="button"
+                                                                    onClick={() => setBloqueoForm(p => ({ ...p, modo: v, fecha_fin: '' }))}
+                                                                    className={`py-1.5 rounded-lg text-[10px] font-black transition border ${bloqueoForm.modo === v ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-500 border-slate-200 hover:border-amber-300'}`}>
+                                                                    {l}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Fechas según modo */}
+                                                    <div className={`grid gap-2 ${bloqueoForm.modo === 'RANGO' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                                        <div>
+                                                            <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">
+                                                                {bloqueoForm.modo === 'DIA' ? 'Fecha *' : bloqueoForm.modo === 'INDEFINIDO' ? 'Desde *' : 'Fecha inicio *'}
+                                                            </label>
+                                                            <input type="date" required
+                                                                min={todayStr}
+                                                                className="w-full rounded-lg border border-slate-200 text-xs px-2 py-2 focus:ring-1 focus:ring-amber-400 outline-none"
+                                                                value={bloqueoForm.fecha_inicio}
+                                                                onChange={e => setBloqueoForm(p => ({ ...p, fecha_inicio: e.target.value }))} />
+                                                        </div>
+                                                        {bloqueoForm.modo === 'RANGO' && (
+                                                            <div>
+                                                                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Fecha fin *</label>
+                                                                <input type="date" required
+                                                                    className="w-full rounded-lg border border-slate-200 text-xs px-2 py-2 focus:ring-1 focus:ring-amber-400 outline-none"
+                                                                    value={bloqueoForm.fecha_fin}
+                                                                    min={bloqueoForm.fecha_inicio}
+                                                                    onChange={e => setBloqueoForm(p => ({ ...p, fecha_fin: e.target.value }))} />
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Horas y motivo */}
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div>
+                                                            <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Hora inicio *</label>
+                                                            <input type="time" required
+                                                                className="w-full rounded-lg border border-slate-200 text-xs px-2 py-2 focus:ring-1 focus:ring-amber-400 outline-none"
+                                                                value={bloqueoForm.hora_inicio}
+                                                                onChange={e => setBloqueoForm(p => ({ ...p, hora_inicio: e.target.value }))} />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Hora fin *</label>
+                                                            <input type="time" required
+                                                                className="w-full rounded-lg border border-slate-200 text-xs px-2 py-2 focus:ring-1 focus:ring-amber-400 outline-none"
+                                                                value={bloqueoForm.hora_fin}
+                                                                onChange={e => setBloqueoForm(p => ({ ...p, hora_fin: e.target.value }))} />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Motivo (opcional)</label>
+                                                        <input type="text"
+                                                            className="w-full rounded-lg border border-slate-200 text-xs px-2 py-2 focus:ring-1 focus:ring-amber-400 outline-none"
+                                                            placeholder="Ej: Mantención, feriado..."
+                                                            value={bloqueoForm.motivo}
+                                                            onChange={e => setBloqueoForm(p => ({ ...p, motivo: e.target.value }))} />
+                                                    </div>
+
+                                                    <button type="submit" disabled={bloqueoSaving}
+                                                        className="w-full py-2 bg-amber-500 text-white rounded-lg text-xs font-black hover:bg-amber-600 transition disabled:opacity-50 flex items-center justify-center gap-1">
+                                                        {bloqueoSaving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Lock className="w-3 h-3" />}
+                                                        Agregar Bloqueo
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                            </div>
-
-                            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/10">
-                                {(() => {
-                                    let filtered = [...reservas];
-
-                                    // 1. Filtro por Estado
-                                    if (historyFilterEstado === 'HISTORIAL') {
-                                        filtered = filtered.filter(r => ['FINALIZADA', 'RECHAZADA', 'CANCELADA'].includes(r.estado));
-                                    } else if (historyFilterEstado !== 'ALL_RECORDS') {
-                                        filtered = filtered.filter(r => r.estado === historyFilterEstado);
-                                    }
-
-                                    // 2. Filtro por Recurso
-                                    if (historyFilterRecurso !== 'all') {
-                                        filtered = filtered.filter(r => parseInt(r.recurso) === parseInt(historyFilterRecurso));
-                                    }
-
-                                    // 3. Búsqueda Texto
-                                    if (historySearch.trim()) {
-                                        const q = historySearch.toLowerCase();
-                                        filtered = filtered.filter(r =>
-                                            r.titulo.toLowerCase().includes(q) ||
-                                            (r.nombre_funcionario && r.nombre_funcionario.toLowerCase().includes(q)) ||
-                                            (r.codigo_reserva && r.codigo_reserva.toLowerCase().includes(q)) ||
-                                            (r.descripcion && r.descripcion.toLowerCase().includes(q))
-                                        );
-                                    }
-
-                                    // 4. Orden
-                                    filtered.sort((a, b) => {
-                                        if (historySort === '-fecha_inicio') return new Date(b.fecha_inicio) - new Date(a.fecha_inicio);
-                                        if (historySort === 'fecha_inicio') return new Date(a.fecha_inicio) - new Date(b.fecha_inicio);
-                                        if (historySort === 'titulo') return a.titulo.localeCompare(b.titulo);
-                                        return 0;
-                                    });
-
-                                    if (filtered.length === 0) {
-                                        return (
-                                            <div className="text-center py-20">
-                                                <AlertCircle className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-                                                <p className="text-slate-400 font-bold">No se encontraron resultados</p>
-                                                <p className="text-[10px] text-slate-300 mt-1">Prueba con otros criterios de búsqueda</p>
-                                            </div>
-                                        );
-                                    }
-
-                                    return filtered.map(r => {
-                                        const rec = recursos.find(rec => rec.id === r.recurso);
-                                        const cfg = ESTADO_CFG[r.estado] || ESTADO_CFG.PENDIENTE;
-                                        const color = rec?.color || '#6366f1';
-                                        return (
-                                            <div key={r.id} className="group bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col gap-3 hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer"
-                                                onClick={() => { setDetailReserva(r); /* Podríamos abrir el detalle si quisiéramos */ }}>
-                                                <div className="flex justify-between items-start">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{rec?.nombre || 'Recurso'}</span>
-                                                    </div>
-                                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase border" style={{ background: cfg.bg, color: cfg.text, borderColor: cfg.border }}>{cfg.label}</span>
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-black text-slate-800 text-sm group-hover:text-indigo-600 transition-colors uppercase">{r.titulo}</h4>
-                                                    <div className="flex items-center gap-1.5 mt-1">
-                                                        <User className="w-3 h-3 text-slate-300" />
-                                                        <p className="text-[11px] font-bold text-slate-500">{r.nombre_funcionario || 'Sin nombre'}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-4 pt-2 border-t border-slate-50">
-                                                    <div className="flex items-center gap-1.5 text-slate-400">
-                                                        <Calendar className="w-3 h-3" />
-                                                        <span className="text-[10px] font-bold">{toDateStr(r.fecha_inicio)}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5 text-slate-400">
-                                                        <Clock className="w-3 h-3" />
-                                                        <span className="text-[10px] font-bold">
-                                                            {new Date(r.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(r.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                        </span>
-                                                    </div>
-                                                    <div className="ml-auto text-[9px] font-black text-slate-300 font-mono" title="Código de Reserva">
-                                                        #{r.codigo_reserva || '---'}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    });
-                                })()}
+                                )}
                             </div>
                         </div>
                     </div>
-                )
-            }
-        </div >
+                </div>
+            )}
+            {/* ── MODAL LOG / HISTORIAL ── */}
+            {historyOpen && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex justify-end" onClick={() => setHistoryOpen(false)}>
+                    <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col animate-in slide-in-from-right" onClick={e => e.stopPropagation()}>
+                        <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                            <div>
+                                <h2 className="text-xl font-black text-slate-900">Historial de Reservas</h2>
+                                <p className="text-sm text-slate-500">Busca y filtra entre todos los registros</p>
+                            </div>
+                            <button onClick={() => setHistoryOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition"><X className="w-6 h-6 text-slate-400" /></button>
+                        </div>
+
+                        {/* BARRA DE FILTROS */}
+                        <div className="p-4 bg-white border-b border-slate-100 space-y-3">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por título, funcionario, código..."
+                                    value={historySearch}
+                                    onChange={e => setHistorySearch(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 transition outline-none"
+                                />
+                                <Clock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <select
+                                    value={historyFilterEstado}
+                                    onChange={e => setHistoryFilterEstado(e.target.value)}
+                                    className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                                >
+                                    <option value="HISTORIAL">Todos (Cerrados)</option>
+                                    <option value="ALL_RECORDS">Todos (Incluso Activos)</option>
+                                    <option value="PENDIENTE">Solo Pendientes</option>
+                                    <option value="APROBADA">Solo Aprobadas</option>
+                                    <option value="FINALIZADA">Solo Finalizadas</option>
+                                    <option value="RECHAZADA">Solo Rechazadas</option>
+                                    <option value="CANCELADA">Solo Canceladas</option>
+                                </select>
+
+                                <select
+                                    value={historyFilterRecurso}
+                                    onChange={e => setHistoryFilterRecurso(e.target.value)}
+                                    className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                                >
+                                    <option value="all">Todos los Recursos</option>
+                                    {recursos.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)).map(r => (
+                                        <option key={r.id} value={r.id}>{r.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ordenar por:</span>
+                                <div className="flex bg-slate-100 p-0.5 rounded-lg flex-1">
+                                    {[
+                                        { v: '-fecha_inicio', l: 'Recientes' },
+                                        { v: 'fecha_inicio', l: 'Antiguos' },
+                                        { v: 'titulo', l: 'Título' }
+                                    ].map(opt => (
+                                        <button
+                                            key={opt.v}
+                                            onClick={() => setHistorySort(opt.v)}
+                                            className={`flex-1 py-1 px-2 text-[10px] font-bold rounded-md transition ${historySort === opt.v ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            {opt.l}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/10">
+                            {(() => {
+                                let filtered = [...reservas];
+
+                                // 1. Filtro por Estado
+                                if (historyFilterEstado === 'HISTORIAL') {
+                                    filtered = filtered.filter(r => ['FINALIZADA', 'RECHAZADA', 'CANCELADA'].includes(r.estado));
+                                } else if (historyFilterEstado !== 'ALL_RECORDS') {
+                                    filtered = filtered.filter(r => r.estado === historyFilterEstado);
+                                }
+
+                                // 2. Filtro por Recurso
+                                if (historyFilterRecurso !== 'all') {
+                                    filtered = filtered.filter(r => parseInt(r.recurso) === parseInt(historyFilterRecurso));
+                                }
+
+                                // 3. Búsqueda Texto
+                                if (historySearch.trim()) {
+                                    const q = historySearch.toLowerCase();
+                                    filtered = filtered.filter(r =>
+                                        r.titulo.toLowerCase().includes(q) ||
+                                        (r.nombre_funcionario && r.nombre_funcionario.toLowerCase().includes(q)) ||
+                                        (r.codigo_reserva && r.codigo_reserva.toLowerCase().includes(q)) ||
+                                        (r.descripcion && r.descripcion.toLowerCase().includes(q))
+                                    );
+                                }
+
+                                // 4. Orden
+                                filtered.sort((a, b) => {
+                                    if (historySort === '-fecha_inicio') return new Date(b.fecha_inicio) - new Date(a.fecha_inicio);
+                                    if (historySort === 'fecha_inicio') return new Date(a.fecha_inicio) - new Date(b.fecha_inicio);
+                                    if (historySort === 'titulo') return a.titulo.localeCompare(b.titulo);
+                                    return 0;
+                                });
+
+                                if (filtered.length === 0) {
+                                    return (
+                                        <div className="text-center py-20">
+                                            <AlertCircle className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                                            <p className="text-slate-400 font-bold">No se encontraron resultados</p>
+                                            <p className="text-[10px] text-slate-300 mt-1">Prueba con otros criterios de búsqueda</p>
+                                        </div>
+                                    );
+                                }
+
+                                return filtered.map(r => {
+                                    const rec = recursos.find(rec => rec.id === r.recurso);
+                                    const cfg = ESTADO_CFG[r.estado] || ESTADO_CFG.PENDIENTE;
+                                    const color = rec?.color || '#6366f1';
+                                    return (
+                                        <div key={r.id} className="group bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col gap-3 hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer"
+                                            onClick={() => { setDetailReserva(r); /* Podríamos abrir el detalle si quisiéramos */ }}>
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{rec?.nombre || 'Recurso'}</span>
+                                                </div>
+                                                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase border" style={{ background: cfg.bg, color: cfg.text, borderColor: cfg.border }}>{cfg.label}</span>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-black text-slate-800 text-sm group-hover:text-indigo-600 transition-colors uppercase">{r.titulo}</h4>
+                                                <div className="flex items-center gap-1.5 mt-1">
+                                                    <User className="w-3 h-3 text-slate-300" />
+                                                    <p className="text-[11px] font-bold text-slate-500">{r.nombre_funcionario || 'Sin nombre'}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4 pt-2 border-t border-slate-50">
+                                                <div className="flex items-center gap-1.5 text-slate-400">
+                                                    <Calendar className="w-3 h-3" />
+                                                    <span className="text-[10px] font-bold">{toDateStr(r.fecha_inicio)}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 text-slate-400">
+                                                    <Clock className="w-3 h-3" />
+                                                    <span className="text-[10px] font-bold">
+                                                        {new Date(r.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(r.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                                <div className="ml-auto text-[9px] font-black text-slate-300 font-mono" title="Código de Reserva">
+                                                    #{r.codigo_reserva || '---'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                });
+                            })()}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };
 

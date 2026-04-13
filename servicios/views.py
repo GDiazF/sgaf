@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status, pagination
+from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import transaction
@@ -14,12 +14,6 @@ from .serializers import (
     CDPSerializer, TipoEntregaSerializer, FacturaAdquisicionSerializer
 )
 from reportlab.lib.colors import HexColor
-import os
-
-class StandardResultsSetPagination(pagination.PageNumberPagination):
-    page_size = 10
-    page_size_query_param = 'page_size'
-    max_page_size = 1000
 
 # --- Corporate Branding for PDFs ---
 COLOR_VERDE = HexColor('#92D050')
@@ -71,7 +65,6 @@ class TipoDocumentoViewSet(viewsets.ModelViewSet):
 class ServicioViewSet(viewsets.ModelViewSet):
     queryset = Servicio.objects.all()
     serializer_class = ServicioSerializer
-    pagination_class = StandardResultsSetPagination
     filterset_fields = ['proveedor', 'establecimiento', 'tipo_documento', 'numero_cliente']
     ordering_fields = ['establecimiento__nombre', 'proveedor__nombre', 'numero_cliente']
     search_fields = ['numero_cliente', 'establecimiento__nombre', 'proveedor__nombre']
@@ -79,10 +72,10 @@ class ServicioViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def download_template(self, request):
         """Genera una plantilla de Excel para la carga masiva de servicios."""
-        cols = ['RBD', 'Proveedor', 'Nro Cliente', 'Tipo Documento']
+        cols = ['RBD', 'Proveedor', 'Nro Cliente', 'Nro Servicio', 'Tipo Documento']
         df = pd.DataFrame(columns=cols)
         # Sample data
-        df.loc[0] = [11475, 'AGUAS ALTIPLANO', '12345678', 'BOLETA']
+        df.loc[0] = [11475, 'AGUAS ALTIPLANO', '12345678', '9999', 'BOLETA']
         
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
@@ -120,6 +113,7 @@ class ServicioViewSet(viewsets.ModelViewSet):
             rbd_raw = str(row['RBD']).split('.')[0].strip() if not pd.isna(row['RBD']) else ''
             prov_name = str(row['Proveedor']).strip() if not pd.isna(row['Proveedor']) else ''
             nro_cli = str(row['Nro Cliente']).strip() if not pd.isna(row['Nro Cliente']) else ''
+            nro_srv = str(row['Nro Servicio']).strip() if 'Nro Servicio' in df.columns and not pd.isna(row['Nro Servicio']) else None
             tipo_doc_name = str(row['Tipo Documento']).strip() if not pd.isna(row['Tipo Documento']) else ''
 
             if not rbd_raw or not prov_name or not nro_cli:
@@ -162,6 +156,7 @@ class ServicioViewSet(viewsets.ModelViewSet):
                 proveedor=prov,
                 establecimiento=est,
                 numero_cliente=nro_cli,
+                numero_servicio=nro_srv,
                 tipo_documento=tipo_doc
             ))
 
@@ -181,7 +176,6 @@ class ServicioViewSet(viewsets.ModelViewSet):
 class RegistroPagoViewSet(viewsets.ModelViewSet):
     queryset = RegistroPago.objects.all().order_by('-fecha_pago')
     serializer_class = RegistroPagoSerializer
-    pagination_class = StandardResultsSetPagination
     filterset_fields = {
         'establecimiento': ['exact'],
         'servicio': ['exact'],
@@ -193,97 +187,20 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
     ordering_fields = ['fecha_pago', 'fecha_emision', 'fecha_vencimiento', 'monto_total', 'nro_documento', 'establecimiento__nombre']
     search_fields = ['nro_documento', 'servicio__numero_cliente', 'establecimiento__nombre']
 
-    @action(detail=False, methods=['post'])
-    def mark_historical(self, request):
-        payment_ids = request.data.get('ids', [])
-        if not payment_ids:
-            return Response({"error": "No se proporcionaron IDs"}, status=400)
-            
-        # 1. Get or Create the Historical RC Record
-        # We search for one with a specific folio to group all legacy data
-        folio_historico = f"HISTORICO-{datetime.date.today().year}"
-        
-        # We need a provider for the RC, we'll take it from the first payment or use a generic one
-        first_payment = RegistroPago.objects.filter(id__in=payment_ids).first()
-        if not first_payment:
-            return Response({"error": "Registros no encontrados"}, status=404)
-
-        rc_historica, created = RecepcionConforme.objects.get_or_create(
-            folio=folio_historico,
-            defaults={
-                'proveedor': first_payment.servicio.proveedor, # Generic provider
-                'observaciones': "Registro vinculado masivamente como historial (Carga Masiva)."
-            }
-        )
-
-        # 2. Bulk update the payments
-        updated_count = RegistroPago.objects.filter(id__in=payment_ids).update(recepcion_conforme=rc_historica)
-        
-        return Response({
-            "message": f"Se han marcado {updated_count} registros como históricos bajo el folio {folio_historico}",
-            "rc_id": rc_historica.id
-        })
-
-    @action(detail=False, methods=['get'])
-    def export_excel(self, request):
-        """Exporta un reporte detallado de pagos a Excel basado en filtros."""
-        queryset = self.filter_queryset(self.get_queryset())
-        
-        # Additional Date filtering if provided (redundant if using filterset but good for safety)
-        f_inicio = request.query_params.get('fecha_inicio')
-        f_fin = request.query_params.get('fecha_fin')
-        
-        if f_inicio:
-            queryset = queryset.filter(fecha_pago__gte=f_inicio)
-        if f_fin:
-            queryset = queryset.filter(fecha_pago__lte=f_fin)
-
-        data = []
-        for p in queryset:
-            data.append({
-                'Establecimiento': p.establecimiento.nombre,
-                'RBD': p.establecimiento.rbd,
-                'Proveedor': p.servicio.proveedor.nombre,
-                'Tipo Proveedor': p.servicio.proveedor.tipo_proveedor.nombre if p.servicio.proveedor.tipo_proveedor else '',
-                'Nro Cliente': p.servicio.numero_cliente,
-                'Cuenta Facturacion': p.nro_servicio_factura or 'Individual',
-                'Nro Documento': p.nro_documento,
-                'Monto Total': p.monto_total,
-                'Monto Interes': p.monto_interes,
-                'Fecha Emision': p.fecha_emision.strftime('%d/%m/%Y') if p.fecha_emision else '',
-                'Fecha Vencimiento': p.fecha_vencimiento.strftime('%d/%m/%Y') if p.fecha_vencimiento else '',
-                'Fecha Pago': p.fecha_pago.strftime('%d/%m/%Y') if p.fecha_pago else '',
-                'Estado RC': 'CON RC' if p.recepcion_conforme else 'PENDIENTE',
-                'Folio RC': p.recepcion_conforme.folio if p.recepcion_conforme else ''
-            })
-
-        df = pd.DataFrame(data)
-        buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='Reporte Pagos')
-        
-        buffer.seek(0)
-        response = HttpResponse(
-            buffer.getvalue(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = 'attachment; filename="reporte_pagos_servicios.xlsx"'
-        return response
-
     @action(detail=False, methods=['get'])
     def download_template(self, request):
         """Genera una plantilla de Excel simplificada para la carga masiva."""
         cols = [
             'Nro Cliente', 'Nro Documento', 'Monto Total', 'Monto Interes', 
             'Fecha Emision (DD/MM/YYYY)', 'Fecha Vencimiento (DD/MM/YYYY)', 
-            'Fecha Pago (DD/MM/YYYY)', 'Cuenta Facturacion (Opcional)'
+            'Fecha Pago (DD/MM/YYYY)'
         ]
         df = pd.DataFrame(columns=cols)
         
         # Add a sample row
         df.loc[0] = [
             '10002000', 'FAC-123', 50000, 0, 
-            '01/01/2026', '15/01/2026', '20/01/2026', '58967-k'
+            '01/01/2026', '15/01/2026', '20/01/2026'
         ]
 
         buffer = io.BytesIO()
@@ -380,9 +297,6 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
                 errors.append(f"Fila {index + 2}: Los montos deben ser valores numéricos enteros.")
                 continue
 
-            # 6. Optional Billing Account
-            nro_srv_factura = str(row['Cuenta Facturacion (Opcional)']).strip() if 'Cuenta Facturacion (Opcional)' in df.columns and not pd.isna(row['Cuenta Facturacion (Opcional)']) else None
-
             pagos_to_create.append(RegistroPago(
                 servicio=srv,
                 establecimiento=est,
@@ -391,8 +305,7 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
                 fecha_pago=f_pago,
                 nro_documento=nro_doc,
                 monto_interes=m_interes,
-                monto_total=m_total,
-                nro_servicio_factura=nro_srv_factura
+                monto_total=m_total
             ))
 
         if errors:
@@ -498,8 +411,7 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
         elements.append(Spacer(1, 40))
         elements.append(Paragraph("RECEPCIÓN CONFORME", styles['MainTitle']))
 
-        # Always use current date for the document header
-        fecha = datetime.date.today()
+        fecha = pago.fecha_pago
         intro_text = (
             f"En Iquique, a {fecha.day} de {MESES.get(fecha.month)} de {fecha.year} "
             f"en el establecimiento {pago.establecimiento.nombre}, se procede a dar recepción conforme a la boleta "
@@ -513,7 +425,7 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
         monto_junji = pago.monto_total - pago.monto_interes
         data_body.append([
             pago.servicio.numero_cliente,
-            Paragraph(pago.establecimiento.nombre, ParagraphStyle('EstStyle', parent=styles['Normal'], fontSize=8.5, leading=10)),
+            Paragraph(pago.establecimiento.nombre, styles['Normal']),
             pago.nro_documento,
             f"${monto_junji:,}".replace(",", "."),
             f"${pago.monto_total:,}".replace(",", ".")
@@ -709,8 +621,7 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
         first_pago = rc.registros.first()
         est_name = first_pago.establecimiento.nombre if first_pago else "Establecimiento no definido"
         prov_name = rc.proveedor.nombre
-        # Always use the current date for the document header
-        fecha = datetime.date.today() 
+        fecha = rc.fecha_emision
         intro_text = (
             f"En Iquique, a {fecha.day} de {MESES.get(fecha.month)} de {fecha.year} "
             f"en el establecimiento {est_name}, se procede a dar recepción conforme a las boletas "

@@ -42,16 +42,31 @@ class SolicitudReservaSerializer(serializers.ModelSerializer):
         if fi and ff and ff <= fi:
             raise serializers.ValidationError({'fecha_fin': 'La hora de término debe ser posterior a la de inicio.'})
 
-        # ─ Validación: no permitir reservas en el pasado ─
+        # ─ Validación: bloqueo por antelación configurada ─
+        setting = ReservaSetting.objects.first()
         now = timezone.now()
+        user = self.context['request'].user
+        
         if fi:
-            # Primero comparamos solo la fecha para dar un mensaje específico si es otro día
-            if fi.date() < now.date():
-                raise serializers.ValidationError({'fecha_inicio': 'No se pueden realizar reservas para días anteriores a hoy.'})
-            # Margen relax: permitimos reservar desde el inicio de la hora actual
-            limite_hora = now.replace(minute=0, second=0, microsecond=0)
-            if fi < limite_hora:
-                raise serializers.ValidationError({'fecha_inicio': 'No se pueden realizar reservas para un horario anterior al inicio de la hora actual.'})
+            # Si el usuario tiene el permiso especial o es superusuario, saltamos la antelación
+            can_bypass = user.is_superuser or user.has_perm('solicitudes_reservas.can_bypass_antelacion')
+            
+            # Calculamos la fecha límite: Hoy + X días
+            x_dias = setting.dias_bloqueo_antelacion if setting and not can_bypass else 0
+            fecha_limite = now.date() + timedelta(days=x_dias)
+            
+            if fi.date() <= fecha_limite:
+                if x_dias == 0:
+                    # Comportamiento original si es 0: solo evitar el pasado estricto
+                    if fi.date() < now.date():
+                        raise serializers.ValidationError({'fecha_inicio': 'No se pueden realizar reservas para días anteriores a hoy.'})
+                    limite_hora = now.replace(minute=0, second=0, microsecond=0)
+                    if fi < limite_hora:
+                        raise serializers.ValidationError({'fecha_inicio': 'No se pueden realizar reservas para un horario anterior al inicio de la hora actual.'})
+                else:
+                    raise serializers.ValidationError({
+                        'fecha_inicio': f'El sistema requiere una antelación de {x_dias} días. No se pueden realizar reservas para antes del {(fecha_limite + timedelta(days=1)).strftime("%d/%m/%Y")}.'
+                    })
 
         # ─ Validación: hora de fin contra configuración global ─
         setting = ReservaSetting.objects.first()
