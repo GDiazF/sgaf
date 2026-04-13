@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import transaction
@@ -176,6 +176,7 @@ class ServicioViewSet(viewsets.ModelViewSet):
 class RegistroPagoViewSet(viewsets.ModelViewSet):
     queryset = RegistroPago.objects.all().order_by('-fecha_pago')
     serializer_class = RegistroPagoSerializer
+    permission_classes = [permissions.DjangoModelPermissions]
     filterset_fields = {
         'establecimiento': ['exact'],
         'servicio': ['exact'],
@@ -186,6 +187,42 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
     }
     ordering_fields = ['fecha_pago', 'fecha_emision', 'fecha_vencimiento', 'monto_total', 'nro_documento', 'establecimiento__nombre']
     search_fields = ['nro_documento', 'servicio__numero_cliente', 'establecimiento__nombre']
+
+    @action(detail=False, methods=['get'])
+    def export_excel(self, request):
+        """Exporta los pagos filtrados a Excel."""
+        from django_filters.rest_framework import DjangoFilterBackend
+        
+        # We manually apply filters to get the exact same result as the list view
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        data = []
+        for p in queryset:
+            data.append({
+                'Fecha Pago': p.fecha_pago,
+                'Establecimiento': p.establecimiento.nombre,
+                'RBD': p.establecimiento.rbd,
+                'Proveedor': p.servicio.proveedor.nombre,
+                'Nro Cliente': p.servicio.numero_cliente,
+                'Nro Documento': p.nro_documento,
+                'Monto Total': p.monto_total,
+                'Monto Interes': p.monto_interes,
+                'Tiene RC': 'SÍ' if p.recepcion_conforme else 'NO',
+                'Folio RC': p.recepcion_conforme.folio if p.recepcion_conforme else '-'
+            })
+            
+        df = pd.DataFrame(data)
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Reporte Consumos')
+            
+        buffer.seek(0)
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="reporte_consumos.xlsx"'
+        return response
 
     @action(detail=False, methods=['get'])
     def download_template(self, request):

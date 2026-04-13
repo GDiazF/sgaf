@@ -35,8 +35,10 @@ class ServicioSerializer(serializers.ModelSerializer):
 
 class RegistroPagoSerializer(serializers.ModelSerializer):
     servicio_detalle = serializers.SerializerMethodField()
-    establecimiento_nombre = serializers.ReadOnlyField(source='establecimiento.nombre')
-    recepcion_conforme_folio = serializers.ReadOnlyField(source='recepcion_conforme.folio')
+    establecimiento_nombre = serializers.ReadOnlyField(source='establecimiento.nombre', default='')
+    servicio_proveedor_nombre = serializers.ReadOnlyField(source='servicio.proveedor.nombre', default='')
+    servicio_numero_cliente = serializers.ReadOnlyField(source='servicio.numero_cliente', default='')
+    recepcion_conforme_folio = serializers.ReadOnlyField(source='recepcion_conforme.folio', default=None)
 
     class Meta:
         model = RegistroPago
