@@ -28,30 +28,25 @@ const ServicesDashboard = () => {
     const [totalCount, setTotalCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [ordering, setOrdering] = useState('establecimiento__nombre');
-    const [pageSize, setPageSize] = useState(10);
-    const [selectedProvider, setSelectedProvider] = useState('');
-    const [selectedEstablishment, setSelectedEstablishment] = useState('');
+
     const [editingId, setEditingId] = useState(null);
 
     const [formData, setFormData] = useState({
         proveedor: '',
         establecimiento: '',
         numero_cliente: '',
+        numero_servicio: '',
         tipo_documento: ''
     });
 
-    const fetchData = async (page = 1, search = '', order = ordering, size = pageSize, prov = selectedProvider, est = selectedEstablishment) => {
+    const fetchData = async (page = 1, search = '', order = ordering) => {
         setLoading(true);
         try {
             const params = {
                 page,
                 search,
-                ordering: order,
-                page_size: size
+                ordering: order
             };
-
-            if (prov) params.proveedor = prov;
-            if (est) params.establecimiento = est;
 
             const [servRes, provRes, estRes, docRes] = await Promise.all([
                 api.get('servicios/', { params }),
@@ -63,7 +58,7 @@ const ServicesDashboard = () => {
             // Handle Services Pagination
             setServices(servRes.data.results || []);
             setTotalCount(servRes.data.count || 0);
-            setTotalPages(Math.ceil((servRes.data.count || 0) / size));
+            setTotalPages(Math.ceil((servRes.data.count || 0) / 10));
 
             // Handle others (if they become paginated, we might need adjustments)
             setProviders(provRes.data.results || provRes.data);
@@ -78,8 +73,8 @@ const ServicesDashboard = () => {
     };
 
     useEffect(() => {
-        fetchData(currentPage, searchQuery, ordering, pageSize, selectedProvider, selectedEstablishment);
-    }, [currentPage, ordering, pageSize, selectedProvider, selectedEstablishment]);
+        fetchData(currentPage, searchQuery, ordering);
+    }, [currentPage, ordering]);
 
     const handleSearch = (query) => {
         setSearchQuery(query);
@@ -101,6 +96,7 @@ const ServicesDashboard = () => {
             proveedor: item.proveedor,
             establecimiento: item.establecimiento,
             numero_cliente: item.numero_cliente,
+            numero_servicio: item.numero_servicio || '',
             tipo_documento: item.tipo_documento || ''
         });
         setEditingId(item.id);
@@ -112,6 +108,7 @@ const ServicesDashboard = () => {
             proveedor: '',
             establecimiento: '',
             numero_cliente: '',
+            numero_servicio: '',
             tipo_documento: ''
         });
         setEditingId(null);
@@ -202,13 +199,14 @@ const ServicesDashboard = () => {
     return (
         <div>
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800">Servicios Básicos</h2>
-                    <p className="text-slate-500 text-sm">Gestión de servicios y números de cliente por establecimiento.</p>
+                    <p className="text-slate-500">Gestión de servicios y números de cliente por establecimiento.</p>
                 </div>
 
                 <div className="flex items-center gap-3">
+                    <FilterBar onSearch={handleSearch} placeholder="Buscar por cliente, proveedor..." />
                     {can('servicios.add_servicio') && (
                         <>
                             <button
@@ -228,41 +226,6 @@ const ServicesDashboard = () => {
                             </button>
                         </>
                     )}
-                </div>
-            </div>
-
-            {/* Filter Bar Row */}
-            <div className="bg-white/50 backdrop-blur-sm p-3 rounded-2xl border border-slate-200 mb-6 flex flex-wrap items-center gap-3">
-                <div className="flex-1 min-w-[200px]">
-                    <div className="relative">
-                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <select
-                            value={selectedEstablishment}
-                            onChange={(e) => { setSelectedEstablishment(e.target.value); setCurrentPage(1); }}
-                            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all appearance-none cursor-pointer"
-                        >
-                            <option value="">Todos los Establecimientos</option>
-                            {establishments.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-                        </select>
-                    </div>
-                </div>
-
-                <div className="flex-1 min-w-[200px]">
-                    <div className="relative">
-                        <Zap className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <select
-                            value={selectedProvider}
-                            onChange={(e) => { setSelectedProvider(e.target.value); setCurrentPage(1); }}
-                            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all appearance-none cursor-pointer"
-                        >
-                            <option value="">Todos los Proveedores</option>
-                            {providers.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                        </select>
-                    </div>
-                </div>
-
-                <div className="w-full md:w-80">
-                    <FilterBar onSearch={handleSearch} placeholder="Buscar por cliente..." />
                 </div>
             </div>
 
@@ -316,6 +279,7 @@ const ServicesDashboard = () => {
                                     </td>
                                     <td className="p-2.5">
                                         <div className="font-semibold text-blue-700">{item.proveedor_nombre}</div>
+                                        {item.numero_servicio && <div className="text-[10px] text-slate-500">Serv: {item.numero_servicio}</div>}
                                     </td>
                                     <td className="p-2.5 font-mono text-slate-700 bg-slate-50/50 w-fit">
                                         #{item.numero_cliente}
@@ -358,12 +322,6 @@ const ServicesDashboard = () => {
                     totalPages={totalPages}
                     onPageChange={handlePageChange}
                     totalCount={totalCount}
-                    pageSize={pageSize}
-                    onPageSizeChange={(size) => {
-                        setPageSize(size);
-                        setCurrentPage(1);
-                        fetchData(1, searchQuery, ordering, size);
-                    }}
                 />
             </div>
         </div>

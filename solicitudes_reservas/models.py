@@ -134,16 +134,16 @@ class SolicitudReserva(models.Model):
     class Meta:
         ordering = ['-fecha_inicio']
         permissions = [
-            ("aprobar_solicitudreserva", "Puede aprobar o denegar solicitudes de reserva"),
-            ("finalizar_solicitudreserva", "Puede marcar reservas como finalizadas"),
-            ("view_solicitudreserva_logs", "Puede ver el historial de cambios y logs de la reserva"),
-            ("manage_solicitudreserva", "Administración total del módulo de reservas"),
+            ("can_change_reserva_name", "Puede cambiar el nombre de la reserva"),
+            ("can_bypass_antelacion", "Puede saltar bloqueo de antelación"),
         ]
 
 class ReservaSetting(models.Model):
     """Configuración global para el sistema de reservas."""
     hora_inicio = models.TimeField(default='07:00', verbose_name="Hora de Inicio Jornada")
     hora_fin = models.TimeField(default='18:00', verbose_name="Hora de Fin Jornada")
+    dias_bloqueo_antelacion = models.IntegerField(default=0, verbose_name="Días Bloqueo Antelación", 
+                                                 help_text="Bloquea X días desde hoy hacia atrás.")
 
     def __str__(self):
         return f"Configuración: {self.hora_inicio.strftime('%H:%M')} - {self.hora_fin.strftime('%H:%M')}"

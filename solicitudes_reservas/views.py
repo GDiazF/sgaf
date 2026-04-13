@@ -24,10 +24,10 @@ class RecursoReservableViewSet(viewsets.ModelViewSet):
     pagination_class = None
 
     def get_permissions(self):
-        """Lectura: cualquier usuario. Escritura: solo personal con permiso de gestión."""
+        """Lectura: cualquier usuario. Escritura: solo staff."""
         if self.action in ('list', 'retrieve'):
             return [permissions.AllowAny()]
-        return [permissions.IsAuthenticated(), permissions.DjangoModelPermissions()]
+        return [permissions.IsAuthenticated(), permissions.IsAdminUser()]
 
     def get_queryset(self):
         if self.request.user.is_authenticated and self.request.user.is_staff:
@@ -94,8 +94,6 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
     # ─── Acción: Aprobar ──────────────────────────────────────────────────────
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def aprobar(self, request, pk=None):
-        if not request.user.has_perm('solicitudes_reservas.aprobar_solicitudreserva'):
-            return Response({"detail": "No tienes permiso para aprobar reservas."}, status=403)
         solicitud = self.get_object()
         if solicitud.fecha_fin < timezone.now():
             return Response({"detail": "No se pueden aprobar reservas que ya han pasado su hora de término."}, status=400)
@@ -110,8 +108,6 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
     # ─── Acción: Rechazar ─────────────────────────────────────────────────────
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def rechazar(self, request, pk=None):
-        if not request.user.has_perm('solicitudes_reservas.aprobar_solicitudreserva'):
-            return Response({"detail": "No tienes permiso para rechazar reservas."}, status=403)
         solicitud = self.get_object()
         if solicitud.fecha_fin < timezone.now():
             return Response({"detail": "No se pueden rechazar reservas que ya han pasado su hora de término."}, status=400)
@@ -170,29 +166,8 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         instance = self.get_object()
-        
-        # Check for state-specific permissions
-        new_estado = serializer.validated_data.get('estado')
-        if new_estado == 'FINALIZADA' and instance.estado != 'FINALIZADA':
-            if not self.request.user.has_perm('solicitudes_reservas.finalizar_solicitudreserva'):
-                raise serializers.ValidationError({"detail": "No tienes permiso para finalizar reservas."})
-        
-        # General change permission for other fields if not superuser
-        is_owner = instance.solicitante == self.request.user
-        has_change_perm = self.request.user.has_perm('solicitudes_reservas.change_solicitudreserva')
-        
-        if not self.request.user.is_superuser and not has_change_perm and not is_owner:
-            raise serializers.ValidationError({"detail": "No tienes permiso para modificar esta reserva."})
-
-        # Logic: If a non-admin owner edits, force state to PENDIENTE
-        if is_owner and not has_change_perm and new_estado != 'CANCELADA':
-            serializer.validated_data['estado'] = 'PENDIENTE'
-            serializer.validated_data['aprobado_por'] = None
-            serializer.validated_data['fecha_aprobacion'] = None
-
-        if instance.fecha_fin < timezone.now() and new_estado != 'FINALIZADA':
-            raise serializers.ValidationError({"detail": "No se pueden modificar reservas que ya han finalizado."})
-            
+        if instance.fecha_fin < timezone.now():
+            raise serializers.ValidationError("No se pueden modificar reservas que ya han finalizado.")
         serializer.save()
 
     def perform_destroy(self, instance):
@@ -209,7 +184,7 @@ class BloqueoHorarioViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
             return [permissions.AllowAny()]
-        return [permissions.IsAuthenticated(), permissions.DjangoModelPermissions()]
+        return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
         qs = BloqueoHorario.objects.all()
@@ -229,8 +204,7 @@ class ReservaSettingViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
             return [permissions.AllowAny()]
-        # Solo usuarios con permiso manage_solicitudreserva o admin
-        return [permissions.IsAuthenticated(), permissions.DjangoModelPermissions()]
+        return [permissions.IsAuthenticated(), permissions.IsAdminUser()]
 
     def list(self, request, *args, **kwargs):
         setting, _ = ReservaSetting.objects.get_or_create(id=1)

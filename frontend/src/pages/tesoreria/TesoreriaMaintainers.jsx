@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Plus, Trash2, Edit2, Check, X, AlertCircle, Loader2, Database, ShieldCheck, Landmark, CreditCard, Code } from 'lucide-react';
 import api from '../../api';
-import { usePermission } from '../../hooks/usePermission';
 
-const MaintainerTable = ({ title, icon: Icon, endpoint, fields, description, modelName }) => {
-    const { can } = usePermission();
+const MaintainerTable = ({ title, icon: Icon, endpoint, fields, description }) => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -91,14 +89,12 @@ const MaintainerTable = ({ title, icon: Icon, endpoint, fields, description, mod
                         <p className="text-xs text-slate-500 mt-1">{description}</p>
                     </div>
                 </div>
-                {can(`remuneraciones.add_${modelName}`) && (
-                    <button
-                        onClick={startAdd}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all shadow-md active:scale-95"
-                    >
-                        <Plus className="w-4 h-4" /> Nuevo Registro
-                    </button>
-                )}
+                <button
+                    onClick={startAdd}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all shadow-md active:scale-95"
+                >
+                    <Plus className="w-4 h-4" /> Nuevo Registro
+                </button>
             </div>
 
             <div className="overflow-x-auto">
@@ -158,12 +154,8 @@ const MaintainerTable = ({ title, icon: Icon, endpoint, fields, description, mod
                                             </>
                                         ) : (
                                             <>
-                                                {can(`remuneraciones.change_${modelName}`) && (
-                                                    <button onClick={() => startEdit(item)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
-                                                )}
-                                                {can(`remuneraciones.delete_${modelName}`) && (
-                                                    <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                                                )}
+                                                <button onClick={() => startEdit(item)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
+                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                                             </>
                                         )}
                                     </div>
@@ -232,7 +224,6 @@ const TesoreriaMaintainers = () => {
                                 { name: 'nombre', label: 'Nombre en Archivo' },
                                 { name: 'codigo', label: 'Código Banco' }
                             ]}
-                            modelName="mapeobanco"
                         />
                     )}
 
@@ -246,7 +237,6 @@ const TesoreriaMaintainers = () => {
                                 { name: 'nombre', label: 'Medio de Pago' },
                                 { name: 'codigo', label: 'Código Medio' }
                             ]}
-                            modelName="mapeomediopago"
                         />
                     )}
 
@@ -260,7 +250,6 @@ const TesoreriaMaintainers = () => {
                                 { name: 'segmento', label: 'Segmento/Código' },
                                 { name: 'codigo_completo', label: 'Código Completo' }
                             ]}
-                            modelName="mapeobancodirecto"
                         />
                     )}
 
@@ -275,7 +264,6 @@ const TesoreriaMaintainers = () => {
                                 { name: 'valor', label: 'Valor' },
                                 { name: 'descripcion', label: 'Descripción' }
                             ]}
-                            modelName="valevistaconfig"
                         />
                     )}
                 </div>

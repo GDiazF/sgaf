@@ -72,32 +72,6 @@ class PermissionListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     pagination_class = None
 
-from rest_framework import status
-from django.contrib.auth import update_session_auth_hash
-
-class ChangePasswordView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        user = request.user
-        old_password = request.data.get('old_password')
-        new_password = request.data.get('new_password')
-        
-        if not old_password or not new_password:
-            return Response({'error': 'Debe proporcionar la contraseña actual y la nueva.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if not user.check_password(old_password):
-            return Response({'error': 'La contraseña actual es incorrecta.'}, status=status.HTTP_400_BAD_REQUEST)
-            
-        # Basic validation for password length (Django normally does more, but this is a start)
-        if len(new_password) < 6:
-            return Response({'error': 'La nueva contraseña debe tener al menos 6 caracteres.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        user.set_password(new_password)
-        user.save()
-        update_session_auth_hash(request, user)
-        return Response({'message': 'Contraseña actualizada correctamente.'})
-
 class AvatarUploadView(APIView):
     permission_classes = [IsAuthenticated]
 
