@@ -13,6 +13,7 @@ import Establishments from './pages/establishments/Establishments';
 import ServicesDashboard from './pages/services/ServicesDashboard';
 import Providers from './pages/services/Providers';
 import PaymentsDashboard from './pages/services/PaymentsDashboard';
+import PaymentsReport from './pages/services/PaymentsReport';
 import RecepcionConformeList from './pages/services/RecepcionConformeList';
 import CDPManager from './pages/services/CDPManager';
 import FacturasAdquisicionDashboard from './pages/services/FacturasAdquisicionDashboard';
@@ -37,6 +38,7 @@ import OCDashboard from './pages/orden_compra/OCDashboard';
 import ReservasDashboard from './pages/reservas/ReservasDashboard';
 import PublicReservas from './pages/reservas/PublicReservas';
 import PersonalTIDashboard from './pages/personal_ti/PersonalTIDashboard';
+import ProceduresDashboard from './pages/procedimientos/ProceduresDashboard';
 import Login from './pages/Login';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
@@ -105,6 +107,7 @@ function App() {
 
               <Route element={<ProtectedRoute permission="servicios.view_registropago" />}>
                 <Route path="services/payments" element={<PaymentsDashboard />} />
+                <Route path="services/reporte-consumos" element={<PaymentsReport />} />
               </Route>
 
               <Route element={<ProtectedRoute permission="servicios.view_recepcionconforme" />}>
@@ -166,6 +169,8 @@ function App() {
               <Route element={<ProtectedRoute permission="personal_ti.view_personalti" />}>
                 <Route path="personal-ti" element={<PersonalTIDashboard />} />
               </Route>
+
+              <Route path="procedimientos" element={<ProceduresDashboard />} />
 
               {/* Administración */}
               <Route element={<ProtectedRoute permission="auth.view_group" />}>

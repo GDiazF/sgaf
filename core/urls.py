@@ -54,6 +54,7 @@ urlpatterns = [
     path('api/reservas/', include('solicitudes_reservas.urls')),
     path('api/', include('personal_ti.urls')),
     path('api/tesoreria/', include('tesoreria.urls')),
+    path('api/procedimientos/', include('procedimientos.urls')),
 ]
 
 from django.conf import settings

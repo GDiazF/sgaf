@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'solicitudes_reservas',
     'personal_ti',
     'tesoreria',
+    'procedimientos',
 ]
 
 # REST_FRAMEWORK, SIMPLE_JWT y CORS se configuran al final del archivo para evitar duplicados.
@@ -169,6 +170,10 @@ REST_FRAMEWORK = {
         'user': '1000/minute',
     },
 }
+
+# Permitir ver documentos en IFRAMES
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+SILENCED_SYSTEM_CHECKS = ['security.W019']
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME':  timedelta(minutes=60),

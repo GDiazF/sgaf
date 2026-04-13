@@ -80,13 +80,13 @@ const UserProfileModal = ({ isOpen, onClose }) => {
     };
 
     const InfoItem = ({ icon: Icon, label, value, colorClass = "text-blue-500", bgClass = "bg-blue-50" }) => (
-        <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm transition-all duration-300 group">
-            <div className={`p-2 ${bgClass} ${colorClass} rounded-lg`}>
-                <Icon className="w-4 h-4" />
+        <div className="flex items-center gap-2 p-1.5 bg-white rounded-lg border border-slate-100 shadow-sm transition-all duration-300">
+            <div className={`p-1.5 ${bgClass} ${colorClass} rounded-md`}>
+                <Icon className="w-3.5 h-3.5" />
             </div>
             <div className="flex-1 min-w-0">
-                <p className="text-[9px] font-medium text-slate-400 uppercase tracking-wider mb-0.5">{label}</p>
-                <p className="text-sm font-medium text-slate-600 break-words">{value || 'No especificado'}</p>
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-0.5">{label}</p>
+                <p className="text-xs font-semibold text-slate-600 break-words">{value || 'No especificado'}</p>
             </div>
         </div>
     );
@@ -104,13 +104,13 @@ const UserProfileModal = ({ isOpen, onClose }) => {
             cancelLabel={isChangingPassword ? "Regresar" : "Cerrar"}
             onCancel={isChangingPassword ? () => setIsChangingPassword(false) : onClose}
             hideFooter={!isChangingPassword}
-            maxWidth="max-w-2xl"
+            maxWidth="max-w-lg"
         >
-            <div className="space-y-3 py-0.5">
+            <div className="space-y-2 py-0.5">
                 {/* Compact Header */}
-                <div className="flex items-center gap-5 px-1 pb-3 border-b border-slate-50">
+                <div className="flex items-center gap-4 px-1 pb-2 border-b border-slate-50">
                     <div className="relative">
-                        <div className="w-24 h-24 rounded-2xl border-2 border-white shadow-xl overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-4xl text-white font-medium transition-all duration-500 ring-1 ring-slate-100">
+                        <div className="w-16 h-16 rounded-xl border-2 border-white shadow-lg overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-2xl text-white font-medium transition-all duration-500 ring-1 ring-slate-100">
                             {user?.avatar ? (
                                 <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
                             ) : (
@@ -124,13 +124,13 @@ const UserProfileModal = ({ isOpen, onClose }) => {
                     </div>
 
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-semibold text-slate-700">
+                        <div className="flex items-center gap-1.5">
+                            <h3 className="text-base font-bold text-slate-700 truncate">
                                 {user?.funcionario_data?.nombre_funcionario || (user?.first_name ? `${user.first_name} ${user.last_name || ''}` : user?.username)}
                             </h3>
-                            {user?.is_superuser && <BadgeCheck className="w-5 h-5 text-blue-500" />}
+                            {user?.is_superuser && <BadgeCheck className="w-4 h-4 text-blue-500" />}
                         </div>
-                        <p className="text-xs font-medium text-slate-400">@{user?.username}</p>
+                        <p className="text-[10px] font-medium text-slate-400 leading-none">@{user?.username}</p>
                         <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] uppercase font-semibold">
                             {user?.is_superuser ? 'Super Administrador' : (user?.groups?.[0] || 'Usuario Sistema')}
                         </div>
@@ -146,19 +146,19 @@ const UserProfileModal = ({ isOpen, onClose }) => {
                 )}
 
                 {!isChangingPassword ? (
-                    <div className="flex flex-col gap-3 animate-in fade-in duration-300">
+                    <div className="flex flex-col gap-2 animate-in fade-in duration-300">
                         <InfoItem icon={IdCard} label="RUT / RUN" value={user?.funcionario_data?.rut} />
-                        <InfoItem icon={Mail} label="E-Mail" value={user?.email} />
                         <InfoItem icon={Briefcase} label="Cargo" value={user?.funcionario_data?.cargo} colorClass="text-emerald-500" bgClass="bg-emerald-50" />
+                        <InfoItem icon={Mail} label="E-Mail" value={user?.email} />
                         <InfoItem icon={Building2} label="Departamento" value={user?.funcionario_data?.departamento} colorClass="text-indigo-500" bgClass="bg-indigo-50" />
                         <InfoItem icon={MapPin} label="Unidad" value={user?.funcionario_data?.unidad} colorClass="text-orange-500" bgClass="bg-orange-50" />
 
-                        <div className="pt-2">
+                        <div className="pt-1">
                             <button
                                 onClick={() => setIsChangingPassword(true)}
-                                className="w-full flex items-center justify-center gap-2.5 p-3.5 bg-slate-800 text-white rounded-xl font-medium text-sm hover:bg-slate-700 transition-all shadow-lg active:scale-[0.99]"
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-800 text-white rounded-lg font-bold text-[11px] uppercase tracking-widest hover:bg-slate-700 transition-all shadow-md active:scale-[0.98]"
                             >
-                                <Lock className="w-4 h-4" />
+                                <Lock className="w-3.5 h-3.5" />
                                 Cambiar Contraseña
                             </button>
                         </div>

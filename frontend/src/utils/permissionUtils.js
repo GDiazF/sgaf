@@ -29,6 +29,7 @@ export const groupPermissions = (permissions) => {
         else if (name.includes('impresora') || name.includes('printer')) module = 'Impresoras';
         else if (name.includes('vehiculo') || name.includes('registro mensual')) module = 'Vehículos';
         else if (name.includes('anexo')) module = 'Telecomunicaciones';
+        else if (name.includes('procedimiento') || name.includes('tipo de documento')) module = 'Gestor Documental';
         else if (name.includes('user') || name.includes('group') || name.includes('permission')) module = 'Seguridad y Usuarios';
 
         if (!groups[module]) groups[module] = [];
@@ -103,7 +104,9 @@ export const getFriendlyPermName = (perm) => {
         'solicitudreserva': 'Solicitudes de Reserva',
         'recursoreservable': 'Recursos (Salas/Vehículos)',
         'bloqueohorario': 'Bloqueos de Horario',
-        'reservasetting': 'Ajustes de Reservas'
+        'reservasetting': 'Ajustes de Reservas',
+        'procedimiento': 'Documentos / Procedimientos',
+        'tipoprocedimiento': 'Categorías de Documentos'
     };
 
     const modelKey = codename.split('_')[1];

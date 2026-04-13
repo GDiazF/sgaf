@@ -51,6 +51,18 @@ const Layout = () => {
         }
     }, [location.pathname, windowWidth]);
 
+    // Block scroll when mobile menu is open
+    useEffect(() => {
+        if (mobileMenuOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [mobileMenuOpen]);
+
     // Handle clicks outside profile dropdown
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -77,8 +89,9 @@ const Layout = () => {
             '/services/providers': 'Proveedores',
             '/services/adquisiciones': 'Factura sin OC',
             '/services': 'Servicios',
-            '/services/payments': 'Pagos',
-            '/services/rc': 'Recepciones',
+            '/services/payments': 'Pagos de Servicios',
+            '/services/reporte-consumos': 'Reporte Consumos',
+            '/services/rc': 'Recepción Conforme',
             '/services/cdp': 'CDPs',
             '/telecomunicaciones': 'Teléfonos',
             '/impresoras': 'Impresoras',
@@ -89,7 +102,8 @@ const Layout = () => {
             '/orden-compra': 'Visor OC',
             '/licitaciones': 'Visor Licitaciones',
             '/reservas': 'Reservas',
-            '/personal-ti': 'Personal TI'
+            '/personal-ti': 'Personal TI',
+            '/procedimientos': 'Procedimientos'
         };
 
         const baseTitle = 'SGAF - SLEP Iquique';
@@ -134,7 +148,7 @@ const Layout = () => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setMobileMenuOpen(false)}
-                        className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 md:hidden"
+                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[60] md:hidden"
                     />
                 )}
             </AnimatePresence>
@@ -154,7 +168,7 @@ const Layout = () => {
                     mass: 0.8
                 }}
                 className={`
-                    fixed md:relative inset-y-0 left-0 z-40 bg-slate-900 text-slate-200 flex flex-col shadow-2xl overflow-hidden h-full
+                    fixed md:relative inset-y-0 left-0 z-[100] md:z-40 bg-slate-900 text-slate-200 flex flex-col shadow-2xl overflow-hidden h-full
                     ${!mobileMenuOpen && windowWidth < 768 ? '-translate-x-full' : ''}
                 `}
             >
@@ -239,6 +253,20 @@ const Layout = () => {
                         </Link>
                     )}
 
+                    <Link
+                        to="/procedimientos"
+                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/procedimientos') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                    >
+                        <FileStack className="w-5 h-5 flex-shrink-0" />
+                        <motion.span
+                            initial={false}
+                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                            className="font-medium whitespace-nowrap"
+                        >
+                            Procedimientos
+                        </motion.span>
+                    </Link>
+
                     {(can('establecimientos.view_establecimiento') || can('funcionarios.view_funcionario')) && (
                         <div className="py-2 px-4">
                             <div className="border-t border-slate-700/50" />
@@ -314,10 +342,15 @@ const Layout = () => {
                                                         </button>
                                                         {activeSubMenu === 'services' && (
                                                             <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
-                                                                {can('servicios.view_servicio') && <Link to="/services" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Panel Principal</Link>}
-                                                                {can('servicios.view_registropago') && <Link to="/services/payments" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/payments') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Pagos</Link>}
-                                                                {can('servicios.view_recepcionconforme') && <Link to="/services/rc" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/rc') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Recepciones</Link>}
-                                                                {can('servicios.view_cdp') && <Link to="/services/cdp" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/cdp') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>CDPs</Link>}
+                                                                {can('servicios.view_servicio') && <Link to="/services" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Panel Principal</Link>}
+                                                                {can('servicios.view_registropago') && (
+                                                                    <>
+                                                                        <Link to="/services/payments" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/payments') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Pagos</Link>
+                                                                        <Link to="/services/reporte-consumos" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/reporte-consumos') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Reporte Consumos</Link>
+                                                                    </>
+                                                                )}
+                                                                {can('servicios.view_recepcionconforme') && <Link to="/services/rc" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/rc') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Recepciones</Link>}
+                                                                {can('servicios.view_cdp') && <Link to="/services/cdp" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/cdp') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>CDPs</Link>}
                                                             </div>
                                                         )}
                                                     </div>
@@ -541,28 +574,28 @@ const Layout = () => {
                                     setMobileMenuOpen(true);
                                 }
                             }}
-                            className="relative group p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all duration-300"
+                            className="relative group p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all duration-300 md:ml-0 -ml-1"
                         >
-                            <div className="w-5 h-5 flex flex-col justify-center items-center gap-1">
+                            <div className="w-5 h-5 flex flex-col justify-center items-center gap-1 text-slate-600">
                                 <motion.span
                                     animate={{
-                                        rotate: sidebarOpen ? 0 : 0,
-                                        y: sidebarOpen ? 0 : 0,
-                                        width: sidebarOpen ? "100%" : "60%"
+                                        width: (sidebarOpen || mobileMenuOpen) ? "100%" : "60%",
+                                        x: (sidebarOpen || mobileMenuOpen) ? 0 : -2
                                     }}
-                                    className="h-0.5 bg-slate-600 rounded-full"
+                                    className="h-0.5 bg-current rounded-full"
                                 />
                                 <motion.span
                                     animate={{
-                                        width: sidebarOpen ? "80%" : "100%"
+                                        width: "100%"
                                     }}
-                                    className="h-0.5 bg-slate-600 rounded-full"
+                                    className="h-0.5 bg-current rounded-full"
                                 />
                                 <motion.span
                                     animate={{
-                                        width: sidebarOpen ? "100%" : "40%"
+                                        width: (sidebarOpen || mobileMenuOpen) ? "100%" : "40%",
+                                        x: (sidebarOpen || mobileMenuOpen) ? 0 : -4
                                     }}
-                                    className="h-0.5 bg-slate-600 rounded-full"
+                                    className="h-0.5 bg-current rounded-full"
                                 />
                             </div>
                         </button>
@@ -575,7 +608,7 @@ const Layout = () => {
                     </div>
 
                     <div className="flex items-center gap-3 relative" ref={profileRef}>
-                        <div className="hidden md:flex flex-col items-end">
+                        <div className="hidden md:flex flex-col items-end leading-tight">
                             <span className="text-sm font-semibold text-slate-700">
                                 {user?.funcionario_data?.nombre_funcionario || user?.username || 'Cargando...'}
                             </span>
