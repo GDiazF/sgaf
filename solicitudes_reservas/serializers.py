@@ -51,8 +51,8 @@ class SolicitudReservaSerializer(serializers.ModelSerializer):
             # Si el usuario tiene el permiso especial o es superusuario, saltamos la antelación
             can_bypass = user.is_superuser or user.has_perm('solicitudes_reservas.can_bypass_antelacion')
             
-            # Calculamos la fecha límite: Hoy + X días
-            x_dias = setting.dias_bloqueo_antelacion if setting and not can_bypass else 0
+            # Calculamos la fecha límite: Hoy + X días del recurso específico
+            x_dias = recurso.dias_antelacion if recurso and not can_bypass else 0
             fecha_limite = now.date() + timedelta(days=x_dias)
             
             if fi.date() <= fecha_limite:
@@ -65,7 +65,7 @@ class SolicitudReservaSerializer(serializers.ModelSerializer):
                         raise serializers.ValidationError({'fecha_inicio': 'No se pueden realizar reservas para un horario anterior al inicio de la hora actual.'})
                 else:
                     raise serializers.ValidationError({
-                        'fecha_inicio': f'El sistema requiere una antelación de {x_dias} días. No se pueden realizar reservas para antes del {(fecha_limite + timedelta(days=1)).strftime("%d/%m/%Y")}.'
+                        'fecha_inicio': f'Este recurso requiere una antelación de {x_dias} días. No se pueden realizar reservas para antes del {(fecha_limite + timedelta(days=1)).strftime("%d/%m/%Y")}.'
                     })
 
         # ─ Validación: hora de fin contra configuración global ─

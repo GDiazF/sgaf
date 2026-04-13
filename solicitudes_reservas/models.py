@@ -18,6 +18,8 @@ class RecursoReservable(models.Model):
     activo = models.BooleanField(default=True)
     color = models.CharField(max_length=7, default='#6366f1', verbose_name="Color en Calendario",
                              help_text="Color hexadecimal, ej: #6366f1")
+    dias_antelacion = models.IntegerField(default=0, verbose_name="Días de antelación",
+                                         help_text="Días mínimos requeridos para reservar este recurso.")
 
     def __str__(self):
         return f"{self.nombre} ({self.get_tipo_display()})"
@@ -142,8 +144,6 @@ class ReservaSetting(models.Model):
     """Configuración global para el sistema de reservas."""
     hora_inicio = models.TimeField(default='07:00', verbose_name="Hora de Inicio Jornada")
     hora_fin = models.TimeField(default='18:00', verbose_name="Hora de Fin Jornada")
-    dias_bloqueo_antelacion = models.IntegerField(default=0, verbose_name="Días Bloqueo Antelación", 
-                                                 help_text="Bloquea X días desde hoy hacia atrás.")
 
     def __str__(self):
         return f"Configuración: {self.hora_inicio.strftime('%H:%M')} - {self.hora_fin.strftime('%H:%M')}"

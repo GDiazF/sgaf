@@ -168,6 +168,25 @@ const ReservasDashboard = () => {
     const [bloqueoError, setBloqueoError] = useState('');
     const [bloqueoSaving, setBloqueoSaving] = useState(false);
     const [bloqueoTab, setBloqueoTab] = useState(false); // true = mostrando pestaña de bloqueos
+    
+    // Antelación masiva
+    const [bulkDays, setBulkDays] = useState(0);
+    const [selectedBulk, setSelectedBulk] = useState([]);
+
+    const handleBulkUpdate = async () => {
+        setAdminSaving(true);
+        try {
+            await Promise.all(selectedBulk.map(id => api.patch(`reservas/recursos/${id}/`, { dias_antelacion: bulkDays })));
+            setAdminError('');
+            await fetchData();
+            setSelectedBulk([]);
+            alert('Configuración aplicada con éxito a los recursos seleccionados.');
+        } catch (e) {
+            setAdminError('Error al actualizar recursos en masa');
+        } finally {
+            setAdminSaving(false);
+        }
+    };
 
     const scrollRef = useRef(null);
     const headerScrollRef = useRef(null);
@@ -332,12 +351,13 @@ const ReservasDashboard = () => {
     };
 
     const handleSlotClick = (day, slotTime, recursoId) => {
-        const x = settings.dias_bloqueo_antelacion || 0;
-        const limit = new Date(); limit.setHours(0, 0, 0, 0);
+        const rec = recursos.find(r => r.id === recursoId);
+        const x = rec?.dias_antelacion || 0;
+        const limit = new Date(); limit.setHours(0,0,0,0);
         limit.setDate(limit.getDate() + x);
-
+        
         if (day <= limit && !canBypass) {
-            setSlotBloqueadoMsg(`El sistema requiere ${x} días de antelación. Bloqueado hasta el ${addDays(limit, 1).toLocaleDateString()}.`);
+            setSlotBloqueadoMsg(`Este recurso necesita ${x} días de antelación. Bloqueado hasta el ${addDays(limit, 1).toLocaleDateString()}.`);
             setTimeout(() => setSlotBloqueadoMsg(''), 3000);
             return;
         }
@@ -381,8 +401,8 @@ const ReservasDashboard = () => {
         const [h, m] = actualSlot.split(':').map(Number);
         const endH = m === 30 ? h + 1 : h, endM = m === 30 ? 0 : 30;
 
-        const rec = recursos.find(r => r.id === recursoId);
-        setFormTipo(rec?.tipo || '');
+        const recObj = recursos.find(r => r.id === recursoId);
+        setFormTipo(recObj?.tipo || '');
         setFormData({ recurso: recursoId || '', titulo: '', nombre_funcionario: defaultName, descripcion: '', fecha: toDateStr(day), horaInicio: actualSlot, horaFin: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}` });
         setFormError('');
         setModalOpen(true);
@@ -440,11 +460,25 @@ const ReservasDashboard = () => {
         catch (err) { alert(err.response?.data?.detail || err.response?.data?.non_field_errors?.[0] || 'Error al actualizar estado'); }
     };
 
-    const openAdminEdit = r => { setAdminEditing(r); setAdminForm({ nombre: r.nombre, tipo: r.tipo, ubicacion: r.ubicacion || '', capacidad: r.capacidad || 1, descripcion: r.descripcion || '', activo: r.activo, color: r.color || '#6366f1' }); setAdminError(''); };
     const openAdminCreate = () => {
-        const usedColors = recursos.map(r => r.color);
-        const nextColor = DEFAULT_COLORS.find(c => !usedColors.includes(c)) || DEFAULT_COLORS[recursos.length % DEFAULT_COLORS.length];
-        setAdminEditing(null); setAdminForm({ nombre: '', tipo: 'SALA', ubicacion: '', capacidad: 1, descripcion: '', activo: true, color: nextColor }); setAdminError('');
+        setAdminEditing(null);
+        setAdminForm({ nombre: '', tipo: 'SALA', color: '#6366f1', ubicacion: '', capacidad: 10, descripcion: '', activo: true, dias_antelacion: 0 });
+        setAdminError('');
+    };
+    const openAdminEdit = (r) => {
+        setAdminEditing(r);
+        setAdminForm({ 
+            nombre: r.nombre, 
+            tipo: r.tipo, 
+            color: r.color || '#6366f1', 
+            ubicacion: r.ubicacion || '', 
+            capacidad: r.capacidad || 10, 
+            descripcion: r.descripcion || '', 
+            activo: r.activo,
+            dias_antelacion: r.dias_antelacion || 0
+        });
+        setAdminError('');
+        setBloqueoTab(false);
     };
 
     const handleAdminSave = async e => {
@@ -585,11 +619,9 @@ const ReservasDashboard = () => {
                         <Settings className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Administrar</span>
                     </button>
                     {(() => {
-                        const x = settings.dias_bloqueo_antelacion || 0;
-                        const limit = new Date(); limit.setHours(0, 0, 0, 0);
-                        limit.setDate(limit.getDate() + x);
-                        const isPast = currentDate <= limit && !canBypass;
-                        return !isPast && (
+                        // Nota: En el botón de nueva reserva, la validación de antelación es global o por recurso.
+                        // Aquí simplificamos usando la fecha actual.
+                        return (
                             <button onClick={() => { setFormTipo(''); setFormData({ recurso: '', titulo: '', nombre_funcionario: defaultName, descripcion: '', fecha: toDateStr(currentDate), horaInicio: '09:00', horaFin: '10:00' }); setFormError(''); setModalOpen(true); }}
                                 className="flex-2 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-indigo-700 transition shadow-md shadow-indigo-500/20">
                                 <Plus className="w-4 h-4" /> Nueva <span className="hidden sm:inline">Reserva</span>
@@ -1462,56 +1494,72 @@ const ReservasDashboard = () => {
                                     </div>
                                 )}
                                 {adminEditing?.id === 'settings' ? (
-                                    <form onSubmit={async (e) => {
-                                        e.preventDefault();
-                                        setAdminSaving(true);
-                                        try {
-                                            await api.put('reservas/settings/1/', settings);
-                                            setAdminError('');
-                                            await fetchData();
-                                            // No cerramos el modal para que vea el cambio o pueda seguir ajustando
-                                        } catch (e) {
-                                            setAdminError('Error al guardar la configuración. Revisa los valores.');
-                                        } finally {
-                                            setAdminSaving(false);
-                                        }
-                                    }} className="space-y-6">
-                                        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
-                                            <p className="text-xs text-indigo-700 leading-relaxed">
-                                                Ajusta el rango de horas que se mostrará en el calendario para todos los usuarios.
-                                                Las reservas existentes fuera de este rango seguirán siendo válidas pero podrían no ser visibles en la vista diaria/semanal.
-                                            </p>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Hora de Inicio</label>
-                                                <input type="time" step="1800" className="w-full rounded-xl border border-slate-200 text-sm px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                    value={settings.hora_inicio.slice(0, 5)} onChange={e => setSettings(p => ({ ...p, hora_inicio: e.target.value }))} required />
+                                    <div className="space-y-8">
+                                        <form onSubmit={async (e) => {
+                                            e.preventDefault();
+                                            setAdminSaving(true);
+                                            try {
+                                                await api.put('reservas/settings/1/', settings);
+                                                setAdminError('');
+                                                await fetchData();
+                                                alert('Horario laboral actualizado con éxito.');
+                                            } catch (e) {
+                                                setAdminError('Error al guardar la configuración.');
+                                            } finally {
+                                                setAdminSaving(false);
+                                            }
+                                        }} className="space-y-6">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Hora de Inicio</label>
+                                                    <input type="time" step="1800" className="w-full rounded-xl border border-slate-200 text-sm px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                        value={settings.hora_inicio.slice(0, 5)} onChange={e => setSettings(p => ({ ...p, hora_inicio: e.target.value }))} required />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Hora de Término</label>
+                                                    <input type="time" step="1800" className="w-full rounded-xl border border-slate-200 text-sm px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                        value={settings.hora_fin.slice(0, 5)} onChange={e => setSettings(p => ({ ...p, hora_fin: e.target.value }))} required />
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Hora de Término</label>
-                                                <input type="time" step="1800" className="w-full rounded-xl border border-slate-200 text-sm px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                    value={settings.hora_fin.slice(0, 5)} onChange={e => setSettings(p => ({ ...p, hora_fin: e.target.value }))} required />
+                                            <button type="submit" disabled={adminSaving} className="w-full py-3 bg-slate-800 text-white rounded-xl font-black text-xs hover:bg-slate-900 transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-50">
+                                                {adminSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                                Actualizar Horario Laboral
+                                            </button>
+                                        </form>
+
+                                        <div className="pt-6 border-t border-slate-100">
+                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Aplicar Antelación en Masa</h4>
+                                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-4">
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">1. Días de Antelación</label>
+                                                    <input type="number" min="0" className="w-24 rounded-xl border border-slate-200 text-sm px-4 py-2 font-black text-indigo-600 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                        value={bulkDays || 0} onChange={e => setBulkDays(parseInt(e.target.value) || 0)} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">2. Seleccionar Recursos</label>
+                                                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
+                                                        {recursos.map(r => (
+                                                            <label key={r.id} className="flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-100 hover:border-indigo-200 cursor-pointer transition">
+                                                                <input type="checkbox" className="rounded text-indigo-600 focus:ring-indigo-500" 
+                                                                    checked={selectedBulk.includes(r.id)} 
+                                                                    onChange={e => {
+                                                                        if (e.target.checked) setSelectedBulk(p => [...p, r.id]);
+                                                                        else setSelectedBulk(p => p.filter(id => id !== r.id));
+                                                                    }} />
+                                                                <span className="text-[10px] font-bold text-slate-600 truncate">{r.nombre}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <button type="button" 
+                                                    onClick={handleBulkUpdate}
+                                                    disabled={adminSaving || selectedBulk.length === 0}
+                                                    className="w-full py-2.5 bg-indigo-50 text-indigo-700 rounded-xl font-black text-[10px] uppercase border border-indigo-100 hover:bg-indigo-100 transition flex items-center justify-center gap-2 disabled:opacity-50">
+                                                    <Check className="w-3 h-3" /> Aplicar a {selectedBulk.length} recursos
+                                                </button>
                                             </div>
                                         </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Días Bloqueo Antelación</label>
-                                            <div className="flex items-center gap-3 bg-slate-100 p-3 rounded-xl border border-slate-200">
-                                                <input type="number" min="0" max="30" className="w-20 rounded-lg border border-slate-200 text-sm px-3 py-2 font-black text-indigo-600 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                    value={settings.dias_bloqueo_antelacion} onChange={e => setSettings(p => ({ ...p, dias_bloqueo_antelacion: parseInt(e.target.value) || 0 }))} required />
-                                                <p className="text-[11px] text-slate-500 font-bold leading-tight">
-                                                    Bloquea <span className="text-indigo-600 font-black">{settings.dias_bloqueo_antelacion}</span> días desde hoy hacia atrás. <br />
-                                                    Las nuevas reservas solo podrán pedirse desde el <span className="text-slate-800 font-black underline">
-                                                        {addDays(new Date(), (settings.dias_bloqueo_antelacion || 0) + 1).toLocaleDateString()}
-                                                    </span>.
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <button type="submit" disabled={adminSaving} className="w-full py-3 bg-slate-800 text-white rounded-xl font-black text-xs hover:bg-slate-900 transition flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg">
-                                            {adminSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                                            Guardar Configuración
-                                        </button>
-                                    </form>
+                                    </div>
                                 ) : (
                                     <form onSubmit={handleAdminSave} className="space-y-4">
                                         {/* Tipo */}
@@ -1561,8 +1609,8 @@ const ReservasDashboard = () => {
                                             </div>
                                         </div>
 
-                                        {/* Ubicación + Capacidad */}
-                                        <div className="grid grid-cols-2 gap-3">
+                                        {/* Ubicación + Capacidad + Antelación */}
+                                        <div className="grid grid-cols-3 gap-3">
                                             <div>
                                                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><MapPin className="w-3 h-3" /> Ubicación</label>
                                                 <input type="text" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -1572,6 +1620,11 @@ const ReservasDashboard = () => {
                                                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Users className="w-3 h-3" /> Capacidad</label>
                                                 <input type="number" min="1" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
                                                     value={adminForm.capacidad} onChange={e => setAdminForm(p => ({ ...p, capacidad: parseInt(e.target.value) || 1 }))} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Clock className="w-3 h-3" /> Antelación</label>
+                                                <input type="number" min="0" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 font-bold text-indigo-600 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    value={adminForm.dias_antelacion} onChange={e => setAdminForm(p => ({ ...p, dias_antelacion: parseInt(e.target.value) || 0 }))} />
                                             </div>
                                         </div>
 

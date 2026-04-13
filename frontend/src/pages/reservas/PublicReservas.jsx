@@ -320,13 +320,14 @@ const PublicReservas = () => {
     }, [formData.recurso, formData.fecha, formData.horaInicio, modalOpen, reservas, todayStr, settings.hora_fin]);
 
     const handleSlotClick = (day, slotTime, recursoId) => {
-        const x = settings.dias_bloqueo_antelacion || 0;
+        const rec = (recursos || []).find(r => r.id === recursoId);
+        const x = rec?.dias_antelacion || 0;
         const limit = new Date(); limit.setHours(0,0,0,0);
         limit.setDate(limit.getDate() + x);
         const dayStr = toDateStr(day);
 
         if (day <= limit) {
-            setSlotBloqueadoMsg(`El sistema requiere ${x} días de antelación. Bloqueado hasta el ${addDays(limit, 1).toLocaleDateString()}.`);
+            setSlotBloqueadoMsg(`Este recurso requiere una antelación de ${x} días. Bloqueado hasta el ${addDays(limit, 1).toLocaleDateString()}.`);
             setTimeout(() => setSlotBloqueadoMsg(''), 3000);
             return;
         }
@@ -366,8 +367,8 @@ const PublicReservas = () => {
         const [h, m] = actualSlot.split(':').map(Number);
         const endH = m === 30 ? h + 1 : h, endM = m === 30 ? 0 : 30;
 
-        const rec = recursos.find(r => r.id === recursoId);
-        setFormTipo(rec?.tipo || '');
+        const recObj = recursos.find(r => r.id === recursoId);
+        setFormTipo(recObj?.tipo || '');
         setFormData({
             recurso: recursoId || '',
             titulo: '',
@@ -607,7 +608,7 @@ const PublicReservas = () => {
                                                 const dayEvents = getReservasForDayAndRecurso(day, rec.id);
                                                 const dayBloqueos = bloqueos.filter(b => Number(b.recurso) === Number(rec.id) && bloqueoAppliesToDate(b, dayStr));
 
-                                                const x = settings.dias_bloqueo_antelacion || 0;
+                                                const x = rec?.dias_antelacion || 0;
                                                 const limit = new Date(); limit.setHours(0,0,0,0);
                                                 limit.setDate(limit.getDate() + x);
                                                 const isDayBlocked = day <= limit;

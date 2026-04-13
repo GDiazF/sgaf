@@ -1,0 +1,52 @@
+services:
+
+  sandbox_db:
+    image: postgres:16-alpine
+    container_name: sgaf_sandbox_db
+    restart: unless-stopped
+    env_file: .env.sandbox
+    environment:
+      POSTGRES_DB: sgaf_sandbox_db
+      POSTGRES_USER: sgaf_user
+      POSTGRES_PASSWORD: sgaf_sandbox_pass
+    volumes:
+      - /home/slepiquique/sgaf_pgdata_sandbox:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sgaf_user -d sgaf_sandbox_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sandbox_backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sgaf_sandbox_backend
+    restart: unless-stopped
+    env_file: .env.sandbox
+    volumes:
+      - /home/slepiquique/sgaf/media_sandbox:/app/media
+      - /home/slepiquique/sgaf/staticfiles_sandbox:/app/staticfiles
+      - sandbox_frontend_assets:/app/frontend/dist
+    depends_on:
+      sandbox_db:
+        condition: service_healthy
+    expose:
+      - "8000"
+
+  sandbox_nginx:
+    image: nginx:alpine
+    container_name: sgaf_sandbox_nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.sandbox.conf:/etc/nginx/conf.d/default.conf:ro
+      - /home/slepiquique/sgaf/staticfiles_sandbox:/app/staticfiles:ro
+      - /home/slepiquique/sgaf/media_sandbox:/app/media:ro
+      - sandbox_frontend_assets:/usr/share/nginx/html:ro
+    depends_on:
+      - sandbox_backend
+
+volumes:
+  sandbox_frontend_assets:
