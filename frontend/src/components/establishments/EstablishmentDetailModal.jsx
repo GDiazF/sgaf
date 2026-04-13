@@ -42,7 +42,7 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
         : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion || nombre)}`;
 
     const InfoBox = ({ icon: Icon, label, value, subValue, highlight = false }) => (
-        <div className={`flex gap-3 p-2 rounded-xl border transition-all ${highlight ? 'bg-slate-900 border-slate-800 shadow-sm text-white' : 'bg-slate-50 border-slate-100 hover:bg-white hover:shadow-sm'}`}>
+        <div className={`flex gap-3 p-1.5 rounded-xl border transition-all ${highlight ? 'bg-slate-900 border-slate-800 shadow-sm text-white' : 'bg-slate-50 border-slate-100 hover:bg-white hover:shadow-sm'}`}>
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 border shadow-sm ${highlight ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-50 text-slate-400'}`}>
                 <Icon className="w-3.5 h-3.5" />
             </div>
@@ -98,10 +98,18 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
                         initial={{ opacity: 0, scale: 0.95, y: 10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                        className="relative w-full max-w-6xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-[85vh] md:h-[620px]"
+                        className="relative w-full max-w-6xl bg-white rounded-3xl md:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-[660px]"
                     >
+                        {/* Botón Cerrar Absoluto */}
+                        <button
+                            onClick={onClose}
+                            className="absolute top-4 right-4 z-[1100] p-2 bg-white/80 backdrop-blur-md text-slate-500 hover:text-slate-900 rounded-full shadow-xl border border-white/50 transition-all active:scale-95 hover:bg-white"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+
                         {/* Map Area */}
-                        <div className="flex-1 relative bg-slate-100 overflow-hidden min-h-[250px] md:min-h-full">
+                        <div className="flex-1 relative bg-slate-100 overflow-hidden min-h-[200px] md:min-h-full">
                             {hasCoordinates ? (
                                 <MapContainer center={position} zoom={16} className="w-full h-full" scrollWheelZoom={true} zoomControl={false}>
                                     <TileLayer attribution='&copy; CARTO' url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
@@ -135,12 +143,10 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
 
                         {/* Sidebar */}
                         <div className="w-full md:w-[360px] p-4 lg:p-5 flex flex-col bg-white overflow-y-auto border-l border-slate-100 custom-scrollbar">
-                            <button onClick={onClose} className="self-end p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-all mb-1"><X className="w-4 h-4" /></button>
-
-                            <div className="flex-1 space-y-3">
+                            <div className="flex-1 space-y-2.5 pt-6">
                                 {/* Header */}
                                 <div className="flex items-center gap-3 mb-1 bg-slate-900 p-3 rounded-[1.5rem] shadow-lg border border-slate-800">
-                                    <div className="w-11 h-11 rounded-xl bg-white p-1.5 shadow-inner flex items-center justify-center flex-shrink-0">
+                                    <div className="w-10 h-10 rounded-xl bg-white p-1.5 shadow-inner flex items-center justify-center flex-shrink-0">
                                         {logo ? <img src={logo} alt={nombre} className="w-full h-full object-contain" /> : <Building className="w-6 h-6 text-slate-300" />}
                                     </div>
                                     <div className="min-w-0">
@@ -154,11 +160,11 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
 
                                 {/* RBD and Main Info Grid */}
                                 <div className="grid grid-cols-1 gap-2">
-                                    <InfoBox icon={Hash} label="RBD del Establecimiento" value={rbd} highlight={true} />
-                                    <InfoBox icon={User} label="Director / Responsable" value={director} />
-                                    <InfoBox icon={Mail} label="Email Institucional" value={email} />
-                                    <InfoBox icon={Navigation} label="Dirección Física" value={direccion} />
-                                    <InfoBox icon={Phone} label="Teléfono Fijo" value={principalPhone?.numero} subValue={principalPhone?.etiqueta} />
+                                    <InfoBox icon={Hash} label="RBD" value={rbd} highlight={true} />
+                                    <InfoBox icon={User} label="Director" value={director} />
+                                    <InfoBox icon={Mail} label="Email" value={email} />
+                                    <InfoBox icon={Navigation} label="Dirección" value={direccion} />
+                                    <InfoBox icon={Phone} label="Teléfono" value={principalPhone?.numero} subValue={principalPhone?.etiqueta} />
                                 </div>
 
                                 {/* Other Phones */}
@@ -181,13 +187,12 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
                             </div>
 
                             {/* Redirect Button */}
-                            <div className="mt-3 pt-3 border-t border-slate-50">
-                                <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2.5 bg-blue-600 text-white py-3 rounded-2xl font-bold text-[10px] uppercase tracking-[1px] hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 group">
+                            <div className="mt-2 pt-2 border-t border-slate-50">
+                                <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-2xl font-bold text-[10px] uppercase tracking-[1px] hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 group">
                                     <img src="https://www.google.com/images/branding/product/ico/maps_32dp.ico" alt="Maps" className="w-4 h-4 group-hover:scale-110 transition-transform" />
                                     Google Maps
                                     <ExternalLink className="w-3.5 h-3.5 text-white/50" />
                                 </a>
-                                <p className="text-[8px] text-slate-300 font-medium uppercase tracking-widest text-center mt-2 italic">Consultar navegación externa</p>
                             </div>
                         </div>
                     </motion.div>

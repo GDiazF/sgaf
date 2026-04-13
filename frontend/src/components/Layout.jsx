@@ -680,7 +680,7 @@ const Layout = () => {
                     </div>
                 </header>
 
-                <div className={`p-4 md:p-8 ${windowWidth <= 1366 ? 'md:px-6' : 'md:px-12'} max-w-[1800px] mx-auto`}>
+                <div className="p-4 md:p-8 w-full">
                     <motion.div
                         key={location.pathname}
                         initial={{ opacity: 0, x: -10 }}

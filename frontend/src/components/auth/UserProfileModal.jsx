@@ -146,26 +146,14 @@ const UserProfileModal = ({ isOpen, onClose }) => {
                 )}
 
                 {!isChangingPassword ? (
-                    <div className="grid grid-cols-2 gap-3 animate-in fade-in duration-300">
-                        <div className="col-span-1">
-                            <InfoItem icon={IdCard} label="RUT / RUN" value={user?.funcionario_data?.rut} />
-                        </div>
-                        <div className="col-span-1">
-                            <InfoItem icon={Mail} label="E-Mail" value={user?.email} />
-                        </div>
+                    <div className="flex flex-col gap-3 animate-in fade-in duration-300">
+                        <InfoItem icon={IdCard} label="RUT / RUN" value={user?.funcionario_data?.rut} />
+                        <InfoItem icon={Mail} label="E-Mail" value={user?.email} />
+                        <InfoItem icon={Briefcase} label="Cargo" value={user?.funcionario_data?.cargo} colorClass="text-emerald-500" bgClass="bg-emerald-50" />
+                        <InfoItem icon={Building2} label="Departamento" value={user?.funcionario_data?.departamento} colorClass="text-indigo-500" bgClass="bg-indigo-50" />
+                        <InfoItem icon={MapPin} label="Unidad" value={user?.funcionario_data?.unidad} colorClass="text-orange-500" bgClass="bg-orange-50" />
 
-                        <div className="col-span-1">
-                            <InfoItem icon={Briefcase} label="Cargo" value={user?.funcionario_data?.cargo} colorClass="text-emerald-500" bgClass="bg-emerald-50" />
-                        </div>
-                        <div className="col-span-1">
-                            <InfoItem icon={Building2} label="Departamento" value={user?.funcionario_data?.departamento} colorClass="text-indigo-500" bgClass="bg-indigo-50" />
-                        </div>
-
-                        <div className="col-span-2">
-                            <InfoItem icon={MapPin} label="Unidad" value={user?.funcionario_data?.unidad} colorClass="text-orange-500" bgClass="bg-orange-50" />
-                        </div>
-
-                        <div className="col-span-2 pt-2">
+                        <div className="pt-2">
                             <button
                                 onClick={() => setIsChangingPassword(true)}
                                 className="w-full flex items-center justify-center gap-2.5 p-3.5 bg-slate-800 text-white rounded-xl font-medium text-sm hover:bg-slate-700 transition-all shadow-lg active:scale-[0.99]"
@@ -188,7 +176,7 @@ const UserProfileModal = ({ isOpen, onClose }) => {
                                     onChange={e => setPasswordData({ ...passwordData, old_password: e.target.value })}
                                 />
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Nueva Clave</label>
                                     <input

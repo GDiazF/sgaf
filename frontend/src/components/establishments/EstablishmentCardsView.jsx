@@ -220,7 +220,7 @@ const EstablishmentCardsView = ({ isOpen, onClose, data, establishmentTypes = []
                         </div>
                     </div>
 
-                    <div className={`grid gap-5 grid-print ${isPreviewMode ? (isLandscape ? 'grid-cols-3' : 'grid-cols-1') : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+                    <div className={`grid gap-5 grid-print ${isPreviewMode ? (isLandscape ? 'grid-cols-3' : 'grid-cols-1') : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'}`}>
                         <AnimatePresence mode='popLayout'>
                             {filteredData.map((item, index) => {
                                 const principalPhone = item.telefonos?.find(p => p.es_principal) || item.telefonos?.[0];

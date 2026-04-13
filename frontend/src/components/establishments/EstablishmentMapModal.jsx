@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MapPin, Navigation, Info, ExternalLink, Building } from 'lucide-react';
+import { X, MapPin, ExternalLink, Building, Hash } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
@@ -15,44 +15,39 @@ const createMarkerIcon = (color) => L.divIcon({
     popupAnchor: [0, -36]
 });
 
-const blueIcon = createMarkerIcon('#3b82f6'); // Blue 500
-const greenIcon = createMarkerIcon('#10b981'); // Emerald 500
+const blueIcon = createMarkerIcon('#3b82f6');
+const greenIcon = createMarkerIcon('#10b981');
 
-// Helper component to update map view when establishment changes
-const ChangeView = ({ center }) => {
+const ChangeView = ({ center, zoom = 14 }) => {
     const map = useMap();
     useEffect(() => {
         if (center) {
-            map.setView(center, 16);
+            map.setView(center, zoom);
         }
-    }, [center, map]);
+    }, [center, zoom, map]);
     return null;
 };
 
 const EstablishmentMapModal = ({ isOpen, onClose, establishment, allEstablishments = [] }) => {
-    if (!establishment) return null;
+    // Si no hay establecimiento seleccionado, es vista "Red Educativa" (Mapa Maestro)
+    const isGlobalView = !establishment;
 
-    const { nombre, direccion, latitud, longitud } = establishment;
+    // Centro inicial: Iquique
+    const iquiqueCenter = [-20.2307, -70.1357];
 
-    // Check if we have valid numeric coordinates
-    const hasCoordinates = latitud && longitud && !isNaN(parseFloat(latitud)) && !isNaN(parseFloat(longitud));
-    const position = hasCoordinates ? [parseFloat(latitud), parseFloat(longitud)] : null;
+    const activeEst = establishment;
+    const position = activeEst?.latitud && activeEst?.longitud
+        ? [parseFloat(activeEst.latitud), parseFloat(activeEst.longitud)]
+        : iquiqueCenter;
 
-    // Filter others that have coordinates
-    const otherMarkers = allEstablishments.filter(e =>
-        e.id !== establishment.id &&
-        e.latitud && e.longitud &&
-        !isNaN(parseFloat(e.latitud)) && !isNaN(parseFloat(e.longitud))
+    const markers = allEstablishments.filter(e =>
+        e.latitud && e.longitud && !isNaN(parseFloat(e.latitud)) && !isNaN(parseFloat(e.longitud))
     );
-
-    const externalUrl = hasCoordinates
-        ? `https://www.google.com/maps/search/?api=1&query=${latitud},${longitud}`
-        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion || nombre)}`;
 
     return (
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -65,206 +60,152 @@ const EstablishmentMapModal = ({ isOpen, onClose, establishment, allEstablishmen
                         initial={{ opacity: 0, scale: 0.9, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                        className="relative w-full max-w-5xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-[85vh] md:h-[650px] border border-white/20"
+                        className={`relative w-full ${isGlobalView ? 'max-w-6xl' : 'max-w-5xl'} bg-white rounded-[2.5rem] shadow-2xl overflow-hidden h-[85vh] md:h-[750px] border border-white/20`}
                     >
-                        {/* Map Section */}
-                        <div className="flex-1 relative bg-slate-100 overflow-hidden min-h-[300px] md:min-h-full">
-                            {hasCoordinates ? (
-                                <MapContainer
-                                    center={position}
-                                    zoom={16}
-                                    className="w-full h-full"
-                                    scrollWheelZoom={true}
-                                    zoomControl={false}
+                        {/* Cabecera Flotante para Vista Global */}
+                        {isGlobalView && (
+                            <div className="absolute top-6 left-6 right-6 z-[1000] flex justify-between items-start pointer-events-none">
+                                <div className="bg-white/95 backdrop-blur-md px-6 py-4 rounded-[1.8rem] shadow-2xl border border-slate-100 flex items-center gap-4 pointer-events-auto">
+                                    <div className="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                                        <Building className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-black text-slate-800 uppercase text-base leading-none mb-1.5">Red Educativa SLEP</h3>
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Mapa Completo de Establecimientos</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={onClose}
+                                    className="bg-white/95 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-slate-100 text-slate-400 hover:text-slate-900 transition-all pointer-events-auto active:scale-95"
                                 >
-                                    <TileLayer
-                                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-                                        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-                                    />
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+                        )}
 
+                        <div className="w-full h-full relative bg-slate-100">
+                            <MapContainer
+                                center={position}
+                                zoom={isGlobalView ? 13 : 16}
+                                className="w-full h-full"
+                                scrollWheelZoom={true}
+                                zoomControl={false}
+                            >
+                                <TileLayer
+                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                    url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                                />
 
-                                    {/* Selected Establishment (Green) */}
-                                    <Marker position={position} icon={greenIcon}>
-                                        <Popup className="premium-popup">
-                                            <div className="p-3 min-w-[200px] space-y-2">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 flex-shrink-0 animate-bounce-subtle">
-                                                        <MapPin className="w-4 h-4" />
-                                                    </div>
-                                                    <div>
-                                                        <span className="text-[9px] font-black uppercase text-emerald-600 tracking-widest block leading-none mb-1">Consultando:</span>
-                                                        <div className="font-black text-slate-900 text-[13px] leading-tight">{nombre}</div>
-                                                    </div>
-                                                </div>
-                                                <div className="pl-10">
-                                                    <div className="text-[11px] font-bold text-slate-500 italic leading-relaxed">
-                                                        "{direccion || 'Sin dirección registrada'}"
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Popup>
-                                    </Marker>
+                                {markers.map(marker => {
+                                    const isSelected = activeEst?.id === marker.id;
+                                    const gMapsUrl = `https://www.google.com/maps/search/?api=1&query=${marker.latitud},${marker.longitud}`;
 
-                                    {/* Other Establishments (Blue) */}
-                                    {otherMarkers.map(marker => (
+                                    return (
                                         <Marker
                                             key={marker.id}
                                             position={[parseFloat(marker.latitud), parseFloat(marker.longitud)]}
-                                            icon={blueIcon}
+                                            icon={isSelected ? greenIcon : blueIcon}
                                         >
                                             <Popup className="premium-popup">
-                                                <div className="p-3 min-w-[200px] space-y-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
-                                                            <Building className="w-4 h-4" />
+                                                <div className="p-0 min-w-[300px] overflow-hidden rounded-[2rem]">
+                                                    {/* Header del Globo */}
+                                                    <div className="p-6 pb-2 flex justify-between items-start gap-4">
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-2 mb-1.5">
+                                                                <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-semibold tracking-wide rounded-md border border-blue-100">
+                                                                    Establecimiento
+                                                                </span>
+                                                            </div>
+                                                            <h4 className="text-[17px] font-bold text-slate-800 leading-tight">
+                                                                {marker.nombre}
+                                                            </h4>
                                                         </div>
-                                                        <div>
-                                                            <span className="text-[9px] font-black uppercase text-blue-600 tracking-widest block leading-none mb-1">Institución SLEP:</span>
-                                                            <div className="font-black text-slate-900 text-[13px] leading-tight">{marker.nombre}</div>
+                                                        <div className="text-right flex-shrink-0">
+                                                            <div className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-xl border border-slate-200 flex flex-col items-center">
+                                                                <span className="text-[7px] font-bold uppercase opacity-60 leading-none mb-1">RBD</span>
+                                                                <span className="text-[11px] font-bold leading-none">{marker.rbd || '---'}</span>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <div className="pl-10">
-                                                        <div className="text-[11px] font-bold text-slate-500 italic leading-relaxed">
-                                                            "{marker.direccion || 'Sin dirección'}"
+
+                                                    {/* Información de Ubicación */}
+                                                    <div className="px-6 py-4">
+                                                        <div className="flex gap-3 items-center p-3 bg-slate-50/50 rounded-2xl border border-slate-100/50">
+                                                            <div className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-400 border border-slate-100 flex-shrink-0">
+                                                                <MapPin className="w-4 h-4" />
+                                                            </div>
+                                                            <p className="text-[12px] font-medium text-slate-500 leading-snug">
+                                                                {marker.direccion || 'Dirección no registrada'}
+                                                            </p>
                                                         </div>
+                                                    </div>
+
+                                                    {/* Pie de Acción */}
+                                                    <div className="p-6 pt-0">
+                                                        <a
+                                                            href={gMapsUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="w-full h-11 bg-blue-600 hover:bg-blue-700 !text-white rounded-2xl flex items-center justify-center gap-3 text-[11px] font-bold uppercase tracking-widest transition-all shadow-lg shadow-blue-100 active:scale-95 group whitespace-nowrap px-6"
+                                                        >
+                                                            <span className="!text-white">Ver en Google Maps</span>
+                                                            <ExternalLink className="w-3.5 h-3.5 !text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all text-white" />
+                                                        </a>
                                                     </div>
                                                 </div>
                                             </Popup>
                                         </Marker>
-                                    ))}
+                                    );
+                                })}
 
-                                    <ChangeView center={position} />
-                                </MapContainer>
-                            ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 p-12 text-center">
-                                    <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-4 border border-slate-200">
-                                        <MapPin className="w-10 h-10 text-slate-300" />
-                                    </div>
-                                    <h4 className="text-xl font-black text-slate-800 mb-2">Sin Coordenadas Exactas</h4>
-                                    <p className="text-sm text-slate-500 max-w-xs">
-                                        Este establecimiento no tiene latitud y longitud registradas. Puedes ver la ubicación aproximada en Google Maps.
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Overlay Control */}
-                            {hasCoordinates && (
-                                <div className="absolute top-6 left-6 z-[1000] flex flex-col gap-2">
-                                    <motion.div
-                                        initial={{ x: -20, opacity: 0 }}
-                                        animate={{ x: 0, opacity: 1 }}
-                                        transition={{ delay: 0.3 }}
-                                        className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-white shadow-xl flex items-center gap-3"
-                                    >
-                                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)] animate-pulse" />
-                                        <span className="text-[10px] font-black text-slate-700 tracking-widest uppercase">Vista Premium Activa</span>
-                                    </motion.div>
-                                </div>
-                            )}
+                                <ChangeView center={position} zoom={isGlobalView ? 13 : 16} />
+                            </MapContainer>
                         </div>
 
-                        {/* Info Section */}
-                        <div className="w-full md:w-[360px] p-6 md:p-8 lg:p-10 flex flex-col bg-white overflow-y-auto border-l border-slate-100 no-scrollbar">
-                            <button
-                                onClick={onClose}
-                                className="self-end p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all mb-6"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-
-                            <div className="flex-1 space-y-8">
-                                <div className="space-y-3">
-                                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-wider border border-emerald-100">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                        <span>Institución SLEP</span>
+                        {/* Sidebar solo si NO es vista global */}
+                        {!isGlobalView && (
+                            <div className="w-full md:w-[380px] p-10 flex flex-col bg-white overflow-y-auto border-l border-slate-100 no-scrollbar">
+                                <button onClick={onClose} className="self-end p-2.5 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-full transition-all mb-8">
+                                    <X className="w-6 h-6" />
+                                </button>
+                                <div className="space-y-8">
+                                    <div>
+                                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-4">
+                                            RBD: {activeEst.rbd}
+                                        </div>
+                                        <h3 className="text-3xl font-black text-slate-900 leading-tight uppercase">{activeEst.nombre}</h3>
                                     </div>
-                                    <h3 className="text-2xl font-black text-slate-900 leading-tight tracking-tight">{nombre}</h3>
-                                </div>
-
-                                <div className="space-y-6">
-                                    <div className="p-5 bg-slate-50 rounded-[32px] border border-slate-200/60 space-y-4 shadow-inner">
+                                    <div className="space-y-4 p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100">
                                         <div className="flex gap-4">
-                                            <div className="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center flex-shrink-0 border border-slate-100">
-                                                <Navigation className="w-5 h-5 text-blue-600" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Dirección Oficial</span>
-                                                <p className="text-[13px] font-bold text-slate-700 leading-relaxed italic pr-2">
-                                                    "{direccion || 'Dirección no registrada'}"
-                                                </p>
+                                            <MapPin className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                                            <div>
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Dirección</span>
+                                                <p className="text-sm font-bold text-slate-700 leading-relaxed italic pr-2">"{activeEst.direccion || 'No registra'}"</p>
                                             </div>
                                         </div>
-
-                                        {hasCoordinates && (
-                                            <div className="pt-4 border-t border-slate-200/50 grid grid-cols-2 gap-3">
-                                                <div className="space-y-1">
-                                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block text-center">Latitud</span>
-                                                    <span className="text-[11px] font-mono font-bold text-slate-600 bg-white px-3 py-1.5 rounded-xl border border-slate-100 block text-center truncate shadow-sm">{latitud}</span>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block text-center">Longitud</span>
-                                                    <span className="text-[11px] font-mono font-bold text-slate-600 bg-white px-3 py-1.5 rounded-xl border border-slate-100 block text-center truncate shadow-sm">{longitud}</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="flex gap-3 items-start p-4 bg-blue-50/50 rounded-2xl border border-blue-100/30">
-                                        <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                                        <p className="text-[11px] font-bold text-blue-700/70 leading-normal">
-                                            {hasCoordinates
-                                                ? 'Esta ubicación utiliza coordenadas satelitales exactas para una mayor precisión en el seguimiento.'
-                                                : 'Este registro no cuenta con coordenadas. Se recomienda actualizarlas en el formulario de edición.'}
-                                        </p>
                                     </div>
                                 </div>
                             </div>
-
-                            <div className="mt-8 pt-6 border-t border-slate-100">
-                                <a
-                                    href={externalUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="w-full flex items-center justify-center gap-2 bg-[#0f172a] text-white py-4 rounded-[20px] font-black text-[11px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl shadow-slate-200 group"
-                                >
-                                    {hasCoordinates ? 'Ir con Google Maps' : 'Buscar en Google Maps'}
-                                    <ExternalLink className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                                </a>
-                            </div>
-                        </div>
+                        )}
                     </motion.div>
                 </div>
             )}
             <style dangerouslySetInnerHTML={{
                 __html: `
                 .premium-popup .leaflet-popup-content-wrapper {
-                    border-radius: 20px;
+                    border-radius: 28px;
                     padding: 0;
-                    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-                    border: 1px solid rgba(255,255,255,0.2);
+                    box-shadow: 0 25px 50px rgba(15, 23, 42, 0.25);
+                    border: 1px solid white;
                     background: white;
                 }
-                .premium-popup .leaflet-popup-content {
-                    margin: 0;
-                    width: auto !important;
-                }
-                .premium-popup .leaflet-popup-tip {
-                    background: white;
-                }
-                .no-scrollbar::-webkit-scrollbar {
-                    display: none;
-                }
-                .no-scrollbar {
-                    -ms-overflow-style: none;
-                    scrollbar-width: none;
-                }
-                @keyframes bounce-subtle {
-                    0%, 100% { transform: translateY(0); }
-                    50% { transform: translateY(-3px); }
-                }
-                .animate-bounce-subtle {
-                    animation: bounce-subtle 2s infinite ease-in-out;
-                }
+                .premium-popup .leaflet-popup-content { margin: 0; width: auto !important; }
+                .premium-popup .leaflet-popup-tip { background: white; }
+                .no-scrollbar::-webkit-scrollbar { display: none; }
+                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}} />
         </AnimatePresence>
     );
