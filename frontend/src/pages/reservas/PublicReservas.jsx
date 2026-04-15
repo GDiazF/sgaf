@@ -77,7 +77,7 @@ const PublicReservas = () => {
     const [recursos, setRecursos] = useState([]);
     const [reservas, setReservas] = useState([]);
     const [bloqueos, setBloqueos] = useState([]);
-    const [settings, setSettings] = useState({ hora_inicio: '07:00', hora_fin: '18:00' });
+    const [settings, setSettings] = useState({ hora_inicio: '07:00', hora_fin: '18:00', dias_bloqueo_antelacion: 0 });
     const [loading, setLoading] = useState(true);
 
     const configStart = parseInt(settings.hora_inicio.split(':')[0]) || DEFAULT_HOUR_START;
@@ -136,10 +136,14 @@ const PublicReservas = () => {
         setLoading(true);
         console.log("Fetching public data...");
         try {
+            // Optimización: Solo traer reservas cercanas al mes que se está viendo
+            const dStart = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+            const dEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 4, 0); // ~4 meses de margen
+            
             const [rRes, sRes, tRes, bRes] = await Promise.all([
                 publicApi.get('reservas/recursos/'),
-                publicApi.get('reservas/solicitudes/'),
-                publicApi.get('reservas/settings/').catch(() => ({ data: { hora_inicio: '07:00', hora_fin: '18:00' } })),
+                publicApi.get(`reservas/solicitudes/?fecha_inicio__gte=${toDateStr(dStart)}&fecha_inicio__lte=${toDateStr(dEnd)}`),
+                publicApi.get('reservas/settings/').catch(() => ({ data: { hora_inicio: '07:00', hora_fin: '18:00', dias_bloqueo_antelacion: 0 } })),
                 publicApi.get('reservas/bloqueos/').catch(() => ({ data: [] }))
             ]);
             console.log("Resources:", rRes.data);
@@ -163,23 +167,36 @@ const PublicReservas = () => {
         return () => clearInterval(interval);
     }, [filtroRecurso, currentDate, viewMode]);
 
+    // Responsividad: Forzar modo día en móviles
+    useEffect(() => {
+        const checkMobile = () => {
+            if (window.innerWidth < 768 && viewMode === 'week') {
+                setViewMode('day');
+            }
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, [viewMode]);
+
     // Auto-ajuste de horas (igual que el Dashboard principal)
     useEffect(() => {
         if (!modalOpen || !formData.recurso || !formData.fecha) return;
         if (!Array.isArray(reservas)) return;
         const resDía = reservas.filter(r => parseInt(r.recurso) === parseInt(formData.recurso) && r.estado === 'APROBADA' && toDateStr(r.fecha_inicio) === formData.fecha);
         const getMins = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
-        const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+        const now = new Date();
+        const nowHourStart = now.getHours() * 60;
         const esHoy = formData.fecha === todayStr;
 
         const mInicio = getMins(formData.horaInicio);
         const estaOcupadoI = resDía.some(r => mInicio >= dtMinutes(r.fecha_inicio) && mInicio < dtMinutes(r.fecha_fin));
-        const esPasado = esHoy && mInicio < nowMins - 15;
+        const esPasado = esHoy && mInicio < nowHourStart;
 
         if (estaOcupadoI || esPasado) {
             const primerLibre = TIME_SLOTS.find(s => {
                 const m = getMins(s);
-                if (esHoy && m < nowMins - 15) return false;
+                if (esHoy && m < nowHourStart) return false;
                 return !resDía.some(r => m >= dtMinutes(r.fecha_inicio) && m < dtMinutes(r.fecha_fin));
             });
             if (primerLibre) setFormData(p => ({ ...p, horaInicio: primerLibre }));
@@ -201,6 +218,24 @@ const PublicReservas = () => {
         })
         : [currentDate];
 
+    // Optimización: Agrupar reservas por recurso y día una sola vez
+    const reservasBuckets = useMemo(() => {
+        const buckets = {};
+        if (!Array.isArray(reservas)) return buckets;
+        
+        reservas.forEach(r => {
+            const dayStr = toDateStr(r.fecha_inicio);
+            const key = `${r.recurso}_${dayStr}`;
+            const rEstado = (r.estado || "").toUpperCase();
+            
+            if (rEstado === 'PENDIENTE' || rEstado === 'APROBADA' || rEstado === 'FINALIZADA') {
+                if (!buckets[key]) buckets[key] = [];
+                buckets[key].push(r);
+            }
+        });
+        return buckets;
+    }, [reservas]);
+
     const recursosFiltrados = (() => {
         let list;
         if (filtroRecurso === 'all') list = recursos;
@@ -214,13 +249,7 @@ const PublicReservas = () => {
 
     const getReservasForDayAndRecurso = (day, recursoId) => {
         const dayStr = toDateStr(day);
-        if (!Array.isArray(reservas)) return [];
-        return reservas.filter(r => {
-            const rEstado = (r.estado || "").toUpperCase();
-            return toDateStr(r.fecha_inicio) === dayStr &&
-                parseInt(r.recurso) === parseInt(recursoId) &&
-                (rEstado === 'PENDIENTE' || rEstado === 'APROBADA');
-        });
+        return reservasBuckets[`${recursoId}_${dayStr}`] || [];
     };
 
     const getEventPos = (ev) => {
@@ -253,18 +282,18 @@ const PublicReservas = () => {
             return h * 60 + m;
         };
         const now = new Date();
-        const nowMins = now.getHours() * 60 + now.getMinutes();
+        const nowHourStart = now.getHours() * 60;
         const esHoy = formData.fecha === todayStr;
 
         // 1. Validar "Desde"
         const mInicio = getMins(formData.horaInicio);
         const estaOcupadoI = resDía.some(r => mInicio >= dtMinutes(r.fecha_inicio) && mInicio < dtMinutes(r.fecha_fin));
-        const esPasado = esHoy && mInicio < nowMins - 15;
+        const esPasado = esHoy && mInicio < nowHourStart;
 
         if (estaOcupadoI || esPasado) {
             const primerLibre = TIME_SLOTS.find(s => {
                 const m = getMins(s);
-                if (esHoy && m < nowMins - 15) return false;
+                if (esHoy && m < nowHourStart) return false;
                 return !resDía.some(r => m >= dtMinutes(r.fecha_inicio) && m < dtMinutes(r.fecha_fin));
             });
             if (primerLibre) setFormData(p => ({ ...p, horaInicio: primerLibre }));
@@ -291,7 +320,17 @@ const PublicReservas = () => {
     }, [formData.recurso, formData.fecha, formData.horaInicio, modalOpen, reservas, todayStr, settings.hora_fin]);
 
     const handleSlotClick = (day, slotTime, recursoId) => {
+        const rec = (recursos || []).find(r => r.id === recursoId);
+        const x = rec?.dias_antelacion || 0;
+        const limit = new Date(); limit.setHours(0,0,0,0);
+        limit.setDate(limit.getDate() + x);
         const dayStr = toDateStr(day);
+
+        if (day <= limit) {
+            setSlotBloqueadoMsg(`Este recurso requiere una antelación de ${x} días. Bloqueado hasta el ${addDays(limit, 1).toLocaleDateString()}.`);
+            setTimeout(() => setSlotBloqueadoMsg(''), 3000);
+            return;
+        }
         let actualSlot = slotTime || '09:00';
 
         if (recursoId) {
@@ -328,8 +367,8 @@ const PublicReservas = () => {
         const [h, m] = actualSlot.split(':').map(Number);
         const endH = m === 30 ? h + 1 : h, endM = m === 30 ? 0 : 30;
 
-        const rec = recursos.find(r => r.id === recursoId);
-        setFormTipo(rec?.tipo || '');
+        const recObj = recursos.find(r => r.id === recursoId);
+        setFormTipo(recObj?.tipo || '');
         setFormData({
             recurso: recursoId || '',
             titulo: '',
@@ -378,69 +417,80 @@ const PublicReservas = () => {
 
     return (
         <div className="h-screen flex flex-col bg-slate-50 font-sans text-slate-900 overflow-hidden">
-            {/* TOP BAR PÚBLICO */}
-            <div className="flex-shrink-0 bg-white border-b border-slate-100 px-4 py-2.5 flex items-center gap-3 shadow-sm z-20">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-                        <Calendar className="w-4 h-4 text-white" />
+            {/* TOP BAR PÚBLICO - Responsive */}
+            <div className="flex-shrink-0 bg-white border-b border-slate-100 px-4 py-3 flex flex-col md:flex-row md:items-center gap-3 shadow-sm z-20">
+                <div className="flex items-center justify-between w-full md:w-auto">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <Calendar className="w-4 h-4 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="font-black text-slate-900 text-sm leading-none">Portal de Reservas</h1>
+                            <p className="text-[10px] text-indigo-500 font-bold capitalize mt-0.5">{fmtMonth()}</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="font-black text-slate-900 text-sm leading-none">Portal de Reservas</h1>
-                        <p className="text-[10px] text-indigo-500 font-bold capitalize mt-0.5">{fmtMonth()}</p>
+                    {/* Nav móvil */}
+                    <div className="flex md:hidden items-center gap-1">
+                        <button onClick={() => handleNav(-1)} className="p-2 rounded-lg hover:bg-slate-100 transition"><ChevronLeft className="w-5 h-5 text-slate-600" /></button>
+                        <button onClick={() => handleNav(1)} className="p-2 rounded-lg hover:bg-slate-100 transition"><ChevronRight className="w-5 h-5 text-slate-600" /></button>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1 mx-4">
-                    <button onClick={() => handleNav(-1)} className="p-1.5 rounded-lg hover:bg-slate-100"><ChevronLeft className="w-4 h-4 text-slate-600" /></button>
-                    <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg">Hoy</button>
-                    <button onClick={() => handleNav(1)} className="p-1.5 rounded-lg hover:bg-slate-100"><ChevronRight className="w-4 h-4 text-slate-600" /></button>
+                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
+                    <div className="hidden md:flex items-center gap-1 mx-4">
+                        <button onClick={() => handleNav(-1)} className="p-1.5 rounded-lg hover:bg-slate-100 transition"><ChevronLeft className="w-4 h-4 text-slate-600" /></button>
+                        <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition">Hoy</button>
+                        <button onClick={() => handleNav(1)} className="p-1.5 rounded-lg hover:bg-slate-100 transition"><ChevronRight className="w-4 h-4 text-slate-600" /></button>
+                    </div>
+
+                    <div className="flex items-center bg-slate-100 rounded-lg p-0.5 flex-shrink-0">
+                        {['day', 'week'].map(v => (
+                            <button key={v} onClick={() => setViewMode(v)} className={`px-4 py-1.5 text-[11px] font-bold rounded-md transition ${viewMode === v ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
+                                {v === 'day' ? 'Día' : 'Semana'}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
-                    {['day', 'week'].map(v => (
-                        <button key={v} onClick={() => setViewMode(v)} className={`px-3 py-1.5 text-[11px] font-bold rounded-md transition ${viewMode === v ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
-                            {v === 'day' ? 'Día' : 'Semana'}
+                <div className="flex items-center gap-2 ml-auto w-full md:w-auto mt-1 md:mt-0">
+                    {!(viewMode === 'day' && toDateStr(currentDate) < todayStr) && (
+                        <button
+                            onClick={() => {
+                                if (filtroRecurso !== 'all' && !filtroRecurso.startsWith('tipo_')) {
+                                    const rec = recursos.find(r => r.id === parseInt(filtroRecurso));
+                                    if (rec) {
+                                        setFormTipo(rec.tipo);
+                                        setFormData(prev => ({ ...prev, recurso: rec.id }));
+                                    }
+                                } else if (filtroRecurso.startsWith('tipo_')) {
+                                    setFormTipo(filtroRecurso.replace('tipo_', ''));
+                                    setFormData(prev => ({ ...prev, recurso: '' }));
+                                } else {
+                                    setFormTipo('');
+                                    setFormData(prev => ({ ...prev, recurso: '' }));
+                                }
+                                setModalOpen(true);
+                            }}
+                            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-indigo-700 transition shadow-md"
+                        >
+                            <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Solicitar Reserva</span><span className="sm:hidden">Solicitar</span>
                         </button>
-                    ))}
+                    )}
+
+                    <button
+                        onClick={() => {
+                            setManageOpen(true);
+                            setManageCode('');
+                            setManageReserva(null);
+                            setManageError('');
+                            setManageSuccess('');
+                            setIsEditing(false);
+                        }}
+                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-black hover:bg-slate-900 transition shadow-md"
+                    >
+                        <Lock className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Gestionar Mi Reserva</span><span className="sm:hidden">Gestionar</span>
+                    </button>
                 </div>
-
-                <div className="flex-1" />
-
-                <button
-                    onClick={() => {
-                        if (filtroRecurso !== 'all' && !filtroRecurso.startsWith('tipo_')) {
-                            const rec = recursos.find(r => r.id === parseInt(filtroRecurso));
-                            if (rec) {
-                                setFormTipo(rec.tipo);
-                                setFormData(prev => ({ ...prev, recurso: rec.id }));
-                            }
-                        } else if (filtroRecurso.startsWith('tipo_')) {
-                            setFormTipo(filtroRecurso.replace('tipo_', ''));
-                            setFormData(prev => ({ ...prev, recurso: '' }));
-                        } else {
-                            setFormTipo('');
-                            setFormData(prev => ({ ...prev, recurso: '' }));
-                        }
-                        setModalOpen(true);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-indigo-700 transition shadow-md"
-                >
-                    <Plus className="w-3.5 h-3.5" /> Solicitar Reserva
-                </button>
-
-                <button
-                    onClick={() => {
-                        setManageOpen(true);
-                        setManageCode('');
-                        setManageReserva(null);
-                        setManageError('');
-                        setManageSuccess('');
-                        setIsEditing(false);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-black hover:bg-slate-900 transition shadow-md"
-                >
-                    <Lock className="w-3.5 h-3.5" /> Gestionar Mi Reserva
-                </button>
             </div>
 
             {/* FILTROS — grupos por tipo + recursos individuales */}
@@ -558,10 +608,19 @@ const PublicReservas = () => {
                                                 const dayEvents = getReservasForDayAndRecurso(day, rec.id);
                                                 const dayBloqueos = bloqueos.filter(b => Number(b.recurso) === Number(rec.id) && bloqueoAppliesToDate(b, dayStr));
 
+                                                const x = rec?.dias_antelacion || 0;
+                                                const limit = new Date(); limit.setHours(0,0,0,0);
+                                                limit.setDate(limit.getDate() + x);
+                                                const isDayBlocked = day <= limit;
+
                                                 return (
                                                     <div key={dayStr}
-                                                        onClick={() => handleSlotClick(day, '', rec.id)}
-                                                        className={`flex-1 min-w-[160px] p-2 border-r border-slate-50 min-h-[120px] transition-colors relative cursor-pointer hover:bg-indigo-50/20 ${dayStr === todayStr ? 'bg-indigo-50/10' : ''}`}>
+                                                        onClick={() => !isDayBlocked && handleSlotClick(day, '', rec.id)}
+                                                        className={`flex-1 min-w-[160px] p-2 border-r border-slate-50 min-h-[120px] transition-colors relative hover:bg-indigo-50/20 ${!isDayBlocked ? 'cursor-pointer' : 'bg-slate-100/50'} ${dayStr === todayStr ? 'bg-indigo-50/10' : ''}`}>
+                                                        
+                                                        {isDayBlocked && (
+                                                            <div className="absolute inset-0 z-0 opacity-40" style={{ background: 'repeating-linear-gradient(45deg, #f1f5f9 0, #f1f5f9 10px, transparent 10px, transparent 20px)' }} />
+                                                        )}
 
                                                         <div className="space-y-1.5 relative z-10">
                                                             {/* Bloqueos */}
@@ -616,8 +675,8 @@ const PublicReservas = () => {
                                                                 );
                                                             })}
 
-                                                            {/* Icono + siempre visible para nuevas solicitudes */}
-                                                            {!dayBloqueos.some(b => b.hora_inicio <= '09:00' && b.hora_fin >= '18:00') && (
+                                                            {/* Icono + para nuevas solicitudes: ocultar en días bloqueados */}
+                                                            {!isDayBlocked && !dayBloqueos.some(b => b.hora_inicio <= '09:00' && b.hora_fin >= '18:00') && (
                                                                 <div className="flex justify-center pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                     <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all">
                                                                         <Plus className="w-4 h-4" />
@@ -701,9 +760,9 @@ const PublicReservas = () => {
                                                     {dayRes.map((recurso, rIdx) => (
                                                         <div key={recurso.id} className="flex-1 relative border-r border-slate-50 last:border-r-0">
                                                             {TIME_SLOTS.map((slot, idx) => (
-                                                                <div key={slot} className="absolute inset-x-0 border-t border-slate-50 cursor-pointer hover:bg-slate-50/50"
+                                                                <div key={slot} className={`absolute inset-x-0 border-t border-slate-50 hover:bg-slate-50/50 ${dayStr >= todayStr ? 'cursor-pointer' : ''}`}
                                                                     style={{ top: `${idx * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px` }}
-                                                                    onClick={() => handleSlotClick(day, slot, recurso.id)}>
+                                                                    onClick={() => dayStr >= todayStr && handleSlotClick(day, slot, recurso.id)}>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -930,6 +989,7 @@ const PublicReservas = () => {
                                         <div className="col-span-2">
                                             <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Fecha *</label>
                                             <input type="date" className="w-full p-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                                                min={todayStr}
                                                 value={formData.fecha} onChange={e => setFormData({ ...formData, fecha: e.target.value })} required />
                                         </div>
                                         <div>
@@ -941,10 +1001,10 @@ const PublicReservas = () => {
                                                     const slotMins = h * 60 + m;
                                                     const esHoy = formData.fecha === todayStr;
                                                     const now = new Date();
-                                                    const currentMins = now.getHours() * 60 + now.getMinutes();
+                                                    const nowHourStart = now.getHours() * 60;
 
-                                                    // Filtro 1: No mostrar pasado (con 15 min de margen)
-                                                    if (esHoy && slotMins < currentMins - 15) return false;
+                                                    // Filtro 1: No mostrar pasado (permitir desde inicio de la hora actual)
+                                                    if (esHoy && slotMins < nowHourStart) return false;
 
                                                     // Filtro 2: No mostrar si está ocupado por otra APROBADA
                                                     if (formData.recurso) {
@@ -1105,52 +1165,65 @@ const PublicReservas = () => {
                                 </div>
                             )}
 
-                            {manageReserva && manageReserva.verificado && !isEditing && !manageSuccess && (
-                                <div className="space-y-4">
-                                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-3">
-                                        <div className="flex justify-between items-start">
-                                            <div className="px-2 py-0.5 bg-indigo-100 text-indigo-600 rounded text-[9px] font-black uppercase">{recursos.find(r => r.id === manageReserva.recurso)?.nombre}</div>
-                                            <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${manageReserva.estado === 'APROBADA' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>{manageReserva.estado}</div>
+                            {manageReserva && manageReserva.verificado && !isEditing && !manageSuccess && (() => {
+                                const isPast = new Date(manageReserva.fecha_fin) < new Date();
+                                return (
+                                    <div className="space-y-4">
+                                        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-3">
+                                            <div className="flex justify-between items-start">
+                                                <div className="px-2 py-0.5 bg-indigo-100 text-indigo-600 rounded text-[9px] font-black uppercase">{recursos.find(r => r.id === manageReserva.recurso)?.nombre}</div>
+                                                <div className={`flex items-center gap-2`}>
+                                                    <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${manageReserva.estado === 'APROBADA' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>{manageReserva.estado}</div>
+                                                    {isPast && <div className="px-2 py-0.5 bg-slate-200 text-slate-500 rounded text-[9px] font-black uppercase">Finalizada</div>}
+                                                </div>
+                                            </div>
+                                            <h4 className="font-black text-slate-800 text-sm leading-tight">{manageReserva.titulo}</h4>
+                                            <div className="flex items-center gap-2 text-[11px] text-slate-500 font-bold">
+                                                <Clock className="w-3.5 h-3.5" />
+                                                {new Date(manageReserva.fecha_inicio).toLocaleDateString('es-CL')} | {new Date(manageReserva.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(manageReserva.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </div>
                                         </div>
-                                        <h4 className="font-black text-slate-800 text-sm leading-tight">{manageReserva.titulo}</h4>
-                                        <div className="flex items-center gap-2 text-[11px] text-slate-500 font-bold">
-                                            <Clock className="w-3.5 h-3.5" />
-                                            {new Date(manageReserva.fecha_inicio).toLocaleDateString('es-CL')} | {new Date(manageReserva.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(manageReserva.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </div>
-                                    </div>
 
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button
-                                            onClick={() => {
-                                                setFormData({
-                                                    ...manageReserva,
-                                                    fecha: toDateStr(manageReserva.fecha_inicio),
-                                                    horaInicio: new Date(manageReserva.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                                                    horaFin: new Date(manageReserva.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                                                });
-                                                setFormTipo(recursos.find(r => r.id === manageReserva.recurso)?.tipo || '');
-                                                setIsEditing(true);
-                                            }}
-                                            className="py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-black text-xs hover:bg-slate-50 transition"
-                                        >Editar Reserva</button>
-                                        <button
-                                            onClick={async () => {
-                                                if (!window.confirm('¿Estás seguro de que deseas anular esta reserva?')) return;
-                                                setManageLoading(true);
-                                                try {
-                                                    await publicApi.post('reservas/solicitudes/public_manage/', { codigo_reserva: manageCode, accion: 'DELETE' });
-                                                    setManageSuccess('Tu reserva ha sido anulada correctamente.');
-                                                    setManageReserva(null);
-                                                    fetchData();
-                                                } catch (err) {
-                                                    setManageError('Error al anular la reserva.');
-                                                } finally { setManageLoading(false); }
-                                            }}
-                                            className="py-3 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl font-black text-xs hover:bg-rose-100 transition"
-                                        >Anular Reserva</button>
+                                        {!isPast ? (
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    onClick={() => {
+                                                        setFormData({
+                                                            ...manageReserva,
+                                                            fecha: toDateStr(manageReserva.fecha_inicio),
+                                                            horaInicio: new Date(manageReserva.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                                            horaFin: new Date(manageReserva.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                                        });
+                                                        setFormTipo(recursos.find(r => r.id === manageReserva.recurso)?.tipo || '');
+                                                        setIsEditing(true);
+                                                    }}
+                                                    className="py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-black text-xs hover:bg-slate-50 transition"
+                                                >Editar Reserva</button>
+                                                <button
+                                                    onClick={async () => {
+                                                        if (!window.confirm('¿Estás seguro de que deseas anular esta reserva?')) return;
+                                                        setManageLoading(true);
+                                                        try {
+                                                            await publicApi.post('reservas/solicitudes/public_manage/', { codigo_reserva: manageCode, accion: 'DELETE' });
+                                                            setManageSuccess('Tu reserva ha sido anulada correctamente.');
+                                                            setManageReserva(null);
+                                                            fetchData();
+                                                        } catch (err) {
+                                                            setManageError('Error al anular la reserva.');
+                                                        } finally { setManageLoading(false); }
+                                                    }}
+                                                    className="py-3 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl font-black text-xs hover:bg-rose-100 transition"
+                                                >Anular Reserva</button>
+                                            </div>
+                                        ) : (
+                                            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reserva Finalizada</p>
+                                                <p className="text-[10px] text-slate-400 mt-1">No se pueden modificar reservas que ya han cumplido su horario.</p>
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
 
                             {isEditing && !manageSuccess && (
                                 <div className="space-y-4">

@@ -1,5 +1,17 @@
 from django.contrib import admin
-from .models import PersonalTI
+from .models import PersonalTI, FuncionTI, ContratoTI
+
+
+@admin.register(FuncionTI)
+class FuncionTIAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'color']
+    search_fields = ['nombre']
+
+
+@admin.register(ContratoTI)
+class ContratoTIAdmin(admin.ModelAdmin):
+    list_display = ['codigo', 'nombre', 'color']
+    search_fields = ['codigo', 'nombre']
 
 
 @admin.register(PersonalTI)

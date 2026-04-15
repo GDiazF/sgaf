@@ -21,14 +21,20 @@ class Solicitante(models.Model):
     def __str__(self):
         return f"{self.nombre} {self.apellido} ({self.rut})"
 
+class TipoActivo(models.Model):
+    nombre = models.CharField("Nombre del Tipo", max_length=50, unique=True)
+    descripcion = models.TextField("Descripción", blank=True)
+    
+    class Meta:
+        verbose_name = "Tipo de Activo"
+        verbose_name_plural = "Tipos de Activos"
+        ordering = ['nombre']
+
+    def __str__(self):
+        return self.nombre
+
 class Activo(models.Model):
-    TIPO_CHOICES = [
-        ('LLAVE', 'Llave/Llavero'),
-        ('PROYECTOR', 'Proyector'),
-        ('NOTEBOOK', 'Notebook/Computador'),
-        ('OTRO', 'Otro')
-    ]
-    tipo = models.CharField("Tipo de Activo", max_length=50, choices=TIPO_CHOICES, default='LLAVE')
+    tipo = models.ForeignKey(TipoActivo, on_delete=models.PROTECT, related_name="activos", verbose_name="Tipo de Activo")
     nombre = models.CharField("Nombre", max_length=100)
     codigo_inventario = models.CharField("Código de Inventario", max_length=50, blank=True, help_text="Opcional. Ej: Placa de inventario o S/N")
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE, related_name="activos")

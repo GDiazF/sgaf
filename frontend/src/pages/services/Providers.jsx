@@ -44,7 +44,7 @@ const Providers = () => {
 
             const [provRes, typesRes] = await Promise.all([
                 api.get('proveedores/', { params }),
-                api.get('tipos-proveedores/')
+                api.get('tipos-proveedores/', { params: { page_size: 1000 } })
             ]);
 
             // Handle Pagination

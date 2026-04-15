@@ -10,41 +10,18 @@ import api from '../../api';
 
 // ─── CONSTANTES ────────────────────────────────────────────────────────────────
 
-const FUNCIONES = [
-    { value: 'TECNICO_ENLACES', label: 'Técnico de Enlaces' },
-    { value: 'COORDINADOR_ENLACES', label: 'Coordinador(a) de Enlaces' },
-    { value: 'ENCARGADO_ENLACE', label: 'Encargado(a) Enlace' },
-    { value: 'TECNICO_A_ENLACES', label: 'Técnico/a Enlace' },
-    { value: 'OTRO', label: 'Otro' },
-];
-
-const CONTRATOS = [
-    { value: '24', label: '24 · Profesor Titular' },
-    { value: '25', label: '25 · Profesor Contrata' },
-    { value: '27', label: '27 · Asist. Educación Plazo Fijo' },
-    { value: '28', label: '28 · Asist. Educación Plazo Indefinido' },
-    { value: 'OTRO', label: 'Otro' },
-];
-
-const FUNCION_COLORS = {
-    TECNICO_ENLACES: 'bg-blue-100 text-blue-700 border-blue-200',
-    COORDINADOR_ENLACES: 'bg-violet-100 text-violet-700 border-violet-200',
-    ENCARGADO_ENLACE: 'bg-amber-100 text-amber-700 border-amber-200',
-    TECNICO_A_ENLACES: 'bg-cyan-100 text-cyan-700 border-cyan-200',
-    OTRO: 'bg-slate-100 text-slate-600 border-slate-200',
-};
-
-const CONTRATO_COLORS = {
-    '24': 'bg-emerald-100 text-emerald-700',
-    '25': 'bg-teal-100 text-teal-700',
-    '27': 'bg-orange-100 text-orange-700',
-    '28': 'bg-indigo-100 text-indigo-700',
-    'OTRO': 'bg-slate-100 text-slate-500',
+// Helpers
+const hexToRgba = (hex, alpha) => {
+    if (!hex || !hex.startsWith('#')) return 'rgba(0,0,0,0.1)';
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
 };
 
 // ─── MODAL FORMULARIO ──────────────────────────────────────────────────────────
 
-const PersonalModal = ({ isOpen, onClose, onSave, record, establecimientos, loading }) => {
+const PersonalModal = ({ isOpen, onClose, onSave, record, establecimientos, funciones, contratos, loading }) => {
     const emptyForm = {
         establecimiento: '',
         funcion: '',
@@ -120,13 +97,12 @@ const PersonalModal = ({ isOpen, onClose, onSave, record, establecimientos, load
                     value={form[name]}
                     onChange={handleChange}
                     required={required}
-                    className={`w-full ${Icon ? 'pl-9' : 'pl-4'} pr-8 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition appearance-none`}
+                    className={`w-full ${Icon ? 'pl-9' : 'pl-4'} pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition cursor-pointer`}
                 >
                     {options.map(o => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                 </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             </div>
         </div>
     );
@@ -173,7 +149,7 @@ const PersonalModal = ({ isOpen, onClose, onSave, record, establecimientos, load
                         />
                         <SelectField
                             label="Función" name="funcion" required icon={Briefcase}
-                            options={[{ value: '', label: '-- Selecciona una función --' }, ...FUNCIONES]}
+                            options={[{ value: '', label: '-- Selecciona una función --' }, ...funciones.map(f => ({ value: f.id, label: f.nombre } ))]}
                         />
 
                         <InputField label="Nombre Completo" name="nombre_completo" required placeholder="Ej: MARIO RENE CAIPA AVALOS" />
@@ -183,7 +159,7 @@ const PersonalModal = ({ isOpen, onClose, onSave, record, establecimientos, load
                             <InputField label="RUT" name="rut" required placeholder="Ej: 13413616-2" />
                             <SelectField
                                 label="Tipo de Contrato" name="tipo_contrato" required icon={FileText}
-                                options={[{ value: '', label: '-- Tipo --' }, ...CONTRATOS]}
+                                options={[{ value: '', label: '-- Tipo --' }, ...contratos.map(c => ({ value: c.id, label: `${c.codigo} · ${c.nombre}` } ))]}
                             />
                         </div>
 
@@ -244,7 +220,10 @@ const PersonalRow = ({ record, onEdit, onDelete, index }) => (
             </span>
         </td>
         <td className="px-4 py-3">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold border ${FUNCION_COLORS[record.funcion] || FUNCION_COLORS.OTRO}`}>
+            <span 
+                className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold border"
+                style={{ backgroundColor: hexToRgba(record.funcion_color, 0.1), color: record.funcion_color, borderColor: hexToRgba(record.funcion_color, 0.3) }}
+            >
                 {record.funcion_display}
             </span>
         </td>
@@ -253,7 +232,10 @@ const PersonalRow = ({ record, onEdit, onDelete, index }) => (
             {record.nombre_completo}
         </td>
         <td className="px-4 py-3">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold ${CONTRATO_COLORS[record.tipo_contrato] || CONTRATO_COLORS.OTRO}`}>
+            <span 
+                className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold"
+                style={{ backgroundColor: hexToRgba(record.tipo_contrato_color, 0.1), color: record.tipo_contrato_color }}
+            >
                 {record.tipo_contrato_display}
             </span>
         </td>
@@ -498,6 +480,8 @@ const CoberturaTab = ({ onAsignar }) => {
 const PersonalTIDashboard = () => {
     const [records, setRecords] = useState([]);
     const [establecimientos, setEstablecimientos] = useState([]);
+    const [funciones, setFunciones] = useState([]);
+    const [contratos, setContratos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedRecord, setSelectedRecord] = useState(null);
@@ -535,10 +519,14 @@ const PersonalTIDashboard = () => {
     useEffect(() => { fetchRecords(); }, [fetchRecords]);
 
     useEffect(() => {
-        api.get('establecimientos/', { params: { limit: 300 } }).then(res => {
+        // Cargar Establecimientos (Aumentado limite para mostrar todos)
+        api.get('establecimientos/', { params: { page_size: 1000 } }).then(res => {
             const data = Array.isArray(res.data) ? res.data : (res.data?.results || []);
             setEstablecimientos(data);
         });
+        // Cargar Mantenedores Dinámicos
+        api.get('funciones-ti/').then(res => setFunciones(res.data.results || res.data));
+        api.get('contratos-ti/').then(res => setContratos(res.data.results || res.data));
     }, []);
 
     const handleSave = async (form) => {
@@ -582,7 +570,7 @@ const PersonalTIDashboard = () => {
     };
 
     const totalActivos = records.filter(r => r.activo).length;
-    const totalCoords = records.filter(r => r.funcion === 'COORDINADOR_ENLACES').length;
+    const totalCoords = records.filter(r => r.funcion_display.toUpperCase().includes('COORDINADOR')).length;
     const establsUnicos = new Set(records.map(r => r.establecimiento)).size;
 
     const TABLE_HEADERS = ['RBD', 'Establecimiento', 'Función', 'RUT', 'Nombre Completo', 'Contrato', 'Teléfono', 'Correo', 'Estado', ''];
@@ -672,17 +660,16 @@ const PersonalTIDashboard = () => {
                             />
                         </div>
                         {[
-                            { value: filterFuncion, onChange: setFilterFuncion, options: FUNCIONES, placeholder: 'Todas las funciones', icon: Filter },
+                            { value: filterFuncion, onChange: setFilterFuncion, options: funciones.map(f => ({ value: f.id, label: f.nombre })), placeholder: 'Todas las funciones', icon: Filter },
                             { value: filterEstab, onChange: setFilterEstab, options: establecimientos.map(e => ({ value: e.id, label: e.nombre })), placeholder: 'Todos los establecimientos', icon: Building },
-                            { value: filterContrato, onChange: setFilterContrato, options: CONTRATOS, placeholder: 'Todos los contratos', icon: FileText },
+                            { value: filterContrato, onChange: setFilterContrato, options: contratos.map(c => ({ value: c.id, label: c.nombre })), placeholder: 'Todos los contratos', icon: FileText },
                         ].map(({ value, onChange, options, placeholder, icon: Icon }, i) => (
                             <div key={i} className="relative">
                                 <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                                <select value={value} onChange={e => onChange(e.target.value)} className="pl-8 pr-8 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500 outline-none appearance-none max-w-[200px]">
+                                <select value={value} onChange={e => onChange(e.target.value)} className="pl-8 pr-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500 outline-none max-w-[200px] cursor-pointer">
                                     <option value="">{placeholder}</option>
                                     {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                                 </select>
-                                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
                             </div>
                         ))}
                         <button onClick={fetchRecords} className="p-2 border border-slate-200 rounded-xl text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-all" title="Actualizar">
@@ -751,6 +738,8 @@ const PersonalTIDashboard = () => {
                 onSave={handleSave}
                 record={selectedRecord}
                 establecimientos={establecimientos}
+                funciones={funciones}
+                contratos={contratos}
                 loading={modalLoading}
             />
         </div>

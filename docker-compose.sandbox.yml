@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  sandbox_db:
+    image: postgres:16-alpine
+    container_name: sgaf_sandbox_db
+    restart: unless-stopped
+    env_file: .env.sandbox
+    environment:
+      POSTGRES_DB: sgaf_sandbox_db
+      POSTGRES_USER: sgaf_sandbox_user
+      POSTGRES_PASSWORD: sandbox_pass_123
+    volumes:
+      - sgaf_sandbox_pgdata_v3:/var/lib/postgresql/data
+    networks:
+      - sgaf_sandbox_net
+
+  sandbox_backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sgaf_sandbox_backend
+    restart: unless-stopped
+    env_file: .env.sandbox
+    volumes:
+      - .:/app
+      - ./media_sandbox:/app/media
+    depends_on:
+      - sandbox_db
+    networks:
+      - sgaf_sandbox_net
+
+  sandbox_frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sgaf_sandbox_frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.sandbox.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./media_sandbox:/app/media_sandbox:ro
+    depends_on:
+      - sandbox_backend
+    networks:
+      - sgaf_sandbox_net
+
+networks:
+  sgaf_sandbox_net:
+    driver: bridge
+
+volumes:
+  sgaf_sandbox_pgdata_v3:

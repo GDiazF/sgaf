@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import api from '../../api';
-import { Building, Search, Plus, Edit2, Trash2, X, Save, CheckCircle, XCircle, Power, Phone, Mail, FileDown, Layout, MapPin } from 'lucide-react';
+import { Building, Search, Plus, Edit2, Trash2, X, Save, CheckCircle, XCircle, Power, Phone, Mail, FileDown, Layout, MapPin, UserCircle2, ChevronRight } from 'lucide-react';
 import { usePermission } from '../../hooks/usePermission';
 import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '../../components/common/Pagination';
@@ -11,6 +11,7 @@ import EstablishmentModal from '../../components/establishments/EstablishmentMod
 import EstablishmentPhonesModal from '../../components/establishments/EstablishmentPhonesModal';
 import EstablishmentCardsView from '../../components/establishments/EstablishmentCardsView';
 import EstablishmentMapModal from '../../components/establishments/EstablishmentMapModal';
+import EstablishmentDetailModal from '../../components/establishments/EstablishmentDetailModal';
 
 const Establishments = () => {
     const { can } = usePermission();
@@ -34,6 +35,8 @@ const Establishments = () => {
     const [isCardsViewOpen, setIsCardsViewOpen] = useState(false);
     const [isMapModalOpen, setIsMapModalOpen] = useState(false);
     const [selectedEstForMap, setSelectedEstForMap] = useState(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [selectedEstForDetail, setSelectedEstForDetail] = useState(null);
 
     const [filterType, setFilterType] = useState('');
 
@@ -168,6 +171,11 @@ const Establishments = () => {
         setIsMapModalOpen(true);
     };
 
+    const handleOpenDetail = (item) => {
+        setSelectedEstForDetail(item);
+        setIsDetailModalOpen(true);
+    };
+
     const handleExportExcel = () => {
         if (allEstablishments.length === 0) {
             alert("No hay datos para exportar.");
@@ -271,54 +279,63 @@ const Establishments = () => {
 
     return (
         <div>
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-800">Establecimientos</h2>
-                    <p className="text-slate-500">Gestión de escuelas, liceos y jardines.</p>
+            {/* Header Compacto */}
+            <div className="flex flex-col gap-3 mb-6">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight uppercase">Establecimientos</h2>
+                        <p className="text-[10px] md:text-xs text-slate-500 font-medium">Gestión institucional de escuelas, liceos y jardines.</p>
+                    </div>
+                    {can('establecimientos.add_establecimiento') && (
+                        <button
+                            onClick={handleNew}
+                            className="lg:hidden p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-500/20 active:scale-95 transition-transform"
+                        >
+                            <Plus className="w-6 h-6" />
+                        </button>
+                    )}
                 </div>
 
-                <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-                    <select
-                        value={filterType}
-                        onChange={handleFilterChange}
-                        className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm"
-                    >
-                        <option value="">Todos los tipos</option>
-                        {establishmentTypes.map(t => (
-                            <option key={t.id} value={t.id}>{t.nombre}</option>
-                        ))}
-                    </select>
-
-                    <FilterBar onSearch={handleSearch} placeholder="Buscar por nombre o RBD..." />
+                <div className="flex flex-col lg:flex-row gap-2">
+                    <div className="flex flex-1 gap-2">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
+                            <input
+                                type="text"
+                                placeholder="Buscar establecimiento..."
+                                value={searchQuery}
+                                onChange={(e) => handleSearch(e.target.value)}
+                                className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                            />
+                        </div>
+                        <select
+                            value={filterType}
+                            onChange={handleFilterChange}
+                            className="w-1/3 lg:w-40 px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-500 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        >
+                            <option value="">TODOS LOS TIPOS</option>
+                            {establishmentTypes.map(t => (
+                                <option key={t.id} value={t.id}>{t.nombre.toUpperCase()}</option>
+                            ))}
+                        </select>
+                    </div>
 
                     <div className="flex gap-2">
                         <button
-                            onClick={fetchAllForDirectory}
-                            className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 font-bold whitespace-nowrap disabled:opacity-50"
-                            disabled={loadingDirectory}
+                            onClick={handleExportExcel}
+                            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-100 font-bold text-[10px] uppercase hover:bg-emerald-100 transition-colors"
                         >
-                            <Layout className="w-5 h-5" />
-                            <span>{loadingDirectory ? 'Cargando...' : 'Directorio'}</span>
+                            <FileDown className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Exportar Excel</span>
                         </button>
 
                         <button
-                            onClick={handleExportExcel}
-                            className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 font-medium whitespace-nowrap"
+                            onClick={handleNew}
+                            className="hidden lg:flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl hover:bg-blue-700 transition-all font-bold text-[10px] uppercase shadow-lg shadow-blue-600/20"
                         >
-                            <FileDown className="w-5 h-5" />
-                            <span>Exportar</span>
+                            <Plus className="w-4 h-4" />
+                            <span>Nuevo</span>
                         </button>
-
-                        {can('establecimientos.add_establecimiento') && (
-                            <button
-                                onClick={handleNew}
-                                className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
-                            >
-                                <Plus className="w-5 h-5" />
-                                <span>Nuevo</span>
-                            </button>
-                        )}
                     </div>
                 </div>
             </div>
@@ -359,150 +376,142 @@ const Establishments = () => {
                 allEstablishments={allEstablishments}
             />
 
-            {/* Table List */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            {/* Detail Modal */}
+            <EstablishmentDetailModal
+                isOpen={isDetailModalOpen}
+                onClose={() => setIsDetailModalOpen(false)}
+                establishment={selectedEstForDetail}
+                allEstablishments={allEstablishments}
+            />
+
+            {/* Mobile Cards View */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-4 mb-8">
+                {filteredData.map(item => (
+                    <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden"
+                    >
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                {item.logo ? (
+                                    <img src={item.logo} alt="" className="w-full h-full object-contain p-1" />
+                                ) : (
+                                    <Building className="w-6 h-6 text-slate-300" />
+                                )}
+                            </div>
+                            <div className="min-w-0">
+                                <h3 className="font-bold text-slate-800 text-sm truncate uppercase leading-tight">{item.nombre}</h3>
+                                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{item.tipo_nombre} • RBD {item.rbd}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2 mb-4">
+                            <div className="flex items-center gap-2 text-xs text-slate-600">
+                                <UserCircle2 className="w-3.5 h-3.5" />
+                                <span className="truncate">Dir: {item.director || 'No asignado'}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-slate-500 italic">
+                                <MapPin className="w-3.5 h-3.5" />
+                                <span className="truncate">{item.direccion || 'Sin dirección registrada'}</span>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 mt-auto pt-4 border-t border-slate-50">
+                            {item.telefonos && item.telefonos.length > 0 ? (
+                                <a
+                                    href={`tel:${item.telefonos[0].numero}`}
+                                    className="flex items-center justify-center gap-2 bg-blue-50 text-blue-700 py-2.5 rounded-xl font-bold text-xs"
+                                >
+                                    <Phone className="w-3.5 h-3.5" /> Llamar
+                                </a>
+                            ) : (
+                                <button className="flex items-center justify-center gap-2 bg-slate-50 text-slate-400 py-2.5 rounded-xl font-bold text-xs cursor-not-allowed">
+                                    <Phone className="w-3.5 h-3.5" /> Sin Tel.
+                                </button>
+                            )}
+
+                            <button
+                                onClick={() => handleOpenDetail(item)}
+                                className="flex items-center justify-center gap-2 bg-slate-50 text-slate-700 py-2.5 rounded-xl font-bold text-xs hover:bg-slate-100 transition-colors"
+                            >
+                                <Layout className="w-3.5 h-3.5" /> Ver Info
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={() => handleOpenDetail(item)}
+                            className="absolute top-3 right-3 p-2 text-slate-300 hover:text-blue-500"
+                        >
+                            <ChevronRight className="w-5 h-5" />
+                        </button>
+                    </motion.div>
+                ))}
+            </div>
+
+            {/* Desktop Table List */}
+            <div className="hidden lg:block bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left whitespace-nowrap">
                         <thead className="bg-slate-50 border-b border-slate-200">
                             <tr>
-                                <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+                                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
                                 <SortableHeader label="RBD" sortKey="rbd" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="Nombre" sortKey="nombre" currentOrdering={ordering} onSort={handleSort} />
-                                <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Tipo</th>
+                                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Tipo</th>
                                 <SortableHeader label="Director" sortKey="director" currentOrdering={ordering} onSort={handleSort} />
-                                <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</th>
-                                <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Teléfonos</th>
-                                <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
+                                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {filteredData.map(item => {
-                                const principalPhone = item.telefonos?.find(p => p.es_principal) || item.telefonos?.[0];
-
-                                return (
-                                    <tr key={item.id} className="hover:bg-slate-50 transition-colors text-xs">
-                                        <td className="p-2.5">
-                                            {can('establecimientos.change_establecimiento') ? (
-                                                <button
-                                                    onClick={() => handleStatusToggle(item.id, item.activo)}
-                                                    className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold transition-all ${item.activo ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                                                >
-                                                    <Power className="w-3 h-3" />
-                                                    {item.activo ? 'ACTIVO' : 'INACTIVO'}
-                                                </button>
-                                            ) : (
-                                                <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold ${item.activo ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}>
-                                                    {item.activo ? 'ACTIVO' : 'INACTIVO'}
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="p-2.5 font-mono text-slate-600 font-semibold">{item.rbd}</td>
-                                        <td className="p-2.5">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-slate-100 border-2 border-white shadow-sm overflow-hidden flex-shrink-0 flex items-center justify-center">
-                                                    {item.logo ? (
-                                                        <img src={item.logo} alt={item.nombre} className="w-full h-full object-contain p-1.5" />
-                                                    ) : (
-                                                        <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-[10px]">
-                                                            {item.nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <span className="font-medium text-slate-900 truncate" title={item.nombre}>{item.nombre}</span>
+                        <tbody className="divide-y divide-slate-100 font-sans">
+                            {filteredData.map(item => (
+                                <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
+                                    <td className="py-2.5 px-4">
+                                        <button
+                                            onClick={() => handleStatusToggle(item.id, item.activo)}
+                                            className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold transition-all ${item.activo ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                        >
+                                            <Power className="w-3 h-3" />
+                                            {item.activo ? 'ACTIVO' : 'INACTIVO'}
+                                        </button>
+                                    </td>
+                                    <td className="py-2.5 px-4 font-mono text-[11px] font-semibold text-slate-400">{item.rbd}</td>
+                                    <td className="py-2.5 px-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0 group-hover:bg-white transition-colors">
+                                                {item.logo ? <img src={item.logo} className="w-full h-full object-contain p-1" /> : <Building className="w-5 h-5 text-slate-300" />}
                                             </div>
-                                        </td>
-                                        <td className="p-2.5">
-                                            <span className="capitalize px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-[10px] font-medium border border-blue-100">
-                                                {item.tipo_nombre}
-                                            </span>
-                                        </td>
-                                        <td className="p-2.5 text-slate-600 truncate" title={item.director || ''}>{item.director || '-'}</td>
-                                        <td className="p-2.5">
-                                            {item.email ? (
-                                                <a
-                                                    href={`mailto:${item.email}`}
-                                                    className="flex items-center gap-2 text-slate-600 hover:text-blue-600 transition-colors group"
-                                                    title={item.email}
-                                                >
-                                                    <div className="w-7 h-7 bg-slate-100 rounded-lg flex items-center justify-center group-hover:bg-blue-50 transition-colors">
-                                                        <Mail className="w-3.5 h-3.5" />
-                                                    </div>
-                                                    <span className="font-medium truncate">{item.email}</span>
-                                                </a>
-                                            ) : (
-                                                <span className="text-slate-300 italic">No registrado</span>
-                                            )}
-                                        </td>
-                                        <td className="p-2.5">
-                                            {principalPhone ? (
-                                                <div className="flex items-center gap-3">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-xs font-black text-slate-900 tracking-tight">{principalPhone.numero}</span>
-                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{principalPhone.etiqueta}</span>
-                                                    </div>
-                                                    {item.telefonos.length > 1 && (
-                                                        <button
-                                                            onClick={() => handleOpenPhones(item)}
-                                                            className="flex items-center justify-center px-1.5 h-5 rounded-lg bg-blue-600 text-white text-[9px] font-black hover:bg-blue-700 transition-all shadow-sm shadow-blue-100 border border-blue-500 whitespace-nowrap"
-                                                            title="Ver todos los teléfonos"
-                                                        >
-                                                            +{item.telefonos.length - 1} MÁS
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <span className="text-slate-300 italic">Sin teléfonos</span>
-                                            )}
-                                        </td>
-                                        <td className="p-2.5 text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <button
-                                                    onClick={() => handleOpenMap(item)}
-                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                                    title="Ver Ubicación en Mapa"
-                                                >
-                                                    <MapPin className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleOpenPhones(item)}
-                                                    className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                                                    title="Teléfonos"
-                                                >
-                                                    <Phone className="w-3.5 h-3.5" />
-                                                </button>
-                                                {can('establecimientos.change_establecimiento') && (
-                                                    <button onClick={() => handleEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
-                                                        <Edit2 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                                {can('establecimientos.delete_establecimiento') && (
-                                                    <button onClick={() => handleDelete(item.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                                            <span onClick={() => handleOpenDetail(item)} className="font-bold text-slate-800 text-sm hover:text-blue-600 cursor-pointer">{item.nombre}</span>
+                                        </div>
+                                    </td>
+                                    <td className="py-2.5 px-4">
+                                        <span className="capitalize px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-[10px] font-black uppercase border border-blue-100">
+                                            {item.tipo_nombre}
+                                        </span>
+                                    </td>
+                                    <td className="py-2.5 px-4 text-xs font-medium text-slate-600">{item.director || '-'}</td>
+                                    <td className="py-2.5 px-4 text-right">
+                                        <div className="flex justify-end items-center gap-1">
+                                            <button onClick={() => handleOpenPhones(item)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Teléfonos"><Phone className="w-3.5 h-3.5 text-slate-400" /></button>
+                                            <button onClick={() => handleEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Editar"><Edit2 className="w-3.5 h-3.5 text-slate-400" /></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
-                    {filteredData.length === 0 && !loading && (
-                        <div className="p-12 text-center text-slate-400">
-                            <Building className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                            <p>No se encontraron establecimientos.</p>
-                        </div>
-                    )}
                 </div>
+            </div>
 
-                <div className="p-4 border-t border-slate-100 bg-slate-50/30">
-                    <Pagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        onPageChange={handlePageChange}
-                        totalCount={totalCount}
-                    />
-                </div>
+            {/* Pagination for both views */}
+            <div className="mt-6 flex justify-center lg:justify-end">
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
+                    totalCount={totalCount}
+                />
             </div>
         </div >
     );

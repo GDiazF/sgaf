@@ -6,7 +6,9 @@ import Pagination from '../../components/common/Pagination';
 import FilterBar from '../../components/common/FilterBar';
 import SortableHeader from '../../components/common/SortableHeader';
 import ServiceModal from '../../components/services/ServiceModal';
+import BulkUploadModal from '../../components/common/BulkUploadModal';
 import { usePermission } from '../../hooks/usePermission';
+import PageSizeSelector from '../../components/common/PageSizeSelector';
 
 const ServicesDashboard = () => {
     const { can } = usePermission();
@@ -17,6 +19,9 @@ const ServicesDashboard = () => {
 
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
+    const [showBulkForm, setShowBulkForm] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [bulkErrors, setBulkErrors] = useState([]);
 
     // Pagination & Search State
     const [currentPage, setCurrentPage] = useState(1);
@@ -24,6 +29,7 @@ const ServicesDashboard = () => {
     const [totalCount, setTotalCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [ordering, setOrdering] = useState('establecimiento__nombre');
+    const [pageSize, setPageSize] = useState(10);
 
     const [editingId, setEditingId] = useState(null);
 
@@ -41,20 +47,21 @@ const ServicesDashboard = () => {
             const params = {
                 page,
                 search,
-                ordering: order
+                ordering: order,
+                page_size: pageSize
             };
 
             const [servRes, provRes, estRes, docRes] = await Promise.all([
                 api.get('servicios/', { params }),
-                api.get('proveedores/'), // Potentially paginated, assume < 10 for now or needs SelectAsync
-                api.get('establecimientos/'), // Potentially paginated
-                api.get('tipos-documentos/')
+                api.get('proveedores/', { params: { page_size: 1000 } }),
+                api.get('establecimientos/', { params: { page_size: 1000 } }),
+                api.get('tipos-documentos/', { params: { page_size: 1000 } })
             ]);
 
             // Handle Services Pagination
             setServices(servRes.data.results || []);
             setTotalCount(servRes.data.count || 0);
-            setTotalPages(Math.ceil((servRes.data.count || 0) / 10));
+            setTotalPages(Math.ceil((servRes.data.count || 0) / pageSize));
 
             // Handle others (if they become paginated, we might need adjustments)
             setProviders(provRes.data.results || provRes.data);
@@ -70,7 +77,7 @@ const ServicesDashboard = () => {
 
     useEffect(() => {
         fetchData(currentPage, searchQuery, ordering);
-    }, [currentPage, ordering]);
+    }, [currentPage, ordering, pageSize]);
 
     const handleSearch = (query) => {
         setSearchQuery(query);
@@ -140,6 +147,58 @@ const ServicesDashboard = () => {
     // No client-side filtering
     const filteredData = services;
 
+    const handleBulk = () => {
+        setBulkErrors([]);
+        setShowBulkForm(true);
+    };
+
+    const handleBulkUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formDataFile = new FormData();
+        formDataFile.append('file', file);
+
+        setUploading(true);
+        setBulkErrors([]);
+        try {
+            const res = await api.post('servicios/bulk_upload/', formDataFile, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            alert(res.data.message);
+            setShowBulkForm(false);
+            fetchData(currentPage, searchQuery);
+        } catch (error) {
+            console.error(error);
+            if (error.response?.data?.errors) {
+                setBulkErrors(error.response.data.errors);
+            } else {
+                alert(error.response?.data?.error || "Error al subir el archivo.");
+            }
+        } finally {
+            setUploading(false);
+            e.target.value = null; // Reset input
+        }
+    };
+
+    const handleDownloadTemplate = async () => {
+        try {
+            const response = await api.get('servicios/download_template/', {
+                responseType: 'blob'
+            });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'plantilla_servicios.xlsx');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (error) {
+            console.error(error);
+            alert("Error al descargar la plantilla.");
+        }
+    };
+
     return (
         <div>
             {/* Header */}
@@ -150,15 +209,26 @@ const ServicesDashboard = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    <PageSizeSelector pageSize={pageSize} onChange={setPageSize} />
                     <FilterBar onSearch={handleSearch} placeholder="Buscar por cliente, proveedor..." />
                     {can('servicios.add_servicio') && (
-                        <button
-                            onClick={handleNew}
-                            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
-                        >
-                            <Plus className="w-5 h-5" />
-                            <span>Nuevo Servicio</span>
-                        </button>
+                        <>
+                            <button
+                                onClick={handleNew}
+                                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap text-sm"
+                            >
+                                <Plus className="w-4 h-4" />
+                                <span>Nuevo Servicio</span>
+                            </button>
+
+                            <button
+                                onClick={handleBulk}
+                                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 font-medium whitespace-nowrap text-sm"
+                            >
+                                <FileText className="w-4 h-4" />
+                                <span>Carga Masiva</span>
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -175,6 +245,18 @@ const ServicesDashboard = () => {
                     establishments,
                     documentTypes: docTypes.map(d => ({ value: d.id, label: d.nombre }))
                 }}
+            />
+
+            {/* Bulk Upload Modal */}
+            <BulkUploadModal
+                isOpen={showBulkForm}
+                onClose={() => setShowBulkForm(false)}
+                title="Carga Masiva de Servicios"
+                description="Suba un archivo Excel con los datos de los servicios básicos (Agua, Luz, Gas, etc.)."
+                onUpload={handleBulkUpload}
+                onDownloadTemplate={handleDownloadTemplate}
+                uploading={uploading}
+                errors={bulkErrors}
             />
 
             {/* Table List */}

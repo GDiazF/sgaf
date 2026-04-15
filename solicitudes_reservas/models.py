@@ -18,6 +18,8 @@ class RecursoReservable(models.Model):
     activo = models.BooleanField(default=True)
     color = models.CharField(max_length=7, default='#6366f1', verbose_name="Color en Calendario",
                              help_text="Color hexadecimal, ej: #6366f1")
+    dias_antelacion = models.IntegerField(default=0, verbose_name="Días de antelación",
+                                         help_text="Días mínimos requeridos para reservar este recurso.")
 
     def __str__(self):
         return f"{self.nombre} ({self.get_tipo_display()})"
@@ -133,6 +135,10 @@ class SolicitudReserva(models.Model):
 
     class Meta:
         ordering = ['-fecha_inicio']
+        permissions = [
+            ("can_change_reserva_name", "Puede cambiar el nombre de la reserva"),
+            ("can_bypass_antelacion", "Puede saltar bloqueo de antelación"),
+        ]
 
 class ReservaSetting(models.Model):
     """Configuración global para el sistema de reservas."""

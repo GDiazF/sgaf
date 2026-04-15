@@ -44,7 +44,7 @@ class Servicio(models.Model):
     proveedor = models.ForeignKey(Proveedor, on_delete=models.CASCADE, related_name='servicios')
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE, related_name='servicios')
     numero_servicio = models.CharField(max_length=100, blank=True, null=True) # Optional
-    numero_cliente = models.CharField(max_length=100) # Required
+    numero_cliente = models.CharField(max_length=100, unique=True) # Required and unique globally
     tipo_documento = models.ForeignKey(TipoDocumento, on_delete=models.SET_NULL, null=True)
     
     fecha_creacion = models.DateTimeField(auto_now_add=True)

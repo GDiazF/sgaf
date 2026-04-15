@@ -19,17 +19,20 @@ export const groupPermissions = (permissions) => {
         else if (name.includes('contrato') || name.includes('proceso') || name.includes('licitacion')) module = 'Contratos y Licitaciones';
         else if (name.includes('orden de compra') || name.includes('ordencompra')) module = 'Órdenes de Compra';
         else if (name.includes('reserva') || name.includes('bloqueo') || name.includes('recurso')) module = 'Reservas de Espacios';
-        else if (name.includes('personal ti') || name.includes('personalti')) module = 'Personal TI';
+        else if (name.includes('personal ti') || name.includes('personalti')) module = 'Funcionarios TI';
         else if (name.includes('servicio contratado') || name.includes('tipo documento') || name.includes('cdp')) module = 'Configuración Servicios';
         else if (name.includes('registro de pago') || name.includes('pago')) module = 'Pagos de Servicios';
         else if (name.includes('recepcion conforme')) module = 'Recepciones Conformes';
         else if (name.includes('factura adquisicion') || name.includes('adquisicion')) module = 'Adquisiciones';
-        else if (name.includes('funcionario') || name.includes('subdireccion') || name.includes('departamento') || name.includes('unidad')) module = 'Personal y Estructura';
+        else if (name.includes('funcionario') || name.includes('personal') || name.includes('subdireccion') || name.includes('departamento') || name.includes('unidad')) module = 'Funcionarios y Estructura';
         else if (name.includes('tesoreria') || name.includes('remuneracion')) module = 'Tesorería';
         else if (name.includes('impresora') || name.includes('printer')) module = 'Impresoras';
         else if (name.includes('vehiculo') || name.includes('registro mensual')) module = 'Vehículos';
         else if (name.includes('anexo')) module = 'Telecomunicaciones';
+        else if (name.includes('procedimiento') || name.includes('tipo de documento')) module = 'Gestor Documental';
         else if (name.includes('user') || name.includes('group') || name.includes('permission')) module = 'Seguridad y Usuarios';
+        else if (name.includes('log entry') || name.includes('logentry')) module = 'Auditoría';
+        else if (name.includes('link de interes') || name.includes('linkinteres')) module = 'Dashboard, Links y Redes';
 
         if (!groups[module]) groups[module] = [];
         groups[module].push(perm);
@@ -72,7 +75,8 @@ export const getFriendlyPermName = (perm) => {
         'registropago': 'Pagos de Servicios',
         'recepcionconforme': 'Recepciones Conformes',
         'facturaadquisicion': 'Facturas de Adquisición',
-        'funcionario': 'Ficha de Personal',
+        'funcionario': 'Ficha de Funcionario',
+        'personal': 'Ficha de Funcionario',
         'subdireccion': 'Subdirecciones',
         'departamento': 'Departamentos',
         'unidad': 'Unidades',
@@ -102,7 +106,11 @@ export const getFriendlyPermName = (perm) => {
         'solicitudreserva': 'Solicitudes de Reserva',
         'recursoreservable': 'Recursos (Salas/Vehículos)',
         'bloqueohorario': 'Bloqueos de Horario',
-        'reservasetting': 'Ajustes de Reservas'
+        'reservasetting': 'Ajustes de Reservas',
+        'procedimiento': 'Documentos / Procedimientos',
+        'tipoprocedimiento': 'Categorías de Documentos',
+        'linkinteres': 'Links y Redes Sociales / Dashboard',
+        'logentry': 'Logs de Auditoría'
     };
 
     const modelKey = codename.split('_')[1];

@@ -108,3 +108,10 @@ class UserManagementSerializer(serializers.ModelSerializer):
         if rut:
             self._handle_rut_link(user, rut)
         return user
+
+from .models import LinkInteres
+
+class LinkInteresSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LinkInteres
+        fields = '__all__'

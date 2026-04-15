@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     Calendar, ChevronLeft, ChevronRight, Plus, X, Check,
     Clock, Truck, Monitor, Package, User, AlertCircle, Lock,
     RefreshCw, Building2, Settings, Power, Trash2, Users, MapPin
 } from 'lucide-react';
 import api from '../../api';
+import { useAuth } from '../../context/AuthContext';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 // ─── Constantes de Fallback ──────────────────────────────────────────────────
@@ -104,9 +105,15 @@ const bloqueoAppliesToDate = (b, dateStr) => {
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 const ReservasDashboard = () => {
+    const { user } = useAuth();
+    const canChangeName = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_change_reserva_name'));
+    const canBypass = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_bypass_antelacion'));
+    const canForceDelete = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_force_delete_reserva'));
+    const defaultName = user?.funcionario_data?.nombre_funcionario || (user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : '') || user?.username || '';
+
     const [recursos, setRecursos] = useState([]);
     const [reservas, setReservas] = useState([]);
-    const [settings, setSettings] = useState({ hora_inicio: '07:00', hora_fin: '18:00' });
+    const [settings, setSettings] = useState({ hora_inicio: '07:00', hora_fin: '18:00', dias_bloqueo_antelacion: 0 });
     const [loading, setLoading] = useState(true);
 
     const configStart = parseInt(settings.hora_inicio.split(':')[0]) || DEFAULT_HOUR_START;
@@ -131,7 +138,7 @@ const ReservasDashboard = () => {
 
     // Modal nueva reserva
     const [modalOpen, setModalOpen] = useState(false);
-    const [formData, setFormData] = useState({ recurso: '', titulo: '', nombre_funcionario: '', descripcion: '', fecha: toDateStr(new Date()), horaInicio: '09:00', horaFin: '10:00' });
+    const [formData, setFormData] = useState({ recurso: '', titulo: '', nombre_funcionario: defaultName, descripcion: '', fecha: toDateStr(new Date()), horaInicio: '09:00', horaFin: '10:00' });
     const [formTipo, setFormTipo] = useState(''); // tipo seleccionado en el modal
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState('');
@@ -142,6 +149,10 @@ const ReservasDashboard = () => {
     const [motivoRechazo, setMotivoRechazo] = useState('');
     // Log/Historial
     const [historyOpen, setHistoryOpen] = useState(false);
+    const [historySearch, setHistorySearch] = useState('');
+    const [historyFilterEstado, setHistoryFilterEstado] = useState('HISTORIAL'); // 'HISTORIAL' (todos los cerrados) o estados específicos
+    const [historyFilterRecurso, setHistoryFilterRecurso] = useState('all');
+    const [historySort, setHistorySort] = useState('-fecha_inicio');
     // Aviso cuando sl slot está bloqueado
     const [slotBloqueadoMsg, setSlotBloqueadoMsg] = useState('');
 
@@ -158,9 +169,38 @@ const ReservasDashboard = () => {
     const [bloqueoError, setBloqueoError] = useState('');
     const [bloqueoSaving, setBloqueoSaving] = useState(false);
     const [bloqueoTab, setBloqueoTab] = useState(false); // true = mostrando pestaña de bloqueos
+    
+    // Antelación masiva
+    const [bulkDays, setBulkDays] = useState(0);
+    const [selectedBulk, setSelectedBulk] = useState([]);
+
+    const handleBulkUpdate = async () => {
+        setAdminSaving(true);
+        try {
+            await Promise.all(selectedBulk.map(id => api.patch(`reservas/recursos/${id}/`, { dias_antelacion: bulkDays })));
+            setAdminError('');
+            await fetchData();
+            setSelectedBulk([]);
+            alert('Configuración aplicada con éxito a los recursos seleccionados.');
+        } catch (e) {
+            setAdminError('Error al actualizar recursos en masa');
+        } finally {
+            setAdminSaving(false);
+        }
+    };
 
     const scrollRef = useRef(null);
     const headerScrollRef = useRef(null);
+
+    // Responsividad: Ajustes menores si es necesario, pero permitimos libertad de vista
+    useEffect(() => {
+        const checkMobile = () => {
+            // Ya no forzamos setViewMode('day'), dejamos que el usuario elija
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     // ── Data ──────────────────────────────────────────────────────────────────
     const fetchData = async () => {
@@ -218,18 +258,19 @@ const ReservasDashboard = () => {
         );
 
         const getMins = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
-        const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+        const now = new Date();
+        const nowHourStart = now.getHours() * 60;
         const esHoy = formData.fecha === todayStr;
 
         // 1. Validar "Desde"
         const mInicio = getMins(formData.horaInicio);
         const estaOcupadoI = resDía.some(r => mInicio >= dtMinutes(r.fecha_inicio) && mInicio < dtMinutes(r.fecha_fin));
-        const esPasado = esHoy && mInicio < nowMins - 15;
+        const esPasado = esHoy && mInicio < nowHourStart;
 
         if (estaOcupadoI || esPasado) {
             const primerLibre = TIME_SLOTS.find(s => {
                 const m = getMins(s);
-                if (esHoy && m < nowMins - 15) return false;
+                if (esHoy && m < nowHourStart) return false;
                 return !resDía.some(r => m >= dtMinutes(r.fecha_inicio) && m < dtMinutes(r.fecha_fin));
             });
             if (primerLibre) setFormData(p => ({ ...p, horaInicio: primerLibre }));
@@ -259,6 +300,24 @@ const ReservasDashboard = () => {
         })
         : [currentDate];
 
+    // Optimización: Agrupar reservas por recurso y día una sola vez
+    const reservasBuckets = useMemo(() => {
+        const buckets = {};
+        if (!Array.isArray(reservas)) return buckets;
+
+        reservas.forEach(r => {
+            const dayStr = toDateStr(r.fecha_inicio);
+            const key = `${r.recurso}_${dayStr}`;
+            const rEstado = (r.estado || "").toUpperCase();
+
+            if (rEstado === 'PENDIENTE' || rEstado === 'APROBADA' || rEstado === 'FINALIZADA') {
+                if (!buckets[key]) buckets[key] = [];
+                buckets[key].push(r);
+            }
+        });
+        return buckets;
+    }, [reservas]);
+
     const recursosFiltrados = (() => {
         let list;
         if (filtroRecurso === 'all') {
@@ -274,13 +333,7 @@ const ReservasDashboard = () => {
 
     const getReservasForDayAndRecurso = (day, recursoId) => {
         const dayStr = toDateStr(day);
-        if (!Array.isArray(reservas)) return [];
-        return reservas.filter(r => {
-            const rEstado = (r.estado || "").toUpperCase();
-            return toDateStr(r.fecha_inicio) === dayStr &&
-                parseInt(r.recurso) === parseInt(recursoId) &&
-                (rEstado === 'PENDIENTE' || rEstado === 'APROBADA');
-        });
+        return reservasBuckets[`${recursoId}_${dayStr}`] || [];
     };
 
     const getEventPos = (ev) => {
@@ -299,6 +352,16 @@ const ReservasDashboard = () => {
     };
 
     const handleSlotClick = (day, slotTime, recursoId) => {
+        const rec = recursos.find(r => r.id === recursoId);
+        const x = rec?.dias_antelacion || 0;
+        const limit = new Date(); limit.setHours(0,0,0,0);
+        limit.setDate(limit.getDate() + x);
+        
+        if (day <= limit && !canBypass) {
+            setSlotBloqueadoMsg(`Este recurso necesita ${x} días de antelación. Bloqueado hasta el ${addDays(limit, 1).toLocaleDateString()}.`);
+            setTimeout(() => setSlotBloqueadoMsg(''), 3000);
+            return;
+        }
         const dayStr = toDateStr(day);
 
         // 1. Si no hay slotTime (o es el default), intentamos buscar el primer hueco libre del día
@@ -339,9 +402,9 @@ const ReservasDashboard = () => {
         const [h, m] = actualSlot.split(':').map(Number);
         const endH = m === 30 ? h + 1 : h, endM = m === 30 ? 0 : 30;
 
-        const rec = recursos.find(r => r.id === recursoId);
-        setFormTipo(rec?.tipo || '');
-        setFormData({ recurso: recursoId || '', titulo: '', nombre_funcionario: '', descripcion: '', fecha: toDateStr(day), horaInicio: actualSlot, horaFin: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}` });
+        const recObj = recursos.find(r => r.id === recursoId);
+        setFormTipo(recObj?.tipo || '');
+        setFormData({ recurso: recursoId || '', titulo: '', nombre_funcionario: defaultName, descripcion: '', fecha: toDateStr(day), horaInicio: actualSlot, horaFin: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}` });
         setFormError('');
         setModalOpen(true);
     };
@@ -398,11 +461,25 @@ const ReservasDashboard = () => {
         catch (err) { alert(err.response?.data?.detail || err.response?.data?.non_field_errors?.[0] || 'Error al actualizar estado'); }
     };
 
-    const openAdminEdit = r => { setAdminEditing(r); setAdminForm({ nombre: r.nombre, tipo: r.tipo, ubicacion: r.ubicacion || '', capacidad: r.capacidad || 1, descripcion: r.descripcion || '', activo: r.activo, color: r.color || '#6366f1' }); setAdminError(''); };
     const openAdminCreate = () => {
-        const usedColors = recursos.map(r => r.color);
-        const nextColor = DEFAULT_COLORS.find(c => !usedColors.includes(c)) || DEFAULT_COLORS[recursos.length % DEFAULT_COLORS.length];
-        setAdminEditing(null); setAdminForm({ nombre: '', tipo: 'SALA', ubicacion: '', capacidad: 1, descripcion: '', activo: true, color: nextColor }); setAdminError('');
+        setAdminEditing(null);
+        setAdminForm({ nombre: '', tipo: 'SALA', color: '#6366f1', ubicacion: '', capacidad: 10, descripcion: '', activo: true, dias_antelacion: 0 });
+        setAdminError('');
+    };
+    const openAdminEdit = (r) => {
+        setAdminEditing(r);
+        setAdminForm({ 
+            nombre: r.nombre, 
+            tipo: r.tipo, 
+            color: r.color || '#6366f1', 
+            ubicacion: r.ubicacion || '', 
+            capacidad: r.capacidad || 10, 
+            descripcion: r.descripcion || '', 
+            activo: r.activo,
+            dias_antelacion: r.dias_antelacion || 0
+        });
+        setAdminError('');
+        setBloqueoTab(false);
     };
 
     const handleAdminSave = async e => {
@@ -444,6 +521,17 @@ const ReservasDashboard = () => {
         if (!window.confirm(`¿Eliminar permanentemente "${r.nombre}"?`)) return;
         try { await api.delete(`reservas/recursos/${r.id}/`); fetchData(); if (adminEditing?.id === r.id) openAdminCreate(); }
         catch { alert('Error al eliminar'); }
+    };
+
+    const handleForceDeleteReserva = async (reserva, e) => {
+        e.stopPropagation();
+        if (!window.confirm(`¿Eliminar PERMANENTEMENTE la reserva "${reserva.titulo}"?\n\nEsta acción no se puede deshacer.`)) return;
+        try {
+            await api.delete(`reservas/solicitudes/${reserva.id}/force_delete/`);
+            fetchData();
+        } catch (err) {
+            alert(err.response?.data?.detail || 'Error al eliminar la reserva.');
+        }
     };
 
     // ── Bloqueos de Horario ──────────────────────────────────────────────
@@ -495,50 +583,64 @@ const ReservasDashboard = () => {
     return (
         <div className="flex flex-col h-[calc(100vh-140px)] bg-white overflow-hidden rounded-3xl border border-slate-200/60 shadow-xl shadow-slate-200/20">
 
-            {/* TOP BAR */}
-            <div className="flex-shrink-0 bg-white border-b border-slate-100 px-4 py-2.5 flex items-center gap-3 shadow-sm z-20">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Calendar className="w-4 h-4 text-white" />
+            {/* TOP BAR - Responsive */}
+            <div className="flex-shrink-0 bg-white border-b border-slate-100 px-4 py-3 flex flex-col md:flex-row md:items-center gap-3 shadow-sm z-20">
+                <div className="flex items-center justify-between w-full md:w-auto">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-100">
+                            <Calendar className="w-4 h-4 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="font-black text-slate-900 text-sm md:text-base leading-none">Reservas</h1>
+                            <p className="text-[10px] text-indigo-500 font-bold capitalize mt-0.5">{fmtMonth()}</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="font-black text-slate-900 text-sm leading-none">Reservas</h1>
-                        <p className="text-[10px] text-indigo-500 font-bold capitalize mt-0.5">{fmtMonth()}</p>
+                    {/* Botones de nav en móvil */}
+                    <div className="flex md:hidden items-center gap-1">
+                        <button onClick={() => handleNav(-1)} className="p-2 rounded-lg hover:bg-slate-100 transition"><ChevronLeft className="w-5 h-5 text-slate-600" /></button>
+                        <button onClick={() => handleNav(1)} className="p-2 rounded-lg hover:bg-slate-100 transition"><ChevronRight className="w-5 h-5 text-slate-600" /></button>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1">
-                    <button onClick={() => handleNav(-1)} className="p-1.5 rounded-lg hover:bg-slate-100 transition"><ChevronLeft className="w-4 h-4 text-slate-600" /></button>
-                    <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition">Hoy</button>
-                    <button onClick={() => handleNav(1)} className="p-1.5 rounded-lg hover:bg-slate-100 transition"><ChevronRight className="w-4 h-4 text-slate-600" /></button>
+                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
+                    <div className="hidden md:flex items-center gap-1 mr-2">
+                        <button onClick={() => handleNav(-1)} className="p-1.5 rounded-lg hover:bg-slate-100 transition"><ChevronLeft className="w-4 h-4 text-slate-600" /></button>
+                        <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition">Hoy</button>
+                        <button onClick={() => handleNav(1)} className="p-1.5 rounded-lg hover:bg-slate-100 transition"><ChevronRight className="w-4 h-4 text-slate-600" /></button>
+                    </div>
+
+                    <div className="flex items-center bg-slate-100 rounded-lg p-0.5 flex-shrink-0">
+                        {['day', 'week'].map(v => (
+                            <button key={v} onClick={() => setViewMode(v)} className={`px-4 py-1.5 text-[11px] font-bold rounded-md transition ${viewMode === v ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
+                                {v === 'day' ? 'Día' : 'Semana'}
+                            </button>
+                        ))}
+                    </div>
+
+                    <button onClick={() => setHistoryOpen(true)} className="flex items-center gap-2 px-3 py-1.5 text-slate-500 hover:text-slate-800 transition text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50">
+                        <Clock className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Log</span>
+                    </button>
+
+                    <button onClick={fetchData} className="p-2 hover:bg-slate-100 rounded-lg transition" title="Actualizar">
+                        <RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
                 </div>
 
-                <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
-                    {['day', 'week'].map(v => (
-                        <button key={v} onClick={() => setViewMode(v)} className={`px-3 py-1.5 text-[11px] font-bold rounded-md transition ${viewMode === v ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
-                            {v === 'day' ? 'Día' : 'Semana'}
-                        </button>
-                    ))}
+                <div className="flex items-center gap-2 ml-auto w-full md:w-auto mt-1 md:mt-0">
+                    <button onClick={() => { openAdminCreate(); setAdminOpen(true); }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-black hover:bg-slate-200 transition">
+                        <Settings className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Administrar</span>
+                    </button>
+                    {(() => {
+                        // Nota: En el botón de nueva reserva, la validación de antelación es global o por recurso.
+                        // Aquí simplificamos usando la fecha actual.
+                        return (
+                            <button onClick={() => { setFormTipo(''); setFormData({ recurso: '', titulo: '', nombre_funcionario: defaultName, descripcion: '', fecha: toDateStr(currentDate), horaInicio: '09:00', horaFin: '10:00' }); setFormError(''); setModalOpen(true); }}
+                                className="flex-2 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-indigo-700 transition shadow-md shadow-indigo-500/20">
+                                <Plus className="w-4 h-4" /> Nueva <span className="hidden sm:inline">Reserva</span>
+                            </button>
+                        );
+                    })()}
                 </div>
-
-                <select value={filtroRecurso} onChange={e => setFiltroRecurso(e.target.value)} className="hidden"></select>
-
-                <div className="flex-1" />
-
-                <button onClick={() => setHistoryOpen(true)} className="flex items-center gap-2 px-3 py-1.5 text-slate-500 hover:text-slate-800 transition text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50">
-                    <Clock className="w-3.5 h-3.5" /> Log
-                </button>
-                <div className="w-px h-4 bg-slate-200 mx-1" />
-                <button onClick={fetchData} className="p-1.5 hover:bg-slate-100 rounded-lg transition" title="Actualizar">
-                    <RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
-                </button>
-                <button onClick={() => { openAdminCreate(); setAdminOpen(true); }} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-black hover:bg-slate-200 transition">
-                    <Settings className="w-3.5 h-3.5" /> Administrar
-                </button>
-                <button onClick={() => { setFormTipo(''); setFormData({ recurso: '', titulo: '', nombre_funcionario: '', descripcion: '', fecha: toDateStr(currentDate), horaInicio: '09:00', horaFin: '10:00' }); setFormError(''); setModalOpen(true); }}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-indigo-700 transition shadow-md shadow-indigo-500/20">
-                    <Plus className="w-3.5 h-3.5" /> Nueva Reserva
-                </button>
             </div>
 
             {/* FILTER BAR — grupos por tipo + recursos individuales */}
@@ -670,10 +772,19 @@ const ReservasDashboard = () => {
                                             const dayEvents = getReservasForDayAndRecurso(day, rec.id);
                                             const dayBloqueos = bloqueos.filter(b => Number(b.recurso) === Number(rec.id) && bloqueoAppliesToDate(b, dayS));
 
+                                            const x = settings.dias_bloqueo_antelacion || 0;
+                                            const limit = new Date(); limit.setHours(0, 0, 0, 0);
+                                            limit.setDate(limit.getDate() + x);
+                                            const isDayBlocked = day <= limit && !canBypass;
+
                                             return (
                                                 <div key={dayS}
-                                                    onClick={() => handleSlotClick(day, '', rec.id)}
-                                                    className={`flex-1 min-w-[110px] p-2 border-r border-slate-50 min-h-[140px] transition-colors relative cursor-pointer hover:bg-indigo-50/10 ${dayS === todayStr ? 'bg-indigo-50/5' : ''}`}>
+                                                    onClick={() => !isDayBlocked && handleSlotClick(day, '', rec.id)}
+                                                    className={`flex-1 min-w-[110px] p-2 border-r border-slate-50 min-h-[140px] transition-colors relative hover:bg-indigo-50/10 ${!isDayBlocked ? 'cursor-pointer' : 'bg-slate-100/50'} ${dayS === todayStr ? 'bg-indigo-50/5' : ''}`}>
+
+                                                    {isDayBlocked && (
+                                                        <div className="absolute inset-0 z-0 opacity-40" style={{ background: 'repeating-linear-gradient(45deg, #f1f5f9 0, #f1f5f9 10px, transparent 10px, transparent 20px)' }} />
+                                                    )}
 
                                                     <div className="space-y-1.5 relative z-10">
                                                         {/* Bloqueos */}
@@ -722,8 +833,8 @@ const ReservasDashboard = () => {
                                                             );
                                                         })}
 
-                                                        {/* Icono + siempre visible para nuevas reservas */}
-                                                        {!dayBloqueos.some(b => b.hora_inicio <= '09:00' && b.hora_fin >= '18:00') && (
+                                                        {/* Icono + para nuevas reservas: ocultar en días bloqueados */}
+                                                        {!isDayBlocked && !dayBloqueos.some(b => b.hora_inicio <= '09:00' && b.hora_fin >= '18:00') && (
                                                             <div className="flex justify-center pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                 <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all">
                                                                     <Plus className="w-4 h-4" />
@@ -741,181 +852,260 @@ const ReservasDashboard = () => {
                     </div>
                 ) : (
                     /* MODO DÍA (CALENDARIO DE TIEMPO CLÁSICO) */
-                    <>
-                        {/* Day headers + sub-resource labels con scroll coordinado */}
-                        <div className="flex-shrink-0 bg-white border-b border-slate-100 overflow-x-auto no-scrollbar"
-                            ref={headerScrollRef}
-                            onScroll={(e) => { if (scrollRef.current) scrollRef.current.scrollLeft = e.target.scrollLeft; }}>
-                            <div className="flex" style={{ minWidth: 'min-content' }}>
-                                <div className="w-14 flex-shrink-0 bg-white" />
-                                {visibleDays.map(day => {
-                                    const isToday = toDateStr(day) === todayStr;
-                                    const dayRes = getDayResources(day);
-                                    const dayMinWidth = '100%'; // En modo día ocupa todo el ancho
+                    window.innerWidth < 768 ? (
+                        /* ── VISTA MÓVIL (LISTA DE TARJETAS) ── */
+                        <div className="flex-1 overflow-y-auto bg-slate-50/50 flex flex-col">
+                            {/* Header de fecha pegajoso en móvil */}
+                            <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-100 p-4 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                                        <Calendar className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-sm font-black text-slate-800 capitalize">{new Intl.DateTimeFormat('es-CL', { weekday: 'long' }).format(currentDate)}</h2>
+                                        <p className="text-[10px] font-bold text-slate-400">{new Intl.DateTimeFormat('es-CL', { day: 'numeric', month: 'long' }).format(currentDate)}</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-1">
+                                    <button onClick={() => handleNav(-1)} className="p-2 hover:bg-slate-100 rounded-lg transition"><ChevronLeft className="w-5 h-5 text-slate-600" /></button>
+                                    <button onClick={() => handleNav(1)} className="p-2 hover:bg-slate-100 rounded-lg transition"><ChevronRight className="w-5 h-5 text-slate-600" /></button>
+                                </div>
+                            </div>
 
-                                    return (
-                                        <div key={toDateStr(day)} className={`flex-1 text-center border-l border-slate-100 ${isToday ? 'bg-indigo-50/30' : ''}`} style={{ minWidth: dayMinWidth }}>
-                                            <div className={`text-[9px] font-black uppercase tracking-wider pt-2 ${isToday ? 'text-indigo-400' : 'text-slate-400'}`}>{fmtDay(day).split(' ')[0]}</div>
-                                            <div className={`text-lg font-black leading-tight pb-1 ${isToday ? 'text-indigo-600' : 'text-slate-700'}`}>{day.getDate()}</div>
-                                            {/* Sub-cabeceras de recursos */}
-                                            {dayRes.length > 0 && (
-                                                <div className="flex border-t border-slate-100 bg-slate-50/30">
-                                                    {dayRes.map(rec => (
-                                                        <div key={rec.id} className="flex-1 py-1 px-1 text-center truncate border-r border-slate-100 last:border-0">
-                                                            <div className="w-2 h-2 rounded-full mx-auto mb-0.5" style={{ background: rec.color || '#6366f1' }} />
-                                                            <span className="text-[8px] font-black truncate block leading-none" style={{ color: rec.color || '#6366f1' }}>
-                                                                {rec.nombre}
-                                                            </span>
+                            <div className="p-4 space-y-3 pb-24">
+                                {(() => {
+                                    const dayS = toDateStr(currentDate);
+                                    const dayEvents = filtroRecurso === 'all'
+                                        ? reservas.filter(r => toDateStr(r.fecha_inicio) === dayS)
+                                        : reservas.filter(r => toDateStr(r.fecha_inicio) === dayS && r.recurso === parseInt(filtroRecurso));
+
+                                    dayEvents.sort((a, b) => new Date(a.fecha_inicio) - new Date(b.fecha_inicio));
+
+                                    if (dayEvents.length === 0) return (
+                                        <div className="flex flex-col items-center justify-center pt-20 py-10 opacity-30">
+                                            <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center mb-4">
+                                                <Calendar className="w-8 h-8 text-slate-400" />
+                                            </div>
+                                            <p className="text-xs font-black uppercase tracking-widest text-slate-400">Sin reservas para este día</p>
+                                        </div>
+                                    );
+
+                                    return dayEvents.map(ev => {
+                                        const rec = recursos.find(r => r.id === ev.recurso);
+                                        const color = rec?.color || '#6366f1';
+                                        const Icon = RECURSO_ICONS[rec?.tipo] || Package;
+                                        const isApproved = ev.estado === 'APROBADA';
+                                        const isPending = ev.estado === 'PENDIENTE';
+
+                                        return (
+                                            <motion.div key={ev.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                                                onClick={() => setDetailReserva(ev)}
+                                                className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 active:scale-[0.98] transition-all relative overflow-hidden"
+                                            >
+                                                <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: color }} />
+                                                <div className="w-16 flex-shrink-0 text-center border-r border-slate-50 pr-4">
+                                                    <span className="text-xs font-black text-slate-900 block">{new Date(ev.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                    <span className="text-[9px] text-slate-400 font-bold block mt-0.5">{new Date(ev.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <div className="w-5 h-5 rounded flex items-center justify-center shrink-0" style={{ background: hexToRgba(color, 0.1) }}>
+                                                            <Icon className="w-3 h-3" style={{ color }} />
+                                                        </div>
+                                                        <span className="text-[10px] font-black uppercase tracking-tight truncate max-w-[120px]" style={{ color }}>{rec?.nombre}</span>
+                                                        <div className="ml-auto">
+                                                            {isApproved && <Check className="w-3.5 h-3.5 text-emerald-500" />}
+                                                            {isPending && <Clock className="w-3.5 h-3.5 text-amber-500" />}
+                                                        </div>
+                                                    </div>
+                                                    <h3 className="text-xs font-black text-slate-800 leading-tight truncate">{ev.titulo}</h3>
+                                                    <p className="text-[10px] font-bold text-slate-400 truncate">{ev.nombre_funcionario}</p>
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    });
+                                })()}
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Day headers + sub-resource labels con scroll coordinado */}
+                            <div className="flex-shrink-0 bg-white border-b border-slate-100 overflow-x-auto no-scrollbar"
+                                ref={headerScrollRef}
+                                onScroll={(e) => { if (scrollRef.current) scrollRef.current.scrollLeft = e.target.scrollLeft; }}>
+                                <div className="flex" style={{ minWidth: 'min-content' }}>
+                                    <div className="w-14 flex-shrink-0 bg-white" />
+                                    {visibleDays.map(day => {
+                                        const isToday = toDateStr(day) === todayStr;
+                                        const dayRes = getDayResources(day);
+                                        const dayMinWidth = '100%'; // En modo día ocupa todo el ancho
+
+                                        return (
+                                            <div key={toDateStr(day)} className={`flex-1 text-center border-l border-slate-100 ${isToday ? 'bg-indigo-50/30' : ''}`} style={{ minWidth: dayMinWidth }}>
+                                                <div className={`text-[10px] font-black uppercase tracking-widest pt-3 pb-1 ${isToday ? 'text-indigo-400' : 'text-slate-400'}`}>{fmtDay(day)}</div>
+                                                {/* Sub-cabeceras de recursos - MÁS GRANDES */}
+                                                {dayRes.length > 0 && (
+                                                    <div className="flex border-t border-slate-100 bg-slate-50/50">
+                                                        {dayRes.map(rec => (
+                                                            <div key={rec.id} className="flex-1 py-1.5 px-2 text-center truncate border-r border-slate-100 last:border-0 hover:bg-slate-100 transition-colors cursor-default">
+                                                                <div className="w-2.5 h-2.5 rounded-full mx-auto mb-1" style={{ background: rec.color || '#6366f1' }} />
+                                                                <span className="text-[9px] font-black truncate block leading-none" style={{ color: rec.color || '#6366f1' }}>
+                                                                    {rec.nombre}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Calendar Grid Container */}
+                            <div ref={scrollRef} className="flex-1 overflow-auto scroll-smooth"
+                                style={{ scrollbarGutter: 'stable' }}
+                                onScroll={(e) => { if (headerScrollRef.current) headerScrollRef.current.scrollLeft = e.target.scrollLeft; }}>
+                                <div className="flex relative" style={{ minHeight: `${TIME_SLOTS.length * SLOT_HEIGHT}px`, minWidth: 'min-content' }}>
+
+                                    {/* Time gutter — sticky left */}
+                                    <div className="w-14 flex-shrink-0 relative bg-white border-r border-slate-100 sticky left-0 z-40">
+                                        {TIME_SLOTS.map((slot, idx) => (
+                                            <div key={slot} className="absolute right-2 flex items-start" style={{ top: `${idx * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px` }}>
+                                                {slot.endsWith(':00') && <span className="text-[10px] font-black text-slate-400 leading-none pt-1">{slot.slice(0, 5)}</span>}
+                                            </div>
+                                        ))}
+                                        {/* Final time label */}
+                                        <div className="absolute right-2 flex items-start" style={{ top: `${TIME_SLOTS.length * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px` }}>
+                                            <span className="text-[10px] font-black text-slate-400 leading-none pt-1">{settings.hora_fin.slice(0, 5)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Day columns */}
+                                    {visibleDays.map(day => {
+                                        const isToday = toDateStr(day) === todayStr;
+                                        const dayRes = getDayResources(day);
+                                        const nRes = dayRes.length || 1;
+                                        const dayMinWidth = '100%';
+                                        const dayS = toDateStr(day);
+
+                                        return (
+                                            <div key={toDateStr(day)} className={`flex-1 border-l border-slate-100 relative ${isToday ? 'bg-indigo-50/10' : 'bg-white'}`} style={{ minWidth: dayMinWidth }}>
+                                                <div className="flex h-full">
+                                                    {dayRes.map((recurso, rIdx) => (
+                                                        <div key={recurso.id} className="flex-1 relative border-r border-slate-100 last:border-r-0">
+                                                            {TIME_SLOTS.map((slot, idx) => {
+                                                                const isHour = slot.endsWith(':00');
+                                                                return (
+                                                                    <div key={slot} className={`absolute inset-x-0 group ${dayS >= todayStr ? 'cursor-pointer' : ''}`}
+                                                                        style={{
+                                                                            top: `${idx * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px`,
+                                                                            borderTop: isHour ? '1px solid #f1f5f9' : '1px dashed #f8fafc'
+                                                                        }}
+                                                                        onClick={() => dayS >= todayStr && handleSlotClick(day, slot, recurso.id)}>
+                                                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute inset-0" style={{ background: 'rgba(99,102,241,0.03)' }} />
+                                                                        <span className="opacity-0 group-hover:opacity-100 transition-opacity absolute left-1 top-0.5 text-[7px] font-bold text-indigo-400">{slot}</span>
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     ))}
                                                 </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
 
-                        {/* Calendar Grid Container */}
-                        <div ref={scrollRef} className="flex-1 overflow-auto scroll-smooth"
-                            style={{ scrollbarGutter: 'stable' }}
-                            onScroll={(e) => { if (headerScrollRef.current) headerScrollRef.current.scrollLeft = e.target.scrollLeft; }}>
-                            <div className="flex relative" style={{ minHeight: `${TIME_SLOTS.length * SLOT_HEIGHT}px`, minWidth: 'min-content' }}>
+                                                {/* Final grid line base */}
+                                                <div className="absolute left-0 right-0 border-t border-slate-200" style={{ top: `${TIME_SLOTS.length * SLOT_HEIGHT}px` }} />
 
-                                {/* Time gutter — sticky left */}
-                                <div className="w-14 flex-shrink-0 relative bg-white border-r border-slate-100 sticky left-0 z-40">
-                                    {TIME_SLOTS.map((slot, idx) => (
-                                        <div key={slot} className="absolute right-2 flex items-start" style={{ top: `${idx * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px` }}>
-                                            {slot.endsWith(':00') && <span className="text-[9px] font-bold text-slate-400 leading-none pt-1">{slot}</span>}
-                                        </div>
-                                    ))}
-                                    {/* Final time label */}
-                                    <div className="absolute right-2 flex items-start" style={{ top: `${TIME_SLOTS.length * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px` }}>
-                                        <span className="text-[9px] font-bold text-slate-400 leading-none pt-1">{settings.hora_fin.slice(0, 5)}</span>
-                                    </div>
-                                </div>
-
-                                {/* Day columns */}
-                                {visibleDays.map(day => {
-                                    const isToday = toDateStr(day) === todayStr;
-                                    const dayRes = getDayResources(day);
-                                    const nRes = dayRes.length || 1;
-                                    const dayMinWidth = '100%';
-
-                                    return (
-                                        <div key={toDateStr(day)} className={`flex-1 border-l border-slate-100 relative ${isToday ? 'bg-indigo-50/10' : 'bg-white'}`} style={{ minWidth: dayMinWidth }}>
-                                            <div className="flex h-full">
-                                                {dayRes.map((recurso, rIdx) => (
-                                                    <div key={recurso.id} className="flex-1 relative border-r border-slate-100 last:border-r-0">
-                                                        {TIME_SLOTS.map((slot, idx) => {
-                                                            const isHour = slot.endsWith(':00');
-                                                            return (
-                                                                <div key={slot} className="absolute inset-x-0 cursor-pointer group"
-                                                                    style={{
-                                                                        top: `${idx * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px`,
-                                                                        borderTop: isHour ? '1px solid #f1f5f9' : '1px dashed #f8fafc'
-                                                                    }}
-                                                                    onClick={() => handleSlotClick(day, slot, recurso.id)}>
-                                                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute inset-0" style={{ background: 'rgba(99,102,241,0.03)' }} />
-                                                                    <span className="opacity-0 group-hover:opacity-100 transition-opacity absolute left-1 top-0.5 text-[7px] font-bold text-indigo-400">{slot}</span>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                ))}
-                                            </div>
-
-                                            {/* Final grid line base */}
-                                            <div className="absolute left-0 right-0 border-t border-slate-200" style={{ top: `${TIME_SLOTS.length * SLOT_HEIGHT}px` }} />
-
-                                            {/* Now indicator */}
-                                            {isToday && (() => {
-                                                const now = new Date();
-                                                const top = ((now.getHours() * 60 + now.getMinutes() - configStart * 60) / SLOT_MIN) * SLOT_HEIGHT;
-                                                if (top < 0 || top > TIME_SLOTS.length * SLOT_HEIGHT) return null;
-                                                return (
-                                                    <div className="absolute left-0 right-0 z-30 flex items-center pointer-events-none" style={{ top: `${top}px` }}>
-                                                        <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-md shadow-rose-500/50 -ml-1.5 flex-shrink-0" />
-                                                        <div className="flex-1 h-0.5 bg-rose-400 shadow-sm" />
-                                                    </div>
-                                                );
-                                            })()}
-
-                                            {dayRes.map((recurso, rIdx) => {
-                                                const color = recurso.color || '#6366f1';
-                                                const events = getReservasForDayAndRecurso(day, recurso.id);
-                                                const laid = layoutEvents(events);
-                                                const colW = 100 / nRes;
-                                                const colLeft = rIdx * colW;
-
-                                                return laid.map(({ ev, colIndex, colCount }) => {
-                                                    const { top, height } = getEventPos(ev);
-                                                    const isPending = ev.estado === 'PENDIENTE';
-                                                    const isApproved = ev.estado === 'APROBADA';
-                                                    const isRejected = ev.estado === 'RECHAZADA' || ev.estado === 'CANCELADA';
-                                                    const subW = colW / colCount;
-                                                    const subLeft = colLeft + colIndex * subW;
-
-                                                    return (
-                                                        <div key={ev.id} className="absolute z-20 cursor-pointer group transition-all hover:z-40"
-                                                            style={{
-                                                                top: `${top}px`, height: `${height}px`,
-                                                                left: `${subLeft}%`, width: `calc(${subW}% - 3px)`,
-                                                                opacity: isRejected ? 0.35 : 1
-                                                            }}
-                                                            onClick={e => { e.stopPropagation(); setDetailReserva(ev); }}>
-                                                            <div className="h-full rounded-lg overflow-hidden flex flex-col"
-                                                                style={{
-                                                                    background: isApproved ? hexToRgba(color, 0.15) : hexToRgba(color, 0.10),
-                                                                    borderLeft: `4px solid ${color}`,
-                                                                    borderTop: `1px solid ${hexToRgba(color, 0.25)}`,
-                                                                    borderRight: `1px solid ${hexToRgba(color, 0.25)}`,
-                                                                    borderBottom: `1px solid ${hexToRgba(color, 0.25)}`,
-                                                                }}>
-                                                                <div className="flex-shrink-0 px-2 py-1 flex items-center gap-1" style={{ background: hexToRgba(color, isPending ? 0.35 : isApproved ? 0.85 : 0.5) }}>
-                                                                    {isApproved && <Lock className="w-2.5 h-2.5 text-white flex-shrink-0 opacity-90" />}
-                                                                    {isPending && <AlertCircle className="w-2.5 h-2.5 text-white flex-shrink-0 opacity-90" />}
-                                                                    <p className="text-[10px] font-black truncate leading-tight text-white drop-shadow-sm flex-1">{ev.titulo}</p>
-                                                                </div>
-                                                                {height > 40 && (
-                                                                    <div className="px-2 py-0.5 flex-1">
-                                                                        <p className="text-[9px] font-bold truncate" style={{ color }}>{new Date(ev.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(ev.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                });
-                                            })}
-
-                                            {dayRes.map((recurso, rIdx) => {
-                                                const colW = 100 / nRes;
-                                                const colLeft = rIdx * colW;
-                                                return bloqueos
-                                                    .filter(b => Number(b.recurso) === Number(recurso.id) && bloqueoAppliesToDate(b, toDateStr(day)))
-                                                    .map(b => {
-                                                        const hiMins = (b.hora_inicio || '00:00').split(':').slice(0, 2).reduce((h, m) => h * 60 + Number(m), 0);
-                                                        const hfMins = (b.hora_fin || '00:00').split(':').slice(0, 2).reduce((h, m) => h * 60 + Number(m), 0);
-                                                        const top = ((hiMins - configStart * 60) / SLOT_MIN) * SLOT_HEIGHT;
-                                                        const height = ((hfMins - hiMins) / SLOT_MIN) * SLOT_HEIGHT;
-                                                        if (top < 0 || height <= 0) return null;
+                                                {/* Now indicator */}
+                                                {isToday && (() => {
+                                                    try {
+                                                        const now = new Date();
+                                                        const top = ((now.getHours() * 60 + now.getMinutes() - configStart * 60) / SLOT_MIN) * SLOT_HEIGHT;
+                                                        if (top < 0 || top > TIME_SLOTS.length * SLOT_HEIGHT) return null;
                                                         return (
-                                                            <div key={`bloqueo-${b.id}`} className="absolute z-25 pointer-events-none"
-                                                                style={{ top: `${top}px`, height: `${height}px`, left: `${colLeft}%`, width: `${colW}%` }}>
-                                                                <div className="h-full mx-0.5 rounded-md flex items-center gap-1 px-1 overflow-hidden" style={{ background: 'repeating-linear-gradient(45deg,rgba(251,191,36,0.18) 0,rgba(251,191,36,0.18) 4px,rgba(254,243,199,0.5) 4px,rgba(254,243,199,0.5) 10px)', border: '1.5px solid rgba(251,191,36,0.55)' }}>
-                                                                    <Lock className="w-2.5 h-2.5 text-amber-500" />
-                                                                    {height > 28 && <span className="text-[9px] font-black text-amber-700 truncate">{b.motivo || 'Bloqueado'}</span>}
+                                                            <div className="absolute left-0 right-0 z-30 flex items-center pointer-events-none" style={{ top: `${top}px` }}>
+                                                                <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-md shadow-rose-500/50 -ml-1.5 flex-shrink-0" />
+                                                                <div className="flex-1 h-0.5 bg-rose-400 shadow-sm" />
+                                                            </div>
+                                                        );
+                                                    } catch (e) { return null; }
+                                                })()}
+
+                                                {dayRes.map((recurso, rIdx) => {
+                                                    const color = recurso.color || '#6366f1';
+                                                    const events = getReservasForDayAndRecurso(day, recurso.id);
+                                                    const laid = layoutEvents(events);
+                                                    const colW = 100 / nRes;
+                                                    const colLeft = rIdx * colW;
+
+                                                    return laid.map(({ ev, colIndex, colCount }) => {
+                                                        const { top, height } = getEventPos(ev);
+                                                        const isPending = ev.estado === 'PENDIENTE';
+                                                        const isApproved = ev.estado === 'APROBADA';
+                                                        const isRejected = ev.estado === 'RECHAZADA' || ev.estado === 'CANCELADA';
+                                                        const subW = colW / colCount;
+                                                        const subLeft = colLeft + colIndex * subW;
+
+                                                        return (
+                                                            <div key={ev.id} className="absolute z-20 cursor-pointer group transition-all hover:z-40"
+                                                                style={{
+                                                                    top: `${top}px`, height: `${height}px`,
+                                                                    left: `${subLeft}%`, width: `calc(${subW}% - 3px)`,
+                                                                    opacity: isRejected ? 0.35 : 1
+                                                                }}
+                                                                onClick={e => { e.stopPropagation(); setDetailReserva(ev); }}>
+                                                                <div className="h-full rounded-lg overflow-hidden flex flex-col"
+                                                                    style={{
+                                                                        background: isApproved ? hexToRgba(color, 0.15) : hexToRgba(color, 0.10),
+                                                                        borderLeft: `4px solid ${color}`,
+                                                                        borderTop: `1px solid ${hexToRgba(color, 0.25)}`,
+                                                                        borderRight: `1px solid ${hexToRgba(color, 0.25)}`,
+                                                                        borderBottom: `1px solid ${hexToRgba(color, 0.25)}`,
+                                                                    }}>
+                                                                    <div className="flex-shrink-0 px-2 py-1 flex items-center gap-1" style={{ background: hexToRgba(color, isPending ? 0.35 : isApproved ? 0.85 : 0.5) }}>
+                                                                        {isApproved && <Lock className="w-2.5 h-2.5 text-white flex-shrink-0 opacity-90" />}
+                                                                        {isPending && <AlertCircle className="w-2.5 h-2.5 text-white flex-shrink-0 opacity-90" />}
+                                                                        <p className="text-[10px] font-black truncate leading-tight text-white drop-shadow-sm flex-1">{ev.titulo}</p>
+                                                                    </div>
+                                                                    {height > 40 && (
+                                                                        <div className="px-2 py-0.5 flex-1">
+                                                                            <p className="text-[9px] font-bold truncate" style={{ color }}>{new Date(ev.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(ev.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         );
                                                     });
-                                            })}
-                                        </div>
-                                    );
-                                })}
+                                                })}
+
+                                                {dayRes.map((recurso, rIdx) => {
+                                                    const colW = 100 / nRes;
+                                                    const colLeft = rIdx * colW;
+                                                    return bloqueos
+                                                        .filter(b => Number(b.recurso) === Number(recurso.id) && bloqueoAppliesToDate(b, toDateStr(day)))
+                                                        .map(b => {
+                                                            const hiMins = (b.hora_inicio || '00:00').split(':').slice(0, 2).reduce((h, m) => h * 60 + Number(m), 0);
+                                                            const hfMins = (b.hora_fin || '00:00').split(':').slice(0, 2).reduce((h, m) => h * 60 + Number(m), 0);
+                                                            const top = ((hiMins - configStart * 60) / SLOT_MIN) * SLOT_HEIGHT;
+                                                            const height = ((hfMins - hiMins) / SLOT_MIN) * SLOT_HEIGHT;
+                                                            if (top < 0 || height <= 0) return null;
+                                                            return (
+                                                                <div key={`bloqueo-${b.id}`} className="absolute z-25 pointer-events-none"
+                                                                    style={{ top: `${top}px`, height: `${height}px`, left: `${colLeft}%`, width: `${colW}%` }}>
+                                                                    <div className="h-full mx-0.5 rounded-md flex items-center gap-1 px-1 overflow-hidden" style={{ background: 'repeating-linear-gradient(45deg,rgba(251,191,36,0.18) 0,rgba(251,191,36,0.18) 4px,rgba(254,243,199,0.5) 4px,rgba(254,243,199,0.5) 10px)', border: '1.5px solid rgba(251,191,36,0.55)' }}>
+                                                                        <Lock className="w-2.5 h-2.5 text-amber-500" />
+                                                                        {height > 28 && <span className="text-[9px] font-black text-amber-700 truncate">{b.motivo || 'Bloqueado'}</span>}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        });
+                                                })}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
-                    </>
+                        </>
+                    )
                 )}
             </div>
 
@@ -940,7 +1130,7 @@ const ReservasDashboard = () => {
                             {/* ─ PASO 1: Tipo de recurso ─ */}
                             <div>
                                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Tipo de recurso *</label>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                     {Object.entries(TYPE_LABELS).map(([tipo, label]) => {
                                         const Icon = RECURSO_ICONS[tipo] || Package;
                                         const tieneRecursos = recursos.some(r => r.tipo === tipo && r.activo !== false);
@@ -978,7 +1168,7 @@ const ReservasDashboard = () => {
                                         {recursosDeTipo.length === 0 ? (
                                             <p className="text-xs text-slate-400 italic text-center py-3">No hay recursos de este tipo</p>
                                         ) : (
-                                            <div className="grid grid-cols-2 gap-2">
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                                 {recursosDeTipo.map(r => {
                                                     const Icon = RECURSO_ICONS[r.tipo] || Package;
                                                     const isSelected = parseInt(formData.recurso) === r.id;
@@ -1019,11 +1209,12 @@ const ReservasDashboard = () => {
                                 </label>
                                 <input
                                     type="text"
-                                    className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    className={`w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 outline-none ${!canChangeName ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'focus:ring-2 focus:ring-indigo-500'}`}
                                     value={formData.nombre_funcionario}
                                     onChange={e => setFormData(p => ({ ...p, nombre_funcionario: e.target.value }))}
                                     placeholder="Ej: Juan Pérez González"
                                     required
+                                    readOnly={!canChangeName}
                                 />
                             </div>
                             {/* Fecha y horas */}
@@ -1031,6 +1222,7 @@ const ReservasDashboard = () => {
                                 <div className="col-span-3">
                                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Fecha *</label>
                                     <input type="date" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        min={todayStr}
                                         value={formData.fecha} onChange={e => setFormData(p => ({ ...p, fecha: e.target.value }))} required />
                                 </div>
                                 <div className="col-span-3 grid grid-cols-2 gap-3">
@@ -1047,13 +1239,13 @@ const ReservasDashboard = () => {
 
                                         // 3. Filtrar slots para "Desde"
                                         const now = new Date();
-                                        const nowMins = now.getHours() * 60 + now.getMinutes();
+                                        const nowHourStart = now.getHours() * 60;
                                         const esHoy = formData.fecha === todayStr;
 
                                         const slotsDesde = TIME_SLOTS.filter(s => {
                                             const m = getMins(s);
-                                            // Si es hoy, no mostrar horas que ya pasaron
-                                            if (esHoy && m < nowMins - 15) return false; // Buffer de 15 min por si acaso
+                                            // Si es hoy, permitir desde el inicio de la hora actual
+                                            if (esHoy && m < nowHourStart) return false;
 
                                             // Un slot es válido para empezar si no está DENTRO de una reserva (inicio <= m < fin)
                                             return !resDía.some(r => {
@@ -1134,8 +1326,9 @@ const ReservasDashboard = () => {
                 const color = rec?.color || '#6366f1';
                 const cfg = ESTADO_CFG[detailReserva.estado] || ESTADO_CFG.PENDIENTE;
                 const isRechazando = rechazandoId === detailReserva.id;
+                const isPast = new Date(detailReserva.fecha_fin) < new Date();
                 return (
-                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setDetailReserva(null); setRechazandoId(null); setMotivoRechazo(''); }}>
+                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => { setDetailReserva(null); setRechazandoId(null); setMotivoRechazo(''); }}>
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
                             <div className="px-6 py-5" style={{ background: `linear-gradient(135deg, ${color}, ${hexToRgba(color, 0.7)})` }}>
                                 <div className="flex justify-between items-start">
@@ -1147,10 +1340,17 @@ const ReservasDashboard = () => {
                                 </div>
                             </div>
                             <div className="p-5 space-y-4">
-                                <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border"
-                                    style={{ background: cfg.bg, color: cfg.text, borderColor: cfg.border }}>
-                                    {cfg.label}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border"
+                                        style={{ background: cfg.bg, color: cfg.text, borderColor: cfg.border }}>
+                                        {cfg.label}
+                                    </span>
+                                    {isPast && (
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-500 border border-slate-200">
+                                            Finalizada (Pasada)
+                                        </span>
+                                    )}
+                                </div>
                                 <div className="space-y-3">
                                     <div className="flex items-start gap-3 text-sm">
                                         <Clock className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
@@ -1202,7 +1402,7 @@ const ReservasDashboard = () => {
 
                                 {detailReserva.estado === 'PENDIENTE' && !isRechazando && (
                                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-                                        <button onClick={() => handleEstado(detailReserva.id, 'APROBADA')} className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl font-black text-xs hover:bg-emerald-100 border border-emerald-200">
+                                        <button onClick={() => handleEstado(detailReserva.id, 'APROBADA', '')} className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl font-black text-xs hover:bg-emerald-100 border border-emerald-200">
                                             <Check className="w-4 h-4" /> Aprobar
                                         </button>
                                         <button onClick={() => { setRechazandoId(detailReserva.id); setMotivoRechazo(''); }} className="flex items-center justify-center gap-2 py-2.5 bg-rose-50 text-rose-700 rounded-xl font-black text-xs hover:bg-rose-100 border border-rose-200">
@@ -1211,9 +1411,39 @@ const ReservasDashboard = () => {
                                     </div>
                                 )}
                                 {detailReserva.estado === 'APROBADA' && (
-                                    <button onClick={() => handleEstado(detailReserva.id, 'FINALIZADA')} className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-50 text-blue-700 rounded-xl font-black text-xs hover:bg-blue-100 border border-blue-200">
-                                        <Check className="w-4 h-4" /> Marcar como Finalizada
-                                    </button>
+                                    <div className="pt-2 border-t border-slate-100">
+                                        {!isPast ? (
+                                            <button onClick={() => handleEstado(detailReserva.id, 'FINALIZADA', '')} className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-50 text-blue-700 rounded-xl font-black text-xs hover:bg-blue-100 border border-blue-200">
+                                                <Check className="w-4 h-4" /> Marcar como Finalizada
+                                            </button>
+                                        ) : (
+                                            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reserva Completada</p>
+                                                <p className="text-[9px] text-slate-400 mt-0.5">Esta reserva ya ha finalizado su horario.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Zona peligro: Eliminar Permanentemente */}
+                                {canForceDelete && !isRechazando && (
+                                    <div className="pt-3 border-t border-rose-100">
+                                        <button
+                                            onClick={async () => {
+                                                if (!window.confirm(`¿Eliminar PERMANENTEMENTE la reserva "${detailReserva.titulo}"?\n\nEsta acción no se puede deshacer.`)) return;
+                                                try {
+                                                    await api.delete(`reservas/solicitudes/${detailReserva.id}/force_delete/`);
+                                                    setDetailReserva(null);
+                                                    fetchData();
+                                                } catch (err) {
+                                                    alert(err.response?.data?.detail || 'Error al eliminar la reserva.');
+                                                }
+                                            }}
+                                            className="w-full flex items-center justify-center gap-2 py-2.5 bg-rose-50 text-rose-600 rounded-xl font-black text-xs hover:bg-rose-100 border border-rose-200 transition"
+                                        >
+                                            <Trash2 className="w-4 h-4" /> Eliminar Permanentemente
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -1297,43 +1527,72 @@ const ReservasDashboard = () => {
                                     </div>
                                 )}
                                 {adminEditing?.id === 'settings' ? (
-                                    <form onSubmit={async (e) => {
-                                        e.preventDefault();
-                                        setAdminSaving(true);
-                                        try {
-                                            await api.put('reservas/settings/1/', settings);
-                                            setAdminError('');
-                                            await fetchData();
-                                            // No cerramos el modal para que vea el cambio o pueda seguir ajustando
-                                        } catch (e) {
-                                            setAdminError('Error al guardar la configuración. Revisa los valores.');
-                                        } finally {
-                                            setAdminSaving(false);
-                                        }
-                                    }} className="space-y-6">
-                                        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
-                                            <p className="text-xs text-indigo-700 leading-relaxed">
-                                                Ajusta el rango de horas que se mostrará en el calendario para todos los usuarios.
-                                                Las reservas existentes fuera de este rango seguirán siendo válidas pero podrían no ser visibles en la vista diaria/semanal.
-                                            </p>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Hora de Inicio</label>
-                                                <input type="time" step="1800" className="w-full rounded-xl border border-slate-200 text-sm px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                    value={settings.hora_inicio.slice(0, 5)} onChange={e => setSettings(p => ({ ...p, hora_inicio: e.target.value }))} required />
+                                    <div className="space-y-8">
+                                        <form onSubmit={async (e) => {
+                                            e.preventDefault();
+                                            setAdminSaving(true);
+                                            try {
+                                                await api.put('reservas/settings/1/', settings);
+                                                setAdminError('');
+                                                await fetchData();
+                                                alert('Horario laboral actualizado con éxito.');
+                                            } catch (e) {
+                                                setAdminError('Error al guardar la configuración.');
+                                            } finally {
+                                                setAdminSaving(false);
+                                            }
+                                        }} className="space-y-6">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Hora de Inicio</label>
+                                                    <input type="time" step="1800" className="w-full rounded-xl border border-slate-200 text-sm px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                        value={settings.hora_inicio.slice(0, 5)} onChange={e => setSettings(p => ({ ...p, hora_inicio: e.target.value }))} required />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Hora de Término</label>
+                                                    <input type="time" step="1800" className="w-full rounded-xl border border-slate-200 text-sm px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                        value={settings.hora_fin.slice(0, 5)} onChange={e => setSettings(p => ({ ...p, hora_fin: e.target.value }))} required />
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Hora de Término</label>
-                                                <input type="time" step="1800" className="w-full rounded-xl border border-slate-200 text-sm px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                    value={settings.hora_fin.slice(0, 5)} onChange={e => setSettings(p => ({ ...p, hora_fin: e.target.value }))} required />
+                                            <button type="submit" disabled={adminSaving} className="w-full py-3 bg-slate-800 text-white rounded-xl font-black text-xs hover:bg-slate-900 transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-50">
+                                                {adminSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                                Actualizar Horario Laboral
+                                            </button>
+                                        </form>
+
+                                        <div className="pt-6 border-t border-slate-100">
+                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Aplicar Antelación en Masa</h4>
+                                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-4">
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">1. Días de Antelación</label>
+                                                    <input type="number" min="0" className="w-24 rounded-xl border border-slate-200 text-sm px-4 py-2 font-black text-indigo-600 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                        value={bulkDays || 0} onChange={e => setBulkDays(parseInt(e.target.value) || 0)} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">2. Seleccionar Recursos</label>
+                                                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
+                                                        {recursos.map(r => (
+                                                            <label key={r.id} className="flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-100 hover:border-indigo-200 cursor-pointer transition">
+                                                                <input type="checkbox" className="rounded text-indigo-600 focus:ring-indigo-500" 
+                                                                    checked={selectedBulk.includes(r.id)} 
+                                                                    onChange={e => {
+                                                                        if (e.target.checked) setSelectedBulk(p => [...p, r.id]);
+                                                                        else setSelectedBulk(p => p.filter(id => id !== r.id));
+                                                                    }} />
+                                                                <span className="text-[10px] font-bold text-slate-600 truncate">{r.nombre}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <button type="button" 
+                                                    onClick={handleBulkUpdate}
+                                                    disabled={adminSaving || selectedBulk.length === 0}
+                                                    className="w-full py-2.5 bg-indigo-50 text-indigo-700 rounded-xl font-black text-[10px] uppercase border border-indigo-100 hover:bg-indigo-100 transition flex items-center justify-center gap-2 disabled:opacity-50">
+                                                    <Check className="w-3 h-3" /> Aplicar a {selectedBulk.length} recursos
+                                                </button>
                                             </div>
                                         </div>
-                                        <button type="submit" disabled={adminSaving} className="w-full py-3 bg-slate-800 text-white rounded-xl font-black text-xs hover:bg-slate-900 transition flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg">
-                                            {adminSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                                            Guardar Configuración
-                                        </button>
-                                    </form>
+                                    </div>
                                 ) : (
                                     <form onSubmit={handleAdminSave} className="space-y-4">
                                         {/* Tipo */}
@@ -1383,8 +1642,8 @@ const ReservasDashboard = () => {
                                             </div>
                                         </div>
 
-                                        {/* Ubicación + Capacidad */}
-                                        <div className="grid grid-cols-2 gap-3">
+                                        {/* Ubicación + Capacidad + Antelación */}
+                                        <div className="grid grid-cols-3 gap-3">
                                             <div>
                                                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><MapPin className="w-3 h-3" /> Ubicación</label>
                                                 <input type="text" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -1394,6 +1653,11 @@ const ReservasDashboard = () => {
                                                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Users className="w-3 h-3" /> Capacidad</label>
                                                 <input type="number" min="1" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
                                                     value={adminForm.capacidad} onChange={e => setAdminForm(p => ({ ...p, capacidad: parseInt(e.target.value) || 1 }))} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Clock className="w-3 h-3" /> Antelación</label>
+                                                <input type="number" min="0" className="w-full rounded-xl border border-slate-200 text-sm px-3 py-2.5 font-bold text-indigo-600 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    value={adminForm.dias_antelacion} onChange={e => setAdminForm(p => ({ ...p, dias_antelacion: parseInt(e.target.value) || 0 }))} />
                                             </div>
                                         </div>
 
@@ -1515,6 +1779,7 @@ const ReservasDashboard = () => {
                                                                 {bloqueoForm.modo === 'DIA' ? 'Fecha *' : bloqueoForm.modo === 'INDEFINIDO' ? 'Desde *' : 'Fecha inicio *'}
                                                             </label>
                                                             <input type="date" required
+                                                                min={todayStr}
                                                                 className="w-full rounded-lg border border-slate-200 text-xs px-2 py-2 focus:ring-1 focus:ring-amber-400 outline-none"
                                                                 value={bloqueoForm.fecha_inicio}
                                                                 onChange={e => setBloqueoForm(p => ({ ...p, fecha_inicio: e.target.value }))} />
@@ -1576,52 +1841,170 @@ const ReservasDashboard = () => {
             {historyOpen && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex justify-end" onClick={() => setHistoryOpen(false)}>
                     <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col animate-in slide-in-from-right" onClick={e => e.stopPropagation()}>
-                        <div className="px-6 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                        <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                             <div>
                                 <h2 className="text-xl font-black text-slate-900">Historial de Reservas</h2>
-                                <p className="text-sm text-slate-500">Registros finalizados, rechazados o cancelados</p>
+                                <p className="text-sm text-slate-500">Busca y filtra entre todos los registros</p>
                             </div>
                             <button onClick={() => setHistoryOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition"><X className="w-6 h-6 text-slate-400" /></button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/30">
-                            {reservas.filter(r => ['FINALIZADA', 'RECHAZADA', 'CANCELADA'].includes(r.estado))
-                                .sort((a, b) => new Date(b.fecha_inicio) - new Date(a.fecha_inicio))
-                                .map(r => {
+
+                        {/* BARRA DE FILTROS */}
+                        <div className="p-4 bg-white border-b border-slate-100 space-y-3">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por título, funcionario, código..."
+                                    value={historySearch}
+                                    onChange={e => setHistorySearch(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 transition outline-none"
+                                />
+                                <Clock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <select
+                                    value={historyFilterEstado}
+                                    onChange={e => setHistoryFilterEstado(e.target.value)}
+                                    className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                                >
+                                    <option value="HISTORIAL">Todos (Cerrados)</option>
+                                    <option value="ALL_RECORDS">Todos (Incluso Activos)</option>
+                                    <option value="PENDIENTE">Solo Pendientes</option>
+                                    <option value="APROBADA">Solo Aprobadas</option>
+                                    <option value="FINALIZADA">Solo Finalizadas</option>
+                                    <option value="RECHAZADA">Solo Rechazadas</option>
+                                    <option value="CANCELADA">Solo Canceladas</option>
+                                </select>
+
+                                <select
+                                    value={historyFilterRecurso}
+                                    onChange={e => setHistoryFilterRecurso(e.target.value)}
+                                    className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                                >
+                                    <option value="all">Todos los Recursos</option>
+                                    {recursos.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)).map(r => (
+                                        <option key={r.id} value={r.id}>{r.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ordenar por:</span>
+                                <div className="flex bg-slate-100 p-0.5 rounded-lg flex-1">
+                                    {[
+                                        { v: '-fecha_inicio', l: 'Recientes' },
+                                        { v: 'fecha_inicio', l: 'Antiguos' },
+                                        { v: 'titulo', l: 'Título' }
+                                    ].map(opt => (
+                                        <button
+                                            key={opt.v}
+                                            onClick={() => setHistorySort(opt.v)}
+                                            className={`flex-1 py-1 px-2 text-[10px] font-bold rounded-md transition ${historySort === opt.v ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            {opt.l}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/10">
+                            {(() => {
+                                let filtered = [...reservas];
+
+                                // 1. Filtro por Estado
+                                if (historyFilterEstado === 'HISTORIAL') {
+                                    filtered = filtered.filter(r => ['FINALIZADA', 'RECHAZADA', 'CANCELADA'].includes(r.estado));
+                                } else if (historyFilterEstado !== 'ALL_RECORDS') {
+                                    filtered = filtered.filter(r => r.estado === historyFilterEstado);
+                                }
+
+                                // 2. Filtro por Recurso
+                                if (historyFilterRecurso !== 'all') {
+                                    filtered = filtered.filter(r => parseInt(r.recurso) === parseInt(historyFilterRecurso));
+                                }
+
+                                // 3. Búsqueda Texto
+                                if (historySearch.trim()) {
+                                    const q = historySearch.toLowerCase();
+                                    filtered = filtered.filter(r =>
+                                        r.titulo.toLowerCase().includes(q) ||
+                                        (r.nombre_funcionario && r.nombre_funcionario.toLowerCase().includes(q)) ||
+                                        (r.codigo_reserva && r.codigo_reserva.toLowerCase().includes(q)) ||
+                                        (r.descripcion && r.descripcion.toLowerCase().includes(q))
+                                    );
+                                }
+
+                                // 4. Orden
+                                filtered.sort((a, b) => {
+                                    if (historySort === '-fecha_inicio') return new Date(b.fecha_inicio) - new Date(a.fecha_inicio);
+                                    if (historySort === 'fecha_inicio') return new Date(a.fecha_inicio) - new Date(b.fecha_inicio);
+                                    if (historySort === 'titulo') return a.titulo.localeCompare(b.titulo);
+                                    return 0;
+                                });
+
+                                if (filtered.length === 0) {
+                                    return (
+                                        <div className="text-center py-20">
+                                            <AlertCircle className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                                            <p className="text-slate-400 font-bold">No se encontraron resultados</p>
+                                            <p className="text-[10px] text-slate-300 mt-1">Prueba con otros criterios de búsqueda</p>
+                                        </div>
+                                    );
+                                }
+
+                                return filtered.map(r => {
                                     const rec = recursos.find(rec => rec.id === r.recurso);
                                     const cfg = ESTADO_CFG[r.estado] || ESTADO_CFG.PENDIENTE;
                                     const color = rec?.color || '#6366f1';
                                     return (
-                                        <div key={r.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col gap-3">
+                                        <div key={r.id} className="group bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col gap-3 hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer"
+                                            onClick={() => { setDetailReserva(r); }}>
                                             <div className="flex justify-between items-start">
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
                                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{rec?.nombre || 'Recurso'}</span>
                                                 </div>
-                                                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase border" style={{ background: cfg.bg, color: cfg.text, borderColor: cfg.border }}>{cfg.label}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase border" style={{ background: cfg.bg, color: cfg.text, borderColor: cfg.border }}>{cfg.label}</span>
+                                                    {canForceDelete && (
+                                                        <button
+                                                            title="Eliminar Permanentemente"
+                                                            onClick={(e) => handleForceDeleteReserva(r, e)}
+                                                            className="p-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-500 hover:bg-rose-100 hover:text-rose-700 transition opacity-0 group-hover:opacity-100"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                             <div>
-                                                <h4 className="font-black text-slate-800 text-sm">{r.titulo}</h4>
-                                                <p className="text-[11px] text-slate-500 mt-1">{r.nombre_funcionario || r.solicitante_email}</p>
+                                                <h4 className="font-black text-slate-800 text-sm group-hover:text-indigo-600 transition-colors uppercase">{r.titulo}</h4>
+                                                <div className="flex items-center gap-1.5 mt-1">
+                                                    <User className="w-3 h-3 text-slate-300" />
+                                                    <p className="text-[11px] font-bold text-slate-500">{r.nombre_funcionario || 'Sin nombre'}</p>
+                                                </div>
                                             </div>
                                             <div className="flex items-center gap-4 pt-2 border-t border-slate-50">
-                                                <div className="flex items-center gap-1.5 text-slate-500">
+                                                <div className="flex items-center gap-1.5 text-slate-400">
                                                     <Calendar className="w-3 h-3" />
                                                     <span className="text-[10px] font-bold">{toDateStr(r.fecha_inicio)}</span>
                                                 </div>
-                                                <div className="flex items-center gap-1.5 text-slate-500">
+                                                <div className="flex items-center gap-1.5 text-slate-400">
                                                     <Clock className="w-3 h-3" />
-                                                    <span className="text-[10px] font-bold">{dtMinutes(r.fecha_inicio) / 60 | 0}:{String(dtMinutes(r.fecha_inicio) % 60).padStart(2, '0')} - {dtMinutes(r.fecha_fin) / 60 | 0}:{String(dtMinutes(r.fecha_fin) % 60).padStart(2, '0')}</span>
+                                                    <span className="text-[10px] font-bold">
+                                                        {new Date(r.fecha_inicio).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(r.fecha_fin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                                <div className="ml-auto text-[9px] font-black text-slate-300 font-mono" title="Código de Reserva">
+                                                    #{r.codigo_reserva || '---'}
                                                 </div>
                                             </div>
                                         </div>
                                     );
-                                })}
-                            {reservas.filter(r => ['FINALIZADA', 'RECHAZADA', 'CANCELADA'].includes(r.estado)).length === 0 && (
-                                <div className="text-center py-20">
-                                    <Clock className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-                                    <p className="text-slate-400 font-bold">No hay registros históricos aún</p>
-                                </div>
-                            )}
+                                });
+                            })()}
                         </div>
                     </div>
                 </div>
@@ -1631,3 +2014,4 @@ const ReservasDashboard = () => {
 };
 
 export default ReservasDashboard;
+

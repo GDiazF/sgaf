@@ -3,16 +3,25 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Establecimiento, Solicitante, Activo, Prestamo
+from .models import Establecimiento, Solicitante, Activo, Prestamo, TipoActivo
 from .serializers import (
     EstablecimientoSerializer, 
     SolicitanteSerializer, 
     ActivoSerializer, 
-    PrestamoSerializer
+    PrestamoSerializer,
+    TipoActivoSerializer
 )
 
 from establecimientos.views import EstablecimientoViewSet
 from establecimientos.pagination import LargeResultsSetPagination
+
+from rest_framework.permissions import IsAuthenticated
+
+class TipoActivoViewSet(viewsets.ModelViewSet):
+    queryset = TipoActivo.objects.all()
+    serializer_class = TipoActivoSerializer
+    pagination_class = None
+    permission_classes = [IsAuthenticated]
 
 class SolicitanteViewSet(viewsets.ModelViewSet):
     queryset = Solicitante.objects.all()

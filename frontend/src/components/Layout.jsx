@@ -1,20 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Key, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Box, Globe } from 'lucide-react';
+import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Box, Globe, UserCircle2, Settings, History, Info } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../hooks/usePermission';
 import api from '../api';
+import UserProfileModal from './auth/UserProfileModal';
+import AboutModal from './common/AboutModal';
+import { APP_VERSION } from '../version';
 
 const Layout = () => {
     const location = useLocation();
-    const { user, logout } = useAuth();
+    const { user, logout, checkUserStatus } = useAuth();
     const { can, hasRole } = usePermission();
     const [sidebarOpen, setSidebarOpen] = useState(true); // Desktop: Collapsed/Expanded
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // Mobile: Open/Closed
     const [activeMainGroup, setActiveMainGroup] = useState(null); // 'ssgg', 'tesoreria', 'mp'
     const [activeSubMenu, setActiveSubMenu] = useState(null); // 'services' or 'loans'
     const [isProfileOpen, setIsProfileOpen] = useState(false); // Header profile dropdown
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+    const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
     const [isOnline, setIsOnline] = useState(true); // Backend status
     const profileRef = useRef(null);
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -24,9 +29,11 @@ const Layout = () => {
     // Track window resize for responsive sidebar
     useEffect(() => {
         const handleResize = () => {
-            setWindowWidth(window.innerWidth);
-            if (window.innerWidth < 768) {
-                setSidebarOpen(false); // Automatically collapse standard sidebar on small screens
+            const width = window.innerWidth;
+            setWindowWidth(width);
+            // Si la resolución es menor o igual a 1366px hide sidebar by default
+            if (width <= 1366) {
+                setSidebarOpen(false);
             } else {
                 setSidebarOpen(true);
             }
@@ -39,10 +46,25 @@ const Layout = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Close mobile menu when route changes
+    // Close sidebar/mobile menu when route changes
     useEffect(() => {
         setMobileMenuOpen(false);
-    }, [location.pathname]);
+        if (windowWidth <= 1366) {
+            setSidebarOpen(false);
+        }
+    }, [location.pathname, windowWidth]);
+
+    // Block scroll when mobile menu is open
+    useEffect(() => {
+        if (mobileMenuOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [mobileMenuOpen]);
 
     // Handle clicks outside profile dropdown
     useEffect(() => {
@@ -64,14 +86,15 @@ const Layout = () => {
         const routeTitles = {
             '/': 'Dashboard',
             '/establishments': 'Establecimientos',
-            '/funcionarios': 'Personal',
+            '/funcionarios': 'Funcionarios',
             '/reservas-externas': 'Reservas Externas',
             '/contracts': 'Contratos',
             '/services/providers': 'Proveedores',
             '/services/adquisiciones': 'Factura sin OC',
             '/services': 'Servicios',
-            '/services/payments': 'Pagos',
-            '/services/rc': 'Recepciones',
+            '/services/payments': 'Pagos de Servicios',
+            '/services/reporte-consumos': 'Reporte Consumos',
+            '/services/rc': 'Recepción Conforme',
             '/services/cdp': 'CDPs',
             '/telecomunicaciones': 'Teléfonos',
             '/impresoras': 'Impresoras',
@@ -82,7 +105,9 @@ const Layout = () => {
             '/orden-compra': 'Visor OC',
             '/licitaciones': 'Visor Licitaciones',
             '/reservas': 'Reservas',
-            '/personal-ti': 'Personal TI'
+            '/personal-ti': 'Personal TI',
+            '/procedimientos': 'Procedimientos',
+            '/admin/audit-log': 'Auditoría de Sistema'
         };
 
         const baseTitle = 'SGAF - SLEP Iquique';
@@ -127,7 +152,7 @@ const Layout = () => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setMobileMenuOpen(false)}
-                        className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 md:hidden"
+                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[60] md:hidden"
                     />
                 )}
             </AnimatePresence>
@@ -136,8 +161,8 @@ const Layout = () => {
             <motion.aside
                 initial={false}
                 animate={{
-                    width: sidebarOpen || mobileMenuOpen ? 256 : 0,
-                    x: mobileMenuOpen || (sidebarOpen && windowWidth >= 768) ? 0 : (windowWidth < 768 ? -256 : 0),
+                    width: sidebarOpen || mobileMenuOpen ? '16rem' : '0',
+                    x: mobileMenuOpen || (sidebarOpen && windowWidth >= 768) ? 0 : (windowWidth < 768 ? '-16rem' : 0),
                     opacity: sidebarOpen || mobileMenuOpen || windowWidth >= 768 ? 1 : 0
                 }}
                 transition={{
@@ -147,11 +172,11 @@ const Layout = () => {
                     mass: 0.8
                 }}
                 className={`
-                    fixed md:relative inset-y-0 left-0 z-40 bg-slate-900 text-slate-200 flex flex-col shadow-2xl overflow-hidden h-full
+                    fixed md:relative inset-y-0 left-0 z-[100] md:z-40 bg-slate-900 text-slate-200 flex flex-col shadow-2xl overflow-hidden h-full
                     ${!mobileMenuOpen && windowWidth < 768 ? '-translate-x-full' : ''}
                 `}
             >
-                <div className="p-4 flex items-center justify-center h-28 overflow-hidden">
+                <div className={`p-4 flex items-center justify-center ${windowWidth <= 1366 ? 'h-20' : 'h-28'} overflow-hidden`}>
                     <motion.div
                         initial={false}
                         animate={{
@@ -211,24 +236,38 @@ const Layout = () => {
                                 animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
                                 className="font-medium whitespace-nowrap"
                             >
-                                Personal
+                                Funcionarios
+                            </motion.span>
+                        </Link>
+                    )}
+
+                    {can('solicitudes_reservas.view_solicitudreserva') && (
+                        <Link
+                            to="/reservas"
+                            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/reservas') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                        >
+                            <Calendar className="w-5 h-5 flex-shrink-0" />
+                            <motion.span
+                                initial={false}
+                                animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                                className="font-medium whitespace-nowrap"
+                            >
+                                Reservas
                             </motion.span>
                         </Link>
                     )}
 
                     <Link
-                        to="/reservas-externas"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/reservas-externas') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                        to="/procedimientos"
+                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/procedimientos') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
                     >
-                        <Calendar className="w-5 h-5 flex-shrink-0" />
+                        <FileStack className="w-5 h-5 flex-shrink-0" />
                         <motion.span
                             initial={false}
                             animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
                             className="font-medium whitespace-nowrap"
                         >
-                            Reservas Externas
+                            Procedimientos
                         </motion.span>
                     </Link>
 
@@ -307,10 +346,15 @@ const Layout = () => {
                                                         </button>
                                                         {activeSubMenu === 'services' && (
                                                             <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
-                                                                {can('servicios.view_servicio') && <Link to="/services" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Panel Principal</Link>}
-                                                                {can('servicios.view_registropago') && <Link to="/services/payments" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/payments') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Pagos</Link>}
-                                                                {can('servicios.view_recepcionconforme') && <Link to="/services/rc" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/rc') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Recepciones</Link>}
-                                                                {can('servicios.view_cdp') && <Link to="/services/cdp" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/services/cdp') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>CDPs</Link>}
+                                                                {can('servicios.view_servicio') && <Link to="/services" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Panel Principal</Link>}
+                                                                {can('servicios.view_registropago') && (
+                                                                    <>
+                                                                        <Link to="/services/payments" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/payments') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Pagos</Link>
+                                                                        <Link to="/services/reporte-consumos" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/reporte-consumos') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Reporte Consumos</Link>
+                                                                    </>
+                                                                )}
+                                                                {can('servicios.view_recepcionconforme') && <Link to="/services/rc" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/rc') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Recepciones</Link>}
+                                                                {can('servicios.view_cdp') && <Link to="/services/cdp" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/cdp') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>CDPs</Link>}
                                                             </div>
                                                         )}
                                                     </div>
@@ -319,7 +363,7 @@ const Layout = () => {
                                         )}
 
                                         {/* Section: RECURSOS */}
-                                        {(can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo') || can('personal_ti.view_personalti') || can('solicitudes_reservas.view_reserva')) && (
+                                        {(can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo') || can('personal_ti.view_personalti') || can('solicitudes_reservas.view_solicitudreserva')) && (
                                             <div className="space-y-0.5 pt-2">
                                                 <div className="px-4 mb-1">
                                                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Recursos</span>
@@ -342,12 +386,7 @@ const Layout = () => {
                                                         <span className="font-medium whitespace-nowrap">Vehículos</span>
                                                     </Link>
                                                 )}
-                                                {can('solicitudes_reservas.view_reserva') && (
-                                                    <Link to="/reservas" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/reservas') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                                                        <Calendar className="w-4 h-4 flex-shrink-0" />
-                                                        <span className="font-medium whitespace-nowrap">Reservas</span>
-                                                    </Link>
-                                                )}
+
                                                 {can('personal_ti.view_personalti') && (
                                                     <Link to="/personal-ti" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/personal-ti') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
                                                         <MonitorSmartphone className="w-4 h-4 flex-shrink-0" />
@@ -432,6 +471,15 @@ const Layout = () => {
                                                 <FileText className="w-4 h-4 flex-shrink-0" />
                                                 <span className="font-medium whitespace-nowrap">Remuneraciones</span>
                                             </Link>
+                                            {can('remuneraciones.view_mapeobanco') && (
+                                                <Link
+                                                    to="/tesoreria/config"
+                                                    className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/tesoreria/config') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                                >
+                                                    <Settings className="w-4 h-4 flex-shrink-0" />
+                                                    <span className="font-medium whitespace-nowrap">Configuración</span>
+                                                </Link>
+                                            )}
                                         </div>
                                     </motion.div>
                                 )}
@@ -514,6 +562,13 @@ const Layout = () => {
                             </span>
                         </motion.div>
                     </div>
+                    <motion.div
+                        initial={false}
+                        animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}
+                        className="px-4 mt-1"
+                    >
+                        <span className="text-[10px] text-slate-600 font-medium">v{APP_VERSION}</span>
+                    </motion.div>
                 </div >
             </motion.aside >
 
@@ -530,28 +585,28 @@ const Layout = () => {
                                     setMobileMenuOpen(true);
                                 }
                             }}
-                            className="relative group p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all duration-300"
+                            className="relative group p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all duration-300 md:ml-0 -ml-1"
                         >
-                            <div className="w-5 h-5 flex flex-col justify-center items-center gap-1">
+                            <div className="w-5 h-5 flex flex-col justify-center items-center gap-1 text-slate-600">
                                 <motion.span
                                     animate={{
-                                        rotate: sidebarOpen ? 0 : 0,
-                                        y: sidebarOpen ? 0 : 0,
-                                        width: sidebarOpen ? "100%" : "60%"
+                                        width: (sidebarOpen || mobileMenuOpen) ? "100%" : "60%",
+                                        x: (sidebarOpen || mobileMenuOpen) ? 0 : -2
                                     }}
-                                    className="h-0.5 bg-slate-600 rounded-full"
+                                    className="h-0.5 bg-current rounded-full"
                                 />
                                 <motion.span
                                     animate={{
-                                        width: sidebarOpen ? "80%" : "100%"
+                                        width: "100%"
                                     }}
-                                    className="h-0.5 bg-slate-600 rounded-full"
+                                    className="h-0.5 bg-current rounded-full"
                                 />
                                 <motion.span
                                     animate={{
-                                        width: sidebarOpen ? "100%" : "40%"
+                                        width: (sidebarOpen || mobileMenuOpen) ? "100%" : "40%",
+                                        x: (sidebarOpen || mobileMenuOpen) ? 0 : -4
                                     }}
-                                    className="h-0.5 bg-slate-600 rounded-full"
+                                    className="h-0.5 bg-current rounded-full"
                                 />
                             </div>
                         </button>
@@ -564,9 +619,13 @@ const Layout = () => {
                     </div>
 
                     <div className="flex items-center gap-3 relative" ref={profileRef}>
-                        <div className="hidden md:flex flex-col items-end">
-                            <span className="text-sm font-semibold text-slate-700">{user?.username || 'Administrador'}</span>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase">SLEP Iquique</span>
+                        <div className="hidden md:flex flex-col items-end leading-tight">
+                            <span className="text-sm font-semibold text-slate-700">
+                                {user?.funcionario_data?.nombre_funcionario || user?.username || 'Cargando...'}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">
+                                {user?.is_superuser ? 'Super Administrador' : (user?.groups?.[0] || 'Usuario Sistema')}
+                            </span>
                         </div>
 
                         <div className="relative">
@@ -574,10 +633,19 @@ const Layout = () => {
                                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                                 className="relative group transition-transform active:scale-95"
                             >
-                                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow">
-                                    {user?.username?.charAt(0).toUpperCase() || 'U'}
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow overflow-hidden border-2 border-white">
+                                    {user?.avatar ? (
+                                        <img
+                                            src={user.avatar}
+                                            alt="Avatar"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        user?.username?.charAt(0).toUpperCase() || 'U'
+                                    )}
                                 </div>
                             </button>
+
 
                             {/* Dropdown Menu */}
                             <AnimatePresence>
@@ -590,35 +658,70 @@ const Layout = () => {
                                     >
                                         <div className="px-3 py-2 border-b border-slate-50 mb-1">
                                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cuenta</p>
-                                            <p className="text-sm font-bold text-slate-700 truncate">{user?.username}</p>
+                                            <p className="text-sm font-bold text-slate-700 truncate">
+                                                {user?.funcionario_data?.nombre_funcionario || user?.username}
+                                            </p>
                                         </div>
 
-                                        {(can('auth.view_user') || can('auth.view_group')) && (
-                                            <div className="py-1 border-b border-slate-50 mb-1">
-                                                {can('auth.view_user') && (
-                                                    <Link
-                                                        to="/admin/users"
-                                                        onClick={() => setIsProfileOpen(false)}
-                                                        className="flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                    >
-                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                            <Users className="w-4 h-4" />
-                                                        </div>
-                                                        Gestionar Usuarios
-                                                    </Link>
-                                                )}
-                                                {can('auth.view_group') && (
-                                                    <Link
-                                                        to="/admin/roles"
-                                                        onClick={() => setIsProfileOpen(false)}
-                                                        className="flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                    >
-                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                            <Shield className="w-4 h-4" />
-                                                        </div>
-                                                        Gestionar Roles
-                                                    </Link>
-                                                )}
+                                        <div className="py-1">
+                                            <button
+                                                onClick={() => {
+                                                    setIsProfileOpen(false);
+                                                    setIsProfileModalOpen(true);
+                                                }}
+                                                className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                            >
+                                                <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                    <UserCircle2 className="w-4 h-4" />
+                                                </div>
+                                                Mi Perfil
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setIsProfileOpen(false);
+                                                    setIsAboutModalOpen(true);
+                                                }}
+                                                className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                            >
+                                                <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                    <Info className="w-4 h-4" />
+                                                </div>
+                                                Acerca del Sistema
+                                            </button>
+                                        </div>
+
+                                        {(can('auth.view_group') || user?.is_superuser) && (
+                                            <div className="py-1">
+                                                <Link
+                                                    to="/admin/users"
+                                                    onClick={() => setIsProfileOpen(false)}
+                                                    className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                >
+                                                    <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                        <Users className="w-4 h-4" />
+                                                    </div>
+                                                    Gestionar Usuarios
+                                                </Link>
+                                                <Link
+                                                    to="/admin/roles"
+                                                    onClick={() => setIsProfileOpen(false)}
+                                                    className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                >
+                                                    <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                        <Shield className="w-4 h-4" />
+                                                    </div>
+                                                    Roles y Permisos
+                                                </Link>
+                                                <Link
+                                                    to="/admin/audit-log"
+                                                    onClick={() => setIsProfileOpen(false)}
+                                                    className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                >
+                                                    <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                        <History className="w-4 h-4" />
+                                                    </div>
+                                                    Auditoría de Sistema
+                                                </Link>
                                             </div>
                                         )}
 
@@ -641,7 +744,7 @@ const Layout = () => {
                     </div>
                 </header>
 
-                <div className="p-4 md:p-8 md:px-12 max-w-[1800px] mx-auto">
+                <div className="p-4 md:p-8 w-full">
                     <motion.div
                         key={location.pathname}
                         initial={{ opacity: 0, x: -10 }}
@@ -652,6 +755,17 @@ const Layout = () => {
                         <Outlet />
                     </motion.div>
                 </div>
+
+                <UserProfileModal
+                    isOpen={isProfileModalOpen}
+                    onClose={() => setIsProfileModalOpen(false)}
+                />
+
+                <AboutModal
+                    isOpen={isAboutModalOpen}
+                    onClose={() => setIsAboutModalOpen(false)}
+                    version={APP_VERSION}
+                />
             </main >
         </div >
     );

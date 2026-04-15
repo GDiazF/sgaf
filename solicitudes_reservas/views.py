@@ -1,4 +1,5 @@
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, filters, serializers
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import RecursoReservable, SolicitudReserva, BloqueoHorario, ReservaSetting
@@ -39,6 +40,17 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
     serializer_class = SolicitudReservaSerializer
     pagination_class = None
 
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = {
+        'estado': ['exact'],
+        'recurso': ['exact'],
+        'solicitante': ['exact'],
+        'fecha_inicio': ['exact', 'gte', 'lte'],
+        'fecha_fin': ['exact', 'gte', 'lte'],
+    }
+    search_fields = ['titulo', 'nombre_funcionario', 'descripcion', 'codigo_reserva', 'email_contacto']
+    ordering_fields = ['fecha_inicio', 'fecha_fin', 'created_at', 'estado']
+
     def get_permissions(self):
         if self.action in ('list', 'retrieve', 'create', 'public_manage'):
             return [permissions.AllowAny()]
@@ -50,16 +62,23 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
         return SolicitudReservaSerializer
 
     def get_queryset(self):
-        # Auto-finalizar reservas cuya fecha_fin ya pasó
-        now = timezone.now()
-        SolicitudReserva.objects.filter(
-            estado='APROBADA',
-            fecha_fin__lt=now
-        ).update(estado='FINALIZADA')
-
         user = self.request.user
-        if user.is_authenticated and user.is_staff:
+        
+        # ─ LIMPIEZA/LOG: Mover automáticamente reservas PENDIENTES expiran a CANCELADA ─
+        # Esto las saca del calendario activo pero las mantiene en el historial (LOG).
+        SolicitudReserva.objects.filter(estado='PENDIENTE', fecha_fin__lt=timezone.now()).update(estado='CANCELADA')
+
+        # Para usuarios públicos (anónimos), limitamos el historial a 30 días atrás
+        # Esto reduce el tiempo de carga del portal público si hay miles de registros.
+        if not user.is_authenticated:
+            limit_past = timezone.now() - timezone.timedelta(days=30)
+            return SolicitudReserva.objects.filter(fecha_inicio__gte=limit_past).order_by('-fecha_inicio')
+
+        if user.is_staff:
             return SolicitudReserva.objects.all().order_by('-fecha_inicio')
+        
+        # Usuarios regulares logueados: tal vez solo sus solicitudes? 
+        # (Depende de si necesitan ver el calendario completo)
         return SolicitudReserva.objects.all().order_by('-fecha_inicio')
 
     def perform_create(self, serializer):
@@ -76,6 +95,8 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def aprobar(self, request, pk=None):
         solicitud = self.get_object()
+        if solicitud.fecha_fin < timezone.now():
+            return Response({"detail": "No se pueden aprobar reservas que ya han pasado su hora de término."}, status=400)
         solicitud.estado = 'APROBADA'
         solicitud.aprobado_por = request.user
         solicitud.fecha_aprobacion = timezone.now()
@@ -88,6 +109,8 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def rechazar(self, request, pk=None):
         solicitud = self.get_object()
+        if solicitud.fecha_fin < timezone.now():
+            return Response({"detail": "No se pueden rechazar reservas que ya han pasado su hora de término."}, status=400)
         motivo = request.data.get('motivo', '').strip()
         solicitud.estado = 'RECHAZADA'
         solicitud.aprobado_por = request.user
@@ -117,6 +140,10 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
         if not solicitud:
             return Response({"detail": "Código de reserva inválido o no encontrado."}, status=404)
 
+        # BLOQUEAR MODIFICACIÓN SI YA PASO
+        if accion in ('DELETE', 'UPDATE') and solicitud.fecha_fin < timezone.now():
+            return Response({"detail": "No se pueden modificar reservas que ya han finalizado."}, status=400)
+
         if accion == 'VIEW':
             return Response(SolicitudReservaSerializer(solicitud, context={'request': request}).data)
             
@@ -136,6 +163,17 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
             return Response(serializer.errors, status=400)
             
         return Response({"detail": "Acción no permitida."}, status=400)
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        if instance.fecha_fin < timezone.now():
+            raise serializers.ValidationError("No se pueden modificar reservas que ya han finalizado.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if instance.fecha_fin < timezone.now():
+            raise serializers.ValidationError("No se pueden eliminar reservas que ya han finalizado.")
+        instance.delete()
 
 
 class BloqueoHorarioViewSet(viewsets.ModelViewSet):

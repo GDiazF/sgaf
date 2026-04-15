@@ -82,12 +82,15 @@ const UserManagement = () => {
         if (e) e.preventDefault();
         setSaving(true);
         try {
+            // Clean payload
+            const { funcionario_data, is_superuser, ...cleanData } = selectedUser;
+
             // Only include password if it's not empty
-            const payload = { ...selectedUser };
+            const payload = { ...cleanData };
             if (!payload.password) delete payload.password;
 
             if (selectedUser.id) {
-                await api.put(`admin/users/${selectedUser.id}/`, payload);
+                await api.patch(`admin/users/${selectedUser.id}/`, payload);
             } else {
                 await api.post('admin/users/', payload);
             }
@@ -95,6 +98,7 @@ const UserManagement = () => {
             setIsModalOpen(false);
         } catch (error) {
             console.error("Error saving user:", error);
+            alert("Error al guardar usuario. Verifique los datos e intente nuevamente.");
         } finally {
             setSaving(false);
         }
@@ -107,6 +111,19 @@ const UserManagement = () => {
             await fetchData();
         } catch (error) {
             console.error("Error deleting user:", error);
+            alert("No se pudo eliminar el usuario.");
+        }
+    };
+
+    const toggleUserStatus = async (user) => {
+        try {
+            await api.patch(`admin/users/${user.id}/`, {
+                is_active: !user.is_active
+            });
+            await fetchData();
+        } catch (error) {
+            console.error("Error toggling user status:", error);
+            alert("No se pudo cambiar el estado del usuario.");
         }
     };
 
@@ -223,7 +240,7 @@ const UserManagement = () => {
                             <tr>
                                 <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
                                 <SortableHeader label="Usuario" sortKey="username" currentOrdering={ordering} onSort={handleSort} />
-                                <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Perfil Vinculado / RUT</th>
+                                <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Funcionario Vinculado / RUT</th>
                                 <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</th>
                                 <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Roles</th>
                                 <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
@@ -240,10 +257,14 @@ const UserManagement = () => {
                             ) : paginatedUsers.map(user => (
                                 <tr key={user.id} className="hover:bg-slate-50 transition-colors text-xs">
                                     <td className="p-3">
-                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold ${user.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                                        <button
+                                            onClick={() => toggleUserStatus(user)}
+                                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black transition-all hover:scale-105 active:scale-95 ${user.is_active ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                            title={user.is_active ? 'Desactivar Cuenta' : 'Activar Cuenta'}
+                                        >
                                             <Power className="w-3 h-3" />
                                             {user.is_active ? 'ACTIVO' : 'INACTIVO'}
-                                        </span>
+                                        </button>
                                     </td>
                                     <td className="p-3 font-semibold text-slate-900">{user.username}</td>
                                     <td className="p-3 text-slate-600">
@@ -438,8 +459,9 @@ const UserManagement = () => {
                                                 <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">
                                                     {selectedUser.is_active ? 'Activa' : 'Inactiva'}
                                                 </span>
-                                                <label className="relative cursor-pointer">
+                                                <label htmlFor="user-active-toggle" className="relative cursor-pointer">
                                                     <input
+                                                        id="user-active-toggle"
                                                         type="checkbox"
                                                         className="sr-only"
                                                         checked={selectedUser.is_active}

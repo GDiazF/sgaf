@@ -13,6 +13,7 @@ import Establishments from './pages/establishments/Establishments';
 import ServicesDashboard from './pages/services/ServicesDashboard';
 import Providers from './pages/services/Providers';
 import PaymentsDashboard from './pages/services/PaymentsDashboard';
+import PaymentsReport from './pages/services/PaymentsReport';
 import RecepcionConformeList from './pages/services/RecepcionConformeList';
 import CDPManager from './pages/services/CDPManager';
 import FacturasAdquisicionDashboard from './pages/services/FacturasAdquisicionDashboard';
@@ -31,16 +32,21 @@ import ImpresorasDashboard from './pages/impresoras/ImpresorasDashboard';
 // Vehiculos
 import VehiculosDashboard from './pages/vehiculos/VehiculosDashboard';
 import RemuneracionesDashboard from './pages/tesoreria/Remuneraciones';
+import TesoreriaMaintainers from './pages/tesoreria/TesoreriaMaintainers';
 import LicitacionesDashboard from './pages/licitaciones/LicitacionesDashboard';
 import OCDashboard from './pages/orden_compra/OCDashboard';
 import ReservasDashboard from './pages/reservas/ReservasDashboard';
 import PublicReservas from './pages/reservas/PublicReservas';
 import PersonalTIDashboard from './pages/personal_ti/PersonalTIDashboard';
+import ProceduresDashboard from './pages/procedimientos/ProceduresDashboard';
 import Login from './pages/Login';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
 
 // Admin
 import UserManagement from './pages/admin/UserManagement';
 import RolesManagement from './pages/admin/RolesManagement';
+import AuditLog from './pages/admin/AuditLog';
 
 // Private Route Wrapper
 const PrivateRoute = () => {
@@ -57,6 +63,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
           <Route path="/reservas-externas" element={<PublicReservas />} />
 
           {/* Protected Routes */}
@@ -100,6 +108,7 @@ function App() {
 
               <Route element={<ProtectedRoute permission="servicios.view_registropago" />}>
                 <Route path="services/payments" element={<PaymentsDashboard />} />
+                <Route path="services/reporte-consumos" element={<PaymentsReport />} />
               </Route>
 
               <Route element={<ProtectedRoute permission="servicios.view_recepcionconforme" />}>
@@ -144,6 +153,9 @@ function App() {
               <Route element={<ProtectedRoute permission="remuneraciones.view_remuneracion" />}>
                 <Route path="tesoreria" element={<RemuneracionesDashboard />} />
               </Route>
+              <Route element={<ProtectedRoute permission="remuneraciones.view_mapeobanco" />}>
+                <Route path="tesoreria/config" element={<TesoreriaMaintainers />} />
+              </Route>
 
               {/* Otros */}
               <Route element={<ProtectedRoute permission="licitaciones.view_licitacionmp" />}>
@@ -152,17 +164,20 @@ function App() {
               <Route element={<ProtectedRoute permission="orden_compra.view_ordencompramp" />}>
                 <Route path="orden-compra" element={<OCDashboard />} />
               </Route>
-              <Route element={<ProtectedRoute permission="solicitudes_reservas.view_reserva" />}>
+              <Route element={<ProtectedRoute permission="solicitudes_reservas.view_solicitudreserva" />}>
                 <Route path="reservas" element={<ReservasDashboard />} />
               </Route>
               <Route element={<ProtectedRoute permission="personal_ti.view_personalti" />}>
                 <Route path="personal-ti" element={<PersonalTIDashboard />} />
               </Route>
 
+              <Route path="procedimientos" element={<ProceduresDashboard />} />
+
               {/* Administración */}
               <Route element={<ProtectedRoute permission="auth.view_group" />}>
                 <Route path="admin/users" element={<UserManagement />} />
                 <Route path="admin/roles" element={<RolesManagement />} />
+                <Route path="admin/audit-log" element={<AuditLog />} />
               </Route>
             </Route>
           </Route>

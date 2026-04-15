@@ -3,8 +3,14 @@ import api from '../../api';
 import { FileText, Plus, Trash2, Download, Search, X, Save, Edit2, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FilterBar from '../../components/common/FilterBar';
+import { usePermission } from '../../hooks/usePermission';
 
 const CDPManager = () => {
+    const { can } = usePermission();
+    const canAdd = can('servicios.add_cdp');
+    const canDelete = can('servicios.delete_cdp');
+    const canChange = can('servicios.change_cdp');
+
     const [cdps, setCdps] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -108,28 +114,30 @@ const CDPManager = () => {
     };
 
     return (
-        <div>
+        <div className="p-4 md:p-0">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800">Repositorio de CDPs</h2>
-                    <p className="text-slate-500">Gestión de Certificados de Disponibilidad Presupuestaria.</p>
+                    <p className="text-slate-500 text-sm">Certificados de Disponibilidad Presupuestaria.</p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                     <FilterBar onSearch={handleSearch} placeholder="Buscar CDP..." />
-                    <button
-                        onClick={handleNew}
-                        className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-medium whitespace-nowrap"
-                    >
-                        <Plus className="w-5 h-5" />
-                        <span>Subir CDP</span>
-                    </button>
+                    {canAdd && (
+                        <button
+                            onClick={handleNew}
+                            className="flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 font-bold text-sm whitespace-nowrap"
+                        >
+                            <Plus className="w-5 h-5" />
+                            <span>Subir CDP</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {cdps.map(cdp => (
                     <motion.div
                         key={cdp.id}
@@ -148,7 +156,11 @@ const CDPManager = () => {
                             </div>
                             <div className="flex gap-1">
                                 <button
-                                    onClick={() => setPreviewUrl(cdp.archivo)}
+                                    onClick={() => {
+                                        // Ensure we use a relative URL if it's absolute to avoid Cors/X-Frame issues via the proxy
+                                        const cleanUrl = cdp.archivo?.replace(/^https?:\/\/[^/]+/, '');
+                                        setPreviewUrl(cleanUrl);
+                                    }}
                                     className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                                     title="Ver Documento"
                                 >
@@ -325,11 +337,17 @@ const CDPManager = () => {
                                 </button>
                             </div>
                             <div className="flex-1 bg-slate-100 p-2">
-                                <iframe
-                                    src={previewUrl}
-                                    className="w-full h-full rounded-lg border border-slate-200"
-                                    title="PDF Preview"
-                                />
+                                {previewUrl?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                                    <div className="w-full h-full flex items-center justify-center p-4">
+                                        <img src={previewUrl} className="max-w-full max-h-full rounded-lg shadow-lg" alt="Preview" />
+                                    </div>
+                                ) : (
+                                    <iframe
+                                        src={previewUrl}
+                                        className="w-full h-full rounded-lg border border-slate-200"
+                                        title="PDF Preview"
+                                    />
+                                )}
                             </div>
                             <div className="p-4 border-t border-slate-100 flex justify-end bg-white">
                                 <a

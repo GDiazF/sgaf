@@ -8,25 +8,15 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from decouple import config, Csv
-from dotenv import load_dotenv
 
 # ────────────────────────────────────────────────────────────
 # RUTAS BASE
 # ────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables
-load_dotenv(BASE_DIR / '.env')
-
-# ────────────────────────────────────────────────────────────
-# SEGURIDAD BÁSICA
-# ────────────────────────────────────────────────────────────
-# Load environment variables
-load_dotenv(BASE_DIR / '.env')
-
-SECRET_KEY = config('SECRET_KEY', default=os.getenv('SECRET_KEY', 'django-insecure-fallback-default-change-me'))
-DEBUG = config('DEBUG', default=os.getenv('DEBUG', 'True') == 'True', cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default=os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1'), cast=Csv())
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-fallback-default-change-me')
+DEBUG = config('DEBUG', default=True, cast=bool)
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,10.0.100.119', cast=Csv())
 
 
 # ────────────────────────────────────────────────────────────
@@ -46,6 +36,7 @@ INSTALLED_APPS = [
     'corsheaders',
     # Local apps
     'prestamo_llaves',
+    'core',
     'establecimientos',
     'servicios',
     'contratos',
@@ -58,6 +49,7 @@ INSTALLED_APPS = [
     'solicitudes_reservas',
     'personal_ti',
     'tesoreria',
+    'procedimientos',
 ]
 
 # REST_FRAMEWORK, SIMPLE_JWT y CORS se configuran al final del archivo para evitar duplicados.
@@ -103,10 +95,21 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # ────────────────────────────────────────────────────────────
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': config('DB_ENGINE', default='django.db.backends.sqlite3'),
+        'NAME': config('DB_NAME', default=BASE_DIR / 'db.sqlite3' if config('DB_ENGINE', default='sqlite3') == 'sqlite3' else 'key_system_db'),
     }
 }
+
+# Si existe DB_HOST en el .env, asumimos que estamos en producción/Docker y configuramos PostgreSQL
+if config('DB_HOST', default=''):
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': config('DB_NAME', default='key_system_db'),
+        'USER': config('DB_USER', default='postgres'),
+        'PASSWORD': config('DB_PASSWORD', default='postgres'),
+        'HOST': config('DB_HOST'),
+        'PORT': config('DB_PORT', default='5432'),
+    }
 
 
 # ────────────────────────────────────────────────────────────
@@ -149,7 +152,7 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.DjangoModelPermissions',
+        'rest_framework.permissions.AllowAny',
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
@@ -168,6 +171,10 @@ REST_FRAMEWORK = {
     },
 }
 
+# Permitir ver documentos en IFRAMES
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+SILENCED_SYSTEM_CHECKS = ['security.W019']
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME':  timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
@@ -184,11 +191,26 @@ CORS_ALLOWED_ORIGINS = [
     'http://10.0.100.25',
     'http://10.0.100.25:5173',
     'http://10.0.100.25:80',
+    'http://10.0.100.119',
+    'http://10.0.100.119:5173',
+    'http://10.0.100.119:80',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'http://localhost',
     'http://127.0.0.1',
 ]
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://10.0.100.25',
+    'http://10.0.100.25:5173',
+    'http://10.0.100.119',
+    'http://10.0.100.119:5173',
+    'http://10.0.100.119:80',
+]
+
+FRONTEND_URL = config('FRONTEND_URL', default='http://10.0.100.119')
 
 
 # ────────────────────────────────────────────────────────────

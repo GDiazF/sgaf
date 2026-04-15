@@ -10,7 +10,7 @@ class TipoEstablecimientoSerializer(serializers.ModelSerializer):
 class TelefonoEstablecimientoSerializer(serializers.ModelSerializer):
     class Meta:
         model = TelefonoEstablecimiento
-        fields = ['id', 'numero', 'etiqueta', 'es_principal']
+        fields = ['id', 'establecimiento', 'numero', 'etiqueta', 'es_principal']
 
 class EstablecimientoSerializer(serializers.ModelSerializer):
     telefonos = TelefonoEstablecimientoSerializer(many=True, read_only=True)

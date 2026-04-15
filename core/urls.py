@@ -21,17 +21,26 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
-from core.views import UserProfileView, UserViewSet, GroupViewSet, PermissionListView
+from core.views import (
+    UserProfileView, UserViewSet, GroupViewSet, PermissionListView, 
+    ChangePasswordView, AvatarUploadView, PasswordResetRequestView, PasswordResetConfirmView,
+    LinkInteresViewSet
+)
 
 router = DefaultRouter()
 router.register(r'admin/users', UserViewSet, basename='admin-users')
 router.register(r'admin/roles', GroupViewSet, basename='admin-roles')
+router.register(r'links-interes', LinkInteresViewSet, basename='links-interes')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/auth/me/', UserProfileView.as_view(), name='user-profile'),
+    path('api/auth/change-password/', ChangePasswordView.as_view(), name='change-password'),
+    path('api/auth/avatar/', AvatarUploadView.as_view(), name='avatar-upload'),
+    path('api/auth/password-reset-request/', PasswordResetRequestView.as_view(), name='password_reset_request'),
+    path('api/auth/password-reset-confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('api/admin/permissions/', PermissionListView.as_view(), name='admin-permissions'),
     path('api/', include(router.urls)),
     path('api/', include('prestamo_llaves.urls')),
@@ -47,6 +56,7 @@ urlpatterns = [
     path('api/reservas/', include('solicitudes_reservas.urls')),
     path('api/', include('personal_ti.urls')),
     path('api/tesoreria/', include('tesoreria.urls')),
+    path('api/procedimientos/', include('procedimientos.urls')),
 ]
 
 from django.conf import settings
