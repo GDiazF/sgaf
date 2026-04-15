@@ -237,3 +237,10 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL  = f'SLEP Iquique Reservas <{EMAIL_HOST_USER}>'
 RESERVAS_ADMIN_EMAIL = config('RESERVAS_ADMIN_EMAIL', default='')
 EMAIL_DAILY_LIMIT   = 200
+
+# CSRF TRUSTED ORIGINS (Para Sandbox y Producción)
+CSRF_TRUSTED_ORIGINS = [
+    "http://10.0.100.119:8080",
+    "http://10.0.100.119",
+    "http://localhost:8080",
+]
