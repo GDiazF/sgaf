@@ -46,6 +46,7 @@ import ResetPassword from './pages/auth/ResetPassword';
 // Admin
 import UserManagement from './pages/admin/UserManagement';
 import RolesManagement from './pages/admin/RolesManagement';
+import AuditLog from './pages/admin/AuditLog';
 
 // Private Route Wrapper
 const PrivateRoute = () => {
@@ -176,6 +177,7 @@ function App() {
               <Route element={<ProtectedRoute permission="auth.view_group" />}>
                 <Route path="admin/users" element={<UserManagement />} />
                 <Route path="admin/roles" element={<RolesManagement />} />
+                <Route path="admin/audit-log" element={<AuditLog />} />
               </Route>
             </Route>
           </Route>
