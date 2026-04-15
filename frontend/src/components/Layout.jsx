@@ -1,13 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Box, Globe, UserCircle2, Settings, History, Info } from 'lucide-react';
+import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Box, Globe, UserCircle2, Settings } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../hooks/usePermission';
 import api from '../api';
 import UserProfileModal from './auth/UserProfileModal';
-import AboutModal from './common/AboutModal';
-import { APP_VERSION } from '../version';
 
 const Layout = () => {
     const location = useLocation();
@@ -19,7 +17,6 @@ const Layout = () => {
     const [activeSubMenu, setActiveSubMenu] = useState(null); // 'services' or 'loans'
     const [isProfileOpen, setIsProfileOpen] = useState(false); // Header profile dropdown
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-    const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
     const [isOnline, setIsOnline] = useState(true); // Backend status
     const profileRef = useRef(null);
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -106,8 +103,7 @@ const Layout = () => {
             '/licitaciones': 'Visor Licitaciones',
             '/reservas': 'Reservas',
             '/personal-ti': 'Personal TI',
-            '/procedimientos': 'Procedimientos',
-            '/admin/audit-log': 'Auditoría de Sistema'
+            '/procedimientos': 'Procedimientos'
         };
 
         const baseTitle = 'SGAF - SLEP Iquique';
@@ -562,13 +558,6 @@ const Layout = () => {
                             </span>
                         </motion.div>
                     </div>
-                    <motion.div
-                        initial={false}
-                        animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}
-                        className="px-4 mt-1"
-                    >
-                        <span className="text-[10px] text-slate-600 font-medium">v{APP_VERSION}</span>
-                    </motion.div>
                 </div >
             </motion.aside >
 
@@ -676,18 +665,6 @@ const Layout = () => {
                                                 </div>
                                                 Mi Perfil
                                             </button>
-                                            <button
-                                                onClick={() => {
-                                                    setIsProfileOpen(false);
-                                                    setIsAboutModalOpen(true);
-                                                }}
-                                                className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                            >
-                                                <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                    <Info className="w-4 h-4" />
-                                                </div>
-                                                Acerca del Sistema
-                                            </button>
                                         </div>
 
                                         {(can('auth.view_group') || user?.is_superuser) && (
@@ -711,16 +688,6 @@ const Layout = () => {
                                                         <Shield className="w-4 h-4" />
                                                     </div>
                                                     Roles y Permisos
-                                                </Link>
-                                                <Link
-                                                    to="/admin/audit-log"
-                                                    onClick={() => setIsProfileOpen(false)}
-                                                    className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                >
-                                                    <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                        <History className="w-4 h-4" />
-                                                    </div>
-                                                    Auditoría de Sistema
                                                 </Link>
                                             </div>
                                         )}
@@ -759,12 +726,6 @@ const Layout = () => {
                 <UserProfileModal
                     isOpen={isProfileModalOpen}
                     onClose={() => setIsProfileModalOpen(false)}
-                />
-
-                <AboutModal
-                    isOpen={isAboutModalOpen}
-                    onClose={() => setIsAboutModalOpen(false)}
-                    version={APP_VERSION}
                 />
             </main >
         </div >

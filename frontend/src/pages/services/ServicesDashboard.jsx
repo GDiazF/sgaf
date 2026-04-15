@@ -8,7 +8,6 @@ import SortableHeader from '../../components/common/SortableHeader';
 import ServiceModal from '../../components/services/ServiceModal';
 import BulkUploadModal from '../../components/common/BulkUploadModal';
 import { usePermission } from '../../hooks/usePermission';
-import PageSizeSelector from '../../components/common/PageSizeSelector';
 
 const ServicesDashboard = () => {
     const { can } = usePermission();
@@ -29,7 +28,6 @@ const ServicesDashboard = () => {
     const [totalCount, setTotalCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [ordering, setOrdering] = useState('establecimiento__nombre');
-    const [pageSize, setPageSize] = useState(10);
 
     const [editingId, setEditingId] = useState(null);
 
@@ -47,8 +45,7 @@ const ServicesDashboard = () => {
             const params = {
                 page,
                 search,
-                ordering: order,
-                page_size: pageSize
+                ordering: order
             };
 
             const [servRes, provRes, estRes, docRes] = await Promise.all([
@@ -61,7 +58,7 @@ const ServicesDashboard = () => {
             // Handle Services Pagination
             setServices(servRes.data.results || []);
             setTotalCount(servRes.data.count || 0);
-            setTotalPages(Math.ceil((servRes.data.count || 0) / pageSize));
+            setTotalPages(Math.ceil((servRes.data.count || 0) / 10));
 
             // Handle others (if they become paginated, we might need adjustments)
             setProviders(provRes.data.results || provRes.data);
@@ -77,7 +74,7 @@ const ServicesDashboard = () => {
 
     useEffect(() => {
         fetchData(currentPage, searchQuery, ordering);
-    }, [currentPage, ordering, pageSize]);
+    }, [currentPage, ordering]);
 
     const handleSearch = (query) => {
         setSearchQuery(query);
@@ -209,7 +206,6 @@ const ServicesDashboard = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <PageSizeSelector pageSize={pageSize} onChange={setPageSize} />
                     <FilterBar onSearch={handleSearch} placeholder="Buscar por cliente, proveedor..." />
                     {can('servicios.add_servicio') && (
                         <>
