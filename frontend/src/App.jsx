@@ -1,6 +1,5 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-// TRACKING_ID: 998877665544332211
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -47,7 +46,7 @@ import ResetPassword from './pages/auth/ResetPassword';
 // Admin
 import UserManagement from './pages/admin/UserManagement';
 import RolesManagement from './pages/admin/RolesManagement';
-import SandboxNotice from './components/SandboxNotice';
+import AuditLog from './pages/admin/AuditLog';
 
 // Private Route Wrapper
 const PrivateRoute = () => {
@@ -61,7 +60,6 @@ const PrivateRoute = () => {
 function App() {
   return (
     <AuthProvider>
-      <SandboxNotice />
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -179,6 +177,7 @@ function App() {
               <Route element={<ProtectedRoute permission="auth.view_group" />}>
                 <Route path="admin/users" element={<UserManagement />} />
                 <Route path="admin/roles" element={<RolesManagement />} />
+                <Route path="admin/audit-log" element={<AuditLog />} />
               </Route>
             </Route>
           </Route>

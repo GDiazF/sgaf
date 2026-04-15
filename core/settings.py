@@ -34,7 +34,6 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'django_filters',
     'corsheaders',
-    'auditlog',
     # Local apps
     'prestamo_llaves',
     'core',
@@ -67,8 +66,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'core.audit_middleware.JWTAuditlogMiddleware',
-    'auditlog.middleware.AuditlogMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -159,7 +156,6 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
-    'PAGE_SIZE_QUERY_PARAM': 'page_size',
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
@@ -237,10 +233,3 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL  = f'SLEP Iquique Reservas <{EMAIL_HOST_USER}>'
 RESERVAS_ADMIN_EMAIL = config('RESERVAS_ADMIN_EMAIL', default='')
 EMAIL_DAILY_LIMIT   = 200
-
-# CSRF TRUSTED ORIGINS (Para Sandbox y Producción)
-CSRF_TRUSTED_ORIGINS = [
-    "http://10.0.100.119:8080",
-    "http://10.0.100.119",
-    "http://localhost:8080",
-]

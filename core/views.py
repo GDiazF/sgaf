@@ -8,19 +8,15 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.conf import settings
 from django.contrib.auth import update_session_auth_hash
+from .serializers import UserManagementSerializer, GroupSerializer, PermissionSerializer, LinkInteresSerializer
 from .models import LinkInteres
-from .serializers import UserManagementSerializer, GroupSerializer, PermissionSerializer, AuditLogSerializer, LinkInteresSerializer
-from auditlog.models import LogEntry
 from .emails import enviar_correo_reset_password
 
-class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = LogEntry.objects.all().select_related('actor', 'content_type')
-    serializer_class = AuditLogSerializer
-    permission_classes = [IsAdminUser]
-    filterset_fields = ['action', 'actor', 'content_type', 'object_pk']
-    search_fields = ['object_repr', 'changes', 'remote_addr']
-    ordering_fields = ['timestamp']
-    ordering = ['-timestamp']
+class LinkInteresViewSet(viewsets.ModelViewSet):
+    queryset = LinkInteres.objects.all()
+    serializer_class = LinkInteresSerializer
+    permission_classes = [permissions.DjangoModelPermissions]
+    pagination_class = None
 
 class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
@@ -170,14 +166,3 @@ class PasswordResetConfirmView(APIView):
             return Response({'message': 'Contraseña actualizada correctamente.'})
         else:
             return Response({'error': 'El enlace es inválido o ha expirado.'}, status=status.HTTP_400_BAD_REQUEST)
-
-class LinkInteresViewSet(viewsets.ModelViewSet):
-    queryset = LinkInteres.objects.filter(activo=True)
-    serializer_class = LinkInteresSerializer
-    permission_classes = [permissions.DjangoModelPermissionsOrAnonReadOnly]
-
-    def get_queryset(self):
-        # Si el usuario es admin o tiene permiso de cambio, mostrar todos (incluyendo inactivos)
-        if self.request.user.has_perm('core.change_linkinteres'):
-            return LinkInteres.objects.all()
-        return LinkInteres.objects.filter(activo=True)

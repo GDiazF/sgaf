@@ -8,10 +8,6 @@ class OrdenCompraConfig(AppConfig):
     name = 'orden_compra'
 
     def ready(self):
-        from auditlog.registry import auditlog
-        from .models import OrdenCompraMP
-        auditlog.register(OrdenCompraMP)
-
         # Lanzar el sync automático en un hilo al iniciar el servidor
         # Solo se activa una vez (evita doble arranque en modo autoreload)
         import os

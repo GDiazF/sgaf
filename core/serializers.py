@@ -1,19 +1,5 @@
 from django.contrib.auth.models import User, Group, Permission
 from rest_framework import serializers
-from auditlog.models import LogEntry
-from .models import LinkInteres
-
-class AuditLogSerializer(serializers.ModelSerializer):
-    actor_name = serializers.CharField(source='actor.username', read_only=True, default='Sistema')
-    content_type_name = serializers.CharField(source='content_type.model', read_only=True)
-    
-    class Meta:
-        model = LogEntry
-        fields = [
-            'id', 'object_pk', 'object_id', 'object_repr', 'action', 
-            'changes', 'timestamp', 'actor', 'actor_name', 
-            'content_type', 'content_type_name', 'remote_addr'
-        ]
 
 class MediaRelativeFileField(serializers.FileField):
     """Garantiza que la URL siempre sea relativa al dominio (comience con /media/)"""
@@ -122,6 +108,8 @@ class UserManagementSerializer(serializers.ModelSerializer):
         if rut:
             self._handle_rut_link(user, rut)
         return user
+
+from .models import LinkInteres
 
 class LinkInteresSerializer(serializers.ModelSerializer):
     class Meta:
