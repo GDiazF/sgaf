@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     ExternalLink, Plus, Edit2, Trash2, Globe, FileText,
     Video, MessageSquare, Book, Link as LinkIcon,
     MoreVertical, Save, X, Loader2, Star, Link2,
     Box, Shield, Activity, Phone, Monitor, ShoppingCart,
     Calendar, ClipboardList, Briefcase, GraduationCap, Search,
-    Facebook, Instagram, Twitter, Linkedin, Youtube,
-    Mail, ChevronRight, Layers, Filter, Building2, User2, ChevronDown
+    Facebook, Instagram, Twitter, Linkedin, Youtube
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api';
@@ -23,17 +22,10 @@ const IconMap = {
 const InterestLinksSection = () => {
     const { can } = usePermission();
     const [links, setLinks] = useState([]);
-    const [funcionarios, setFuncionarios] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingLink, setEditingLink] = useState(null);
-    const [activeTab, setActiveTab] = useState('LINK'); // 'LINK', 'RED_SOCIAL', 'DIRECTORIO'
-
-    // Estados para el Directorio (Integrado de Partner)
-    const [selectedSub, setSelectedSub] = useState("Todas");
-    const [selectedDepto, setSelectedDepto] = useState("Todos");
-    const [isFilterOpen, setIsFilterOpen] = useState(false);
-
+    const [activeTab, setActiveTab] = useState('LINK'); // 'LINK' o 'RED_SOCIAL'
     const [formData, setFormData] = useState({
         titulo: '',
         tipo: 'LINK',
@@ -47,28 +39,19 @@ const InterestLinksSection = () => {
     const [searchTerm, setSearchTerm] = useState("");
 
     useEffect(() => {
-        fetchData();
+        fetchLinks();
     }, []);
 
-    const fetchData = async () => {
+    const fetchLinks = async () => {
         setLoading(true);
         try {
-            const [linksRes, funcRes] = await Promise.all([
-                api.get('links-interes/'),
-                api.get('funcionarios/')
-            ]);
-            setLinks(linksRes.data.results || linksRes.data || []);
-            setFuncionarios(funcRes.data.results || funcRes.data || []);
+            const res = await api.get('links-interes/');
+            setLinks(res.data.results || res.data || []);
         } catch (e) {
-            console.error("Error fetching data", e);
+            console.error("Error fetching links", e);
         } finally {
             setLoading(false);
         }
-    };
-
-    const fetchLinks = async () => {
-        // ... kept for compatibility or just merged into fetchData
-        fetchData();
     };
 
     const handleOpenModal = (link = null) => {
@@ -126,35 +109,6 @@ const InterestLinksSection = () => {
             link.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())
         );
 
-    const hierarchy = useMemo(() => {
-        const subs = {};
-        funcionarios.forEach(f => {
-            const sName = f.subdireccion_nombre || "Dirección Ejecutiva";
-            const dName = f.departamento_nombre || "General";
-            if (!subs[sName]) subs[sName] = new Set();
-            subs[sName].add(dName);
-        });
-        return Object.keys(subs).sort().map(s => ({
-            name: s,
-            deptos: Array.from(subs[s]).sort()
-        }));
-    }, [funcionarios]);
-
-    const filteredFuncionarios = useMemo(() => {
-        let list = funcionarios;
-        if (selectedSub !== "Todas") list = list.filter(f => (f.subdireccion_nombre || "Dirección Ejecutiva") === selectedSub);
-        if (selectedDepto !== "Todos") list = list.filter(f => (f.departamento_nombre || "General") === selectedDepto);
-        if (searchTerm) {
-            const s = searchTerm.toLowerCase();
-            list = list.filter(f =>
-                f.nombre_funcionario?.toLowerCase().includes(s) ||
-                f.cargo?.toLowerCase().includes(s) ||
-                f.anexo?.includes(s)
-            );
-        }
-        return list.sort((a, b) => a.nombre_funcionario.localeCompare(b.nombre_funcionario));
-    }, [funcionarios, searchTerm, selectedSub, selectedDepto]);
-
     const renderIcon = (iconName) => {
         const IconComp = IconMap[iconName] || LinkIcon;
 
@@ -200,10 +154,10 @@ const InterestLinksSection = () => {
                         </div>
                         <div>
                             <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">
-                                {activeTab === 'LINK' ? 'Links de Interés' : activeTab === 'RED_SOCIAL' ? 'Nuestras Redes' : 'Directorio Interno'}
+                                {activeTab === 'LINK' ? 'Links de Interés' : 'Nuestras Redes'}
                             </h2>
                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter italic">
-                                {activeTab === 'LINK' ? 'Herramientas y accesos frecuentes' : activeTab === 'RED_SOCIAL' ? 'Canales de comunicación oficial' : 'Contactos y anexos telefónicos'}
+                                {activeTab === 'LINK' ? 'Herramientas y accesos frecuentes' : 'Canales de comunicación oficial'}
                             </span>
                         </div>
                     </div>
@@ -213,13 +167,13 @@ const InterestLinksSection = () => {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
                             <input
                                 type="text"
-                                placeholder={`Buscar ${activeTab === 'LINK' ? 'herramienta' : activeTab === 'RED_SOCIAL' ? 'red social' : 'funcionario'}...`}
+                                placeholder={`Buscar ${activeTab === 'LINK' ? 'herramienta' : 'red social'}...`}
                                 className="w-full pl-10 pr-4 py-2 bg-slate-50 rounded-xl text-[11px] font-bold text-slate-700 placeholder:text-slate-300 outline-none focus:ring-2 focus:ring-blue-500/10 transition-all border border-transparent focus:border-blue-100"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
-                        {activeTab !== 'DIRECTORIO' && can('core.add_linkinteres') && (
+                        {can('core.add_linkinteres') && (
                             <button
                                 onClick={() => handleOpenModal()}
                                 className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95 flex-shrink-0"
@@ -231,128 +185,28 @@ const InterestLinksSection = () => {
                 </div>
 
                 {/* Tab Switcher */}
-                <div className="flex p-1 bg-slate-50 rounded-2xl w-full sm:w-fit overflow-x-auto custom-scrollbar">
+                <div className="flex p-1 bg-slate-50 rounded-2xl w-full sm:w-fit">
                     <button
                         onClick={() => setActiveTab('LINK')}
-                        className={`whitespace-nowrap px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'LINK' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`flex-1 sm:flex-none px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'LINK' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                     >
-                        Links
+                        Links Institucionales
                     </button>
                     <button
                         onClick={() => setActiveTab('RED_SOCIAL')}
-                        className={`whitespace-nowrap px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'RED_SOCIAL' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`flex-1 sm:flex-none px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'RED_SOCIAL' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                     >
-                        Redes
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('DIRECTORIO')}
-                        className={`whitespace-nowrap px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'DIRECTORIO' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                        Directorio
+                        Redes Sociales
                     </button>
                 </div>
             </div>
 
-            {/* Contenido Principal (Links o Directorio) */}
-            <div className={`flex-1 overflow-y-auto custom-scrollbar ${activeTab === 'DIRECTORIO' ? 'bg-slate-50/30' : 'p-6'}`}>
+            {/* Grid de Links Compacto */}
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center h-48 opacity-20 text-slate-400 p-6">
+                    <div className="flex flex-col items-center justify-center h-48 opacity-20 text-slate-400">
                         <Loader2 className="w-8 h-8 animate-spin mb-2" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Cargando datos...</span>
-                    </div>
-                ) : activeTab === 'DIRECTORIO' ? (
-                    <div className="flex flex-col md:flex-row h-full">
-                        {/* Sidebar Jerarquía (Integrated from Partner) */}
-                        <div className="hidden md:flex w-56 border-r border-slate-100 flex-col bg-white/50 shrink-0">
-                            <div className="p-4 border-b border-slate-50">
-                                <h4 className="text-[9px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">
-                                    <Layers className="w-3 h-3" /> Estructura
-                                </h4>
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
-                                <button
-                                    onClick={() => { setSelectedSub("Todas"); setSelectedDepto("Todos"); }}
-                                    className={`w-full text-left px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-tight transition-all ${selectedSub === "Todas" ? "bg-blue-600 text-white shadow-md shadow-blue-500/20" : "text-slate-400 hover:bg-white"}`}
-                                >
-                                    Todos
-                                </button>
-                                {hierarchy.map(sub => (
-                                    <div key={sub.name} className="mt-2">
-                                        <button
-                                            onClick={() => { setSelectedSub(sub.name); setSelectedDepto("Todos"); }}
-                                            className={`w-full text-left px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase truncate ${selectedSub === sub.name ? "text-blue-600 bg-blue-50/50" : "text-slate-300 hover:text-slate-500"}`}
-                                        >
-                                            {sub.name}
-                                        </button>
-                                        {selectedSub === sub.name && (
-                                            <div className="ml-3 mt-1 border-l border-slate-100 space-y-0.5">
-                                                {sub.deptos.map(depto => (
-                                                    <button
-                                                        key={depto}
-                                                        onClick={() => setSelectedDepto(depto)}
-                                                        className={`w-full text-left px-3 py-1.5 rounded-lg text-[8.5px] font-bold tracking-tight transition-all ${selectedDepto === depto ? "text-blue-600 bg-blue-50" : "text-slate-400 hover:text-slate-600"}`}
-                                                    >
-                                                        {depto}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Lista de Funcionarios */}
-                        <div className="flex-1 flex flex-col min-w-0 bg-white">
-                            {/* Filtro Móvil */}
-                            <div className="md:hidden p-4 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
-                                <button onClick={() => setIsFilterOpen(!isFilterOpen)} className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                                    <Filter className="w-3 h-3" />
-                                    {selectedSub === "Todas" ? "Unidades" : selectedDepto !== "Todos" ? selectedDepto : selectedSub}
-                                    <ChevronDown className={`w-3 h-3 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
-                                </button>
-                                <span className="text-[9px] font-bold text-slate-300 uppercase">{filteredFuncionarios.length} regs</span>
-                            </div>
-
-                            <div className="flex-1 overflow-y-auto px-4 md:px-6 py-2 custom-scrollbar">
-                                {filteredFuncionarios.length > 0 ? (
-                                    <div className="space-y-1">
-                                        {filteredFuncionarios.map((f) => (
-                                            <div key={f.id} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50/80 -mx-2 px-3 rounded-xl transition-all group">
-                                                <div className="flex items-center gap-3 min-w-0">
-                                                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all text-[9px] font-black uppercase flex-shrink-0">
-                                                        {f.nombre_funcionario?.charAt(0)}
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <h4 className="text-[11px] font-bold text-slate-800 leading-none mb-0.5 truncate uppercase tracking-tight group-hover:text-blue-600 transition-colors">
-                                                            {f.nombre_funcionario}
-                                                        </h4>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[8px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{f.cargo || 'Funcionario'}</span>
-                                                            <span className="text-[8px] text-slate-200">•</span>
-                                                            <span className="text-[8px] font-medium text-slate-300 lowercase truncate group-hover:text-slate-500">{f.email || f.user_email || '...'}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-center gap-3">
-                                                    <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 group-hover:bg-white group-hover:border-blue-100 transition-all">
-                                                        <Phone className="w-2.5 h-2.5 text-blue-500" />
-                                                        <span className="text-[11px] font-black text-slate-700 tracking-tighter tabular-nums">{f.anexo || '---'}</span>
-                                                    </div>
-                                                    <ChevronRight className="w-3 h-3 text-slate-200 group-hover:text-blue-400 hidden sm:block" />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="h-full flex flex-col items-center justify-center opacity-10 py-10">
-                                        <Search className="w-10 h-10 mb-2" />
-                                        <p className="text-[9px] font-bold uppercase">Sin resultados</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Cargando links...</span>
                     </div>
                 ) : links.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center opacity-20 py-20">
@@ -360,7 +214,7 @@ const InterestLinksSection = () => {
                         <span className="text-[10px] font-black uppercase tracking-widest">No hay accesos configurados</span>
                     </div>
                 ) : filteredLinks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center opacity-20 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center opacity-20 py-12">
                         {searchTerm ? <Search className="w-12 h-12 mb-2" /> : <LinkIcon className="w-12 h-12 mb-2" />}
                         <span className="text-[10px] font-black uppercase tracking-widest text-center">
                             {searchTerm

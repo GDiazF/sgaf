@@ -8,7 +8,7 @@ class ProfileAdmin(admin.ModelAdmin):
 
 @admin.register(LinkInteres)
 class LinkInteresAdmin(admin.ModelAdmin):
-    list_display = ('titulo', 'url', 'orden', 'activo', 'fecha_creacion')
+    list_display = ('titulo', 'tipo', 'url', 'orden', 'activo', 'fecha_creacion')
     list_editable = ('orden', 'activo')
     search_fields = ('titulo', 'url', 'descripcion')
-    list_filter = ('activo',)
+    list_filter = ('tipo', 'activo')

@@ -21,3 +21,26 @@ def handle_user_profile(sender, instance, created, **kwargs):
     else:
         # Use get_or_create to handle existing users without profiles
         Profile.objects.get_or_create(user=instance)
+
+class LinkInteres(models.Model):
+    TIPO_CHOICES = [
+        ('LINK', 'Link de Interés'),
+        ('RED_SOCIAL', 'Red Social'),
+    ]
+
+    titulo = models.CharField(max_length=100, verbose_name="Título")
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='LINK', verbose_name="Tipo")
+    url = models.URLField(verbose_name="URL")
+    icono = models.CharField(max_length=50, default='Link', help_text="Nombre del icono de Lucide (ej: Link, Globe, Box)")
+    descripcion = models.TextField(null=True, blank=True, verbose_name="Descripción")
+    orden = models.IntegerField(default=0, verbose_name="Orden de visualización")
+    activo = models.BooleanField(default=True, verbose_name="Activo")
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Link de Interés"
+        verbose_name_plural = "Links de Interés"
+        ordering = ['orden', 'titulo']
+
+    def __str__(self):
+        return f"{self.titulo} ({self.tipo})"

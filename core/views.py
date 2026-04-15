@@ -8,8 +8,15 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.conf import settings
 from django.contrib.auth import update_session_auth_hash
-from .serializers import UserManagementSerializer, GroupSerializer, PermissionSerializer
+from .serializers import UserManagementSerializer, GroupSerializer, PermissionSerializer, LinkInteresSerializer
+from .models import LinkInteres
 from .emails import enviar_correo_reset_password
+
+class LinkInteresViewSet(viewsets.ModelViewSet):
+    queryset = LinkInteres.objects.all()
+    serializer_class = LinkInteresSerializer
+    permission_classes = [permissions.DjangoModelPermissions]
+    pagination_class = None
 
 class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
