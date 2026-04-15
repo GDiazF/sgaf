@@ -16,8 +16,7 @@ const ServiceModal = ({
         establecimiento: '',
         numero_cliente: '',
         numero_servicio: '',
-        tipo_documento_habitual: 'FACTURA',
-        observaciones: ''
+        tipo_documento: ''
     });
 
     useEffect(() => {
@@ -98,12 +97,13 @@ const ServiceModal = ({
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-600 ml-1">Documento Habitual</label>
+                            <label className="text-xs font-bold text-slate-600 ml-1">Tipo de Documento</label>
                             <select
                                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm appearance-none focus:bg-white transition-all border-r-8 border-transparent cursor-pointer font-medium h-[46px]"
-                                value={formData.tipo_documento_habitual}
-                                onChange={e => setFormData({ ...formData, tipo_documento_habitual: e.target.value })}
+                                value={formData.tipo_documento}
+                                onChange={e => setFormData({ ...formData, tipo_documento: e.target.value })}
                             >
+                                <option value="">Seleccione...</option>
                                 {documentTypes.map(d => (
                                     <option key={d.value} value={d.value}>{d.label}</option>
                                 ))}
@@ -112,21 +112,6 @@ const ServiceModal = ({
                     </div>
                 </div>
 
-                {/* Additional Notes */}
-                <div className="space-y-4">
-                    <h4 className="text-[11px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-2">
-                        <FileText className="w-3.5 h-3.5" /> Antecedentes Adicionales
-                    </h4>
-                    <div className="space-y-1.5 ">
-                        <textarea
-                            rows="2"
-                            placeholder="Observaciones sobre la facturación o particularidades del servicio..."
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium resize-none"
-                            value={formData.observaciones}
-                            onChange={e => setFormData({ ...formData, observaciones: e.target.value })}
-                        />
-                    </div>
-                </div>
 
                 {/* Helper */}
                 <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex gap-3">

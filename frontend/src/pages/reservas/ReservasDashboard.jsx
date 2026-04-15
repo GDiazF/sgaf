@@ -108,7 +108,6 @@ const ReservasDashboard = () => {
     const { user } = useAuth();
     const canChangeName = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_change_reserva_name'));
     const canBypass = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_bypass_antelacion'));
-    const canForceDelete = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_force_delete_reserva'));
     const defaultName = user?.funcionario_data?.nombre_funcionario || (user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : '') || user?.username || '';
 
     const [recursos, setRecursos] = useState([]);
@@ -459,17 +458,6 @@ const ReservasDashboard = () => {
             fetchData();
         }
         catch (err) { alert(err.response?.data?.detail || err.response?.data?.non_field_errors?.[0] || 'Error al actualizar estado'); }
-    };
-
-    const handleForceDelete = async (id, titulo) => {
-        if (!window.confirm(`⚠️ ELIMINAR PERMANENTEMENTE\n\nVas a eliminar la reserva "${titulo}" de forma definitiva.\n\nEsta acción no se puede deshacer. ¿Confirmas?`)) return;
-        try {
-            await api.delete(`reservas/solicitudes/${id}/force-delete/`);
-            setDetailReserva(null);
-            fetchData();
-        } catch (err) {
-            alert(err.response?.data?.detail || 'Error al eliminar la reserva.');
-        }
     };
 
     const openAdminCreate = () => {
@@ -1424,21 +1412,6 @@ const ReservasDashboard = () => {
                                         )}
                                     </div>
                                 )}
-
-                                {/* Botón de eliminación forzosa — solo para usuarios con permiso especial */}
-                                {canForceDelete && ['PENDIENTE', 'APROBADA'].includes(detailReserva.estado) && (
-                                    <div className="pt-2 border-t border-rose-100">
-                                        <button
-                                            onClick={() => handleForceDelete(detailReserva.id, detailReserva.titulo)}
-                                            className="w-full flex items-center justify-center gap-2 py-2.5 bg-rose-600 text-white rounded-xl font-black text-xs hover:bg-rose-700 transition border border-rose-700 shadow-sm"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                            Eliminar Permanentemente
-                                        </button>
-                                        <p className="text-[9px] text-center text-rose-400 mt-1.5 font-bold">Solo para reservas mal solicitadas. Acción irreversible.</p>
-                                    </div>
-                                )}
-
                             </div>
                         </div>
                     </div>

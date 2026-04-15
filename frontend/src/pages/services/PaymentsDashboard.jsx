@@ -11,6 +11,8 @@ import PaymentModal from '../../components/services/PaymentModal';
 import FormSelect from '../../components/common/FormSelect';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
+import PageSizeSelector from '../../components/common/PageSizeSelector';
+import { Archive, ArchiveRestore } from 'lucide-react';
 
 const PaymentsDashboard = () => {
     const { user } = useAuth();
@@ -32,6 +34,8 @@ const PaymentsDashboard = () => {
     const [totalCount, setTotalCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [ordering, setOrdering] = useState('-fecha_pago');
+    const [pageSize, setPageSize] = useState(10);
+    const [esHistoricoFilter, setEsHistoricoFilter] = useState('false'); // 'false', 'true', 'all'
 
     const [editingId, setEditingId] = useState(null);
     const [selectedIds, setSelectedIds] = useState(new Set());
@@ -64,8 +68,13 @@ const PaymentsDashboard = () => {
             const params = {
                 page,
                 search,
-                ordering: order
+                ordering: order,
+                page_size: pageSize
             };
+
+            if (esHistoricoFilter !== 'all') {
+                params.es_historico = esHistoricoFilter;
+            }
 
             if (status === 'paid') {
                 params.recepcion_conforme__isnull = 'false';
@@ -89,7 +98,7 @@ const PaymentsDashboard = () => {
             // Handle Pagination
             setPayments(payRes.data.results || []);
             setTotalCount(payRes.data.count || 0);
-            setTotalPages(Math.ceil((payRes.data.count || 0) / 10));
+            setTotalPages(Math.ceil((payRes.data.count || 0) / pageSize));
 
             setServices(servRes.data.results || servRes.data);
             setEstablishments(estRes.data.results || estRes.data);
@@ -122,7 +131,7 @@ const PaymentsDashboard = () => {
 
     useEffect(() => {
         fetchData(currentPage, searchQuery, statusFilter, ordering);
-    }, [currentPage, statusFilter, ordering, selectedType, selectedProvider]);
+    }, [currentPage, statusFilter, ordering, selectedType, selectedProvider, pageSize, esHistoricoFilter]);
 
     const handleTypeChange = async (e) => {
         const typeId = e.target.value;
@@ -190,6 +199,18 @@ const PaymentsDashboard = () => {
         setShowForm(true);
     };
 
+    const toggleHistoric = async (payment) => {
+        try {
+            await api.patch(`registros-pagos/${payment.id}/`, {
+                es_historico: !payment.es_historico
+            });
+            fetchData(currentPage, searchQuery, statusFilter, ordering);
+        } catch (error) {
+            console.error(error);
+            alert("Error al actualizar estado histórico.");
+        }
+    };
+
     const handleDelete = async (id) => {
         if (!window.confirm("¿Seguro que desea eliminar este registro de pago?")) return;
         try {
@@ -214,6 +235,39 @@ const PaymentsDashboard = () => {
     };
 
     // Generate RC
+    const handleGenerateHistoricalRC = async () => {
+        if (selectedIds.size === 0) return;
+
+        const selectedPayments = payments.filter(p => selectedIds.has(p.id));
+        const firstPayment = selectedPayments[0];
+        const firstService = services.find(s => s.id === firstPayment.servicio);
+        if (!firstService) return;
+        const providerId = firstService.proveedor;
+
+        for (let p of selectedPayments) {
+            const s = services.find(srv => srv.id === p.servicio);
+            if (!s || s.proveedor !== providerId) {
+                alert("Error: Todos los pagos seleccionados deben pertenecer al mismo proveedor.");
+                return;
+            }
+        }
+
+        if (!window.confirm(`¿Marcar ${selectedIds.size} pagos como RC HISTÓRICA?`)) return;
+
+        try {
+            await api.post('recepciones-conformes/create_historical/', {
+                proveedor: providerId,
+                registros_ids: Array.from(selectedIds)
+            });
+            alert("Pagos marcados como Históricos exitosamente.");
+            fetchData(currentPage, searchQuery, statusFilter, ordering);
+            setSelectedIds(new Set());
+        } catch (error) {
+            console.error(error);
+            alert("Error al procesar acción histórica.");
+        }
+    };
+
     const handleGenerateRC = async () => {
         if (selectedIds.size === 0) return;
 
@@ -362,11 +416,11 @@ const PaymentsDashboard = () => {
     return (
         <div>
             {/* Header */}
-            <div className="flex flex-col gap-4 mb-8">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col gap-3 mb-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Pagos de Servicios</h2>
-                        <p className="text-slate-500">Registro histórico de pagos realizados.</p>
+                        <h2 className="text-xl font-bold text-slate-800">Pagos de Servicios</h2>
+                        <p className="text-[11px] text-slate-500">Gestión y registro de consumos.</p>
                     </div>
 
                     <div className="flex flex-col lg:flex-row lg:items-center gap-3 w-full lg:w-auto">
@@ -398,9 +452,22 @@ const PaymentsDashboard = () => {
                                 placeholder="Estado"
                                 inputClassName="!py-2 !h-[38px] !text-xs !w-32"
                             />
+
+                            <FormSelect
+                                value={esHistoricoFilter}
+                                onChange={(e) => setEsHistoricoFilter(e.target.value)}
+                                options={[
+                                    { value: 'false', label: 'Vigentes' },
+                                    { value: 'true', label: 'Históricos' },
+                                    { value: 'all', label: 'Todos' }
+                                ]}
+                                placeholder="Tipo Registro"
+                                inputClassName="!py-2 !h-[38px] !text-xs !w-32"
+                            />
                         </div>
 
                         <div className="flex items-center gap-2">
+                            <PageSizeSelector pageSize={pageSize} onChange={setPageSize} />
                             {can('servicios.add_registropago') && (
                                 <>
                                     <button
@@ -424,7 +491,7 @@ const PaymentsDashboard = () => {
                     </div>
                 </div>
 
-                <div className="w-full md:w-96">
+                <div className="w-full md:w-80">
                     <FilterBar onSearch={handleSearch} placeholder="Buscar pago..." />
                 </div>
             </div>
@@ -460,121 +527,136 @@ const PaymentsDashboard = () => {
                     <table className="w-full text-left whitespace-nowrap">
                         <thead className="bg-slate-50 border-b border-slate-200">
                             <tr>
-                                <th className="p-2.5 w-10">
+                                <th className="p-1.5 w-8">
                                     <button
                                         onClick={() => {
-                                            if (selectedIds.size === payments.length) {
-                                                setSelectedIds(new Set());
+                                            const selectable = payments.filter(p => !p.recepcion_conforme);
+                                            if (selectable.length === 0) return;
+
+                                            const allSelectableAreSelected = selectable.every(p => selectedIds.has(p.id));
+                                            const newSet = new Set(selectedIds);
+
+                                            if (allSelectableAreSelected) {
+                                                selectable.forEach(p => newSet.delete(p.id));
                                             } else {
-                                                setSelectedIds(new Set(payments.map(p => p.id)));
+                                                selectable.forEach(p => newSet.add(p.id));
                                             }
+                                            setSelectedIds(newSet);
                                         }}
-                                        className="text-slate-400 hover:text-blue-600 transition-colors"
+                                        disabled={!payments.some(p => !p.recepcion_conforme)}
+                                        className={`transition-colors ${!payments.some(p => !p.recepcion_conforme)
+                                            ? 'text-slate-200 cursor-not-allowed'
+                                            : 'text-slate-400 hover:text-blue-600'}`}
                                     >
-                                        {selectedIds.size === payments.length && payments.length > 0 ? (
-                                            <CheckSquare className="w-4 h-4 text-blue-600" />
+                                        {payments.some(p => !p.recepcion_conforme) && payments.filter(p => !p.recepcion_conforme).every(p => selectedIds.has(p.id)) ? (
+                                            <CheckSquare className="w-3.5 h-3.5 text-blue-600" />
                                         ) : (
-                                            <Square className="w-4 h-4" />
+                                            <Square className="w-3.5 h-3.5" />
                                         )}
                                     </button>
                                 </th>
                                 <SortableHeader label="Documento" sortKey="nro_documento" currentOrdering={ordering} onSort={handleSort} />
-                                <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Servicio</th>
+                                <th className="p-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Servicio</th>
                                 <SortableHeader label="Establecimiento" sortKey="establecimiento__nombre" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="Fecha Emisión" sortKey="fecha_emision" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="Fecha Venc." sortKey="fecha_vencimiento" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="Envío a Pago" sortKey="fecha_pago" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="Monto" sortKey="monto_total" currentOrdering={ordering} onSort={handleSort} className="text-right" />
-                                <th className="p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
+                                <th className="p-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filteredData.map(item => (
-                                <tr key={item.id} className="hover:bg-slate-50 transition-colors text-xs">
-                                    <td className="p-2.5 text-center">
+                                <tr key={item.id} className="hover:bg-slate-50 transition-colors text-[11px]">
+                                    <td className="p-1.5 text-center">
                                         {!item.recepcion_conforme ? (
                                             <button
                                                 onClick={() => toggleSelection(item.id)}
                                                 className="text-slate-400 hover:text-blue-600 transition-colors"
                                             >
                                                 {selectedIds.has(item.id) ? (
-                                                    <CheckSquare className="w-4 h-4 text-blue-600" />
+                                                    <CheckSquare className="w-3.5 h-3.5 text-blue-600" />
                                                 ) : (
-                                                    <Square className="w-4 h-4" />
+                                                    <Square className="w-3.5 h-3.5" />
                                                 )}
                                             </button>
                                         ) : (
-                                            <div className="w-4 h-4 mx-auto" />
+                                            <div className="w-3.5 h-3.5 mx-auto opacity-20">
+                                                <CheckSquare className="w-3.5 h-3.5 text-slate-400" />
+                                            </div>
                                         )}
                                     </td>
-                                    <td className="p-2.5">
-                                        <div className="font-mono text-xs font-semibold text-slate-800">{item.nro_documento}</div>
+                                    <td className="p-1.5">
+                                        <div className="font-mono text-[10px] font-semibold text-slate-800">{item.nro_documento}</div>
                                         {item.recepcion_conforme_folio && (
-                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800 border-green-200 border mt-1">
-                                                RC: {item.recepcion_conforme_folio}
+                                            <span className={`inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium border mt-0.5 ${item.recepcion_conforme_estado === 'HISTORICA'
+                                                ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                                : 'bg-green-100 text-green-800 border-green-200'
+                                                }`}>
+                                                {item.recepcion_conforme_estado === 'HISTORICA' ? 'H-RC' : 'RC'}: {item.recepcion_conforme_folio}
                                             </span>
                                         )}
                                     </td>
-                                    <td className="p-2.5">
-                                        <div className="font-medium text-blue-700 truncate max-w-xs" title={item.servicio_detalle}>
+                                    <td className="p-1.5">
+                                        <div className="font-medium text-blue-700 truncate max-w-[150px]" title={item.servicio_detalle}>
                                             {item.servicio_detalle}
                                         </div>
                                     </td>
-                                    <td className="p-2.5">
-                                        <div className="flex items-center gap-2 text-slate-700">
-                                            <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                                            {item.establecimiento_nombre}
+                                    <td className="p-1.5">
+                                        <div className="flex items-center gap-1.5 text-slate-700">
+                                            <Building2 className="w-3 h-3 text-slate-400" />
+                                            <span className="truncate max-w-[120px]">{item.establecimiento_nombre}</span>
                                         </div>
                                     </td>
-                                    <td className="p-2.5 text-slate-600">
+                                    <td className="p-1.5 text-slate-600">
                                         {formatDate(item.fecha_emision)}
                                     </td>
-                                    <td className="p-2.5 text-slate-600">
+                                    <td className="p-1.5 text-slate-600">
                                         {formatDate(item.fecha_vencimiento)}
                                     </td>
-                                    <td className="p-2.5">
-                                        <div className="flex items-center gap-2 text-slate-700 font-medium">
-                                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                    <td className="p-1.5">
+                                        <div className="flex items-center gap-1.5 text-slate-700 font-medium">
+                                            <Calendar className="w-3 h-3 text-slate-400" />
                                             {formatDate(item.fecha_pago)}
                                         </div>
                                     </td>
-                                    <td className="p-2.5 text-right">
+                                    <td className="p-1.5 text-right">
                                         <div className="font-bold text-slate-900">{formatCurrency(item.monto_total)}</div>
                                     </td>
-                                    <td className="p-2.5 text-right">
+                                    <td className="p-1.5 text-right">
                                         <div className="flex justify-end gap-2">
                                             <button
                                                 onClick={() => handleDownloadRC(item)}
-                                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                className="p-1 px-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                                                 title="Descargar RC"
-                                                disabled={!item.recepcion_conforme}
+                                                disabled={!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA'}
                                             >
-                                                <Download className={`w-3.5 h-3.5 ${!item.recepcion_conforme ? 'opacity-20' : ''}`} />
+                                                <Download className={`w-3 h-3 ${(!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA') ? 'opacity-20' : ''}`} />
                                             </button>
                                             {can('servicios.change_registropago') && (
                                                 <button
                                                     onClick={() => handleEdit(item)}
-                                                    className={`p-1.5 rounded-lg transition-all ${item.recepcion_conforme && !isPrivileged
+                                                    className={`p-1 px-1.5 rounded-lg transition-all ${item.recepcion_conforme && !isPrivileged
                                                         ? 'text-slate-200 cursor-not-allowed'
                                                         : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
                                                         }`}
                                                     title={item.recepcion_conforme ? (isPrivileged ? "Editar (Admin)" : "No se puede editar: tiene RC asociada") : "Editar"}
                                                     disabled={item.recepcion_conforme && !isPrivileged}
                                                 >
-                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                    <Edit2 className="w-3 h-3" />
                                                 </button>
                                             )}
                                             {can('servicios.delete_registropago') && (
                                                 <button
                                                     onClick={() => handleDelete(item.id)}
-                                                    className={`p-1.5 rounded-lg transition-all ${item.recepcion_conforme && !isPrivileged
+                                                    className={`p-1 px-1.5 rounded-lg transition-all ${item.recepcion_conforme && !isPrivileged
                                                         ? 'text-slate-200 cursor-not-allowed'
                                                         : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
                                                         }`}
                                                     title={item.recepcion_conforme ? (isPrivileged ? "Eliminar (Admin)" : "No se puede eliminar: tiene RC asociada") : "Eliminar"}
                                                     disabled={item.recepcion_conforme && !isPrivileged}
                                                 >
-                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                    <Trash2 className="w-3 h-3" />
                                                 </button>
                                             )}
                                         </div>
@@ -631,6 +713,15 @@ const PaymentsDashboard = () => {
                             >
                                 Cancelar
                             </button>
+                            {can('servicios.add_recepcionconforme') && (
+                                <button
+                                    onClick={handleGenerateHistoricalRC}
+                                    className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-4 py-2.5 rounded-xl transition-all shadow-lg font-black text-xs uppercase tracking-wider"
+                                >
+                                    <Archive className="w-4 h-4" />
+                                    <span>Marcar RC Histórica</span>
+                                </button>
+                            )}
                             {can('servicios.add_recepcionconforme') && (
                                 <button
                                     onClick={handleGenerateRC}

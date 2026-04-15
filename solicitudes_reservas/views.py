@@ -64,10 +64,9 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         
-        # ─ LIMPIEZA: Eliminar automáticamente reservas PENDIENTES cuyo tiempo ya pasó ─
-        # Las reservas PENDIENTES que nunca fueron aprobadas y ya expiraron se eliminan
-        # permanentemente para no contaminar el histórico con ruido.
-        SolicitudReserva.objects.filter(estado='PENDIENTE', fecha_fin__lt=timezone.now()).delete()
+        # ─ LIMPIEZA/LOG: Mover automáticamente reservas PENDIENTES expiran a CANCELADA ─
+        # Esto las saca del calendario activo pero las mantiene en el historial (LOG).
+        SolicitudReserva.objects.filter(estado='PENDIENTE', fecha_fin__lt=timezone.now()).update(estado='CANCELADA')
 
         # Para usuarios públicos (anónimos), limitamos el historial a 30 días atrás
         # Esto reduce el tiempo de carga del portal público si hay miles de registros.
@@ -105,26 +104,6 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
         solicitud.save()
         enviar_correo_aprobacion(solicitud)
         return Response(SolicitudReservaSerializer(solicitud, context={'request': request}).data)
-
-    # ─── Acción: Forzar Eliminación (Permiso Especial) ───────────────────────
-    @action(detail=True, methods=['delete'], url_path='force-delete', permission_classes=[permissions.IsAuthenticated])
-    def force_delete(self, request, pk=None):
-        """Elimina permanentemente una reserva PENDIENTE o APROBADA mal solicitada.
-        Solo disponible para usuarios con el permiso 'can_force_delete_reserva'."""
-        if not request.user.has_perm('solicitudes_reservas.can_force_delete_reserva') and not request.user.is_superuser:
-            return Response(
-                {"detail": "No tienes permiso para forzar la eliminación de reservas."},
-                status=403
-            )
-        solicitud = self.get_object()
-        if solicitud.estado not in ('PENDIENTE', 'APROBADA'):
-            return Response(
-                {"detail": f"Solo se pueden eliminar forzosamente reservas PENDIENTES o APROBADAS. Estado actual: {solicitud.estado}."},
-                status=400
-            )
-        titulo = solicitud.titulo
-        solicitud.delete()
-        return Response({"detail": f"Reserva '{titulo}' eliminada permanentemente."})
 
     # ─── Acción: Rechazar ─────────────────────────────────────────────────────
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
@@ -192,16 +171,7 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_destroy(self, instance):
-        # El borrado normal (DELETE /solicitudes/:id/) solo está permitido si la reserva
-        # todavía no ha finalizado. Para eliminar PENDIENTES o APROBADAS mal solicitadas,
-        # usar el endpoint DELETE /solicitudes/:id/force-delete/ con el permiso correspondiente.
-        if instance.estado in ('PENDIENTE', 'APROBADA'):
-            has_perm = self.request.user.has_perm('solicitudes_reservas.can_force_delete_reserva')
-            if not has_perm and not self.request.user.is_superuser:
-                raise serializers.ValidationError(
-                    "No tienes permiso para eliminar reservas activas. Usa 'Forzar Eliminación' si tienes el permiso adecuado."
-                )
-        if instance.fecha_fin < timezone.now() and instance.estado not in ('PENDIENTE', 'APROBADA'):
+        if instance.fecha_fin < timezone.now():
             raise serializers.ValidationError("No se pueden eliminar reservas que ya han finalizado.")
         instance.delete()
 

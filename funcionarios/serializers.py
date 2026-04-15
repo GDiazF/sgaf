@@ -83,7 +83,6 @@ class FuncionarioSerializer(serializers.ModelSerializer):
     subdireccion_nombre = serializers.ReadOnlyField(source='subdireccion.nombre')
     departamento_nombre = serializers.ReadOnlyField(source='departamento.nombre')
     unidad_nombre = serializers.ReadOnlyField(source='unidad.nombre')
-    user_email = serializers.SerializerMethodField()
     
     # Objetos completos para lectura detallada
     subdireccion_obj = SubdireccionSerializer(source='subdireccion', read_only=True)
@@ -100,11 +99,6 @@ class FuncionarioSerializer(serializers.ModelSerializer):
             'creado_en': {'read_only': True},
             'actualizado_en': {'read_only': True},
         }
-
-    def get_user_email(self, obj):
-        if obj.user and obj.user.email:
-            return obj.user.email
-        return None
     
     def validate_rut(self, value):
         """Validación adicional de RUT en el serializer"""
@@ -152,7 +146,6 @@ class FuncionarioListSerializer(serializers.ModelSerializer):
     subdireccion_nombre = serializers.ReadOnlyField(source='subdireccion.nombre')
     departamento_nombre = serializers.ReadOnlyField(source='departamento.nombre')
     unidad_nombre = serializers.ReadOnlyField(source='unidad.nombre')
-    user_email = serializers.SerializerMethodField()
     
     class Meta:
         model = Funcionario
@@ -160,10 +153,5 @@ class FuncionarioListSerializer(serializers.ModelSerializer):
             'id', 'rut', 'nombre_funcionario', 'anexo', 'numero_publico',
             'cargo', 'estado', 'subdireccion', 'subdireccion_nombre',
             'departamento', 'departamento_nombre', 'unidad', 'unidad_nombre',
-            'grupos', 'user_email'
+            'grupos'
         ]
-
-    def get_user_email(self, obj):
-        if obj.user and obj.user.email:
-            return obj.user.email
-        return None

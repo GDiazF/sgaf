@@ -31,6 +31,8 @@ export const groupPermissions = (permissions) => {
         else if (name.includes('anexo')) module = 'Telecomunicaciones';
         else if (name.includes('procedimiento') || name.includes('tipo de documento')) module = 'Gestor Documental';
         else if (name.includes('user') || name.includes('group') || name.includes('permission')) module = 'Seguridad y Usuarios';
+        else if (name.includes('log entry') || name.includes('logentry')) module = 'Auditoría';
+        else if (name.includes('link de interes') || name.includes('linkinteres')) module = 'Dashboard, Links y Redes';
 
         if (!groups[module]) groups[module] = [];
         groups[module].push(perm);
@@ -106,7 +108,9 @@ export const getFriendlyPermName = (perm) => {
         'bloqueohorario': 'Bloqueos de Horario',
         'reservasetting': 'Ajustes de Reservas',
         'procedimiento': 'Documentos / Procedimientos',
-        'tipoprocedimiento': 'Categorías de Documentos'
+        'tipoprocedimiento': 'Categorías de Documentos',
+        'linkinteres': 'Links y Redes Sociales / Dashboard',
+        'logentry': 'Logs de Auditoría'
     };
 
     const modelKey = codename.split('_')[1];
