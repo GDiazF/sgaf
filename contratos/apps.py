@@ -7,3 +7,10 @@ class ContratosConfig(AppConfig):
 
     def ready(self):
         import contratos.signals
+        from auditlog.registry import auditlog
+        from .models import Contrato, DocumentoContrato, ProcesoCompra, EstadoContrato, CategoriaContrato
+        auditlog.register(Contrato)
+        auditlog.register(DocumentoContrato)
+        auditlog.register(ProcesoCompra)
+        auditlog.register(EstadoContrato)
+        auditlog.register(CategoriaContrato)

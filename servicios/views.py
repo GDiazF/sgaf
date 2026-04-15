@@ -182,6 +182,7 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
         'servicio': ['exact'],
         'fecha_pago': ['exact', 'gte', 'lte'],
         'recepcion_conforme': ['exact', 'isnull'],
+        'es_historico': ['exact'],
         'servicio__proveedor': ['exact'],
         'servicio__proveedor__tipo_proveedor': ['exact']
     }
@@ -358,6 +359,16 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': f'Error al guardar en la base de datos: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @action(detail=False, methods=['post'])
+    def bulk_historical(self, request):
+        ids = request.data.get('ids', [])
+        is_historical = request.data.get('es_historico', True)
+        if not ids:
+            return Response({'error': 'No se proporcionaron IDs.'}, status=400)
+        
+        RegistroPago.objects.filter(id__in=ids).update(es_historico=is_historical)
+        return Response({'message': f'Se han actualizado {len(ids)} registros.'})
+
     @action(detail=True, methods=['get'])
     def generate_pdf(self, request, pk=None):
         import io
@@ -510,7 +521,15 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
         return FileResponse(buffer, as_attachment=True, filename=f'RC_{pago.nro_documento}.pdf')
 
 class RecepcionConformeViewSet(viewsets.ModelViewSet):
-    queryset = RecepcionConforme.objects.all().order_by('-fecha_emision', '-id')
+    queryset = RecepcionConforme.objects.select_related(
+        'proveedor__tipo_proveedor', 
+        'grupo_firmante', 
+        'firmante'
+    ).prefetch_related(
+        'registros__servicio__proveedor', 
+        'registros__establecimiento',
+        'historial'
+    ).all().order_by('-fecha_emision', '-id')
     serializer_class = RecepcionConformeSerializer
     filterset_fields = ['proveedor', 'estado']
     ordering_fields = ['fecha_emision', 'folio', 'proveedor__nombre', 'id']
@@ -817,6 +836,36 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
         )
         
         return Response({'status': 'RC anulada exitosamente.'})
+
+    @action(detail=False, methods=['post'])
+    def create_historical(self, request):
+        from .models import HistorialRecepcionConforme
+        proveedor_id = request.data.get('proveedor')
+        registros_ids = request.data.get('registros_ids', [])
+        
+        if not proveedor_id or not registros_ids:
+            return Response({'error': 'Faltan datos (proveedor o registros).'}, status=400)
+            
+        try:
+            with transaction.atomic():
+                rc = RecepcionConforme.objects.create(
+                    proveedor_id=proveedor_id,
+                    estado='HISTORICA',
+                    observaciones=f"Carga histórica masiva realizada por {request.user.username}"
+                )
+                RegistroPago.objects.filter(id__in=registros_ids).update(recepcion_conforme=rc)
+                
+                # Log action via History
+                HistorialRecepcionConforme.objects.create(
+                    recepcion_conforme=rc,
+                    accion='CREACION',
+                    detalle="RC marcada como HISTORICA vía proceso masivo.",
+                    usuario=request.user.username
+                )
+            
+            return Response({'status': f'RC Histórica {rc.folio} generada exitosamente.', 'id': rc.id})
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
 
 class CDPViewSet(viewsets.ModelViewSet):
     queryset = CDP.objects.all().order_by('-fecha_subida')

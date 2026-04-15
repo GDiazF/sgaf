@@ -59,7 +59,7 @@ class UnidadViewSet(viewsets.ModelViewSet):
 class FuncionarioViewSet(viewsets.ModelViewSet):
     """ViewSet para Funcionarios con búsqueda y filtros avanzados"""
     queryset = Funcionario.objects.select_related(
-        'subdireccion', 'departamento', 'unidad',
+        'user', 'subdireccion', 'departamento', 'unidad',
         'departamento__subdireccion', 'unidad__departamento'
     ).all()
     pagination_class = LargeResultsSetPagination

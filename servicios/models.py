@@ -62,6 +62,7 @@ class RecepcionConforme(models.Model):
     ESTADO_CHOICES = [
         ('EMITIDA', 'Emitida'),
         ('ANULADA', 'Anulada'),
+        ('HISTORICA', 'Histórica'),
     ]
     proveedor = models.ForeignKey(Proveedor, on_delete=models.PROTECT, related_name='recepciones')
     folio = models.CharField(max_length=50, unique=True, blank=True)
@@ -129,6 +130,7 @@ class RegistroPago(models.Model):
     monto_interes = models.IntegerField(default=0)
     monto_total = models.IntegerField()
     recepcion_conforme = models.ForeignKey(RecepcionConforme, on_delete=models.SET_NULL, null=True, blank=True, related_name='registros')
+    es_historico = models.BooleanField(default=False, verbose_name="¿Es registro histórico?")
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
