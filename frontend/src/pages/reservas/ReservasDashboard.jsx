@@ -108,6 +108,7 @@ const ReservasDashboard = () => {
     const { user } = useAuth();
     const canChangeName = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_change_reserva_name'));
     const canBypass = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_bypass_antelacion'));
+    const canForceDelete = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_force_delete_reserva'));
     const defaultName = user?.funcionario_data?.nombre_funcionario || (user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : '') || user?.username || '';
 
     const [recursos, setRecursos] = useState([]);
@@ -520,6 +521,17 @@ const ReservasDashboard = () => {
         if (!window.confirm(`¿Eliminar permanentemente "${r.nombre}"?`)) return;
         try { await api.delete(`reservas/recursos/${r.id}/`); fetchData(); if (adminEditing?.id === r.id) openAdminCreate(); }
         catch { alert('Error al eliminar'); }
+    };
+
+    const handleForceDeleteReserva = async (reserva, e) => {
+        e.stopPropagation();
+        if (!window.confirm(`¿Eliminar PERMANENTEMENTE la reserva "${reserva.titulo}"?\n\nEsta acción no se puede deshacer.`)) return;
+        try {
+            await api.delete(`reservas/solicitudes/${reserva.id}/force_delete/`);
+            fetchData();
+        } catch (err) {
+            alert(err.response?.data?.detail || 'Error al eliminar la reserva.');
+        }
     };
 
     // ── Bloqueos de Horario ──────────────────────────────────────────────
@@ -1412,6 +1424,27 @@ const ReservasDashboard = () => {
                                         )}
                                     </div>
                                 )}
+
+                                {/* Zona peligro: Eliminar Permanentemente */}
+                                {canForceDelete && !isRechazando && (
+                                    <div className="pt-3 border-t border-rose-100">
+                                        <button
+                                            onClick={async () => {
+                                                if (!window.confirm(`¿Eliminar PERMANENTEMENTE la reserva "${detailReserva.titulo}"?\n\nEsta acción no se puede deshacer.`)) return;
+                                                try {
+                                                    await api.delete(`reservas/solicitudes/${detailReserva.id}/force_delete/`);
+                                                    setDetailReserva(null);
+                                                    fetchData();
+                                                } catch (err) {
+                                                    alert(err.response?.data?.detail || 'Error al eliminar la reserva.');
+                                                }
+                                            }}
+                                            className="w-full flex items-center justify-center gap-2 py-2.5 bg-rose-50 text-rose-600 rounded-xl font-black text-xs hover:bg-rose-100 border border-rose-200 transition"
+                                        >
+                                            <Trash2 className="w-4 h-4" /> Eliminar Permanentemente
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -1927,13 +1960,24 @@ const ReservasDashboard = () => {
                                     const color = rec?.color || '#6366f1';
                                     return (
                                         <div key={r.id} className="group bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col gap-3 hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer"
-                                            onClick={() => { setDetailReserva(r); /* Podríamos abrir el detalle si quisiéramos */ }}>
+                                            onClick={() => { setDetailReserva(r); }}>
                                             <div className="flex justify-between items-start">
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
                                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{rec?.nombre || 'Recurso'}</span>
                                                 </div>
-                                                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase border" style={{ background: cfg.bg, color: cfg.text, borderColor: cfg.border }}>{cfg.label}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase border" style={{ background: cfg.bg, color: cfg.text, borderColor: cfg.border }}>{cfg.label}</span>
+                                                    {canForceDelete && (
+                                                        <button
+                                                            title="Eliminar Permanentemente"
+                                                            onClick={(e) => handleForceDeleteReserva(r, e)}
+                                                            className="p-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-500 hover:bg-rose-100 hover:text-rose-700 transition opacity-0 group-hover:opacity-100"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                             <div>
                                                 <h4 className="font-black text-slate-800 text-sm group-hover:text-indigo-600 transition-colors uppercase">{r.titulo}</h4>
@@ -1970,3 +2014,4 @@ const ReservasDashboard = () => {
 };
 
 export default ReservasDashboard;
+
