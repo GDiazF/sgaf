@@ -233,3 +233,31 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL  = f'SLEP Iquique Reservas <{EMAIL_HOST_USER}>'
 RESERVAS_ADMIN_EMAIL = config('RESERVAS_ADMIN_EMAIL', default='')
 EMAIL_DAILY_LIMIT   = 200
+
+# ────────────────────────────────────────────────────────────
+# 🚀 GUARDIÁN DE SEGURIDAD: ALERTAR SI LA DB ESTÁ VACÍA
+# ────────────────────────────────────────────────────────────
+import sys
+# Solo ejecutamos el check si no es una migración o collectstatic
+if not any(arg in sys.argv for arg in ['migrate', 'makemigrations', 'collectstatic']):
+    try:
+        from django.db import connections
+        from django.db.utils import OperationalError
+        def check_db_integrity():
+            try:
+                with connections['default'].cursor() as cursor:
+                    cursor.execute("SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'")
+                    if cursor.fetchone()[0] == 0:
+                        print("\n" + "!"*80)
+                        print("⚠️  AVISO DE SEGURIDAD: LA BASE DE DATOS ACTUAL ESTÁ TOTALMENTE VACÍA.")
+                        print("Si esto no es un servidor nuevo, podrías haber perdido la conexión con")
+                        print("los datos del Sandbox. Verifica tus volúmenes de Docker.")
+                        print("!"*80 + "\n")
+            except (OperationalError, Exception):
+                pass # Ignorar si la DB aún no está levantada
+        
+        # Intentar el check (con manejo de errores para no bloquear el arranque)
+        import threading
+        threading.Timer(5.0, check_db_integrity).start()
+    except:
+        pass

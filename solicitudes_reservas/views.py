@@ -64,9 +64,8 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         
-        # ─ LIMPIEZA/LOG: Mover automáticamente reservas PENDIENTES expiran a CANCELADA ─
-        # Esto las saca del calendario activo pero las mantiene en el historial (LOG).
-        SolicitudReserva.objects.filter(estado='PENDIENTE', fecha_fin__lt=timezone.now()).update(estado='CANCELADA')
+        # ─ LIMPIEZA: Eliminar físicamente las reservas PENDIENTES expiradas ─
+        SolicitudReserva.objects.filter(estado='PENDIENTE', fecha_fin__lt=timezone.now()).delete()
 
         # Para usuarios públicos (anónimos), limitamos el historial a 30 días atrás
         # Esto reduce el tiempo de carga del portal público si hay miles de registros.
@@ -172,8 +171,23 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         if instance.fecha_fin < timezone.now():
-            raise serializers.ValidationError("No se pueden eliminar reservas que ya han finalizado.")
+            raise serializers.ValidationError("No se pueden eliminar reservas que ya han finalizado. Use 'Eliminar Permanentemente' si tiene el permiso.")
         instance.delete()
+
+    # ─── Acción: Eliminar Permanentemente (requiere permiso especial) ─────────
+    @action(detail=True, methods=['delete'], permission_classes=[permissions.IsAuthenticated])
+    def force_delete(self, request, pk=None):
+        """Elimina cualquier reserva sin importar su estado o fecha.
+        Requiere el permiso can_force_delete_reserva.
+        """
+        if not (request.user.is_superuser or request.user.has_perm('solicitudes_reservas.can_force_delete_reserva')):
+            return Response(
+                {"detail": "No tienes permiso para eliminar permanentemente reservas."},
+                status=403
+            )
+        solicitud = self.get_object()
+        solicitud.delete()
+        return Response({"detail": "Reserva eliminada permanentemente."})
 
 
 class BloqueoHorarioViewSet(viewsets.ModelViewSet):
