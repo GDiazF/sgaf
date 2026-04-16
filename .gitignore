@@ -24,6 +24,7 @@ db.sqlite3
 *.sqlite3
 /staticfiles/
 /media/
+/media_sandbox/
 
 # ─── Secretos — NUNCA subir ─────────────────────────────────
 .env
