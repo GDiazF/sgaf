@@ -7,10 +7,26 @@ const api = axios.create({
     baseURL: BASE_URL,
 });
 
+// Helpers para Cookies (Sincronizados con AuthContext)
+const getSessionCookie = (name) => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+};
+
+const setSessionCookie = (name, value) => {
+    document.cookie = `${name}=${value}; path=/; SameSite=Lax`;
+};
+
+const removeSessionCookie = (name) => {
+    document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
+};
+
 // Interceptor para agregar el token JWT a todas las peticiones
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('access_token');
+        const token = getSessionCookie('access_token');
         // No enviar token en peticiones de login o refresh
         const isAuthPath = config.url.includes('token/');
 
@@ -35,21 +51,21 @@ api.interceptors.response.use(
             originalRequest._retry = true;
 
             try {
-                const refreshToken = localStorage.getItem('refresh_token');
+                const refreshToken = getSessionCookie('refresh_token');
                 const response = await axios.post(`${BASE_URL.replace('/api/', '')}/api/token/refresh/`, {
                     refresh: refreshToken,
                 });
 
                 const { access } = response.data;
-                localStorage.setItem('access_token', access);
+                setSessionCookie('access_token', access);
 
                 // Reintentar la petición original con el nuevo token
                 originalRequest.headers.Authorization = `Bearer ${access}`;
                 return api(originalRequest);
             } catch (refreshError) {
                 // Si falla el refresh, limpiar tokens y redirigir al login
-                localStorage.removeItem('access_token');
-                localStorage.removeItem('refresh_token');
+                removeSessionCookie('access_token');
+                removeSessionCookie('refresh_token');
                 window.location.href = '/login';
                 return Promise.reject(refreshError);
             }

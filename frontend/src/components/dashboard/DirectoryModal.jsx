@@ -9,6 +9,15 @@ const DirectoryModal = ({ isOpen, onClose, funcionarios }) => {
     const [selectedSub, setSelectedSub] = useState("Todas");
     const [selectedDepto, setSelectedDepto] = useState("Todos");
 
+    // Reiniciar filtros al cerrar
+    React.useEffect(() => {
+        if (!isOpen) {
+            setSearchTerm("");
+            setSelectedSub("Todas");
+            setSelectedDepto("Todos");
+        }
+    }, [isOpen]);
+
     const hierarchy = useMemo(() => {
         const subs = {};
         funcionarios.forEach(f => {
@@ -54,7 +63,7 @@ const DirectoryModal = ({ isOpen, onClose, funcionarios }) => {
                 initial={{ scale: 0.95, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                className="relative bg-[#fcfdfe] w-full max-w-6xl h-[85vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-slate-200"
+                className="relative bg-[#fcfdfe] w-full max-w-4xl h-[80vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-slate-200"
             >
                 {/* Header */}
                 <div className="p-6 border-b border-slate-100 bg-white flex items-center justify-between shrink-0">
@@ -139,7 +148,7 @@ const DirectoryModal = ({ isOpen, onClose, funcionarios }) => {
                             <div className="space-y-1">
                                 {filtered.length > 0 ? (
                                     filtered.map((f) => (
-                                        <div key={f.id} className="flex items-center justify-between p-3 hover:bg-white hover:shadow-lg hover:shadow-slate-200/50 rounded-2xl transition-all group border-b border-slate-50 last:border-0 border-l-4 border-l-transparent hover:border-l-blue-600">
+                                        <div key={f.id} className="flex items-center justify-between p-3 hover:bg-white hover:shadow-lg hover:shadow-slate-200/50 rounded-2xl transition-all group border-b border-slate-50 border-l-4 border-l-transparent hover:border-l-blue-600">
                                             <div className="flex items-center gap-4 min-w-0 flex-1">
                                                 <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all flex items-center justify-center text-xs font-black uppercase flex-shrink-0">
                                                     {f.nombre_funcionario?.charAt(0)}
@@ -152,7 +161,7 @@ const DirectoryModal = ({ isOpen, onClose, funcionarios }) => {
                                             </div>
 
                                             <div className="flex items-center gap-4">
-                                                <div className="flex flex-col items-end text-right pr-4 border-r border-slate-100">
+                                                <div className="flex flex-col items-end text-right pr-4 border-r border-slate-100 w-20">
                                                     <span className="text-[8px] font-black text-slate-300 uppercase leading-none mb-1">Anexo</span>
                                                     <span className="text-sm font-black text-blue-600 shadow-sm px-2 py-1 bg-blue-50 rounded-lg tracking-tighter tabular-nums leading-none">
                                                         {f.anexo || '---'}

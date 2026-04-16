@@ -42,6 +42,7 @@ import ProceduresDashboard from './pages/procedimientos/ProceduresDashboard';
 import Login from './pages/Login';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
+import SessionTimeoutManager from './components/SessionTimeoutManager';
 
 // Admin
 import UserManagement from './pages/admin/UserManagement';
@@ -61,6 +62,7 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <SessionTimeoutManager />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
