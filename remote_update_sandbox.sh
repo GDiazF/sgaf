@@ -8,6 +8,16 @@ echo "--------------------------------------------------------"
 echo "🚀 ACTUALIZADOR FINAL DE SANDBOX 1.1.2"
 echo "--------------------------------------------------------"
 
+# 0. Verificación de Seguridad de Base de Datos
+if ! docker volume inspect sgaf_sandbox_pgdata_v3 > /dev/null 2>&1; then
+    echo ""
+    echo "🚨 ERROR DE SEGURIDAD: El volumen 'sgaf_sandbox_pgdata_v3' NO EXISTE."
+    echo "🛑 Abortando ejecución para evitar la creación de una base de datos VACÍA."
+    echo "Por favor, verifica el nombre del volumen en tu docker-compose.sandbox.yml"
+    echo ""
+    exit 1
+fi
+
 # 1. Entrar a la carpeta
 cd $SANDBOX_PATH || { echo "❌ Error: No se encontró la carpeta $SANDBOX_PATH"; exit 1; }
 
@@ -32,6 +42,22 @@ docker compose -f $COMPOSE_FILE build --no-cache sandbox_backend
 # 6. Levantar todo
 echo "⬆️ Levantando sistema..."
 docker compose -f $COMPOSE_FILE up -d
+
+# --- Verificación de Contenido de Base de Datos ---
+echo "🔍 Verificando integridad de los datos..."
+# Esperar un momento a que Postgres esté listo
+sleep 3
+TABLE_COUNT=$(docker exec sgaf_sandbox_db psql -U sgaf_sandbox_user -d sgaf_sandbox_db -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';" | xargs)
+
+if [ "$TABLE_COUNT" -eq "0" ]; then
+    echo ""
+    echo "🚨 ERROR: La base de datos está VACÍA (0 tablas)."
+    echo "🛑 Abortando para evitar el inicio de un sistema sin datos reales."
+    echo "Verifica si el contenedor de la base de datos está usando el volumen correcto."
+    echo ""
+    exit 1
+fi
+# --------------------------------------------------
 
 # 7. Migraciones y Estáticos
 echo "📦 Aplicando migraciones y recolectando estáticos..."
