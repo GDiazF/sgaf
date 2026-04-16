@@ -25,11 +25,11 @@ cd $SANDBOX_PATH || { echo "❌ Error: No se encontró la carpeta $SANDBOX_PATH"
 echo "🔑 Asegurando permisos de archivos..."
 sudo chown -R slepiquique:slepiquique .
 
-# 3. Sincronizar con Master GitHub
-echo "📥 Descargando cambios de master (incluye pdfplumber)..."
+# 3. Sincronizar con Rama LOCAL GitHub
+echo "📥 Descargando cambios de rama LOCAL..."
 git fetch origin
-git checkout master
-git reset --hard origin/master
+git checkout local
+git reset --hard origin/local
 
 # 4. Limpieza de Caché de Nginx (Sin tocar volúmenes de DB)
 echo "🛑 Reiniciando servicios para aplicar cambios de código..."
