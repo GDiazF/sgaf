@@ -25,6 +25,8 @@ const VehiculosDashboard = () => {
         mes: new Date().getMonth() + 1,
         vehiculo: '',
         kilometros_recorridos: '',
+        km_inicial: '',
+        km_final: '',
         gasto_bencina: '',
         gasto_peajes: '',
         gasto_seguros: ''
@@ -35,6 +37,16 @@ const VehiculosDashboard = () => {
     const [submitting, setSubmitting] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+    // Aggregator Sub-Modal State
+    const [isAggregatorOpen, setAggregatorOpen] = useState(false);
+    const [aggregatorField, setAggregatorField] = useState(null); // 'gasto_bencina', etc.
+    const [aggregatorValue, setAggregatorValue] = useState('');
+    const [history, setHistory] = useState({
+        gasto_bencina: [],
+        gasto_peajes: [],
+        gasto_seguros: []
+    });
 
     useEffect(() => {
         const handleResize = () => setWindowWidth(window.innerWidth);
@@ -69,43 +81,71 @@ const VehiculosDashboard = () => {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
+        const val = value === '' ? '' : parseInt(value, 10);
+
+        setFormData(prev => {
+            const nextData = {
+                ...prev,
+                [name]: val
+            };
+
+            // Cálculo automático: se dispara si cambia km_inicial o km_final
+            if (name === 'km_inicial' || name === 'km_final') {
+                const kIni = name === 'km_inicial' ? val : prev.km_inicial;
+                const kFin = name === 'km_final' ? val : prev.km_final;
+
+                // Solo calculamos si ambos campos tienen un valor numérico
+                if (typeof kIni === 'number' && typeof kFin === 'number') {
+                    nextData.kilometros_recorridos = kFin - kIni;
+                } else {
+                    nextData.kilometros_recorridos = '';
+                }
+            }
+
+            return nextData;
+        });
+    };
+
+
+
+    const handleAddAmount = (name) => {
+        setAggregatorField(name);
+        setAggregatorValue('');
+        setAggregatorOpen(true);
+    };
+
+    const confirmAddition = () => {
+        const value = parseInt(aggregatorValue);
+        if (isNaN(value) || value <= 0) return;
+
         setFormData(prev => ({
             ...prev,
-            [name]: value === '' ? '' : parseInt(value)
+            [aggregatorField]: (parseInt(prev[aggregatorField]) || 0) + value
         }));
+
+        setHistory(prev => ({
+            ...prev,
+            [aggregatorField]: [...prev[aggregatorField], value]
+        }));
+
+        setAggregatorOpen(false);
     };
 
-
-    const handleSaveFlota = async (e) => {
-        e.preventDefault();
-        setSubmitting(true);
-        try {
-            await api.post('vehiculos/flota/', flotaFormData);
-            setFlotaFormData({ marca: '', modelo: '', patente: '' });
-            fetchData();
-        } catch (error) {
-            console.error("Error saving vehicle:", error);
-            if (error.response && error.response.data) {
-                const message = typeof error.response.data === 'object' 
-                    ? Object.values(error.response.data).join('\n') 
-                    : error.response.data;
-                alert(`Error al guardar vehículo:\n${message}`);
-            } else {
-                alert("Error al guardar vehículo. Verifique si la patente ya existe o revise su conexión.");
-            }
-        } finally {
-            setSubmitting(false);
-        }
+    const resetField = (name) => {
+        setFormData({ ...formData, [name]: 0 });
+        setHistory({ ...history, [name]: [] });
     };
 
-    const handleDeleteFlota = async (id) => {
-        if (!window.confirm("¿Está seguro de eliminar este vehículo?")) return;
-        try {
-            await api.delete(`vehiculos/flota/${id}/`);
-            fetchData();
-        } catch (error) {
-            alert("No se puede eliminar un vehículo que tiene registros asociados. Marque como inactivo en su lugar.");
-        }
+    const removeAddition = (field, index) => {
+        const valToRemove = history[field][index];
+        setHistory(prev => ({
+            ...prev,
+            [field]: prev[field].filter((_, i) => i !== index)
+        }));
+        setFormData(prev => ({
+            ...prev,
+            [field]: Math.max(0, (parseInt(prev[field]) || 0) - valToRemove)
+        }));
     };
 
     const handleOpenCreateModal = () => {
@@ -115,9 +155,16 @@ const VehiculosDashboard = () => {
             mes: registros.length > 0 ? (registros[registros.length - 1].mes % 12) + 1 : new Date().getMonth() + 1,
             vehiculo: flota.length > 0 ? flota[0].id : '',
             kilometros_recorridos: '',
+            km_inicial: '',
+            km_final: '',
             gasto_bencina: '',
             gasto_peajes: '',
             gasto_seguros: ''
+        });
+        setHistory({
+            gasto_bencina: [],
+            gasto_peajes: [],
+            gasto_seguros: []
         });
         setModalOpen(true);
     };
@@ -129,9 +176,16 @@ const VehiculosDashboard = () => {
             mes: registro.mes,
             vehiculo: registro.vehiculo,
             kilometros_recorridos: registro.kilometros_recorridos,
+            km_inicial: '',
+            km_final: '',
             gasto_bencina: registro.gasto_bencina,
             gasto_peajes: registro.gasto_peajes,
             gasto_seguros: registro.gasto_seguros
+        });
+        setHistory({
+            gasto_bencina: registro.gasto_bencina > 0 ? [registro.gasto_bencina] : [],
+            gasto_peajes: registro.gasto_peajes > 0 ? [registro.gasto_peajes] : [],
+            gasto_seguros: registro.gasto_seguros > 0 ? [registro.gasto_seguros] : []
         });
         setModalOpen(true);
     };
@@ -140,8 +194,9 @@ const VehiculosDashboard = () => {
         e.preventDefault();
         setSubmitting(true);
 
+        const { km_inicial, km_final, ...restData } = formData;
         const payload = {
-            ...formData,
+            ...restData,
             kilometros_recorridos: formData.kilometros_recorridos === '' ? 0 : formData.kilometros_recorridos,
             gasto_bencina: formData.gasto_bencina === '' ? 0 : formData.gasto_bencina,
             gasto_peajes: formData.gasto_peajes === '' ? 0 : formData.gasto_peajes,
@@ -577,35 +632,107 @@ const VehiculosDashboard = () => {
                                 </div>
 
                                 <div className="space-y-8 animate-in fade-in duration-500">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Km Inicial del mes</label>
+                                            <div className="relative">
+                                                <input 
+                                                    type="number" 
+                                                    name="km_inicial" 
+                                                    value={formData.km_inicial} 
+                                                    onChange={handleInputChange} 
+                                                    className="w-full px-6 h-14 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 outline-none font-bold text-slate-700 bg-slate-50 transition-all" 
+                                                    placeholder="Ej: 10500"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Km Final del mes</label>
+                                            <div className="relative">
+                                                <input 
+                                                    type="number" 
+                                                    name="km_final" 
+                                                    value={formData.km_final} 
+                                                    onChange={handleInputChange} 
+                                                    className="w-full px-6 h-14 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 outline-none font-bold text-slate-700 bg-slate-50 transition-all" 
+                                                    placeholder="Ej: 11000"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div className="space-y-2">
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Lectura de Odómetro Mensual</label>
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Lectura de Odómetro Mensual (Calculado)</label>
                                         <div className="relative">
-                                            <input type="number" name="kilometros_recorridos" value={formData.kilometros_recorridos} onChange={handleInputChange} className="w-full px-8 py-5 rounded-[24px] border-2 border-slate-100 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none font-black text-2xl text-slate-800 bg-slate-50 transition-all pr-20" placeholder="000,000" />
+                                            <input 
+                                                type="number" 
+                                                name="kilometros_recorridos" 
+                                                value={formData.kilometros_recorridos} 
+                                                onChange={handleInputChange} 
+                                                className="w-full px-8 py-5 rounded-[24px] border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none font-black text-2xl text-slate-900 bg-slate-100/50 transition-all pr-20" 
+                                                placeholder="0"
+                                                readOnly
+                                            />
                                             <span className="absolute right-8 top-1/2 -translate-y-1/2 font-black text-slate-300">KM</span>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-amber-600 uppercase tracking-widest ml-1">Combustible</label>
-                                            <div className="relative">
-                                                <input type="number" name="gasto_bencina" value={formData.gasto_bencina} onChange={handleInputChange} style={{ paddingLeft: '3rem' }} className="w-full pr-6 h-14 rounded-2xl border-2 border-amber-100 focus:border-amber-500 outline-none font-bold text-slate-700 bg-amber-50/10 transition-all" />
-                                                <DollarSign className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-amber-500" />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-violet-600 uppercase tracking-widest ml-1">Peajes / TAG</label>
-                                            <div className="relative">
-                                                <input type="number" name="gasto_peajes" value={formData.gasto_peajes} onChange={handleInputChange} style={{ paddingLeft: '3rem' }} className="w-full pr-6 h-14 rounded-2xl border-2 border-violet-100 focus:border-violet-500 outline-none font-bold text-slate-700 bg-violet-50/10 transition-all" />
-                                                <DollarSign className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-violet-500" />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-emerald-600 uppercase tracking-widest ml-1">Seguros / Otros</label>
-                                            <div className="relative">
-                                                <input type="number" name="gasto_seguros" value={formData.gasto_seguros} onChange={handleInputChange} style={{ paddingLeft: '3rem' }} className="w-full pr-6 h-14 rounded-2xl border-2 border-emerald-100 focus:border-emerald-500 outline-none font-bold text-slate-700 bg-emerald-50/10 transition-all" />
-                                                <DollarSign className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" />
-                                            </div>
-                                        </div>
+                                        {['gasto_bencina', 'gasto_peajes', 'gasto_seguros'].map((field) => {
+                                            const colors = {
+                                                gasto_bencina: { text: 'text-amber-600', bg: 'bg-amber-100', border: 'border-amber-100', bgLight: 'bg-amber-50/20', icon: 'text-amber-500', btn: 'bg-amber-600', label: 'Combustible' },
+                                                gasto_peajes: { text: 'text-violet-600', bg: 'bg-violet-100', border: 'border-violet-100', bgLight: 'bg-violet-50/20', icon: 'text-violet-500', btn: 'bg-violet-600', label: 'Peajes / TAG' },
+                                                gasto_seguros: { text: 'text-emerald-600', bg: 'bg-emerald-100', border: 'border-emerald-100', bgLight: 'bg-emerald-50/20', icon: 'text-emerald-500', btn: 'bg-emerald-600', label: 'Seguros / Otros' }
+                                            };
+                                            const c = colors[field];
+                                            return (
+                                                <div key={field} className="space-y-2">
+                                                    <div className="flex justify-between items-center px-1">
+                                                        <label className={`text-xs font-black ${c.text} uppercase tracking-widest leading-none`}>{c.label}</label>
+                                                        <button type="button" onClick={() => handleAddAmount(field)} className={`text-[10px] font-black ${c.bg} ${c.text} px-2 py-0.5 rounded-lg hover:${c.btn} hover:text-white transition-all flex items-center gap-1`}>
+                                                            <Plus className="w-3 h-3" /> AGREGAR
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    {/* Historial de adiciones */}
+                                                    <div className="flex flex-wrap gap-1 min-h-[1.5rem] px-1 overflow-hidden">
+                                                        {history[field].map((val, idx) => (
+                                                            <motion.button 
+                                                                type="button"
+                                                                initial={{ scale: 0.5, opacity: 0 }} 
+                                                                animate={{ scale: 1, opacity: 1 }} 
+                                                                whileHover={{ scale: 1.05, opacity: 0.8 }}
+                                                                key={`${field}-${idx}`} 
+                                                                onClick={() => removeAddition(field, idx)}
+                                                                className={`text-[9px] font-bold ${c.bg} ${c.text} px-2 py-0.5 rounded-md border ${c.border} cursor-pointer hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex items-center gap-1 group/chip`}
+                                                                title="Haga clic para eliminar este monto"
+                                                            >
+                                                                +{val.toLocaleString()}
+                                                                <X className="w-2 h-2 opacity-0 group-hover/chip:opacity-100" />
+                                                            </motion.button>
+                                                        ))}
+                                                    </div>
+
+                                                    <div className={`flex items-center gap-2 w-full h-14 rounded-2xl border-2 ${c.border} ${c.bgLight} px-5 transition-all group`}>
+                                                        <DollarSign className={`w-5 h-5 ${c.icon} shrink-0`} />
+                                                        <input 
+                                                            type="number" 
+                                                            name={field} 
+                                                            value={formData[field]} 
+                                                            readOnly 
+                                                            className="flex-1 bg-transparent border-none outline-none font-bold text-slate-700 cursor-not-allowed" 
+                                                        />
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => resetField(field)} 
+                                                            className="p-1 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" 
+                                                            title="Reiniciar a 0"
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
 
@@ -620,6 +747,53 @@ const VehiculosDashboard = () => {
                     </div>
                 )}
             </AnimatePresence>
+            {/* Aggregator Sub-Modal */}
+            <AnimatePresence>
+                {isAggregatorOpen && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md" onClick={() => setAggregatorOpen(false)}>
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-white rounded-[40px] shadow-2xl w-full max-w-sm overflow-hidden border border-white/20"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                                    <Calculator className="w-4 h-4 text-indigo-500" />
+                                    Sumar Monto
+                                </h3>
+                                <button onClick={() => setAggregatorOpen(false)} className="text-slate-300 hover:text-slate-500"><X className="w-5 h-5" /></button>
+                            </div>
+                            <div className="p-8 space-y-6 text-center">
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Agregando a {aggregatorField?.replace('gasto_', '').toUpperCase()}</p>
+                                    <div className="text-xs font-bold text-slate-400 flex justify-center gap-2">
+                                        Subtotal: <span className="text-slate-900">{formatCurrency(formData[aggregatorField] || 0)}</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-center gap-3 bg-slate-50 rounded-2xl p-6 border-2 border-dashed border-slate-100">
+                                    <span className="text-4xl font-black text-slate-300">$</span>
+                                    <input
+                                        autoFocus
+                                        type="number"
+                                        value={aggregatorValue}
+                                        onChange={(e) => setAggregatorValue(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && confirmAddition()}
+                                        placeholder="0"
+                                        className="w-full text-left text-5xl font-black text-slate-900 outline-none placeholder-slate-100 bg-transparent"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button onClick={() => setAggregatorOpen(false)} className="py-4 text-xs font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 rounded-2xl transition-all">Cancelar</button>
+                                    <button onClick={confirmAddition} className="py-4 bg-slate-900 text-white text-xs font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-slate-900/20 hover:bg-black transition-all border-b-4 border-black active:scale-95">Sumar</button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
             {/* Flota Modal */}
             <AnimatePresence>
                 {isFlotaModalOpen && (
