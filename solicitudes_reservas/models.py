@@ -138,6 +138,9 @@ class SolicitudReserva(models.Model):
         permissions = [
             ("can_change_reserva_name", "Puede cambiar el nombre de la reserva"),
             ("can_bypass_antelacion", "Puede saltar bloqueo de antelación"),
+            ("can_force_delete_reserva", "Puede eliminar permanentemente una reserva"),
+            ("can_view_logs", "Puede ver historial de cambios (Logs)"),
+            ("can_manage_settings", "Puede configurar horario y antelación"),
         ]
 
 class ReservaSetting(models.Model):

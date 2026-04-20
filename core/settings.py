@@ -34,6 +34,8 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'django_filters',
     'corsheaders',
+    'django_otp',
+    'django_otp.plugins.otp_totp',
     # Local apps
     'prestamo_llaves',
     'core',
@@ -64,6 +66,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django_otp.middleware.OTPMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -186,7 +189,8 @@ SIMPLE_JWT = {
 # ────────────────────────────────────────────────────────────
 # CORS
 # ────────────────────────────────────────────────────────────
-CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bool)
 CORS_ALLOWED_ORIGINS = [
     'http://10.0.100.25',
     'http://10.0.100.25:5173',
@@ -233,3 +237,6 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL  = f'SLEP Iquique Reservas <{EMAIL_HOST_USER}>'
 RESERVAS_ADMIN_EMAIL = config('RESERVAS_ADMIN_EMAIL', default='')
 EMAIL_DAILY_LIMIT   = 200
+
+# MFA - Two Factor Authentication
+OTP_TOTP_ISSUER = 'SGAF - SLEP Iquique'

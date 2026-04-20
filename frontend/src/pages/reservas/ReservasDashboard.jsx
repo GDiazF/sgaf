@@ -106,9 +106,17 @@ const bloqueoAppliesToDate = (b, dateStr) => {
 // ─── Componente Principal ─────────────────────────────────────────────────────
 const ReservasDashboard = () => {
     const { user } = useAuth();
+
+    // Permisos Específicos
     const canChangeName = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_change_reserva_name'));
     const canBypass = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_bypass_antelacion'));
     const canForceDelete = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_force_delete_reserva'));
+
+    // Permisos de Gestión
+    const canViewLogs = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_view_logs'));
+    const canManageSettings = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_manage_settings'));
+    const canManageRecursos = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.add_recursoreservable')) || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.change_recursoreservable'));
+
     const defaultName = user?.funcionario_data?.nombre_funcionario || (user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : '') || user?.username || '';
 
     const [recursos, setRecursos] = useState([]);
@@ -169,7 +177,7 @@ const ReservasDashboard = () => {
     const [bloqueoError, setBloqueoError] = useState('');
     const [bloqueoSaving, setBloqueoSaving] = useState(false);
     const [bloqueoTab, setBloqueoTab] = useState(false); // true = mostrando pestaña de bloqueos
-    
+
     // Antelación masiva
     const [bulkDays, setBulkDays] = useState(0);
     const [selectedBulk, setSelectedBulk] = useState([]);
@@ -354,9 +362,9 @@ const ReservasDashboard = () => {
     const handleSlotClick = (day, slotTime, recursoId) => {
         const rec = recursos.find(r => r.id === recursoId);
         const x = rec?.dias_antelacion || 0;
-        const limit = new Date(); limit.setHours(0,0,0,0);
+        const limit = new Date(); limit.setHours(0, 0, 0, 0);
         limit.setDate(limit.getDate() + x);
-        
+
         if (day <= limit && !canBypass) {
             setSlotBloqueadoMsg(`Este recurso necesita ${x} días de antelación. Bloqueado hasta el ${addDays(limit, 1).toLocaleDateString()}.`);
             setTimeout(() => setSlotBloqueadoMsg(''), 3000);
@@ -468,13 +476,13 @@ const ReservasDashboard = () => {
     };
     const openAdminEdit = (r) => {
         setAdminEditing(r);
-        setAdminForm({ 
-            nombre: r.nombre, 
-            tipo: r.tipo, 
-            color: r.color || '#6366f1', 
-            ubicacion: r.ubicacion || '', 
-            capacidad: r.capacidad || 10, 
-            descripcion: r.descripcion || '', 
+        setAdminForm({
+            nombre: r.nombre,
+            tipo: r.tipo,
+            color: r.color || '#6366f1',
+            ubicacion: r.ubicacion || '',
+            capacidad: r.capacidad || 10,
+            descripcion: r.descripcion || '',
             activo: r.activo,
             dias_antelacion: r.dias_antelacion || 0
         });
@@ -617,9 +625,11 @@ const ReservasDashboard = () => {
                         ))}
                     </div>
 
-                    <button onClick={() => setHistoryOpen(true)} className="flex items-center gap-2 px-3 py-1.5 text-slate-500 hover:text-slate-800 transition text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50">
-                        <Clock className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Log</span>
-                    </button>
+                    {canViewLogs && (
+                        <button onClick={() => setHistoryOpen(true)} className="flex items-center gap-2 px-3 py-1.5 text-slate-500 hover:text-slate-800 transition text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50">
+                            <Clock className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Log</span>
+                        </button>
+                    )}
 
                     <button onClick={fetchData} className="p-2 hover:bg-slate-100 rounded-lg transition" title="Actualizar">
                         <RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
@@ -627,9 +637,11 @@ const ReservasDashboard = () => {
                 </div>
 
                 <div className="flex items-center gap-2 ml-auto w-full md:w-auto mt-1 md:mt-0">
-                    <button onClick={() => { openAdminCreate(); setAdminOpen(true); }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-black hover:bg-slate-200 transition">
-                        <Settings className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Administrar</span>
-                    </button>
+                    {(canManageSettings || canManageRecursos) && (
+                        <button onClick={() => { openAdminCreate(); setAdminOpen(true); }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-black hover:bg-slate-200 transition">
+                            <Settings className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Administrar</span>
+                        </button>
+                    )}
                     {(() => {
                         // Nota: En el botón de nueva reserva, la validación de antelación es global o por recurso.
                         // Aquí simplificamos usando la fecha actual.
@@ -1500,19 +1512,21 @@ const ReservasDashboard = () => {
                                         );
                                     })}
                                 </div>
-                                <div className="p-3 border-t border-slate-100 mt-2 bg-slate-50/50">
-                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 pb-2">Configuración General</div>
-                                    <button onClick={() => setAdminEditing({ id: 'settings', isSettings: true })}
-                                        className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer transition ${adminEditing?.id === 'settings' ? 'bg-white border border-indigo-200 shadow-sm' : 'hover:bg-white border border-transparent'}`}>
-                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${adminEditing?.id === 'settings' ? 'bg-indigo-600' : 'bg-slate-200'}`}>
-                                            <Clock className={`w-3.5 h-3.5 ${adminEditing?.id === 'settings' ? 'text-white' : 'text-slate-500'}`} />
-                                        </div>
-                                        <div className="min-w-0 flex-1 text-left">
-                                            <p className={`text-xs font-black truncate ${adminEditing?.id === 'settings' ? 'text-indigo-600' : 'text-slate-700'}`}>Horario Laboral</p>
-                                            <p className="text-[9px] text-slate-400 truncate">Configurar inicio/fin</p>
-                                        </div>
-                                    </button>
-                                </div>
+                                {canManageSettings && (
+                                    <div className="p-3 border-t border-slate-100 mt-2 bg-slate-50/50">
+                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 pb-2">Configuración General</div>
+                                        <button onClick={() => setAdminEditing({ id: 'settings', isSettings: true })}
+                                            className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer transition ${adminEditing?.id === 'settings' ? 'bg-white border border-indigo-200 shadow-sm' : 'hover:bg-white border border-transparent'}`}>
+                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${adminEditing?.id === 'settings' ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                                                <Clock className={`w-3.5 h-3.5 ${adminEditing?.id === 'settings' ? 'text-white' : 'text-slate-500'}`} />
+                                            </div>
+                                            <div className="min-w-0 flex-1 text-left">
+                                                <p className={`text-xs font-black truncate ${adminEditing?.id === 'settings' ? 'text-indigo-600' : 'text-slate-700'}`}>Horario Laboral</p>
+                                                <p className="text-[9px] text-slate-400 truncate">Configurar inicio/fin</p>
+                                            </div>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Formulario */}
@@ -1573,8 +1587,8 @@ const ReservasDashboard = () => {
                                                     <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
                                                         {recursos.map(r => (
                                                             <label key={r.id} className="flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-100 hover:border-indigo-200 cursor-pointer transition">
-                                                                <input type="checkbox" className="rounded text-indigo-600 focus:ring-indigo-500" 
-                                                                    checked={selectedBulk.includes(r.id)} 
+                                                                <input type="checkbox" className="rounded text-indigo-600 focus:ring-indigo-500"
+                                                                    checked={selectedBulk.includes(r.id)}
                                                                     onChange={e => {
                                                                         if (e.target.checked) setSelectedBulk(p => [...p, r.id]);
                                                                         else setSelectedBulk(p => p.filter(id => id !== r.id));
@@ -1584,7 +1598,7 @@ const ReservasDashboard = () => {
                                                         ))}
                                                     </div>
                                                 </div>
-                                                <button type="button" 
+                                                <button type="button"
                                                     onClick={handleBulkUpdate}
                                                     disabled={adminSaving || selectedBulk.length === 0}
                                                     className="w-full py-2.5 bg-indigo-50 text-indigo-700 rounded-xl font-black text-[10px] uppercase border border-indigo-100 hover:bg-indigo-100 transition flex items-center justify-center gap-2 disabled:opacity-50">

@@ -177,7 +177,7 @@ const AuditLog = () => {
     };
 
     return (
-        <div className="p-6 lg:p-8 max-w-[1600px] mx-auto min-h-screen bg-slate-50/10">
+        <div className="p-6 lg:p-8 w-full min-h-screen bg-slate-50/10">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>

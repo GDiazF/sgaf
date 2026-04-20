@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Box, Globe, UserCircle2, Settings, History, Info } from 'lucide-react';
+import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShieldCheck, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Box, Globe, UserCircle2, Settings, History, Info, Mail } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../hooks/usePermission';
@@ -49,10 +49,14 @@ const Layout = () => {
     // Close sidebar/mobile menu when route changes
     useEffect(() => {
         setMobileMenuOpen(false);
+        // Si venimos con instrucción de configurar MFA, abrimos el modal
+        if (location.state?.setup_mfa) {
+            setIsProfileModalOpen(true);
+        }
         if (windowWidth <= 1366) {
             setSidebarOpen(false);
         }
-    }, [location.pathname, windowWidth]);
+    }, [location.pathname, location.state, windowWidth]);
 
     // Block scroll when mobile menu is open
     useEffect(() => {
@@ -541,7 +545,7 @@ const Layout = () => {
                             </AnimatePresence>
                         </div>
                     )}
-                </nav >
+                </nav>
 
                 {/* Sidebar Footer: Server Status */}
                 < div className="mt-auto border-t border-slate-800/50 pt-4 mb-4" >
@@ -663,7 +667,8 @@ const Layout = () => {
                                             </p>
                                         </div>
 
-                                        <div className="py-1">
+                                        <div className="flex flex-col gap-0.5">
+                                            {/* Sección: Usuario */}
                                             <button
                                                 onClick={() => {
                                                     setIsProfileOpen(false);
@@ -676,6 +681,53 @@ const Layout = () => {
                                                 </div>
                                                 Mi Perfil
                                             </button>
+                                            {/* Sección: Administración */}
+                                            {(can('auth.view_group') || user?.is_superuser) && (
+                                                <>
+                                                    <div className="h-px bg-slate-50 my-1 mx-2" />
+                                                    <Link
+                                                        to="/admin/roles"
+                                                        onClick={() => setIsProfileOpen(false)}
+                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                    >
+                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                            <Shield className="w-4 h-4" />
+                                                        </div>
+                                                        Roles y Permisos
+                                                    </Link>
+                                                    <Link
+                                                        to="/admin/users"
+                                                        onClick={() => setIsProfileOpen(false)}
+                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                    >
+                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                            <ShieldCheck className="w-4 h-4" />
+                                                        </div>
+                                                        Usuarios y Seguridad
+                                                    </Link>
+                                                    <Link
+                                                        to="/admin/audit-log"
+                                                        onClick={() => setIsProfileOpen(false)}
+                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                    >
+                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                            <History className="w-4 h-4" />
+                                                        </div>
+                                                        Auditoría de Sistema
+                                                    </Link>
+                                                    <Link
+                                                        to="/admin/email-settings"
+                                                        onClick={() => setIsProfileOpen(false)}
+                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                    >
+                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                            <Mail className="w-4 h-4" />
+                                                        </div>
+                                                        Configuración de Correo
+                                                    </Link>
+                                                </>
+                                            )}
+
                                             <button
                                                 onClick={() => {
                                                     setIsProfileOpen(false);
@@ -688,55 +740,20 @@ const Layout = () => {
                                                 </div>
                                                 Acerca del Sistema
                                             </button>
+
+                                            <button
+                                                onClick={() => {
+                                                    setIsProfileOpen(false);
+                                                    logout();
+                                                }}
+                                                className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                            >
+                                                <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-red-100 transition-colors">
+                                                    <LogOut className="w-4 h-4" />
+                                                </div>
+                                                Cerrar Sesión
+                                            </button>
                                         </div>
-
-                                        {(can('auth.view_group') || user?.is_superuser) && (
-                                            <div className="py-1">
-                                                <Link
-                                                    to="/admin/users"
-                                                    onClick={() => setIsProfileOpen(false)}
-                                                    className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                >
-                                                    <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                        <Users className="w-4 h-4" />
-                                                    </div>
-                                                    Gestionar Usuarios
-                                                </Link>
-                                                <Link
-                                                    to="/admin/roles"
-                                                    onClick={() => setIsProfileOpen(false)}
-                                                    className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                >
-                                                    <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                        <Shield className="w-4 h-4" />
-                                                    </div>
-                                                    Roles y Permisos
-                                                </Link>
-                                                <Link
-                                                    to="/admin/audit-log"
-                                                    onClick={() => setIsProfileOpen(false)}
-                                                    className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                >
-                                                    <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                        <History className="w-4 h-4" />
-                                                    </div>
-                                                    Auditoría de Sistema
-                                                </Link>
-                                            </div>
-                                        )}
-
-                                        <button
-                                            onClick={() => {
-                                                setIsProfileOpen(false);
-                                                logout();
-                                            }}
-                                            className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                        >
-                                            <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-red-100 transition-colors">
-                                                <LogOut className="w-4 h-4" />
-                                            </div>
-                                            Cerrar Sesión
-                                        </button>
                                     </motion.div>
                                 )}
                             </AnimatePresence>

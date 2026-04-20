@@ -57,6 +57,20 @@ def _safe_email(to_list, subject, html_body):
     daily_limit = getattr(settings, 'EMAIL_DAILY_LIMIT', 200)
 
     def _send():
+        from core.models import EmailConfiguration
+        from django.core.mail import get_connection
+        
+        db_config = EmailConfiguration.get_config()
+        
+        # Determinar destinatarios si es para el admin
+        final_to_list = []
+        for r in to_list:
+            if r == getattr(settings, 'RESERVAS_ADMIN_EMAIL', ''):
+                # Usar el de la DB si está configurado
+                final_to_list.append(db_config.reservas_admin_email or r)
+            else:
+                final_to_list.append(r)
+
         with _counter_lock:
             current = _get_daily_count()
             if current >= daily_limit:
@@ -64,22 +78,35 @@ def _safe_email(to_list, subject, html_body):
                 return
             new_count = _increment_daily_count()
 
-        _log_event(f"[INTENTO] ({new_count}/{daily_limit}) → {to_list} | {subject}")
+        _log_event(f"[INTENTO] ({new_count}/{daily_limit}) → {final_to_list} | {subject}")
         
         try:
-            from django.core.mail import send_mail
-            send_mail(
-                subject=subject,
-                message='',
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[r for r in to_list if r],
-                html_message=html_body,
+            # Crear conexión dinámica con los datos de la DB
+            connection = get_connection(
+                host=db_config.smtp_host,
+                port=db_config.smtp_port,
+                username=db_config.smtp_user,
+                password=db_config.smtp_password,
+                use_tls=db_config.smtp_use_tls,
+                use_ssl=db_config.smtp_use_ssl,
                 fail_silently=False,
             )
-            _log_event(f"[SUCCESS] Enviado a {to_list}")
-            print(f"[EMAIL OK] {to_list} | {subject}")
+            
+            from django.core.mail import EmailMessage
+            msg = EmailMessage(
+                subject=subject,
+                body=html_body,
+                from_email=db_config.default_from_email or settings.DEFAULT_FROM_EMAIL,
+                to=[r for r in final_to_list if r],
+                connection=connection,
+            )
+            msg.content_subtype = "html"
+            msg.send()
+            
+            _log_event(f"[SUCCESS] Enviado a {final_to_list}")
+            print(f"[EMAIL OK] {final_to_list} | {subject}")
         except Exception as e:
-            _log_event(f"[ERROR] Falló envío a {to_list}: {str(e)}")
+            _log_event(f"[ERROR] Falló envío a {final_to_list}: {str(e)}")
             print(f"[EMAIL ERROR] {e}")
 
     threading.Thread(target=_send, daemon=True).start()

@@ -299,7 +299,7 @@ const ImpresorasDashboard = () => {
     });
 
     return (
-        <div className="flex flex-col gap-8 pb-8 max-w-[1900px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-8 pb-8 w-full px-4 sm:px-6 lg:px-8">
             {/* Header Section Aligned to Institutional Design */}
             <div className="flex justify-between items-end border-b border-slate-200/60 pb-6">
                 <div>

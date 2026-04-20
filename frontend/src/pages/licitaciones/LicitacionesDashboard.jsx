@@ -246,7 +246,7 @@ const LicitacionesDashboard = () => {
     ];
 
     return (
-        <div className="max-w-7xl mx-auto px-4 py-4 space-y-8">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-4 space-y-8">
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-slate-200/60 pb-5">
                 <div className="flex items-center gap-5">
