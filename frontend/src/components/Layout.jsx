@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShieldCheck, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Box, Globe, UserCircle2, Settings, History, Info, Mail } from 'lucide-react';
+import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShieldCheck, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Chrome, Box, Globe, UserCircle2, Settings, History, Info, Bell, Trash2, Check, X, TrendingUp, Heart, Mail } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../hooks/usePermission';
@@ -21,7 +21,10 @@ const Layout = () => {
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
     const [isOnline, setIsOnline] = useState(true); // Backend status
+    const [pendingReservas, setPendingReservas] = useState([]);
+    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const profileRef = useRef(null);
+    const notificationsRef = useRef(null);
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
     const isActive = (path) => location.pathname === path;
@@ -70,20 +73,23 @@ const Layout = () => {
         };
     }, [mobileMenuOpen]);
 
-    // Handle clicks outside profile dropdown
+    // Handle clicks outside profile dropdown or notifications
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (profileRef.current && !profileRef.current.contains(event.target)) {
                 setIsProfileOpen(false);
             }
+            if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+                setIsNotificationsOpen(false);
+            }
         };
-        if (isProfileOpen) {
+        if (isProfileOpen || isNotificationsOpen) {
             document.addEventListener('mousedown', handleClickOutside);
         } else {
             document.removeEventListener('mousedown', handleClickOutside);
         }
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isProfileOpen]);
+    }, [isProfileOpen, isNotificationsOpen]);
 
     // Update document title based on route
     useEffect(() => {
@@ -118,6 +124,25 @@ const Layout = () => {
         const pageTitle = routeTitles[location.pathname] || '';
         document.title = pageTitle ? `${pageTitle} | ${baseTitle}` : baseTitle;
     }, [location.pathname]);
+
+    // Check pending reservations for notifications
+    useEffect(() => {
+        const canApprove = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.change_solicitudreserva'));
+        if (!canApprove) return;
+
+        const fetchPending = async () => {
+            try {
+                const res = await api.get('reservas/solicitudes/', { params: { estado: 'PENDIENTE' } });
+                setPendingReservas(res.data.results || res.data || []);
+            } catch (error) {
+                console.warn('Error fetching pending reservations for notifications');
+            }
+        };
+
+        fetchPending();
+        const interval = setInterval(fetchPending, 60000); // Check every minute
+        return () => clearInterval(interval);
+    }, [user]);
 
     // Check backend status
     useEffect(() => {
@@ -245,6 +270,59 @@ const Layout = () => {
                         </Link>
                     )}
 
+                    {/* Grupo: Bienestar */}
+                    <div>
+                        <button
+                            onClick={() => {
+                                setActiveMainGroup(activeMainGroup === 'bienestar' ? null : 'bienestar');
+                                setActiveSubMenu(null);
+                            }}
+                            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'bienestar' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <Heart className="w-5 h-5 flex-shrink-0 text-rose-400" />
+                                <motion.span
+                                    initial={false}
+                                    animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                                    className="font-medium whitespace-nowrap"
+                                >
+                                    Bienestar
+                                </motion.span>
+                            </div>
+                            <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
+                                {activeMainGroup === 'bienestar' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            </motion.div>
+                        </button>
+
+                        <AnimatePresence>
+                            {activeMainGroup === 'bienestar' && (sidebarOpen || mobileMenuOpen) && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="overflow-hidden space-y-1 mt-2 pl-2 border-l border-slate-700/50 ml-6"
+                                >
+                                    <Link
+                                        to="/bienestar/muro"
+                                        className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/bienestar/muro') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                    >
+                                        <Globe className="w-4 h-4 flex-shrink-0" />
+                                        <span className="font-medium whitespace-nowrap">Bienestar</span>
+                                    </Link>
+                                    <Link
+                                        to="/bienestar"
+                                        className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/bienestar') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                    >
+                                        <Settings className="w-4 h-4 flex-shrink-0" />
+                                        <span className="font-medium whitespace-nowrap">Beneficios</span>
+                                    </Link>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+
+
                     {can('solicitudes_reservas.view_solicitudreserva') && (
                         <Link
                             to="/reservas"
@@ -280,6 +358,9 @@ const Layout = () => {
                             <div className="border-t border-slate-700/50" />
                         </div>
                     )}
+
+
+
 
                     {/* Main SSGG Submenu */}
                     {(can('contratos.view_contrato') || can('servicios.view_proveedor') || can('servicios.view_facturaadquisicion') || can('prestamo_llaves.view_prestamo') || can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('servicios.view_servicio') || can('servicios.view_registropago') || can('servicios.view_recepcionconforme') || can('servicios.view_cdp')) && (
@@ -395,6 +476,31 @@ const Layout = () => {
                                                     <Link to="/personal-ti" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/personal-ti') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
                                                         <MonitorSmartphone className="w-4 h-4 flex-shrink-0" />
                                                         <span className="font-medium whitespace-nowrap">Personal TI</span>
+                                                    </Link>
+                                                )}
+
+                                                {can('insights.view_dashboardmetric') && (
+                                                    <Link to="/insights" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/insights') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+                                                        <TrendingUp className="w-4 h-4 flex-shrink-0" />
+                                                        <span className="font-medium whitespace-nowrap">Indicadores</span>
+                                                    </Link>
+                                                )}
+
+
+
+
+
+                                                {can('usuarios_google.view_googleuser') && (
+                                                    <Link to="/usuarios-google" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/usuarios-google') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+                                                        <Chrome className="w-4 h-4 flex-shrink-0" />
+                                                        <span className="font-medium whitespace-nowrap">Usuarios Google</span>
+                                                    </Link>
+                                                )}
+
+                                                {can('conectividad.view_escuelared') && (
+                                                    <Link to="/monitoreo-red" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/monitoreo-red') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+                                                        <Globe className="w-4 h-4 flex-shrink-0" />
+                                                        <span className="font-medium whitespace-nowrap">Monitoreo Red</span>
                                                     </Link>
                                                 )}
                                                 {(can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo')) && (
@@ -622,69 +728,79 @@ const Layout = () => {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3 relative" ref={profileRef}>
-                        <div className="hidden md:flex flex-col items-end leading-tight">
-                            <span className="text-sm font-semibold text-slate-700">
-                                {user?.funcionario_data?.nombre_funcionario || user?.username || 'Cargando...'}
-                            </span>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase">
-                                {user?.is_superuser ? 'Super Administrador' : (user?.groups?.[0] || 'Usuario Sistema')}
-                            </span>
-                        </div>
+                    <div className="flex items-center gap-4">
+                        {/* Profile Section */}
+                        <div className="relative flex items-center gap-3" ref={profileRef}>
+                            <div className="hidden md:flex flex-col items-end leading-tight">
+                                <span className="text-sm font-semibold text-slate-700">
+                                    {user?.funcionario_data?.nombre_funcionario || user?.username || 'Cargando...'}
+                                </span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase">
+                                    {user?.is_superuser ? 'Super Administrador' : (user?.groups?.[0] || 'Usuario Sistema')}
+                                </span>
+                            </div>
 
-                        <div className="relative">
-                            <button
-                                onClick={() => setIsProfileOpen(!isProfileOpen)}
-                                className="relative group transition-transform active:scale-95"
-                            >
-                                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow overflow-hidden border-2 border-white">
-                                    {user?.avatar ? (
-                                        <img
-                                            src={user.avatar}
-                                            alt="Avatar"
-                                            className="w-full h-full object-cover"
-                                        />
-                                    ) : (
-                                        user?.username?.charAt(0).toUpperCase() || 'U'
-                                    )}
-                                </div>
-                            </button>
-
-
-                            {/* Dropdown Menu */}
-                            <AnimatePresence>
-                                {isProfileOpen && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                        className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-50 overflow-hidden"
-                                    >
-                                        <div className="px-3 py-2 border-b border-slate-50 mb-1">
-                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cuenta</p>
-                                            <p className="text-sm font-bold text-slate-700 truncate">
-                                                {user?.funcionario_data?.nombre_funcionario || user?.username}
-                                            </p>
-                                        </div>
-
-                                        <div className="flex flex-col gap-0.5">
-                                            {/* Sección: Usuario */}
-                                            <button
-                                                onClick={() => {
-                                                    setIsProfileOpen(false);
-                                                    setIsProfileModalOpen(true);
-                                                }}
-                                                className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                            >
-                                                <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                    <UserCircle2 className="w-4 h-4" />
-                                                </div>
-                                                Mi Perfil
-                                            </button>
+<div className="relative">
+                                <button
+                                    onClick={() => setIsProfileOpen(!isProfileOpen)}
+                                    className="relative group transition-transform active:scale-95"
+                                >
+                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow overflow-hidden border-2 border-white">
+                                        {user?.avatar ? (
+                                            <img
+                                                src={user.avatar}
+                                                alt="Avatar"
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            user?.username?.charAt(0).toUpperCase() || 'U'
+                                        )}
+                                    </div>
+                                </button>
+                                {/* Profile Dropdown Menu */}
+                                <AnimatePresence>
+                                    {isProfileOpen && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                            className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-50 overflow-hidden"
+                                        >
+                                            <div className="px-3 py-2 border-b border-slate-50 mb-1">
+                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cuenta</p>
+                                                <p className="text-sm font-bold text-slate-700 truncate">
+                                                    {user?.funcionario_data?.nombre_funcionario || user?.username}
+                                                </p>
+                                            </div>
+                                            <div className="py-1">
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        setIsProfileModalOpen(true);
+                                                    }}
+                                                    className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                >
+                                                    <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                        <UserCircle2 className="w-4 h-4" />
+                                                    </div>
+                                                    Mi Perfil
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        setIsAboutModalOpen(true);
+                                                    }}
+                                                    className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                >
+                                                    <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                        <Info className="w-4 h-4" />
+                                                    </div>
+                                                    Acerca del Sistema
+                                                </button>
+                                            </div>
                                             {/* Sección: Administración */}
                                             {(can('auth.view_group') || user?.is_superuser) && (
-                                                <>
-                                                    <div className="h-px bg-slate-50 my-1 mx-2" />
+                                                <div className="py-1 border-t border-slate-50">
                                                     <Link
                                                         to="/admin/roles"
                                                         onClick={() => setIsProfileOpen(false)}
@@ -725,34 +841,91 @@ const Layout = () => {
                                                         </div>
                                                         Configuración de Correo
                                                     </Link>
-                                                </>
-                                            )}
-
-                                            <button
-                                                onClick={() => {
-                                                    setIsProfileOpen(false);
-                                                    setIsAboutModalOpen(true);
-                                                }}
-                                                className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                            >
-                                                <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                    <Info className="w-4 h-4" />
                                                 </div>
-                                                Acerca del Sistema
-                                            </button>
-
+                                            )}
                                             <button
                                                 onClick={() => {
                                                     setIsProfileOpen(false);
                                                     logout();
                                                 }}
-                                                className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 font-medium text-sm group"
                                             >
                                                 <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-red-100 transition-colors">
                                                     <LogOut className="w-4 h-4" />
                                                 </div>
                                                 Cerrar Sesión
                                             </button>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        </div>
+
+                        {/* Notifications Bell */}
+                        <div className="relative" ref={notificationsRef}>
+                            <button
+                                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                                className={`p-2.5 rounded-xl transition-all duration-300 relative group ${isNotificationsOpen ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                            >
+                                <Bell className={`w-5 h-5 ${pendingReservas.length > 0 && !isNotificationsOpen ? 'animate-[bounce_2s_infinite]' : ''}`} />
+                                {pendingReservas.length > 0 && (
+                                    <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
+                                )}
+                            </button>
+
+                            {/* Notifications Drawer */}
+                            <AnimatePresence>
+                                {isNotificationsOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: 20 }}
+                                        className="absolute right-0 mt-3 w-80 md:w-96 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-[60]"
+                                    >
+                                        <div className="p-5 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
+                                            <div className="flex items-center gap-2">
+                                                <Bell className="w-4 h-4 text-indigo-600" />
+                                                <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Notificaciones</h3>
+                                            </div>
+                                            {pendingReservas.length > 0 && (
+                                                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                                    {pendingReservas.length} Pendientes
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="max-h-[70vh] overflow-y-auto p-2 space-y-2">
+                                            {pendingReservas.length === 0 ? (
+                                                <div className="p-10 text-center space-y-3">
+                                                    <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto">
+                                                        <Check className="w-6 h-6 text-slate-300" />
+                                                    </div>
+                                                    <p className="text-sm font-medium text-slate-400">Todo al día, no hay reservas pendientes.</p>
+                                                </div>
+                                            ) : (
+                                                pendingReservas.map((res) => (
+                                                    <Link
+                                                        key={res.id}
+                                                        to="/reservas"
+                                                        onClick={() => setIsNotificationsOpen(false)}
+                                                        className="block p-3 rounded-2xl hover:bg-indigo-50/50 transition-all border border-transparent hover:border-indigo-100 group"
+                                                    >
+                                                        <div className="flex gap-3">
+                                                            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+                                                                <Truck className="w-5 h-5" />
+                                                            </div>
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="flex justify-between items-start">
+                                                                    <p className="text-xs font-black text-slate-800 uppercase tracking-tighter truncate">{res.titulo || 'Sin título'}</p>
+                                                                    <span className="text-[9px] font-bold text-slate-400">{new Date(res.fecha_inicio).toLocaleDateString()}</span>
+                                                                </div>
+                                                                <p className="text-[11px] font-bold text-slate-500 truncate mt-0.5">Por: {res.nombre_funcionario}</p>
+                                                            </div>
+                                                        </div>
+                                                    </Link>
+                                                ))
+                                            )}
+
                                         </div>
                                     </motion.div>
                                 )}

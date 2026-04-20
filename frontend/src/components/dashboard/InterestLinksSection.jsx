@@ -184,22 +184,9 @@ const InterestLinksSection = () => {
                     </div>
                 </div>
 
-                {/* Tab Switcher */}
-                <div className="flex p-1 bg-slate-50 rounded-2xl w-full sm:w-fit">
-                    <button
-                        onClick={() => setActiveTab('LINK')}
-                        className={`flex-1 sm:flex-none px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'LINK' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                        Links Institucionales
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('RED_SOCIAL')}
-                        className={`flex-1 sm:flex-none px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'RED_SOCIAL' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                        Redes Sociales
-                    </button>
-                </div>
+                {/* Tab Switcher Eliminado - Redes movidas a cabecera */}
             </div>
+
 
             {/* Grid de Links Compacto */}
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">

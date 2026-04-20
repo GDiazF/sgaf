@@ -1,4 +1,4 @@
-﻿asgiref==3.8.1
+asgiref==3.8.1
 attrs==25.4.0
 beautifulsoup4==4.14.3
 certifi==2025.11.12
@@ -54,3 +54,4 @@ tzdata==2025.2
 uritemplate==4.2.0
 urllib3==2.5.0
 x690==1.0.0.post1
+pdfplumber==0.11.0
