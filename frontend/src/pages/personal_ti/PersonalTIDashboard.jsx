@@ -149,7 +149,7 @@ const PersonalModal = ({ isOpen, onClose, onSave, record, establecimientos, func
                         />
                         <SelectField
                             label="Función" name="funcion" required icon={Briefcase}
-                            options={[{ value: '', label: '-- Selecciona una función --' }, ...funciones.map(f => ({ value: f.id, label: f.nombre } ))]}
+                            options={[{ value: '', label: '-- Selecciona una función --' }, ...funciones.map(f => ({ value: f.id, label: f.nombre }))]}
                         />
 
                         <InputField label="Nombre Completo" name="nombre_completo" required placeholder="Ej: MARIO RENE CAIPA AVALOS" />
@@ -159,7 +159,7 @@ const PersonalModal = ({ isOpen, onClose, onSave, record, establecimientos, func
                             <InputField label="RUT" name="rut" required placeholder="Ej: 13413616-2" />
                             <SelectField
                                 label="Tipo de Contrato" name="tipo_contrato" required icon={FileText}
-                                options={[{ value: '', label: '-- Tipo --' }, ...contratos.map(c => ({ value: c.id, label: `${c.codigo} · ${c.nombre}` } ))]}
+                                options={[{ value: '', label: '-- Tipo --' }, ...contratos.map(c => ({ value: c.id, label: `${c.codigo} · ${c.nombre}` }))]}
                             />
                         </div>
 
@@ -220,7 +220,7 @@ const PersonalRow = ({ record, onEdit, onDelete, index }) => (
             </span>
         </td>
         <td className="px-4 py-3">
-            <span 
+            <span
                 className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold border"
                 style={{ backgroundColor: hexToRgba(record.funcion_color, 0.1), color: record.funcion_color, borderColor: hexToRgba(record.funcion_color, 0.3) }}
             >
@@ -232,7 +232,7 @@ const PersonalRow = ({ record, onEdit, onDelete, index }) => (
             {record.nombre_completo}
         </td>
         <td className="px-4 py-3">
-            <span 
+            <span
                 className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold"
                 style={{ backgroundColor: hexToRgba(record.tipo_contrato_color, 0.1), color: record.tipo_contrato_color }}
             >
@@ -576,7 +576,7 @@ const PersonalTIDashboard = () => {
     const TABLE_HEADERS = ['RBD', 'Establecimiento', 'Función', 'RUT', 'Nombre Completo', 'Contrato', 'Teléfono', 'Correo', 'Estado', ''];
 
     return (
-        <div className="flex flex-col gap-6 pb-8 max-w-[1900px] mx-auto">
+        <div className="flex flex-col gap-6 pb-8 w-full px-4 sm:px-6 lg:px-8">
             {/* Toast */}
             <AnimatePresence>
                 {toast && (

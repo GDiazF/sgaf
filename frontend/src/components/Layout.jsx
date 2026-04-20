@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Chrome, Box, Globe, UserCircle2, Settings, History, Info, Bell, Trash2, Check, X, TrendingUp, Heart } from 'lucide-react';
-
+import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShieldCheck, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Chrome, Box, Globe, UserCircle2, Settings, History, Info, Bell, Trash2, Check, X, TrendingUp, Heart, Mail } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../hooks/usePermission';
@@ -53,10 +52,14 @@ const Layout = () => {
     // Close sidebar/mobile menu when route changes
     useEffect(() => {
         setMobileMenuOpen(false);
+        // Si venimos con instrucción de configurar MFA, abrimos el modal
+        if (location.state?.setup_mfa) {
+            setIsProfileModalOpen(true);
+        }
         if (windowWidth <= 1366) {
             setSidebarOpen(false);
         }
-    }, [location.pathname, windowWidth]);
+    }, [location.pathname, location.state, windowWidth]);
 
     // Block scroll when mobile menu is open
     useEffect(() => {
@@ -648,7 +651,7 @@ const Layout = () => {
                             </AnimatePresence>
                         </div>
                     )}
-                </nav >
+                </nav>
 
                 {/* Sidebar Footer: Server Status */}
                 < div className="mt-auto border-t border-slate-800/50 pt-4 mb-4" >
@@ -737,7 +740,7 @@ const Layout = () => {
                                 </span>
                             </div>
 
-                            <div className="relative">
+<div className="relative">
                                 <button
                                     onClick={() => setIsProfileOpen(!isProfileOpen)}
                                     className="relative group transition-transform active:scale-95"
@@ -754,7 +757,6 @@ const Layout = () => {
                                         )}
                                     </div>
                                 </button>
-
                                 {/* Profile Dropdown Menu */}
                                 <AnimatePresence>
                                     {isProfileOpen && (
@@ -762,7 +764,7 @@ const Layout = () => {
                                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                             animate={{ opacity: 1, y: 0, scale: 1 }}
                                             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                            className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-50 overflow-hidden"
+                                            className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-50 overflow-hidden"
                                         >
                                             <div className="px-3 py-2 border-b border-slate-50 mb-1">
                                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cuenta</p>
@@ -770,7 +772,6 @@ const Layout = () => {
                                                     {user?.funcionario_data?.nombre_funcionario || user?.username}
                                                 </p>
                                             </div>
-
                                             <div className="py-1">
                                                 <button
                                                     onClick={() => {
@@ -797,19 +798,9 @@ const Layout = () => {
                                                     Acerca del Sistema
                                                 </button>
                                             </div>
-
+                                            {/* Sección: Administración */}
                                             {(can('auth.view_group') || user?.is_superuser) && (
-                                                <div className="py-1">
-                                                    <Link
-                                                        to="/admin/users"
-                                                        onClick={() => setIsProfileOpen(false)}
-                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                    >
-                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                            <Users className="w-4 h-4" />
-                                                        </div>
-                                                        Gestionar Usuarios
-                                                    </Link>
+                                                <div className="py-1 border-t border-slate-50">
                                                     <Link
                                                         to="/admin/roles"
                                                         onClick={() => setIsProfileOpen(false)}
@@ -821,6 +812,16 @@ const Layout = () => {
                                                         Roles y Permisos
                                                     </Link>
                                                     <Link
+                                                        to="/admin/users"
+                                                        onClick={() => setIsProfileOpen(false)}
+                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                    >
+                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                            <ShieldCheck className="w-4 h-4" />
+                                                        </div>
+                                                        Usuarios y Seguridad
+                                                    </Link>
+                                                    <Link
                                                         to="/admin/audit-log"
                                                         onClick={() => setIsProfileOpen(false)}
                                                         className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
@@ -830,15 +831,24 @@ const Layout = () => {
                                                         </div>
                                                         Auditoría de Sistema
                                                     </Link>
+                                                    <Link
+                                                        to="/admin/email-settings"
+                                                        onClick={() => setIsProfileOpen(false)}
+                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                    >
+                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                            <Mail className="w-4 h-4" />
+                                                        </div>
+                                                        Configuración de Correo
+                                                    </Link>
                                                 </div>
                                             )}
-
                                             <button
                                                 onClick={() => {
                                                     setIsProfileOpen(false);
                                                     logout();
                                                 }}
-                                                className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 font-medium text-sm group"
                                             >
                                                 <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-red-100 transition-colors">
                                                     <LogOut className="w-4 h-4" />
@@ -915,6 +925,7 @@ const Layout = () => {
                                                     </Link>
                                                 ))
                                             )}
+
                                         </div>
                                     </motion.div>
                                 )}

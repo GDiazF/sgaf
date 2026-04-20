@@ -12,13 +12,15 @@ export const groupPermissions = (permissions) => {
 
         // Módulos del Navbar (Modelo Dummy eliminado)
 
-        // Categorización por palabras clave en el nombre técnico de Django
+        const appLabel = (perm.content_type_app_label || '').toLowerCase();
+
+        // Categorización por app_label o palabras clave
         if (name.includes('llave') || name.includes('prestamo') || name.includes('solicitante')) module = 'Préstamo de Llaves';
         else if (name.includes('establecimiento')) module = 'Establecimientos';
         else if (name.includes('proveedor')) module = 'Proveedores';
         else if (name.includes('contrato') || name.includes('proceso') || name.includes('licitacion')) module = 'Contratos y Licitaciones';
         else if (name.includes('orden de compra') || name.includes('ordencompra')) module = 'Órdenes de Compra';
-        else if (name.includes('reserva') || name.includes('bloqueo') || name.includes('recurso')) module = 'Reservas de Espacios';
+        else if (appLabel === 'solicitudes_reservas' || name.includes('reserva') || name.includes('bloqueo') || name.includes('recurso')) module = 'Reservas de Espacios';
         else if (name.includes('personal ti') || name.includes('personalti')) module = 'Funcionarios TI';
         else if (name.includes('servicio contratado') || name.includes('tipo documento') || name.includes('cdp')) module = 'Configuración Servicios';
         else if (name.includes('registro de pago') || name.includes('pago')) module = 'Pagos de Servicios';
@@ -31,7 +33,7 @@ export const groupPermissions = (permissions) => {
         else if (name.includes('anexo')) module = 'Telecomunicaciones';
         else if (name.includes('procedimiento') || name.includes('tipo de documento')) module = 'Gestor Documental';
         else if (name.includes('beneficio') || name.includes('bienestar')) module = 'Bienestar y Beneficios';
-        else if (name.includes('user') || name.includes('group') || name.includes('permission')) module = 'Seguridad y Usuarios';
+        else if (name.includes('user') || name.includes('group') || name.includes('permission') || name.includes('correo') || name.includes('email')) module = 'Seguridad y Usuarios';
         else if (name.includes('log entry') || name.includes('logentry')) module = 'Auditoría';
         else if (name.includes('link de interes') || name.includes('linkinteres')) module = 'Dashboard, Links y Redes';
 
@@ -63,10 +65,11 @@ export const getFriendlyPermName = (perm) => {
         'add': 'Crear / Registrar',
         'change': 'Editar / Modificar',
         'delete': 'Eliminar / Anular',
+        'can': 'Permiso:',
     };
 
     const action = codename.split('_')[0];
-    const friendlyAction = translations[action] || action;
+    const friendlyAction = translations[action] || action.charAt(0).toUpperCase() + action.slice(1);
 
     // Limpieza del nombre base (ej: "Can view registro pago" -> "Registro Pago")
     let baseName = name.replace(/^Can (view|add|change|delete) /i, '');
@@ -114,7 +117,8 @@ export const getFriendlyPermName = (perm) => {
         'categoriabienestar': 'Categorías de Bienestar',
         'beneficioarchivo': 'Adjuntos de Beneficios',
         'linkinteres': 'Links y Redes Sociales / Dashboard',
-        'logentry': 'Logs de Auditoría'
+        'logentry': 'Logs de Auditoría',
+        'emailconfiguration': 'Configuración de Correo'
     };
 
     const modelKey = codename.split('_')[1];

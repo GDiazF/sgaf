@@ -30,7 +30,7 @@ const GlobalDashboard = () => {
     const fetchData = async () => {
         try {
             const [funcRes, estRes] = await Promise.all([
-                api.get('funcionarios/'),
+                api.get('funcionarios/', { params: { page_size: 1000 } }),
                 api.get('establecimientos/', { params: { page_size: 1000 } })
             ]);
             setFuncionarios(funcRes.data.results || funcRes.data || []);

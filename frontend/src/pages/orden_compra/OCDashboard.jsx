@@ -127,7 +127,7 @@ const OCDashboard = () => {
     };
 
     return (
-        <div className="space-y-4 max-w-7xl mx-auto">
+        <div className="space-y-4 w-full px-4 sm:px-6 lg:px-8 pb-8">
             {/* Header Area */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/40 backdrop-blur-md p-4 rounded-xl border border-white/20 shadow-xl shadow-slate-200/50">
                 <div className="flex items-center gap-4">

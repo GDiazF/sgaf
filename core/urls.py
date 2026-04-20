@@ -24,7 +24,8 @@ from rest_framework_simplejwt.views import (
 from core.views import (
     UserProfileView, UserViewSet, GroupViewSet, PermissionListView, 
     ChangePasswordView, AvatarUploadView, PasswordResetRequestView, PasswordResetConfirmView,
-    LinkInteresViewSet
+    LinkInteresViewSet, MFATokenObtainPairView, MFAVerifyView, MFASetupView, MFASendEmailOTPView,
+    SecurityConfigView, AdminMFAUserManagementView, EmailConfigurationView
 )
 
 router = DefaultRouter()
@@ -34,14 +35,20 @@ router.register(r'links-interes', LinkInteresViewSet, basename='links-interes')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/', MFATokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/verify-mfa/', MFAVerifyView.as_view(), name='token_verify_mfa'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/auth/me/', UserProfileView.as_view(), name='user-profile'),
     path('api/auth/change-password/', ChangePasswordView.as_view(), name='change-password'),
     path('api/auth/avatar/', AvatarUploadView.as_view(), name='avatar-upload'),
     path('api/auth/password-reset-request/', PasswordResetRequestView.as_view(), name='password_reset_request'),
     path('api/auth/password-reset-confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    path('api/auth/mfa/setup/', MFASetupView.as_view(), name='mfa-setup'),
+    path('api/auth/mfa/send-otp/', MFASendEmailOTPView.as_view(), name='mfa-send-otp'),
     path('api/admin/permissions/', PermissionListView.as_view(), name='admin-permissions'),
+    path('api/admin/security/config/', SecurityConfigView.as_view(), name='security-config'),
+    path('api/admin/security/mfa-users/', AdminMFAUserManagementView.as_view(), name='mfa-users-admin'),
+    path('api/admin/email/config/', EmailConfigurationView.as_view(), name='email-config'),
     path('api/', include(router.urls)),
     path('api/', include('prestamo_llaves.urls')),
     path('api/', include('establecimientos.urls')),

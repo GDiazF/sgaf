@@ -27,9 +27,11 @@ INSTALLED_APPS = [
     # Third party
     'rest_framework',
     'corsheaders',
+    'django_otp',
+    'django_otp.plugins.otp_totp',
+    # Local apps
     'django_filters',
     'rest_framework_simplejwt',
-    
     # Apps
     'core',
     'bienestar',
@@ -61,6 +63,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django_otp.middleware.OTPMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -141,9 +144,25 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-# CORS & CSRF
-CORS_ALLOW_ALL_ORIGINS = True
+
+# ────────────────────────────────────────────────────────────
+# CORS
+# ────────────────────────────────────────────────────────────
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bool)
+CORS_ALLOWED_ORIGINS = [
+    'http://10.0.100.25',
+    'http://10.0.100.25:5173',
+    'http://10.0.100.25:80',
+    'http://10.0.100.119',
+    'http://10.0.100.119:5173',
+    'http://10.0.100.119:80',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost',
+    'http://127.0.0.1',
+]
+# CORS & CSRF
 
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
@@ -155,3 +174,20 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+# ────────────────────────────────────────────────────────────
+# CORREO SMTP
+# ────────────────────────────────────────────────────────────
+EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST          = 'smtp.gmail.com'
+EMAIL_PORT          = 587
+EMAIL_USE_TLS       = True
+EMAIL_USE_SSL       = False
+EMAIL_HOST_USER     = config('EMAIL_HOST_USER',     default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL  = f'SLEP Iquique Reservas <{EMAIL_HOST_USER}>'
+RESERVAS_ADMIN_EMAIL = config('RESERVAS_ADMIN_EMAIL', default='')
+EMAIL_DAILY_LIMIT   = 200
+
+# MFA - Two Factor Authentication
+OTP_TOTP_ISSUER = 'SGAF - SLEP Iquique'

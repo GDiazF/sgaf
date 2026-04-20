@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../api';
-import { Users, Search, Edit2, Shield, ShieldCheck, X, Save, AlertCircle, Check, Loader2, ChevronDown, ChevronRight, UserCircle2, Mail, BadgeCheck, Activity, Trash2, Power, User, UserPlus } from 'lucide-react';
+import { Users, Search, Edit2, Shield, ShieldCheck, ShieldAlert, X, Save, AlertCircle, RefreshCw, Check, Loader2, ChevronDown, ChevronRight, UserCircle2, Mail, BadgeCheck, Activity, Trash2, Power, User, UserPlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePermission } from '../../hooks/usePermission';
 import { groupPermissions, getFriendlyPermName } from '../../utils/permissionUtils';
@@ -24,6 +24,7 @@ const UserManagement = () => {
 
     // Accordion state for permissions
     const [expandedGroups, setExpandedGroups] = useState({});
+    const [globalSecurity, setGlobalSecurity] = useState({ force_mfa_all: false });
 
     useEffect(() => {
         fetchData();
@@ -32,10 +33,11 @@ const UserManagement = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [usersRes, rolesRes, permsRes] = await Promise.all([
+            const [usersRes, rolesRes, permsRes, securityRes] = await Promise.all([
                 api.get('admin/users/'),
                 api.get('admin/roles/'),
-                api.get('admin/permissions/')
+                api.get('admin/permissions/'),
+                api.get('admin/security/config/')
             ]);
 
             // Filter out superusers from the frontend management list
@@ -45,10 +47,30 @@ const UserManagement = () => {
             setUsers(nonSuperUsers);
             setRoles(Array.isArray(rolesRes.data) ? rolesRes.data : rolesRes.data.results || []);
             setPermissions(Array.isArray(permsRes.data) ? permsRes.data : permsRes.data.results || []);
+            setGlobalSecurity(securityRes.data);
         } catch (error) {
             console.error("Error fetching admin data:", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const toggleGlobalMFA = async () => {
+        const newValue = !globalSecurity.force_mfa_all;
+        try {
+            await api.post('admin/security/config/', { force_mfa_all: newValue });
+            setGlobalSecurity({ force_mfa_all: newValue });
+        } catch (err) {
+            alert('Error al actualizar configuración global de seguridad');
+        }
+    };
+
+    const handleUserMFAAction = async (userId, action) => {
+        try {
+            await api.post('admin/security/mfa-users/', { user_id: userId, action });
+            await fetchData();
+        } catch (err) {
+            alert('Error al realizar acción de seguridad');
         }
     };
 
@@ -141,6 +163,7 @@ const UserManagement = () => {
         setSelectedUser({ ...selectedUser, user_permissions: newPerms });
     };
 
+
     const handleRutChange = (e) => {
         const formatted = formatRut(e.target.value);
         setSelectedUser({ ...selectedUser, rut: formatted });
@@ -201,7 +224,28 @@ const UserManagement = () => {
     if (!can('auth.view_user')) return <div className="p-10 text-center font-bold text-slate-400">Acceso denegado.</div>;
 
     return (
-        <div className="p-6 lg:p-8 max-w-[1600px] mx-auto min-h-screen bg-slate-50/30">
+        <div className="p-6 lg:p-8 w-full min-h-screen bg-slate-50/30">
+            {/* Security Quick Bar */}
+            <div className={`mb-6 p-4 rounded-3xl border-2 transition-all flex items-center justify-between ${globalSecurity.force_mfa_all ? 'bg-red-50 border-red-100' : 'bg-white border-slate-100'}`}>
+                <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-2xl ${globalSecurity.force_mfa_all ? 'bg-red-600 text-white shadow-lg shadow-red-500/20' : 'bg-slate-100 text-slate-400'}`}>
+                        <ShieldCheck className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h4 className="text-xs font-black text-slate-700 uppercase tracking-tight">MFA Global Obligatorio</h4>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-none mt-1">
+                            {globalSecurity.force_mfa_all ? "Todos los usuarios deben usar MFA (Fallback: Email)" : "Los usuarios eligen si usar MFA"}
+                        </p>
+                    </div>
+                </div>
+                <button
+                    onClick={toggleGlobalMFA}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${globalSecurity.force_mfa_all ? 'bg-red-600 text-white shadow-lg' : 'bg-slate-900 text-white'}`}
+                >
+                    {globalSecurity.force_mfa_all ? "Desactivar Obligación" : "Activar para Todos"}
+                </button>
+            </div>
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
@@ -243,6 +287,7 @@ const UserManagement = () => {
                                 <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Funcionario Vinculado / RUT</th>
                                 <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</th>
                                 <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Roles</th>
+                                <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">MFA</th>
                                 <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
                             </tr>
                         </thead>
@@ -290,6 +335,37 @@ const UserManagement = () => {
                                                     {g}
                                                 </span>
                                             )) : <span className="text-[10px] text-slate-400">Sin roles</span>}
+                                        </div>
+                                    </td>
+                                    <td className="p-3">
+                                        <div className="flex flex-col items-center gap-1">
+                                            {user.mfa_enabled ? (
+                                                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-md text-[8px] font-black border border-emerald-100 uppercase">
+                                                    Activo ({user.mfa_method})
+                                                </span>
+                                            ) : (
+                                                <span className="px-2 py-0.5 bg-slate-50 text-slate-400 rounded-md text-[8px] font-black border border-slate-100 uppercase">
+                                                    Inactivo
+                                                </span>
+                                            )}
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUserMFAAction(user.id, user.mfa_enforced ? 'UNENFORCE' : 'ENFORCE')}
+                                                    className={`p-1 rounded-md transition-all ${user.mfa_enforced ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-slate-50 text-slate-400 border border-slate-100 hover:border-blue-600'}`}
+                                                    title={user.mfa_enforced ? "Quitar obligatoriedad" : "Forzar uso de MFA"}
+                                                >
+                                                    <ShieldAlert className="w-3 h-3" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { if (window.confirm('¿Resetear MFA?')) handleUserMFAAction(user.id, 'RESET'); }}
+                                                    className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all border border-transparent hover:border-red-100"
+                                                    title="Reiniciar dispositivo MFA"
+                                                >
+                                                    <RefreshCw className="w-3 h-3" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </td>
                                     <td className="p-3 text-right">
@@ -471,6 +547,33 @@ const UserManagement = () => {
                                                     <div className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full transition-all duration-300 transform ${selectedUser.is_active ? 'translate-x-5' : ''} shadow-sm`} />
                                                 </label>
                                             </div>
+                                            {selectedUser.id && (
+                                                <div className="mt-3 space-y-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { if (window.confirm('¿Resetear MFA?')) handleUserMFAAction(selectedUser.id, 'RESET'); }}
+                                                        className={`w-full flex items-center justify-between px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${selectedUser.mfa_enabled ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <ShieldCheck className="w-3.5 h-3.5" />
+                                                            {selectedUser.mfa_enabled ? `MFA ACTIVO (${selectedUser.mfa_method})` : 'MFA NO CONFIGURADO'}
+                                                        </div>
+                                                        {selectedUser.mfa_enabled && <span className="underline">Reiniciar</span>}
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleUserMFAAction(selectedUser.id, selectedUser.mfa_enforced ? 'UNENFORCE' : 'ENFORCE')}
+                                                        className={`w-full flex items-center justify-between px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${selectedUser.mfa_enforced ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-50 text-slate-400 border border-slate-100 hover:border-indigo-600'}`}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <ShieldAlert className="w-3.5 h-3.5" />
+                                                            {selectedUser.mfa_enforced ? 'USO OBLIGATORIO ACTIVADO' : 'USO OPCIONAL'}
+                                                        </div>
+                                                        <span className="underline">{selectedUser.mfa_enforced ? 'Quitar' : 'Forzar'}</span>
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
