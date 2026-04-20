@@ -1,27 +1,21 @@
-"""
-Django settings — lectura de secretos desde .env
-usando python-decouple para separar configuración
-del código fuente.
-"""
-
 import os
 from pathlib import Path
 from datetime import timedelta
-from decouple import config, Csv
+from decouple import config
 
-# ────────────────────────────────────────────────────────────
-# RUTAS BASE
-# ────────────────────────────────────────────────────────────
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-fallback-default-change-me')
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-default-key-change-it')
+
+# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,10.0.100.119', cast=Csv())
 
+ALLOWED_HOSTS = ['*']
 
-# ────────────────────────────────────────────────────────────
-# APLICACIONES INSTALADAS
-# ────────────────────────────────────────────────────────────
+# Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -29,34 +23,37 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # Third-party
+    
+    # Third party
     'rest_framework',
-    'rest_framework_simplejwt',
-    'django_filters',
     'corsheaders',
-    # Local apps
-    'prestamo_llaves',
+    'django_filters',
+    'rest_framework_simplejwt',
+    
+    # Apps
     'core',
-    'establecimientos',
-    'servicios',
+    'bienestar',
+    'conectividad',
     'contratos',
+    'establecimientos',
     'funcionarios',
     'impresoras',
-    'vehiculos',
-    'remuneraciones',
+    'insights',
     'licitaciones',
+    'notificaciones',
     'orden_compra',
-    'solicitudes_reservas',
     'personal_ti',
-    'tesoreria',
+    'prestamo_llaves',
     'procedimientos',
+    'remuneraciones',
+    'servicios',
+    'solicitudes_reservas',
+    'tesoreria',
+    'usuarios_google',
+    'vehiculos',
 ]
 
-# REST_FRAMEWORK, SIMPLE_JWT y CORS se configuran al final del archivo para evitar duplicados.
 
-# ────────────────────────────────────────────────────────────
-# MIDDLEWARE
-# ────────────────────────────────────────────────────────────
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
@@ -73,7 +70,7 @@ ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -88,33 +85,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
-
-# ────────────────────────────────────────────────────────────
-# BASE DE DATOS
-# SQLite para desarrollo; para producción usar PostgreSQL:
-# ────────────────────────────────────────────────────────────
+# Database
 DATABASES = {
     'default': {
-        'ENGINE': config('DB_ENGINE', default='django.db.backends.sqlite3'),
-        'NAME': config('DB_NAME', default=BASE_DIR / 'db.sqlite3' if config('DB_ENGINE', default='sqlite3') == 'sqlite3' else 'key_system_db'),
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
-# Si existe DB_HOST en el .env, asumimos que estamos en producción/Docker y configuramos PostgreSQL
-if config('DB_HOST', default=''):
-    DATABASES['default'] = {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='key_system_db'),
-        'USER': config('DB_USER', default='postgres'),
-        'PASSWORD': config('DB_PASSWORD', default='postgres'),
-        'HOST': config('DB_HOST'),
-        'PORT': config('DB_PORT', default='5432'),
-    }
-
-
-# ────────────────────────────────────────────────────────────
-# VALIDACIÓN DE CONTRASEÑAS
-# ────────────────────────────────────────────────────────────
+# Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -122,142 +101,57 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-
-# ────────────────────────────────────────────────────────────
-# INTERNACIONALIZACIÓN
-# ────────────────────────────────────────────────────────────
+# Internationalization
 LANGUAGE_CODE = 'es-cl'
 TIME_ZONE = 'America/Santiago'
 USE_I18N = True
 USE_TZ = True
 
-
-# ────────────────────────────────────────────────────────────
-# ARCHIVOS ESTÁTICOS Y MEDIA
-# ────────────────────────────────────────────────────────────
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
-# ────────────────────────────────────────────────────────────
-# DRF + JWT
-# ────────────────────────────────────────────────────────────
+# REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.AllowAny',
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_FILTER_BACKENDS': (
+        'django_filters.rest_framework.DjangoFilterBackend',
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
-    'DEFAULT_FILTER_BACKENDS': [
-        'django_filters.rest_framework.DjangoFilterBackend',
-        'rest_framework.filters.SearchFilter',
-        'rest_framework.filters.OrderingFilter',
-    ],
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
-    ],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '30/minute',
-        'user': '1000/minute',
-    },
 }
-
-# Permitir ver documentos en IFRAMES
-X_FRAME_OPTIONS = 'SAMEORIGIN'
-SILENCED_SYSTEM_CHECKS = ['security.W019']
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME':  timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
-    'ROTATE_REFRESH_TOKENS':  True,
-    'BLACKLIST_AFTER_ROTATION': False,
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-
-# ────────────────────────────────────────────────────────────
-# CORS
-# ────────────────────────────────────────────────────────────
-CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)
-CORS_ALLOWED_ORIGINS = [
-    'http://10.0.100.25',
-    'http://10.0.100.25:5173',
-    'http://10.0.100.25:80',
-    'http://10.0.100.119',
-    'http://10.0.100.119:5173',
-    'http://10.0.100.119:80',
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost',
-    'http://127.0.0.1',
-]
+# CORS & CSRF
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
     'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://10.0.100.25',
-    'http://10.0.100.25:5173',
-    'http://10.0.100.119',
-    'http://10.0.100.119:5173',
-    'http://10.0.100.119:80',
+    'http://10.0.100.44:3000',
+    'http://10.0.100.44:5173',
+    'http://10.0.100.44',
 ]
 
-FRONTEND_URL = config('FRONTEND_URL', default='http://10.0.100.119')
-
-
-# ────────────────────────────────────────────────────────────
-# SEGURIDAD DE FRAMES (iframes)
-# ALLOWALL solo para desarrollo; en producción usar SAMEORIGIN
-# ────────────────────────────────────────────────────────────
 X_FRAME_OPTIONS = 'SAMEORIGIN'
-
-
-# ────────────────────────────────────────────────────────────
-# CORREO SMTP
-# ────────────────────────────────────────────────────────────
-EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST          = 'smtp.gmail.com'
-EMAIL_PORT          = 587
-EMAIL_USE_TLS       = True
-EMAIL_USE_SSL       = False
-EMAIL_HOST_USER     = config('EMAIL_HOST_USER',     default='')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL  = f'SLEP Iquique Reservas <{EMAIL_HOST_USER}>'
-RESERVAS_ADMIN_EMAIL = config('RESERVAS_ADMIN_EMAIL', default='')
-EMAIL_DAILY_LIMIT   = 200
-
-# ────────────────────────────────────────────────────────────
-# 🚀 GUARDIÁN DE SEGURIDAD: ALERTAR SI LA DB ESTÁ VACÍA
-# ────────────────────────────────────────────────────────────
-import sys
-# Solo ejecutamos el check si no es una migración o collectstatic
-if not any(arg in sys.argv for arg in ['migrate', 'makemigrations', 'collectstatic']):
-    try:
-        from django.db import connections
-        from django.db.utils import OperationalError
-        def check_db_integrity():
-            try:
-                with connections['default'].cursor() as cursor:
-                    cursor.execute("SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'")
-                    if cursor.fetchone()[0] == 0:
-                        print("\n" + "!"*80)
-                        print("⚠️  AVISO DE SEGURIDAD: LA BASE DE DATOS ACTUAL ESTÁ TOTALMENTE VACÍA.")
-                        print("Si esto no es un servidor nuevo, podrías haber perdido la conexión con")
-                        print("los datos del Sandbox. Verifica tus volúmenes de Docker.")
-                        print("!"*80 + "\n")
-            except (OperationalError, Exception):
-                pass # Ignorar si la DB aún no está levantada
-        
-        # Intentar el check (con manejo de errores para no bloquear el arranque)
-        import threading
-        threading.Timer(5.0, check_db_integrity).start()
-    except:
-        pass

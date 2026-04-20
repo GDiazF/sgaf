@@ -38,7 +38,15 @@ import OCDashboard from './pages/orden_compra/OCDashboard';
 import ReservasDashboard from './pages/reservas/ReservasDashboard';
 import PublicReservas from './pages/reservas/PublicReservas';
 import PersonalTIDashboard from './pages/personal_ti/PersonalTIDashboard';
+import UsuariosGoogleDashboard from './pages/usuarios_google/UsuariosGoogleDashboard';
+import MonitoreoRed from './pages/conectividad/MonitoreoRed';
+import InsightsDashboard from './pages/insights/InsightsDashboard';
+import WelfareBoard from './pages/bienestar/WelfareBoard';
+import WelfareWall from './pages/bienestar/WelfareWall';
+
 import ProceduresDashboard from './pages/procedimientos/ProceduresDashboard';
+
+
 import Login from './pages/Login';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
@@ -171,7 +179,25 @@ function App() {
                 <Route path="personal-ti" element={<PersonalTIDashboard />} />
               </Route>
 
+              <Route element={<ProtectedRoute permission="usuarios_google.view_googleuser" />}>
+                <Route path="usuarios-google" element={<UsuariosGoogleDashboard />} />
+              </Route>
+
+              <Route element={<ProtectedRoute permission="conectividad.view_escuelared" />}>
+                <Route path="monitoreo-red" element={<MonitoreoRed />} />
+              </Route>
+
+              <Route element={<ProtectedRoute permission="insights.view_dashboardmetric" />}>
+                <Route path="insights" element={<InsightsDashboard />} />
+              </Route>
+
+              <Route path="bienestar" element={<WelfareBoard />} />
+              <Route path="bienestar/muro" element={<div className="p-8 h-full overflow-y-auto"><WelfareWall /></div>} />
+
+
+
               <Route path="procedimientos" element={<ProceduresDashboard />} />
+
 
               {/* Administración */}
               <Route element={<ProtectedRoute permission="auth.view_group" />}>

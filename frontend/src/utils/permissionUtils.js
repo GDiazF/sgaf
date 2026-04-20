@@ -30,6 +30,7 @@ export const groupPermissions = (permissions) => {
         else if (name.includes('vehiculo') || name.includes('registro mensual')) module = 'Vehículos';
         else if (name.includes('anexo')) module = 'Telecomunicaciones';
         else if (name.includes('procedimiento') || name.includes('tipo de documento')) module = 'Gestor Documental';
+        else if (name.includes('beneficio') || name.includes('bienestar')) module = 'Bienestar y Beneficios';
         else if (name.includes('user') || name.includes('group') || name.includes('permission')) module = 'Seguridad y Usuarios';
         else if (name.includes('log entry') || name.includes('logentry')) module = 'Auditoría';
         else if (name.includes('link de interes') || name.includes('linkinteres')) module = 'Dashboard, Links y Redes';
@@ -109,6 +110,9 @@ export const getFriendlyPermName = (perm) => {
         'reservasetting': 'Ajustes de Reservas',
         'procedimiento': 'Documentos / Procedimientos',
         'tipoprocedimiento': 'Categorías de Documentos',
+        'beneficio': 'Muro de Bienestar / Beneficios',
+        'categoriabienestar': 'Categorías de Bienestar',
+        'beneficioarchivo': 'Adjuntos de Beneficios',
         'linkinteres': 'Links y Redes Sociales / Dashboard',
         'logentry': 'Logs de Auditoría'
     };

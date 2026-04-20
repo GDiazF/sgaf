@@ -57,6 +57,10 @@ urlpatterns = [
     path('api/', include('personal_ti.urls')),
     path('api/tesoreria/', include('tesoreria.urls')),
     path('api/procedimientos/', include('procedimientos.urls')),
+    path('api/usuarios-google/', include('usuarios_google.urls')),
+    path('api/conectividad/', include('conectividad.urls')),
+    path('api/insights/', include('insights.urls')),
+    path('api/bienestar/', include('bienestar.urls')),
 ]
 
 from django.conf import settings

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Box, Globe, UserCircle2, Settings, History, Info, Bell, Trash2, Check, X } from 'lucide-react';
+import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Chrome, Box, Globe, UserCircle2, Settings, History, Info, Bell, Trash2, Check, X, TrendingUp, Heart } from 'lucide-react';
+
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../hooks/usePermission';
@@ -266,6 +267,59 @@ const Layout = () => {
                         </Link>
                     )}
 
+                    {/* Grupo: Bienestar */}
+                    <div>
+                        <button
+                            onClick={() => {
+                                setActiveMainGroup(activeMainGroup === 'bienestar' ? null : 'bienestar');
+                                setActiveSubMenu(null);
+                            }}
+                            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'bienestar' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <Heart className="w-5 h-5 flex-shrink-0 text-rose-400" />
+                                <motion.span
+                                    initial={false}
+                                    animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                                    className="font-medium whitespace-nowrap"
+                                >
+                                    Bienestar
+                                </motion.span>
+                            </div>
+                            <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
+                                {activeMainGroup === 'bienestar' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            </motion.div>
+                        </button>
+
+                        <AnimatePresence>
+                            {activeMainGroup === 'bienestar' && (sidebarOpen || mobileMenuOpen) && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="overflow-hidden space-y-1 mt-2 pl-2 border-l border-slate-700/50 ml-6"
+                                >
+                                    <Link
+                                        to="/bienestar/muro"
+                                        className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/bienestar/muro') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                    >
+                                        <Globe className="w-4 h-4 flex-shrink-0" />
+                                        <span className="font-medium whitespace-nowrap">Bienestar</span>
+                                    </Link>
+                                    <Link
+                                        to="/bienestar"
+                                        className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/bienestar') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                    >
+                                        <Settings className="w-4 h-4 flex-shrink-0" />
+                                        <span className="font-medium whitespace-nowrap">Beneficios</span>
+                                    </Link>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+
+
                     {can('solicitudes_reservas.view_solicitudreserva') && (
                         <Link
                             to="/reservas"
@@ -301,6 +355,9 @@ const Layout = () => {
                             <div className="border-t border-slate-700/50" />
                         </div>
                     )}
+
+
+
 
                     {/* Main SSGG Submenu */}
                     {(can('contratos.view_contrato') || can('servicios.view_proveedor') || can('servicios.view_facturaadquisicion') || can('prestamo_llaves.view_prestamo') || can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('servicios.view_servicio') || can('servicios.view_registropago') || can('servicios.view_recepcionconforme') || can('servicios.view_cdp')) && (
@@ -416,6 +473,31 @@ const Layout = () => {
                                                     <Link to="/personal-ti" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/personal-ti') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
                                                         <MonitorSmartphone className="w-4 h-4 flex-shrink-0" />
                                                         <span className="font-medium whitespace-nowrap">Personal TI</span>
+                                                    </Link>
+                                                )}
+
+                                                {can('insights.view_dashboardmetric') && (
+                                                    <Link to="/insights" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/insights') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+                                                        <TrendingUp className="w-4 h-4 flex-shrink-0" />
+                                                        <span className="font-medium whitespace-nowrap">Indicadores</span>
+                                                    </Link>
+                                                )}
+
+
+
+
+
+                                                {can('usuarios_google.view_googleuser') && (
+                                                    <Link to="/usuarios-google" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/usuarios-google') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+                                                        <Chrome className="w-4 h-4 flex-shrink-0" />
+                                                        <span className="font-medium whitespace-nowrap">Usuarios Google</span>
+                                                    </Link>
+                                                )}
+
+                                                {can('conectividad.view_escuelared') && (
+                                                    <Link to="/monitoreo-red" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/monitoreo-red') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+                                                        <Globe className="w-4 h-4 flex-shrink-0" />
+                                                        <span className="font-medium whitespace-nowrap">Monitoreo Red</span>
                                                     </Link>
                                                 )}
                                                 {(can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo')) && (
