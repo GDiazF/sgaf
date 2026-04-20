@@ -141,7 +141,15 @@ const Layout = () => {
 
         fetchPending();
         const interval = setInterval(fetchPending, 60000); // Check every minute
-        return () => clearInterval(interval);
+
+        // Listen for manual refreshes (e.g. from ReservasDashboard)
+        const handleRefresh = () => fetchPending();
+        window.addEventListener('refresh-notifications', handleRefresh);
+
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('refresh-notifications', handleRefresh);
+        };
     }, [user]);
 
     // Check backend status
@@ -869,7 +877,9 @@ className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:text-
                             >
                                 <Bell className={`w-5 h-5 ${pendingReservas.length > 0 && !isNotificationsOpen ? 'animate-[bounce_2s_infinite]' : ''}`} />
                                 {pendingReservas.length > 0 && (
-                                    <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
+                                    <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 bg-rose-600 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white shadow-lg shadow-rose-500/40 animate-pulse-subtle">
+                                        {pendingReservas.length}
+                                    </span>
                                 )}
                             </button>
 

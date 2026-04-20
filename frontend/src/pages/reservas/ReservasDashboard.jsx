@@ -432,6 +432,8 @@ const ReservasDashboard = () => {
                 estado: 'PENDIENTE',
             });
             setModalOpen(false); fetchData();
+            // Refrescar campana de notificaciones en Layout
+            window.dispatchEvent(new CustomEvent('refresh-notifications'));
         } catch (err) {
             console.error('Error al solicitar reserva:', err.response?.data);
             const data = err.response?.data;
@@ -465,6 +467,8 @@ const ReservasDashboard = () => {
             setRechazandoId(null);
             setMotivoRechazo('');
             fetchData();
+            // Refrescar campana de notificaciones en Layout
+            window.dispatchEvent(new CustomEvent('refresh-notifications'));
         }
         catch (err) { alert(err.response?.data?.detail || err.response?.data?.non_field_errors?.[0] || 'Error al actualizar estado'); }
     };
@@ -537,6 +541,8 @@ const ReservasDashboard = () => {
         try {
             await api.delete(`reservas/solicitudes/${reserva.id}/force_delete/`);
             fetchData();
+            // Refrescar campana de notificaciones en Layout
+            window.dispatchEvent(new CustomEvent('refresh-notifications'));
         } catch (err) {
             alert(err.response?.data?.detail || 'Error al eliminar la reserva.');
         }
@@ -1447,6 +1453,8 @@ const ReservasDashboard = () => {
                                                     await api.delete(`reservas/solicitudes/${detailReserva.id}/force_delete/`);
                                                     setDetailReserva(null);
                                                     fetchData();
+                                                    // Refrescar campana de notificaciones en Layout
+                                                    window.dispatchEvent(new CustomEvent('refresh-notifications'));
                                                 } catch (err) {
                                                     alert(err.response?.data?.detail || 'Error al eliminar la reserva.');
                                                 }
