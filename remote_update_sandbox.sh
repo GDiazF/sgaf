@@ -35,9 +35,9 @@ git reset --hard origin/local
 echo "🛑 Reiniciando servicios para aplicar cambios de código..."
 docker compose -f $COMPOSE_FILE restart sandbox_frontend
 
-# 5. Reconstrucción de Backend para instalar nuevas librerías (OTP, Seguridad, etc.)
-echo "⚙️  Reconstruyendo backend para instalar requisitos actualizados..."
-docker compose -f $COMPOSE_FILE build --no-cache sandbox_backend
+# 5. Reconstrucción de servicios para instalar nuevas librerías y código frontend
+echo "⚙️  Reconstruyendo backend y frontend para aplicar cambios de código..."
+docker compose -f $COMPOSE_FILE build --no-cache sandbox_backend sandbox_frontend
 
 # 6. Levantar todo
 echo "⬆️  Levantando sistema..."
