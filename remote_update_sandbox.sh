@@ -5,11 +5,11 @@ SANDBOX_PATH="/home/slepiquique/sgaf_sandbox/"
 COMPOSE_FILE="docker-compose.sandbox.yml"
 
 echo "--------------------------------------------------------"
-echo "🚀 ACTUALIZADOR FINAL DE SANDBOX 1.1.2"
+echo "🚀 ACTUALIZADOR FINAL DE SANDBOX 1.1.3"
 echo "--------------------------------------------------------"
 
 # 0. Verificación de Seguridad de Base de Datos
-if ! docker volume inspect sgaf_sandbox_pgdata_v3 > /dev/null 2>&1; then
+if ! docker volume inspect sgaf_sandbox_sgaf_sandbox_pgdata_v3 > /dev/null 2>&1; then
     echo ""
     echo "🚨 ERROR DE SEGURIDAD: El volumen 'sgaf_sandbox_pgdata_v3' NO EXISTE."
     echo "🛑 Abortando ejecución para evitar la creación de una base de datos VACÍA."
@@ -35,12 +35,12 @@ git reset --hard origin/local
 echo "🛑 Reiniciando servicios para aplicar cambios de código..."
 docker compose -f $COMPOSE_FILE restart sandbox_frontend
 
-# 5. Reconstrucción de Backend para instalar nuevas librerías
-echo "⚙️ Reconstruyendo backend para instalar pdfplumber..."
+# 5. Reconstrucción de Backend para instalar nuevas librerías (OTP, Seguridad, etc.)
+echo "⚙️  Reconstruyendo backend para instalar requisitos actualizados..."
 docker compose -f $COMPOSE_FILE build --no-cache sandbox_backend
 
 # 6. Levantar todo
-echo "⬆️ Levantando sistema..."
+echo "⬆️  Levantando sistema..."
 docker compose -f $COMPOSE_FILE up -d
 
 # --- Verificación de Contenido de Base de Datos ---
@@ -61,6 +61,7 @@ fi
 
 # 7. Migraciones y Estáticos
 echo "📦 Aplicando migraciones y recolectando estáticos..."
+docker exec sgaf_sandbox_backend python manage.py makemigrations
 docker exec sgaf_sandbox_backend python manage.py migrate
 docker exec sgaf_sandbox_backend python manage.py collectstatic --no-input
 
@@ -69,6 +70,6 @@ echo "🔑 Asegurando que Nginx pueda leer media y static..."
 sudo chmod -R 755 ./media_sandbox ./staticfiles
 
 echo "--------------------------------------------------------"
-echo "✅ SANDBOX OPERATIVO EN VERSIÓN 1.1.2"
+echo "✅ SANDBOX OPERATIVO EN VERSIÓN 1.1.3"
 echo "🌍 Acceso: http://10.0.100.119:8080"
 echo "--------------------------------------------------------"
