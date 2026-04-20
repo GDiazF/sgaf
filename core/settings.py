@@ -89,12 +89,36 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 # Database
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Priorizamos variables individuales para evitar conflictos
+import os
+
+DB_NAME = os.environ.get('DB_NAME') or config('DB_NAME', default=None)
+
+if DB_NAME:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': DB_NAME,
+            'USER': os.environ.get('DB_USER') or config('DB_USER', default='postgres'),
+            'PASSWORD': os.environ.get('DB_PASSWORD') or config('DB_PASSWORD', default=''),
+            'HOST': os.environ.get('DB_HOST') or config('DB_HOST', default='db'),
+            'PORT': os.environ.get('DB_PORT') or config('DB_PORT', default='5432'),
+        }
     }
-}
+else:
+    # Intentamos con DATABASE_URL como segunda opción
+    DATABASE_URL = os.environ.get('DATABASE_URL') or config('DATABASE_URL', default=None)
+    if DATABASE_URL:
+        import dj_database_url
+        DATABASES = {'default': dj_database_url.config(default=DATABASE_URL)}
+    else:
+        # Por defecto a SQLite (Desarrollo Local)
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
