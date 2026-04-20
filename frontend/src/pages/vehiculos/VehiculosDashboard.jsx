@@ -235,6 +235,32 @@ const VehiculosDashboard = () => {
         }
     };
 
+    const handleSaveFlota = async (e) => {
+        e.preventDefault();
+        setSubmitting(true);
+        try {
+            await api.post('vehiculos/flota/', flotaFormData);
+            setFlotaFormData({ marca: '', modelo: '', patente: '' });
+            fetchData();
+        } catch (error) {
+            console.error("Error saving flota:", error);
+            alert("Error al guardar el vehículo en la flota.");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleDeleteFlota = async (id) => {
+        if (!window.confirm("¿Está seguro que desea eliminar este vehículo de la flota?")) return;
+        try {
+            await api.delete(`vehiculos/flota/${id}/`);
+            fetchData();
+        } catch (error) {
+            console.error("Error deleting flota:", error);
+            alert("Error al eliminar el vehículo de la flota.");
+        }
+    };
+
     const handleExportExcel = async (shouldSum = false) => {
         try {
             const params = { anio: year, sumar: shouldSum };
