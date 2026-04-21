@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-    DndContext, 
+import {
+    DndContext,
     closestCenter,
     KeyboardSensor,
     PointerSensor,
@@ -16,66 +16,67 @@ import {
     useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { 
-    Plus, 
-    GripVertical, 
-    Image as ImageIcon, 
-    File as FileIcon, 
-    Trash2, 
+import {
+    Plus,
+    GripVertical,
+    Image as ImageIcon,
+    File as FileIcon,
+    Trash2,
     Heart,
     X,
     Upload,
     Check,
     Send,
     RotateCcw,
-    Edit3
+    Edit3,
+    Loader2
 } from 'lucide-react';
 import api from '../../api';
 import { usePermission } from '../../hooks/usePermission';
 
-// --- Portal Component para limpieza total ---
+// --- Portal Component ---
 const ModalPortal = ({ children }) => {
     return createPortal(children, document.body);
 };
 
-// --- Sortable Item ---
+// --- Sortable Item (Refinado) ---
 const SortableBenefit = ({ b, categorias, onDelete, onMove, onEdit }) => {
     const { can } = usePermission();
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: b.id,
-        disabled: !can('bienestar.change_beneficio') 
+        disabled: !can('bienestar.change_beneficio')
     });
     const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 };
 
     return (
-        <div ref={setNodeRef} style={style} className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 group hover:shadow-2xl transition-all relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1.5 h-full" style={{ backgroundColor: b.categoria_color }}></div>
-            
-            <div className="flex items-start justify-between mb-4">
-                <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest text-white shadow-sm" style={{ backgroundColor: b.categoria_color }}>
+        <div ref={setNodeRef} style={style} className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 group hover:shadow-xl transition-all relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: b.categoria_color }}></div>
+
+            <div className="flex items-start justify-between mb-3 pl-1">
+                <span className="px-2 py-0.5 rounded-full text-[8px] font-semibold uppercase tracking-wider text-white shadow-sm" style={{ backgroundColor: b.categoria_color }}>
                     {categorias.find(c => c.id === b.categoria)?.nombre}
                 </span>
                 <div className="flex items-center gap-1">
                     {can('bienestar.change_beneficio') && (
                         <>
-                            <button onClick={(e) => { e.stopPropagation(); onEdit(b); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"><Edit3 className="w-4 h-4" /></button>
-                            <button onClick={(e) => { e.stopPropagation(); onMove(b.id, b.estado === 'BORRADOR' ? 'PUBLICADO' : 'BORRADOR'); }} className={`p-2 rounded-xl transition-all active:scale-90 ${b.estado === 'BORRADOR' ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-600 hover:text-white'}`}>{b.estado === 'BORRADOR' ? <Send className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}</button>
+                            <button onClick={(e) => { e.stopPropagation(); onEdit(b); }} className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-slate-900 hover:text-white transition-all"><Edit3 className="w-3.5 h-3.5" /></button>
+                            <button onClick={(e) => { e.stopPropagation(); onMove(b.id, b.estado === 'BORRADOR' ? 'PUBLICADO' : 'BORRADOR'); }} className={`p-1.5 rounded-lg transition-all active:scale-95 ${b.estado === 'BORRADOR' ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-slate-50 text-slate-400 hover:bg-slate-900 hover:text-white'}`}>{b.estado === 'BORRADOR' ? <Send className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}</button>
                         </>
                     )}
                     {can('bienestar.delete_beneficio') && (
-                        <button onClick={() => onDelete(b.id)} className="p-2 hover:bg-rose-50 rounded-xl text-rose-400"><Trash2 className="w-4 h-4" /></button>
+                        <button onClick={() => onDelete(b.id)} className="p-1.5 hover:bg-rose-50 rounded-lg text-rose-300 hover:text-rose-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                     )}
                 </div>
             </div>
-            <h4 className="font-bold text-slate-800 mb-2 leading-tight text-lg">{b.titulo}</h4>
-            <p className="text-xs text-slate-500 line-clamp-2 mb-6 font-medium leading-relaxed">{b.descripcion}</p>
-            <div className="flex items-center justify-between border-t border-slate-50 pt-4 mt-auto">
-                <div className="flex flex-col gap-1">
-                    {b.archivos?.length > 0 && <div className="flex items-center gap-1.5 text-[9px] font-black text-indigo-500 bg-indigo-50/50 px-3 py-1.5 rounded-xl w-fit"><FileIcon className="w-3 h-3" /> {b.archivos.length}</div>}
-                    {b.estado === 'PUBLICADO' && <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1">Ed. {b.creado_por_nombre}</span>}
+            <h4 className="font-bold text-slate-800 mb-1 leading-tight text-sm pl-1">{b.titulo}</h4>
+            <p className="text-[10px] text-slate-400 line-clamp-2 mb-4 font-medium leading-relaxed pl-1">{b.descripcion}</p>
+            <div className="flex items-center justify-between border-t border-slate-50 pt-3 mt-auto pl-1">
+                <div className="flex items-center gap-2">
+                    {b.archivos?.length > 0 && <div className="flex items-center gap-1 text-[8px] font-bold text-slate-300 uppercase tracking-widest"><FileIcon className="w-3 h-3" /> {b.archivos.length}</div>}
+                    {b.estado === 'PUBLICADO' && <span className="text-[8px] font-medium text-slate-300 uppercase tracking-widest italic">{b.creado_por_nombre}</span>}
                 </div>
                 {can('bienestar.change_beneficio') && (
-                    <div {...attributes} {...listeners} className="text-slate-200 hover:text-indigo-400 cursor-grab active:cursor-grabbing p-1"><GripVertical className="w-6 h-6" /></div>
+                    <div {...attributes} {...listeners} className="text-slate-100 hover:text-indigo-300 cursor-grab active:cursor-grabbing p-1"><GripVertical className="w-5 h-5" /></div>
                 )}
             </div>
         </div>
@@ -157,59 +158,107 @@ const WelfareBoard = () => {
     const { can } = usePermission();
 
     return (
-        <div className="h-[calc(100vh-180px)] flex flex-col space-y-6 relative">
-            <div className="flex items-center justify-between px-4">
-                <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-rose-50 rounded-[2.2rem] flex items-center justify-center shadow-sm"><Heart className="w-8 h-8 text-rose-500 fill-rose-500" /></div>
-                    <h2 className="text-4xl font-black text-slate-900 tracking-tighter">Bienestar SLEP</h2>
+        <div className="h-[calc(100vh-180px)] flex flex-col space-y-4">
+            <div className="flex items-center justify-between px-6 pt-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 shadow-sm"><Heart className="w-5 h-5 fill-rose-500/10" /></div>
+                    <div className="flex flex-col">
+                        <h2 className="text-xl font-bold text-slate-800 tracking-tight leading-none mb-1">Muro de Comunicaciones</h2>
+                        <span className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Tablero de Gestión</span>
+                    </div>
                 </div>
                 {can('bienestar.add_beneficio') && (
-                    <button onClick={() => { setEditingId(null); setIsModalOpen(true); }} className="bg-slate-900 text-white px-8 py-5 rounded-[2rem] font-black uppercase tracking-widest text-xs hover:scale-105 transition-all shadow-2xl flex items-center gap-3">
-                        <Plus className="w-5 h-5" /> Nuevo Post-it
+                    <button onClick={() => { setEditingId(null); setIsModalOpen(true); }} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold uppercase tracking-wider text-[10px] hover:bg-rose-500 transition-all shadow-lg flex items-center gap-2 active:scale-95">
+                        <Plus className="w-3.5 h-3.5" /> Nuevo Post-it
                     </button>
                 )}
             </div>
 
 
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <div className="flex-1 flex gap-10 overflow-x-auto pb-8 custom-scrollbar scroll-smooth">
+                <div className="flex-1 flex gap-6 overflow-x-auto pb-4 px-6 custom-scrollbar scroll-smooth">
                     {['BORRADOR', 'PUBLICADO'].map(colId => (
-                        <div key={colId} className={`${colId === 'BORRADOR' ? 'flex-[0.5] min-w-[280px]' : 'flex-[1.5] min-w-[550px]'} bg-slate-100/30 rounded-[4rem] border border-white/50 flex flex-col p-8 shadow-inner backdrop-blur-sm transition-all`}>
-                            <div className="flex items-center justify-between mb-8 px-6 text-[12px] font-black uppercase tracking-[0.3em] text-slate-400">
-                                <h3 className="flex items-center gap-3">{colId === 'BORRADOR' ? <><FileIcon className="w-4 h-4" /> Borradores</> : <><Send className="w-4 h-4 text-emerald-500" /> Publicados</>}</h3>
-                                <div className="bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-100">{beneficios.filter(b => b.estado === colId).length}</div>
+                        <div key={colId} className={`${colId === 'BORRADOR' ? 'flex-[1] min-w-[320px]' : 'flex-[2] min-w-[600px]'} bg-slate-50 border border-slate-100 rounded-[2.5rem] flex flex-col p-6 shadow-sm`}>
+                            <div className="flex items-center justify-between mb-6 px-4">
+                                <h3 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                    {colId === 'BORRADOR' ? <><FileIcon className="w-3.5 h-3.5" /> Borradores</> : <><Send className="w-3.5 h-3.5 text-emerald-500" /> Publicados</>}
+                                </h3>
+                                <div className="bg-white px-3 py-1 rounded-lg shadow-sm border border-slate-100 text-[10px] font-bold text-slate-400">
+                                    {beneficios.filter(b => b.estado === colId).length}
+                                </div>
                             </div>
-                            <div className="flex-1 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
+                            <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
                                 <SortableContext items={beneficios.filter(b => b.estado === colId)} strategy={verticalListSortingStrategy}>
                                     {beneficios.filter(b => b.estado === colId).map(b => (
                                         <SortableBenefit key={b.id} b={b} categorias={categorias} onDelete={handleDelete} onMove={handleMove} onEdit={openEdit} />
                                     ))}
                                 </SortableContext>
-                                <button onClick={() => { setEditingId(null); setNewData({...newData, estado: colId}); setIsModalOpen(true); }} className="w-full py-8 border-4 border-dashed border-slate-200 rounded-[3rem] text-slate-300 flex flex-col items-center justify-center gap-2 hover:border-indigo-200 hover:text-indigo-400 hover:bg-white/50 transition-all group"><Plus className="w-8 h-8 group-hover:rotate-90 transition-transform" /><span className="text-[10px] font-black uppercase tracking-[0.2em]">Añadir Post-it</span></button>
+                                <button onClick={() => { setEditingId(null); setNewData({ ...newData, estado: colId }); setIsModalOpen(true); }} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[1.8rem] text-slate-300 flex flex-col items-center justify-center gap-1 hover:border-indigo-200 hover:text-indigo-400 hover:bg-white/50 transition-all group">
+                                    <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform" />
+                                    <span className="text-[10px] font-bold uppercase tracking-widest">Añadir Post-it</span>
+                                </button>
                             </div>
                         </div>
                     ))}
                 </div>
             </DndContext>
 
-            {/* USANDO PORTAL PARA ELIMINAR CUALQUIER SALTO O FRANJA BLANCA */}
             <ModalPortal>
                 <AnimatePresence>
                     {isModalOpen && (
-                        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-hidden">
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !loading && setIsModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-                            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white w-full max-w-xl rounded-[3rem] shadow-2xl p-10 overflow-hidden">
-                                <div className="flex items-center justify-between mb-8"><h3 className="text-2xl font-black text-slate-900 leading-none">{editingId ? 'Editar Post-it' : 'Nuevo Post-it'}</h3><button disabled={loading} onClick={() => setIsModalOpen(false)}><X className="w-6 h-6 text-slate-300" /></button></div>
-                                <div className="space-y-5">
-                                    <input type="text" placeholder="Título" value={newData.titulo} onChange={e => setNewData({...newData, titulo: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-800" />
-                                    <textarea placeholder="Descripción..." rows="3" value={newData.descripcion} onChange={e => setNewData({...newData, descripcion: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl p-4 text-slate-600" />
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <select value={newData.categoria} onChange={e => setNewData({...newData, categoria: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold appearance-none"><option value="">Selecciona Categoría</option>{categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select>
-                                        <select value={newData.estado} onChange={e => setNewData({...newData, estado: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold appearance-none"><option value="BORRADOR">Como Borrador</option><option value="PUBLICADO">Publicar Inmediato</option></select>
+                        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !loading && setIsModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+                            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="relative bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden">
+                                <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                                    <h3 className="text-lg font-bold text-slate-800 leading-none">{editingId ? 'Editar Post-it' : 'Nuevo Post-it'}</h3>
+                                    <button disabled={loading} onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white rounded-xl transition-all"><X className="w-5 h-5 text-slate-400" /></button>
+                                </div>
+                                <div className="p-8 space-y-5">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Título del Anuncio</label>
+                                        <input type="text" placeholder="Ej: Nuevo Convenio Dental" value={newData.titulo} onChange={e => setNewData({ ...newData, titulo: e.target.value })} className="w-full bg-slate-50 border-none rounded-xl p-3.5 font-semibold text-slate-700 placeholder:text-slate-300 focus:ring-2 focus:ring-indigo-100 transition-all" />
                                     </div>
-                                    <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed border-slate-100 rounded-[2.5rem] p-8 flex flex-col items-center justify-center gap-2 hover:border-indigo-200 transition-all cursor-pointer group"><input type="file" ref={fileInputRef} onChange={e => setNewData(p => ({ ...p, tempFiles: [...p.tempFiles, ...Array.from(e.target.files)] }))} multiple hidden /><Upload className="w-10 h-10 text-slate-200 group-hover:text-indigo-400 transition-all" /><p className="text-xs font-black text-slate-400 uppercase tracking-widest">Añadir archivos</p></div>
-                                    {newData.tempFiles.length > 0 && <div className="flex flex-wrap gap-2">{newData.tempFiles.map((f, i) => <div key={i} className="bg-indigo-50 text-indigo-600 text-[10px] font-bold px-3 py-1 rounded-full"><Check className="w-3 h-3 inline mr-1" /> {f.name}</div>)}</div>}
-                                    <button disabled={loading || !newData.titulo} onClick={handleSave} className={`w-full py-5 rounded-[2rem] font-black text-sm uppercase tracking-[0.2em] shadow-xl transition-all ${loading ? 'bg-slate-200 text-slate-400' : 'bg-slate-900 text-white hover:bg-emerald-600 shadow-emerald-100'}`}>{loading ? 'Guardando...' : editingId ? 'Actualizar Cambios' : 'CREAR POST'}</button>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Descripción / Cuerpo</label>
+                                        <textarea placeholder="Cuéntales más detalles..." rows="10" value={newData.descripcion} onChange={e => setNewData({ ...newData, descripcion: e.target.value })} className="w-full bg-slate-50 border-none rounded-xl p-4 text-slate-600 placeholder:text-slate-300 focus:ring-2 focus:ring-indigo-100 transition-all text-sm leading-relaxed min-h-[220px]" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Categoría</label>
+                                            <select value={newData.categoria} onChange={e => setNewData({ ...newData, categoria: e.target.value })} className="w-full bg-slate-50 border-none rounded-xl p-3.5 font-semibold text-slate-700 appearance-none cursor-pointer">
+                                                <option value="">Selecciona...</option>
+                                                {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Estado Inicial</label>
+                                            <select value={newData.estado} onChange={e => setNewData({ ...newData, estado: e.target.value })} className="w-full bg-slate-50 border-none rounded-xl p-3.5 font-semibold text-slate-700 appearance-none cursor-pointer">
+                                                <option value="BORRADOR">Como Borrador</option>
+                                                <option value="PUBLICADO">Publicar Ahora</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Subida de archivos más compacta */}
+                                    <div onClick={() => !loading && fileInputRef.current?.click()} className="border-2 border-dashed border-slate-100 rounded-2xl p-6 flex flex-col items-center justify-center gap-1 hover:border-indigo-200 hover:bg-slate-50 transition-all cursor-pointer group">
+                                        <input type="file" ref={fileInputRef} onChange={e => setNewData(p => ({ ...p, tempFiles: [...p.tempFiles, ...Array.from(e.target.files)] }))} multiple hidden />
+                                        <Upload className="w-6 h-6 text-slate-200 group-hover:text-indigo-400 transition-all mb-1" />
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Documentos o Imágenes</p>
+                                    </div>
+
+                                    {newData.tempFiles.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 mt-2">
+                                            {newData.tempFiles.map((f, i) => (
+                                                <div key={i} className="bg-emerald-50 text-emerald-600 text-[9px] font-bold px-2 py-1 rounded-lg flex items-center gap-1">
+                                                    <Check className="w-2.5 h-2.5" /> {f.name.slice(0, 15)}...
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <button disabled={loading || !newData.titulo} onClick={handleSave} className={`w-full py-4 rounded-xl font-bold text-[11px] uppercase tracking-[0.2em] shadow-xl transition-all flex items-center justify-center gap-2 ${loading ? 'bg-slate-200 text-slate-400' : 'bg-slate-900 text-white hover:bg-indigo-600 active:scale-95'}`}>
+                                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : editingId ? 'Guardar Cambios' : 'Crear Post-it'}
+                                    </button>
                                 </div>
                             </motion.div>
                         </div>

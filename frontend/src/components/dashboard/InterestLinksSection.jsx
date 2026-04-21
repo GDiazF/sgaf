@@ -19,7 +19,7 @@ const IconMap = {
     Facebook, Instagram, Twitter, Linkedin, Youtube
 };
 
-const InterestLinksSection = () => {
+const InterestLinksSection = ({ isCompact = false }) => {
     const { can } = usePermission();
     const [links, setLinks] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -144,21 +144,23 @@ const InterestLinksSection = () => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-white border border-slate-100 rounded-[2.5rem] shadow-xl overflow-hidden">
-            {/* Header de la sección con buscador y TABS */}
-            <div className="p-6 border-b border-slate-50 flex flex-col gap-6">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-inner">
-                            <Star className="w-5 h-5 fill-blue-600/10" />
+        <div className="flex flex-col h-full bg-white border border-slate-100 rounded-3xl shadow-xl overflow-hidden">
+            {/* Header de la sección con buscador y TABS - Compactado para Dashboard */}
+            <div className={`${isCompact ? 'p-3 gap-2' : 'p-6 gap-6'} border-b border-slate-50 flex flex-col`}>
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 font-sans">
+                        <div className={`${isCompact ? 'w-8 h-8' : 'w-10 h-10'} rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-inner shrink-0`}>
+                            <Star className={`${isCompact ? 'w-4 h-4' : 'w-5 h-5'} fill-blue-600/10`} />
                         </div>
-                        <div>
-                            <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">
+                        <div className="leading-tight">
+                            <h2 className={`${isCompact ? 'text-xs' : 'text-sm'} font-bold text-slate-800 uppercase tracking-widest`}>
                                 {activeTab === 'LINK' ? 'Links de Interés' : 'Nuestras Redes'}
                             </h2>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter italic">
-                                {activeTab === 'LINK' ? 'Herramientas y accesos frecuentes' : 'Canales de comunicación oficial'}
-                            </span>
+                            {!isCompact && (
+                                <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-tighter italic">
+                                    {activeTab === 'LINK' ? 'Herramientas y accesos frecuentes' : 'Canales de comunicación oficial'}
+                                </span>
+                            )}
                         </div>
                     </div>
 
@@ -168,7 +170,7 @@ const InterestLinksSection = () => {
                             <input
                                 type="text"
                                 placeholder={`Buscar ${activeTab === 'LINK' ? 'herramienta' : 'red social'}...`}
-                                className="w-full pl-10 pr-4 py-2 bg-slate-50 rounded-xl text-[11px] font-bold text-slate-700 placeholder:text-slate-300 outline-none focus:ring-2 focus:ring-blue-500/10 transition-all border border-transparent focus:border-blue-100"
+                                className="w-full pl-10 pr-4 py-2 bg-slate-50 rounded-xl text-[11px] font-semibold text-slate-700 placeholder:text-slate-300 outline-none focus:ring-2 focus:ring-blue-500/10 transition-all border border-transparent focus:border-blue-100"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
@@ -189,7 +191,7 @@ const InterestLinksSection = () => {
 
 
             {/* Grid de Links Compacto */}
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+            <div className={`flex-1 overflow-y-auto ${isCompact ? 'p-3' : 'p-6'} custom-scrollbar`}>
                 {loading ? (
                     <div className="flex flex-col items-center justify-center h-48 opacity-20 text-slate-400">
                         <Loader2 className="w-8 h-8 animate-spin mb-2" />
@@ -210,7 +212,7 @@ const InterestLinksSection = () => {
                         </span>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-2">
+                    <div className={`grid ${isCompact ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4' : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-8'} gap-y-1`}>
                         <AnimatePresence mode="popLayout">
                             {filteredLinks.map(link => (
                                 <motion.a
@@ -222,19 +224,19 @@ const InterestLinksSection = () => {
                                     href={link.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="group flex items-center gap-3 p-2 hover:bg-blue-50/50 rounded-xl transition-all border border-transparent hover:border-blue-100/50 active:scale-[0.99]"
+                                    className="group flex items-center gap-2 p-1 hover:bg-blue-50/30 rounded-lg transition-all border border-transparent active:scale-[0.98]"
                                 >
-                                    {/* Link Icon Container */}
-                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-all bg-white shadow-sm border border-slate-50 group-hover:scale-110 group-hover:shadow-md ${!link.activo && 'opacity-50 grayscale'}`}>
-                                        {renderIcon(link.icono)}
+                                    {/* Link Icon Container (ACHICADO) */}
+                                    <div className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 transition-all bg-white shadow-sm border border-slate-50 group-hover:scale-110 ${!link.activo && 'opacity-50 grayscale'}`}>
+                                        {React.cloneElement(renderIcon(link.icono), { className: 'w-3.5 h-3.5' })}
                                     </div>
 
                                     {/* Text Content */}
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-tight group-hover:text-blue-700 transition-colors truncate">
+                                    <div className="flex-1 min-w-0 leading-tight">
+                                        <h4 className="text-[10px] font-bold text-slate-700 uppercase tracking-tight group-hover:text-blue-700 transition-colors truncate">
                                             {link.titulo}
                                         </h4>
-                                        <p className="text-[8px] font-medium text-slate-300 lowercase truncate tracking-wide">
+                                        <p className="text-[8px] font-medium text-slate-400 lowercase truncate">
                                             {link.url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}
                                         </p>
                                     </div>
@@ -281,7 +283,7 @@ const InterestLinksSection = () => {
                 {isModalOpen && (
                     <div className="fixed inset-0 z-[7000] flex items-center justify-center p-4">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-                        <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="relative bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-slate-200">
+                        <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-slate-200">
                             <form onSubmit={handleSave}>
                                 <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
                                     <div className="flex items-center gap-3">
@@ -289,8 +291,8 @@ const InterestLinksSection = () => {
                                             <LinkIcon className="w-5 h-5" />
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">{editingLink ? 'Editar Link' : 'Nuevo Link de Interés'}</h3>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Configuración de Acceso</p>
+                                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest">{editingLink ? 'Editar Link' : 'Nuevo Link de Interés'}</h3>
+                                            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-tighter">Configuración de Acceso</p>
                                         </div>
                                     </div>
                                     <button type="button" onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">

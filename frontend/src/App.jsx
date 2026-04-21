@@ -107,7 +107,7 @@ const PrivateRoute = () => {
 
 function App() {
   return (
-<ErrorBoundary>
+    <ErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
           <SessionTimeoutManager />
@@ -211,7 +211,7 @@ function App() {
                   <Route path="insights" element={<InsightsDashboard />} />
                 </Route>
                 <Route path="bienestar" element={<WelfareBoard />} />
-                <Route path="bienestar/muro" element={<div className="p-8 h-full overflow-y-auto"><WelfareWall /></div>} />
+                <Route path="bienestar/muro" element={<div className="h-full w-full overflow-hidden"><WelfareWall /></div>} />
                 <Route path="procedimientos" element={<ProceduresDashboard />} />
                 {/* Administración */}
                 <Route element={<ProtectedRoute permission="auth.view_group" />}>
