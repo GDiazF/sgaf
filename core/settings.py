@@ -107,18 +107,22 @@ if DB_NAME:
     }
 else:
     # Intentamos con DATABASE_URL como segunda opción
-    DATABASE_URL = os.environ.get('DATABASE_URL') or config('DATABASE_URL', default=None)
-    if DATABASE_URL:
-        import dj_database_url
-        DATABASES = {'default': dj_database_url.config(default=DATABASE_URL)}
-    else:
-        # Por defecto a SQLite (Desarrollo Local)
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3',
-            }
-        }
+    import dj_database_url
+    
+    # Obtener la URL de la base de datos de los entornos de Docker o usar un valor seguro por defecto
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+
+    if not DATABASE_URL:
+        # Si Docker no pasó las variables, las forzamos aquí para Producción
+        DATABASE_URL = "postgres://sgaf_user:sgaf_2024@db:5432/sgaf"
+
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
