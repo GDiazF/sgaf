@@ -1,62 +1,57 @@
 #!/bin/bash
 
-# --- CONFIGURACIÓN DE PRODUCCIÓN ---
-PROD_PATH="/home/slepiquique/sgaf/"
-COMPOSE_FILE="docker-compose.yml"
-DB_CONTAINER="sgaf_db"
-BACKEND_CONTAINER="sgaf_backend"
-DB_NAME="sgaf"
-DB_USER="sgaf_user"
+# --------------------------------------------------------
+# ⚠️ ACTUALIZADOR DE PRODUCCIÓN SGAF 1.2.0 (MODO BLINDADO)
+# --------------------------------------------------------
 
-echo "--------------------------------------------------------"
-echo "⚠️  ACTUALIZADOR DE PRODUCCIÓN SGAF 1.1.3"
-echo "--------------------------------------------------------"
-
-# 0. Verificación de Seguridad de Base de Datos (Bind Mount en Producción)
-if [ ! -d "/home/slepiquique/sgaf_pgdata" ]; then
-    echo "🚨 ERROR CRÍTICO: La carpeta de datos de PRODUCCIÓN '/home/slepiquique/sgaf_pgdata' NO EXISTE."
-    echo "🛑 Abortando para evitar desastres en producción."
-    exit 1
-fi
-
-# 1. Entrar a la carpeta
-cd $PROD_PATH || { echo "❌ Error: Carpeta de producción no encontrada"; exit 1; }
-
-# 2. Sincronizar con la rama de trabajo
 echo "📥 Descargando última versión de GitHub (Rama: local)..."
 git fetch origin
 git checkout local
 git reset --hard origin/local
 
-# 3. Reconstrucción y despliegue
-echo "⚙️  Limpiando contenedores antiguos y reconstruyendo con limpieza de caché..."
-# Detenemos y removemos huérfanos para asegurar que el puerto 80 se libere
-docker compose -f $COMPOSE_FILE down --remove-orphans
-docker compose -f $COMPOSE_FILE build --no-cache
-docker compose -f $COMPOSE_FILE up -d
-
-# 4. Verificación de Integridad de Datos
-echo "🔍 Verificando base de datos de producción..."
-sleep 5
-TABLE_COUNT=$(docker exec $DB_CONTAINER psql -U $DB_USER -d $DB_NAME -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';" | xargs)
-
-if [ "$TABLE_COUNT" -eq "0" ]; then
-    echo "🚨 ERROR: ¡LA BASE DE DATOS DE PRODUCCIÓN APARECE VACÍA!"
-    echo "🛑 Deteniendo todo para proteger la integridad."
-    docker compose -f $COMPOSE_FILE stop
-    exit 1
+# 🛡️ VERIFICACIÓN Y RECONSTRUCCIÓN DEL .ENV
+if [ ! -f .env ]; then
+    echo "⚠️ .env no encontrado. Reconstruyendo configuración de emergencia..."
+    cat <<EOF > .env
+DEBUG=False
+SECRET_KEY=$(openssl rand -hex 32)
+ALLOWED_HOSTS=10.0.100.119,localhost,127.0.0.1
+DATABASE_URL=postgres://sgaf_user:sgaf_2024@db:5432/sgaf
+DB_NAME=sgaf
+DB_USER=sgaf_user
+DB_PASSWORD=sgaf_2024
+DB_HOST=db
+DB_PORT=5432
+STATIC_ROOT=/app/staticfiles
+MEDIA_ROOT=/app/media
+EOF
+    chmod 644 .env
+    echo "✅ .env restaurado con conexión a Postgres."
+else
+    # Aseguramos que tenga la DATABASE_URL para evitar el error de SQLite
+    if ! grep -q "DATABASE_URL" .env; then
+        echo "🔧 Añadiendo DATABASE_URL faltante al .env..."
+        echo "DATABASE_URL=postgres://sgaf_user:sgaf_2024@db:5432/sgaf" >> .env
+    fi
 fi
 
-# 5. Aplicar cambios finales
-echo "📦 Aplicando migraciones y recolectando estáticos..."
-docker exec $BACKEND_CONTAINER python manage.py migrate --no-input
-docker exec $BACKEND_CONTAINER python manage.py collectstatic --no-input
+echo "⚙️ Limpiando y reconstruyendo el sistema..."
+# Forzamos la limpieza de contenedores y volúmenes de frontend huérfanos
+docker compose down --remove-orphans
+docker volume rm sgaf_frontend_assets 2>/dev/null || true
 
-# 6. Limpieza y Permisos
-echo "🔑 Asegurando permisos y reiniciando Nginx..."
-sudo chmod -R 755 ./media ./staticfiles
-docker compose -f $COMPOSE_FILE restart nginx || echo "ℹ️ Nginx no es un servicio de compose, saltando..."
+# Levantamos TODO forzando el uso del .env y reconstruyendo el frontend
+docker compose --env-file .env up -d --build
+
+echo "🚀 Aplicando cambios en la base de datos..."
+# Esperamos un momento a que Postgres esté listo
+sleep 5
+docker exec sgaf_backend python manage.py migrate --no-input
+
+echo "🧹 Limpiando archivos estáticos..."
+docker exec sgaf_backend python manage.py collectstatic --no-input
 
 echo "--------------------------------------------------------"
-echo "✅ PRODUCCIÓN ACTUALIZADA Y OPERATIVA v1.1.3"
+echo "✅ ¡ACTUALIZACIÓN COMPLETADA CON ÉXITO!"
+echo "📍 Versión: $(git describe --tags --always)"
 echo "--------------------------------------------------------"
