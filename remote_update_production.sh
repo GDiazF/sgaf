@@ -9,7 +9,7 @@ DB_NAME="key_system_db"
 DB_USER="postgres"
 
 echo "--------------------------------------------------------"
-echo "⚠️  ACTUALIZADOR DE PRODUCCIÓN SGAF 1.0"
+echo "⚠️  ACTUALIZADOR DE PRODUCCIÓN SGAF 1.1.2"
 echo "--------------------------------------------------------"
 
 # 0. Verificación de Seguridad de Base de Datos
@@ -23,13 +23,13 @@ fi
 cd $PROD_PATH || { echo "❌ Error: Carpeta de producción no encontrada"; exit 1; }
 
 # 2. Sincronizar con Master GitHub
-echo "📥 Descargando última versión estable de GitHub..."
+echo "📥 Descargando última versión estable de GitHub (Master)..."
 git fetch origin
 git checkout master
 git reset --hard origin/master
 
 # 3. Reconstrucción y despliegue
-echo "⚙️  Reconstruyendo backend y levantando servicios..."
+echo "⚙️  Reconstruyendo backend para instalar requisitos actualizados..."
 docker compose -f $COMPOSE_FILE up -d --build
 
 # 4. Verificación de Integridad de Datos
@@ -46,6 +46,7 @@ fi
 
 # 5. Aplicar cambios finales
 echo "📦 Aplicando migraciones y recolectando estáticos..."
+docker exec $BACKEND_CONTAINER python manage.py makemigrations
 docker exec $BACKEND_CONTAINER python manage.py migrate
 docker exec $BACKEND_CONTAINER python manage.py collectstatic --no-input
 
@@ -54,5 +55,5 @@ echo "🔑 Asegurando permisos de archivos de producción..."
 sudo chmod -R 755 ./media ./staticfiles
 
 echo "--------------------------------------------------------"
-echo "✅ PRODUCCIÓN ACTUALIZADA Y OPERATIVA"
+echo "✅ PRODUCCIÓN ACTUALIZADA Y OPERATIVA v1.1.2"
 echo "--------------------------------------------------------"

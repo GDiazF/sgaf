@@ -14,9 +14,40 @@ import {
     Star,
     Image as ImageIcon,
     FileText,
-    Loader2
+    Loader2,
+    Tag,
+    Trash2,
+    Plus,
+    Save,
+    Book,
+    Coffee,
+    Shield,
+    Briefcase,
+    GraduationCap,
+    Utensils,
+    Plane
 } from 'lucide-react';
 import api from '../../api';
+import { usePermission } from '../../hooks/usePermission';
+
+// --- Icon Map ---
+const ICON_OPTIONS = [
+    { name: 'Heart', icon: Heart },
+    { name: 'Star', icon: Star },
+    { name: 'Book', icon: Book },
+    { name: 'Coffee', icon: Coffee },
+    { name: 'Shield', icon: Shield },
+    { name: 'Briefcase', icon: Briefcase },
+    { name: 'GraduationCap', icon: GraduationCap },
+    { name: 'Utensils', icon: Utensils },
+    { name: 'Plane', icon: Plane },
+];
+
+const LucidIcon = ({ name, ...props }) => {
+    const iconObj = ICON_OPTIONS.find(i => i.name === name);
+    const IconComponent = iconObj ? iconObj.icon : Heart;
+    return <IconComponent {...props} />;
+};
 
 // --- Portal Component ---
 const ModalPortal = ({ children }) => {
@@ -107,7 +138,15 @@ const WelfareWall = ({ limit, showFilters = true, sortBy = 'newest', layout = 'v
                     <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
                         <button onClick={() => setSelectedCategory('ALL')} className={`px-3 py-1.5 rounded-xl text-[9px] font-semibold uppercase tracking-widest transition-all ${selectedCategory === 'ALL' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>Todos</button>
                         {categorias.map(cat => (
-                            <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className={`px-3 py-1.5 rounded-xl text-[9px] font-semibold uppercase tracking-widest transition-all whitespace-nowrap ${parseInt(selectedCategory) === cat.id ? 'shadow-lg text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`} style={{ backgroundColor: parseInt(selectedCategory) === cat.id ? cat.color : '' }}>{cat.nombre}</button>
+                            <button 
+                                key={cat.id} 
+                                onClick={() => setSelectedCategory(cat.id)} 
+                                className={`px-3 py-1.5 rounded-xl text-[9px] font-semibold uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2 ${parseInt(selectedCategory) === cat.id ? 'shadow-lg text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`} 
+                                style={{ backgroundColor: parseInt(selectedCategory) === cat.id ? cat.color : '' }}
+                            >
+                                <LucidIcon name={cat.icono} className={`w-3 h-3 ${parseInt(selectedCategory) === cat.id ? 'text-white' : ''}`} />
+                                {cat.nombre}
+                            </button>
                         ))}
                     </div>
                 </div>
@@ -134,7 +173,7 @@ const WelfareWall = ({ limit, showFilters = true, sortBy = 'newest', layout = 'v
                                 {/* CONTENIDO DE TEXTO (ARRIBA - COMPACTO) */}
                                 <div className="p-4 flex flex-col shrink-0">
                                     <div className="flex items-center gap-1.5 mb-2 px-2 py-0.5 bg-slate-50 rounded-lg w-fit">
-                                        <div className="w-1 h-1 rounded-full" style={{ backgroundColor: catColor }} />
+                                        <LucidIcon name={cat?.icono} className="w-3 h-3" style={{ color: catColor }} />
                                         <span className="text-[7px] font-semibold text-slate-500 uppercase tracking-widest">{catName}</span>
                                     </div>
                                     <h4 className="text-[12px] font-bold text-slate-700 mb-0.5 leading-tight group-hover:text-indigo-600 transition-colors line-clamp-2">
@@ -157,8 +196,22 @@ const WelfareWall = ({ limit, showFilters = true, sortBy = 'newest', layout = 'v
                                             <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                         </div>
                                     ) : (
-                                        <div className="w-full h-full bg-slate-50 flex items-center justify-center border-t border-slate-50 border-dashed rounded-b-[1.8rem]">
-                                            <Heart className="w-6 h-6 text-slate-200" />
+                                        <div 
+                                            className="w-full h-full flex items-center justify-center border-t border-slate-50 relative overflow-hidden rounded-b-[1.8rem]"
+                                            style={{ 
+                                                background: `linear-gradient(135deg, ${catColor}15 0%, ${catColor}40 100%)` 
+                                            }}
+                                        >
+                                            {/* Patrón sutil de fondo */}
+                                            <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `radial-gradient(${catColor} 1px, transparent 1px)`, backgroundSize: '15px 15px' }} />
+                                            
+                                            <div className="relative group-hover:scale-110 transition-transform duration-500">
+                                                <LucidIcon name={cat?.icono} className="w-12 h-12 opacity-20" style={{ color: catColor }} />
+                                            </div>
+                                            
+                                            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 opacity-20">
+                                                <span className="text-[8px] font-black uppercase tracking-[0.3em]" style={{ color: catColor }}>SGAF Bienestar</span>
+                                            </div>
                                         </div>
                                     )}
 

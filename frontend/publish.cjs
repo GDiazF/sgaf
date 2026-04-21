@@ -66,7 +66,8 @@ export const APP_DEVELOPER = "Departamento de Servicios Generales, Operaciones y
     const currentBranch = execSync('git rev-parse --abbrev-ref HEAD').toString().trim();
     console.log(`📍 Rama detectada: ${currentBranch}`);
 
-    execSync('git add .', { stdio: 'inherit' });
+    // Agregamos tanto el frontend como la raíz del proyecto para no olvidar settings.py ni scripts
+    execSync('git add ..', { stdio: 'inherit' });
     execSync(`git commit -m "${type}: ${message} (v${newVersion})"`, { stdio: 'inherit' });
 
     // Empuja desde tu rama actual (HEAD) hacia la rama 'local' de GitHub
