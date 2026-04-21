@@ -22,15 +22,16 @@ fi
 # 1. Entrar a la carpeta
 cd $PROD_PATH || { echo "❌ Error: Carpeta de producción no encontrada"; exit 1; }
 
-# 2. Sincronizar con Master GitHub
-echo "📥 Descargando última versión estable de GitHub (Master)..."
+# 2. Sincronizar con la rama de trabajo
+echo "📥 Descargando última versión de GitHub (Rama: local)..."
 git fetch origin
-git checkout master
-git reset --hard origin/master
+git checkout local
+git reset --hard origin/local
 
 # 3. Reconstrucción y despliegue
-echo "⚙️  Reconstruyendo contenedores con limpieza de caché..."
-# Forzamos build sin cache para backend y frontend (si existe) para aplicar cambios de UI
+echo "⚙️  Limpiando contenedores antiguos y reconstruyendo con limpieza de caché..."
+# Detenemos y removemos huérfanos para asegurar que el puerto 80 se libere
+docker compose -f $COMPOSE_FILE down --remove-orphans
 docker compose -f $COMPOSE_FILE build --no-cache
 docker compose -f $COMPOSE_FILE up -d
 
