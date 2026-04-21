@@ -5,16 +5,16 @@ PROD_PATH="/home/slepiquique/sgaf/"
 COMPOSE_FILE="docker-compose.yml"
 DB_CONTAINER="sgaf_db"
 BACKEND_CONTAINER="sgaf_backend"
-DB_NAME="key_system_db"
-DB_USER="postgres"
+DB_NAME="sgaf"
+DB_USER="sgaf_user"
 
 echo "--------------------------------------------------------"
 echo "⚠️  ACTUALIZADOR DE PRODUCCIÓN SGAF 1.1.3"
 echo "--------------------------------------------------------"
 
-# 0. Verificación de Seguridad de Base de Datos
-if ! docker volume inspect sgaf_pgdata > /dev/null 2>&1; then
-    echo "🚨 ERROR CRÍTICO: El volumen de PRODUCCIÓN 'sgaf_pgdata' NO EXISTE."
+# 0. Verificación de Seguridad de Base de Datos (Bind Mount en Producción)
+if [ ! -d "/home/slepiquique/sgaf_pgdata" ]; then
+    echo "🚨 ERROR CRÍTICO: La carpeta de datos de PRODUCCIÓN '/home/slepiquique/sgaf_pgdata' NO EXISTE."
     echo "🛑 Abortando para evitar desastres en producción."
     exit 1
 fi
