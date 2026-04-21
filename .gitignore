@@ -1,58 +1,31 @@
-# ─── Python ─────────────────────────────────────────────────
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-*.egg
-*.egg-info/
-dist/
-build/
-.eggs/
-.Python
 .venv/
 venv/
-venv_tmp/
-env/
 ENV/
-pip-log.txt
-pip-delete-this-directory.txt
 
-# ─── Django ─────────────────────────────────────────────────
-*.log
-*.pot
+# Django
 db.sqlite3
-*.sqlite3
-/staticfiles/
-/media/
-/media_sandbox/
-
-# ─── Secretos — NUNCA subir ─────────────────────────────────
+media/
+staticfiles/
+staticfiles_sandbox/
 .env
-.env.*
-!.env.example
+.env.prod.bak
+.env.sandbox
+.env.local_dev
+.env.prod_backup
 
-# ─── IDEs ───────────────────────────────────────────────────
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Docker
+.docker_compose_cache/
+
+# Node/React
+node_modules/
+dist/
+dist-sandbox/
+.eslintcache
+
+# OS
 .DS_Store
 Thumbs.db
-
-# ─── Frontend (Node) ────────────────────────────────────────
-frontend/node_modules/
-frontend/dist/
-frontend/.env
-frontend/.env.*
-!frontend/.env.example
-
-# ─── Apps excluidas del repo (carpetas locales) ─────────────
-
-
-# ─── Backups y temporales ───────────────────────────────────
-*.bak
-*.tmp
-*_backup.*
-respaldos/*.zip
-respaldos/*.gz

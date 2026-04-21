@@ -1,0 +1,36 @@
+[2026-04-16 21:00:51] [INTENTO] (1/200) → ['ssgg@slepiquique.cl'] | 📋 Nueva Reserva Pendiente: asd
+[2026-04-16 21:00:51] [INTENTO] (2/200) → ['jorge.cubillos@slepiquique.cl'] | ✅ Solicitud Recibida: asd
+[2026-04-16 21:00:54] [SUCCESS] Enviado a ['jorge.cubillos@slepiquique.cl']
+[2026-04-16 21:00:54] [ERROR] Falló envío a ['jorge.cubillos@slepiquique.cl']: 'charmap' codec can't encode character '\u2705' in position 47: character maps to <undefined>
+[2026-04-16 21:00:54] [SUCCESS] Enviado a ['ssgg@slepiquique.cl']
+[2026-04-16 21:00:54] [ERROR] Falló envío a ['ssgg@slepiquique.cl']: 'charmap' codec can't encode character '\U0001f4cb' in position 37: character maps to <undefined>
+[2026-04-20 20:30:43] [INTENTO] (4/200) → ['jorge.cubillos@slepiquique.cl'] | 📋 Nueva Reserva Pendiente: Sala de Directorio
+[2026-04-20 20:30:43] [INTENTO] (5/200) → ['jorge.cubillos@slepiquique.cl'] | ✅ Solicitud Recibida: Sala de Directorio
+[2026-04-20 20:30:45] [SUCCESS] Enviado a ['jorge.cubillos@slepiquique.cl']
+[2026-04-20 20:30:46] [ERROR] Falló envío a ['jorge.cubillos@slepiquique.cl']: 'charmap' codec can't encode character '\U0001f4cb' in position 47: character maps to <undefined>
+[2026-04-20 20:30:46] [SUCCESS] Enviado a ['jorge.cubillos@slepiquique.cl']
+[2026-04-20 20:30:46] [ERROR] Falló envío a ['jorge.cubillos@slepiquique.cl']: 'charmap' codec can't encode character '\u2705' in position 47: character maps to <undefined>
+[2026-04-20 20:32:25] [INTENTO] (6/200) → ['jorge.cubillos@slepiquique.cl'] | 📋 Nueva Reserva Pendiente: Sala de Reuniones 1
+[2026-04-20 20:32:25] [INTENTO] (7/200) → ['jorge.cubillos@slepiquique.cl'] | ✅ Solicitud Recibida: Sala de Reuniones 1
+[2026-04-20 20:32:27] [SUCCESS] Enviado a ['jorge.cubillos@slepiquique.cl']
+[2026-04-20 20:32:27] [ERROR] Falló envío a ['jorge.cubillos@slepiquique.cl']: 'charmap' codec can't encode character '\u2705' in position 47: character maps to <undefined>
+[2026-04-20 20:32:28] [SUCCESS] Enviado a ['jorge.cubillos@slepiquique.cl']
+[2026-04-20 20:32:28] [ERROR] Falló envío a ['jorge.cubillos@slepiquique.cl']: 'charmap' codec can't encode character '\U0001f4cb' in position 47: character maps to <undefined>
+[2026-04-20 20:33:37] [INTENTO] (8/200) → ['jorge.cubillos@slepiquique.cl'] | ✅ Solicitud Recibida: Sala de Profesores
+[2026-04-20 20:33:37] [INTENTO] (9/200) → ['jorge.cubillos@slepiquique.cl'] | 📋 Nueva Reserva Pendiente: Sala de Profesores
+[2026-04-20 20:33:39] [SUCCESS] Enviado a ['jorge.cubillos@slepiquique.cl']
+[2026-04-20 20:33:39] [ERROR] Falló envío a ['jorge.cubillos@slepiquique.cl']: 'charmap' codec can't encode character '\u2705' in position 47: character maps to <undefined>
+[2026-04-20 20:33:40] [SUCCESS] Enviado a ['jorge.cubillos@slepiquique.cl']
+[2026-04-20 20:33:40] [ERROR] Falló envío a ['jorge.cubillos@slepiquique.cl']: 'charmap' codec can't encode character '\U0001f4cb' in position 47: character maps to <undefined>
+[2026-04-20 20:37:58] [INTENTO] (10/200) → ['jorge.cubillos@slepiquique.cl'] | ✅ Solicitud Recibida: Sala de Reuniones 1
+[2026-04-20 20:37:58] [INTENTO] (11/200) → ['jorge.cubillos@slepiquique.cl'] | 📋 Nueva Reserva Pendiente: Sala de Reuniones 1
+[2026-04-20 20:38:01] [SUCCESS] Enviado a ['jorge.cubillos@slepiquique.cl']
+[2026-04-20 20:38:01] [ERROR] Falló envío a ['jorge.cubillos@slepiquique.cl']: 'charmap' codec can't encode character '\U0001f4cb' in position 47: character maps to <undefined>
+[2026-04-20 20:38:02] [SUCCESS] Enviado a ['jorge.cubillos@slepiquique.cl']
+[2026-04-20 20:38:02] [ERROR] Falló envío a ['jorge.cubillos@slepiquique.cl']: 'charmap' codec can't encode character '\u2705' in position 47: character maps to <undefined>
+[2026-04-20 20:40:24] [INTENTO] (12/200) → ['jorge.cubillos@slepiquique.cl'] | ✅ Solicitud Recibida: Sala de Directorio
+[2026-04-20 20:40:24] [INTENTO] (13/200) → ['jorge.cubillos@slepiquique.cl'] | 📋 Nueva Reserva Pendiente: Sala de Directorio
+[2026-04-20 20:40:27] [SUCCESS] Enviado a ['jorge.cubillos@slepiquique.cl']
+[2026-04-20 20:40:27] [ERROR] Falló envío a ['jorge.cubillos@slepiquique.cl']: 'charmap' codec can't encode character '\u2705' in position 47: character maps to <undefined>
+[2026-04-20 20:40:27] [SUCCESS] Enviado a ['jorge.cubillos@slepiquique.cl']
+[2026-04-20 20:40:27] [ERROR] Falló envío a ['jorge.cubillos@slepiquique.cl']: 'charmap' codec can't encode character '\U0001f4cb' in position 47: character maps to <undefined>
