@@ -22,8 +22,6 @@ staticfiles_sandbox/
 
 # Node/React
 node_modules/
-dist/
-dist-sandbox/
 .eslintcache
 
 # OS
