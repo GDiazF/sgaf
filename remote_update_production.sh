@@ -9,7 +9,7 @@ DB_NAME="key_system_db"
 DB_USER="postgres"
 
 echo "--------------------------------------------------------"
-echo "⚠️  ACTUALIZADOR DE PRODUCCIÓN SGAF 1.1.2"
+echo "⚠️  ACTUALIZADOR DE PRODUCCIÓN SGAF 1.1.3"
 echo "--------------------------------------------------------"
 
 # 0. Verificación de Seguridad de Base de Datos
@@ -29,8 +29,10 @@ git checkout master
 git reset --hard origin/master
 
 # 3. Reconstrucción y despliegue
-echo "⚙️  Reconstruyendo backend para instalar requisitos actualizados..."
-docker compose -f $COMPOSE_FILE up -d --build
+echo "⚙️  Reconstruyendo contenedores con limpieza de caché..."
+# Forzamos build sin cache para backend y frontend (si existe) para aplicar cambios de UI
+docker compose -f $COMPOSE_FILE build --no-cache
+docker compose -f $COMPOSE_FILE up -d
 
 # 4. Verificación de Integridad de Datos
 echo "🔍 Verificando base de datos de producción..."
@@ -46,14 +48,14 @@ fi
 
 # 5. Aplicar cambios finales
 echo "📦 Aplicando migraciones y recolectando estáticos..."
-docker exec $BACKEND_CONTAINER python manage.py makemigrations
-docker exec $BACKEND_CONTAINER python manage.py migrate
+docker exec $BACKEND_CONTAINER python manage.py migrate --no-input
 docker exec $BACKEND_CONTAINER python manage.py collectstatic --no-input
 
-# 6. Permisos (Importante para documentos adjuntos)
-echo "🔑 Asegurando permisos de archivos de producción..."
+# 6. Limpieza y Permisos
+echo "🔑 Asegurando permisos y reiniciando Nginx..."
 sudo chmod -R 755 ./media ./staticfiles
+docker compose -f $COMPOSE_FILE restart nginx || echo "ℹ️ Nginx no es un servicio de compose, saltando..."
 
 echo "--------------------------------------------------------"
-echo "✅ PRODUCCIÓN ACTUALIZADA Y OPERATIVA v1.1.2"
+echo "✅ PRODUCCIÓN ACTUALIZADA Y OPERATIVA v1.1.3"
 echo "--------------------------------------------------------"
