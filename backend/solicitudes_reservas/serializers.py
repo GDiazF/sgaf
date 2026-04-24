@@ -57,12 +57,15 @@ class SolicitudReservaSerializer(serializers.ModelSerializer):
             
             if fi.date() <= fecha_limite:
                 if x_dias == 0:
-                    # Comportamiento original si es 0: solo evitar el pasado estricto
+                    # Comportamiento si x_dias es 0 (bypass activado o recurso sin antelación)
                     if fi.date() < now.date():
                         raise serializers.ValidationError({'fecha_inicio': 'No se pueden realizar reservas para días anteriores a hoy.'})
-                    limite_hora = now.replace(minute=0, second=0, microsecond=0)
-                    if fi < limite_hora:
-                        raise serializers.ValidationError({'fecha_inicio': 'No se pueden realizar reservas para un horario anterior al inicio de la hora actual.'})
+                    
+                    # SI NO TIENE BYPASS: Evitar pasado estricto del mismo día
+                    if not can_bypass:
+                        limite_hora = now.replace(minute=0, second=0, microsecond=0)
+                        if fi < limite_hora:
+                            raise serializers.ValidationError({'fecha_inicio': 'No se pueden realizar reservas para un horario anterior al inicio de la hora actual.'})
                 else:
                     raise serializers.ValidationError({
                         'fecha_inicio': f'Este recurso requiere una antelación de {x_dias} días. No se pueden realizar reservas para antes del {(fecha_limite + timedelta(days=1)).strftime("%d/%m/%Y")}.'
@@ -73,12 +76,15 @@ class SolicitudReservaSerializer(serializers.ModelSerializer):
         h_fin_limite = setting.hora_fin if setting else time(17, 30)
         
         if ff and ff.time() > h_fin_limite:
-            raise serializers.ValidationError(
-                {'fecha_fin': f'Las reservas no pueden terminar después de las {h_fin_limite.strftime("%H:%M")} hrs.'}
-            )
+            # Los admin también deben respetar el horario de cierre global por seguridad operativa
+            if not user.is_superuser and not user.has_perm('solicitudes_reservas.can_bypass_antelacion'):
+                raise serializers.ValidationError(
+                    {'fecha_fin': f'Las reservas no pueden terminar después de las {h_fin_limite.strftime("%H:%M")} hrs.'}
+                )
 
         if fi and ff and recurso:
             # ─ Validar contra reservas aprobadas ─
+            # ESTO SE MANTIENE PARA TODOS (Evitar solapamientos físicos entre personas)
             qs = SolicitudReserva.objects.filter(
                 recurso=recurso,
                 estado='APROBADA',
@@ -94,21 +100,25 @@ class SolicitudReservaSerializer(serializers.ModelSerializer):
                 )
 
             # ─ Validar contra bloqueos manuales ─
-            fecha = fi.date()
-            hi = fi.time()
-            hf = ff.time()
-            # Traer todos los bloqueos del recurso con solapamiento de HORA y verificar por modo
-            candidatos = BloqueoHorario.objects.filter(
-                recurso=recurso,
-                hora_inicio__lt=hf,
-                hora_fin__gt=hi,
-            )
-            bloqueo = next((b for b in candidatos if b.aplica_en_fecha(fecha)), None)
-            if bloqueo:
-                motivo = f' Motivo: {bloqueo.motivo}' if bloqueo.motivo else ''
-                raise serializers.ValidationError(
-                    f'El recurso tiene un horario bloqueado de {bloqueo.hora_inicio.strftime("%H:%M")} a {bloqueo.hora_fin.strftime("%H:%M")}.{motivo}'
+            user = self.context['request'].user
+            can_bypass = user.is_superuser or user.has_perm('solicitudes_reservas.can_bypass_antelacion')
+            
+            if not can_bypass:
+                fecha = fi.date()
+                hi = fi.time()
+                hf = ff.time()
+                # Traer todos los bloqueos del recurso con solapamiento de HORA y verificar por modo
+                candidatos = BloqueoHorario.objects.filter(
+                    recurso=recurso,
+                    hora_inicio__lt=hf,
+                    hora_fin__gt=hi,
                 )
+                bloqueo = next((b for b in candidatos if b.aplica_en_fecha(fecha)), None)
+                if bloqueo:
+                    motivo = f' Motivo: {bloqueo.motivo}' if bloqueo.motivo else ''
+                    raise serializers.ValidationError(
+                        f'El recurso tiene un horario bloqueado de {bloqueo.hora_inicio.strftime("%H:%M")} a {bloqueo.hora_fin.strftime("%H:%M")}.{motivo}'
+                    )
 
         return data
 

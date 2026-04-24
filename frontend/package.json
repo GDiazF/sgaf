@@ -1,16 +1,16 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "1.7.1",
+  "version": "1.7.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "version:patch": "node update-version.cjs patch",
-    "version:minor": "node update-version.cjs minor",
-    "version:major": "node update-version.cjs major",
+    "fix": "node update-version.cjs patch",
+    "feat": "node update-version.cjs minor",
+    "release": "node update-version.cjs major",
     "publish": "node publish.cjs"
   },
   "dependencies": {

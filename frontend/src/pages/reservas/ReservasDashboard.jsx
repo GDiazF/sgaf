@@ -397,7 +397,7 @@ const ReservasDashboard = () => {
                     const bEnd = parseInt(b.hora_fin.split(':')[0]) * 60 + parseInt(b.hora_fin.split(':')[1]);
                     return bStart < sEnd && bEnd > sStart;
                 });
-                return hasReserva || hasBloqueo;
+                return hasReserva || (hasBloqueo && !canBypass);
             };
 
             // Solo si el slot por defecto está ocupado, buscamos otro
@@ -1262,15 +1262,30 @@ const ReservasDashboard = () => {
 
                                         const slotsDesde = TIME_SLOTS.filter(s => {
                                             const m = getMins(s);
-                                            // Si es hoy, permitir desde el inicio de la hora actual
-                                            if (esHoy && m < nowHourStart) return false;
+                                            // Si es hoy, permitir desde el inicio de la hora actual (a menos que sea admin enviando retroactivo)
+                                            if (esHoy && m < nowHourStart && !canBypass) return false;
 
                                             // Un slot es válido para empezar si no está DENTRO de una reserva (inicio <= m < fin)
-                                            return !resDía.some(r => {
+                                            // Un slot es válido para empezar si no está DENTRO de una reserva ni de un bloqueo (a menos que sea admin)
+                                            const occupiesReserva = resDía.some(r => {
                                                 const ri = dtMinutes(r.fecha_inicio);
                                                 const rf = dtMinutes(r.fecha_fin);
                                                 return m >= ri && m < rf;
                                             });
+
+                                            const occupiesBloqueo = bloqueos.some(b => {
+                                                const matchRec = Number(b.recurso) === Number(formData.recurso);
+                                                const matchDate = bloqueoAppliesToDate(b, formData.fecha);
+                                                if (!matchRec || !matchDate) return false;
+                                                const hiB = (b.hora_inicio || '00:00').split(':').slice(0, 2).reduce((h, ms) => h * 60 + Number(ms), 0);
+                                                const hfB = (b.hora_fin || '23:59').split(':').slice(0, 2).reduce((h, ms) => h * 60 + Number(ms), 0);
+                                                return m >= hiB && m < hfB;
+                                            });
+
+                                            if (occupiesReserva) return false;
+                                            if (occupiesBloqueo && !canBypass) return false;
+
+                                            return true;
                                         });
 
                                         // 4. Filtrar slots para "Hasta" basado en el "Desde" seleccionado
@@ -1295,7 +1310,7 @@ const ReservasDashboard = () => {
                                                     const hiB = (b.hora_inicio || '00:00').split(':').slice(0, 2).reduce((h, ms) => h * 60 + Number(ms), 0);
                                                     return hiB < m && hiB >= mDesde;
                                                 });
-                                                if (saltandoBloqueo) return false;
+                                                if (saltandoBloqueo && !canBypass) return false;
 
                                                 return true;
                                             });

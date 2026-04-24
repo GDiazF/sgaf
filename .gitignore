@@ -64,3 +64,4 @@ backend/import_postgres_to_sqlite.py
 backend/full_system_activation.py
 .global_email_counter.json
 core_email_debug.log
+docs/
