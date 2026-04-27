@@ -19,7 +19,7 @@ const IconMap = {
     Facebook, Instagram, Twitter, Linkedin, Youtube
 };
 
-const InterestLinksSection = ({ isCompact = false }) => {
+const InterestLinksSection = ({ isCompact = false, isSidebar = false, onRefresh = null }) => {
     const { can } = usePermission();
     const [links, setLinks] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -83,6 +83,7 @@ const InterestLinksSection = ({ isCompact = false }) => {
                 await api.post('links-interes/', formData);
             }
             await fetchLinks();
+            if (onRefresh) onRefresh();
             setIsModalOpen(false);
         } catch (e) {
             console.error("Error saving link", e);
@@ -96,6 +97,7 @@ const InterestLinksSection = ({ isCompact = false }) => {
             try {
                 await api.delete(`links-interes/${id}/`);
                 await fetchLinks();
+                if (onRefresh) onRefresh();
             } catch (e) {
                 console.error("Error deleting link", e);
             }
@@ -144,75 +146,81 @@ const InterestLinksSection = ({ isCompact = false }) => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-white border border-slate-100 rounded-3xl shadow-xl overflow-hidden">
-            {/* Header de la sección con buscador y TABS - Compactado para Dashboard */}
-            <div className={`${isCompact ? 'p-3 gap-2' : 'p-6 gap-6'} border-b border-slate-50 flex flex-col`}>
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
-                    <div className="flex items-center gap-3 font-sans">
-                        <div className={`${isCompact ? 'w-8 h-8' : 'w-10 h-10'} rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-inner shrink-0`}>
-                            <Star className={`${isCompact ? 'w-4 h-4' : 'w-5 h-5'} fill-blue-600/10`} />
+        <div className="flex flex-col h-full bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden">
+            {/* Header de la sección */}
+            <div className={`${(isCompact || isSidebar) ? 'p-5 py-4' : 'p-6'} border-b border-slate-50 shrink-0`}>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                            <Star className="w-4 h-4 fill-indigo-600/10" />
                         </div>
-                        <div className="leading-tight">
-                            <h2 className={`${isCompact ? 'text-xs' : 'text-sm'} font-bold text-slate-800 uppercase tracking-widest`}>
-                                {activeTab === 'LINK' ? 'Links de Interés' : 'Nuestras Redes'}
-                            </h2>
-                            {!isCompact && (
-                                <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-tighter italic">
-                                    {activeTab === 'LINK' ? 'Herramientas y accesos frecuentes' : 'Canales de comunicación oficial'}
-                                </span>
-                            )}
-                        </div>
+                        <h2 className="text-xs font-bold text-slate-800 uppercase tracking-widest leading-none">
+                            {activeTab === 'LINK' ? 'Links de Interés' : 'Redes Sociales'}
+                        </h2>
                     </div>
 
-                    <div className="flex items-center gap-3 w-full sm:w-auto">
-                        <div className="relative flex-1 sm:w-64">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
-                            <input
-                                type="text"
-                                placeholder={`Buscar ${activeTab === 'LINK' ? 'herramienta' : 'red social'}...`}
-                                className="w-full pl-10 pr-4 py-2 bg-slate-50 rounded-xl text-[11px] font-semibold text-slate-700 placeholder:text-slate-300 outline-none focus:ring-2 focus:ring-blue-500/10 transition-all border border-transparent focus:border-blue-100"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
+                    <div className="flex items-center gap-2">
+                        {(!isSidebar && !isCompact) && (
+                            <div className="relative w-48">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-300" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar..."
+                                    className="w-full pl-8 pr-4 py-1.5 bg-slate-50 rounded-xl text-[10px] font-semibold text-slate-700 outline-none"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        )}
                         {can('core.add_linkinteres') && (
                             <button
                                 onClick={() => handleOpenModal()}
-                                className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95 flex-shrink-0"
+                                className="p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all shadow-lg active:scale-95"
                             >
-                                <Plus className="w-5 h-5" />
+                                <Plus className="w-4 h-4" />
                             </button>
                         )}
                     </div>
                 </div>
-
-                {/* Tab Switcher Eliminado - Redes movidas a cabecera */}
             </div>
 
+            {/* Selector de Pestañas (Solo si tiene permisos de gestión) */}
+            {isSidebar && (can('core.add_linkinteres') || can('core.change_linkinteres') || can('core.delete_linkinteres')) && (
+                <div className="flex px-4 py-2 gap-2 bg-slate-50/50 border-b border-slate-100 shrink-0">
+                    <button
+                        onClick={() => setActiveTab('LINK')}
+                        className={`flex-1 py-1 rounded-lg text-[9px] font-bold uppercase transition-all ${activeTab === 'LINK' ? 'bg-white shadow-sm text-indigo-600 border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Links
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('RED_SOCIAL')}
+                        className={`flex-1 py-1 rounded-lg text-[9px] font-bold uppercase transition-all ${activeTab === 'RED_SOCIAL' ? 'bg-white shadow-sm text-indigo-600 border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Redes
+                    </button>
+                </div>
+            )}
 
-            {/* Grid de Links Compacto */}
-            <div className={`flex-1 overflow-y-auto ${isCompact ? 'p-3' : 'p-6'} custom-scrollbar`}>
+            {/* Listado de Links con Efecto de Desvanecimiento */}
+            <div
+                className="flex-1 overflow-y-auto p-4 pb-10 custom-scrollbar"
+                style={{
+                    maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
+                    WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)'
+                }}
+            >
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center h-48 opacity-20 text-slate-400">
-                        <Loader2 className="w-8 h-8 animate-spin mb-2" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Cargando links...</span>
-                    </div>
-                ) : links.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center opacity-20 py-20">
-                        <LinkIcon className="w-12 h-12 mb-2" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">No hay accesos configurados</span>
+                    <div className="flex flex-col items-center justify-center py-10 opacity-20">
+                        <Loader2 className="w-6 h-6 animate-spin mb-2" />
                     </div>
                 ) : filteredLinks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center opacity-20 py-12">
-                        {searchTerm ? <Search className="w-12 h-12 mb-2" /> : <LinkIcon className="w-12 h-12 mb-2" />}
-                        <span className="text-[10px] font-black uppercase tracking-widest text-center">
-                            {searchTerm
-                                ? `No hay resultados para "${searchTerm}"`
-                                : activeTab === 'LINK' ? 'Sin links registrados' : 'Redes sociales no configuradas'}
-                        </span>
+                    <div className="flex flex-col items-center justify-center py-10 opacity-20">
+                        <LinkIcon className="w-8 h-8 mb-2" />
+                        <span className="text-[9px] font-bold uppercase tracking-widest">Sin registros</span>
                     </div>
                 ) : (
-                    <div className={`grid ${isCompact ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4' : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-8'} gap-y-1`}>
+                    <div className={`grid ${isSidebar ? 'grid-cols-1' : (isCompact ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3')} gap-2`}>
                         <AnimatePresence mode="popLayout">
                             {filteredLinks.map(link => (
                                 <motion.a
@@ -232,11 +240,11 @@ const InterestLinksSection = ({ isCompact = false }) => {
                                     </div>
 
                                     {/* Text Content */}
-                                    <div className="flex-1 min-w-0 leading-tight">
-                                        <h4 className="text-[10px] font-bold text-slate-700 uppercase tracking-tight group-hover:text-blue-700 transition-colors truncate">
+                                    <div className="flex-1 min-w-0 leading-tight py-1">
+                                        <h4 className={`font-bold text-slate-700 uppercase tracking-tight group-hover:text-blue-700 transition-colors ${isSidebar ? 'text-[11px]' : 'text-[10px] truncate'}`}>
                                             {link.titulo}
                                         </h4>
-                                        <p className="text-[8px] font-medium text-slate-400 lowercase truncate">
+                                        <p className="text-[9px] font-medium text-slate-400 lowercase truncate">
                                             {link.url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}
                                         </p>
                                     </div>

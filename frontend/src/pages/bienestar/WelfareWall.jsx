@@ -95,7 +95,11 @@ const WelfareWall = ({ limit, showFilters = true, sortBy = 'newest', layout = 'v
         return `${api.defaults.baseURL.replace('/api', '')}${path}`;
     };
 
-    const filteredBeneficios = beneficios
+    const filteredBeneficios = [...beneficios]
+        .sort((a, b) => {
+            if (sortBy === 'newest') return b.id - a.id;
+            return 0;
+        })
         .filter(b => b.estado === 'PUBLICADO')
         .filter(b => selectedCategory === 'ALL' || b.categoria === parseInt(selectedCategory))
         .filter(b =>
@@ -138,10 +142,10 @@ const WelfareWall = ({ limit, showFilters = true, sortBy = 'newest', layout = 'v
                     <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
                         <button onClick={() => setSelectedCategory('ALL')} className={`px-3 py-1.5 rounded-xl text-[9px] font-semibold uppercase tracking-widest transition-all ${selectedCategory === 'ALL' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>Todos</button>
                         {categorias.map(cat => (
-                            <button 
-                                key={cat.id} 
-                                onClick={() => setSelectedCategory(cat.id)} 
-                                className={`px-3 py-1.5 rounded-xl text-[9px] font-semibold uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2 ${parseInt(selectedCategory) === cat.id ? 'shadow-lg text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`} 
+                            <button
+                                key={cat.id}
+                                onClick={() => setSelectedCategory(cat.id)}
+                                className={`px-3 py-1.5 rounded-xl text-[9px] font-semibold uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2 ${parseInt(selectedCategory) === cat.id ? 'shadow-lg text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
                                 style={{ backgroundColor: parseInt(selectedCategory) === cat.id ? cat.color : '' }}
                             >
                                 <LucidIcon name={cat.icono} className={`w-3 h-3 ${parseInt(selectedCategory) === cat.id ? 'text-white' : ''}`} />
@@ -152,7 +156,12 @@ const WelfareWall = ({ limit, showFilters = true, sortBy = 'newest', layout = 'v
                 </div>
             )}
 
-            <div className={`grid gap-5 text-left px-8 py-6 flex-1 overflow-y-auto custom-scrollbar ${layout === 'horizontal' ? 'grid-cols-1 xl:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-7'}`}>
+            <div className={`grid gap-5 text-left px-8 py-6 flex-1 overflow-y-auto custom-scrollbar ${layout === 'horizontal'
+                ? 'grid-cols-1 xl:grid-cols-2'
+                : limit === 5
+                    ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+                    : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-7'
+                }`}>
                 <AnimatePresence>
                     {filteredBeneficios.map((b) => {
                         const imageFile = b.archivos?.find(f => f.tipo === 'image');
@@ -168,7 +177,7 @@ const WelfareWall = ({ limit, showFilters = true, sortBy = 'newest', layout = 'v
                                 animate={{ opacity: 1, y: 0 }}
                                 whileHover={{ y: -5 }}
                                 onClick={() => setSelectedBenefit(b)}
-                                className="bg-white rounded-[1.8rem] shadow-sm border border-slate-100 flex flex-col relative overflow-hidden group cursor-pointer h-[280px]"
+                                className="bg-white rounded-[1.8rem] shadow-sm border border-slate-100 flex flex-col relative overflow-hidden group cursor-pointer h-[320px]"
                             >
                                 {/* CONTENIDO DE TEXTO (ARRIBA - COMPACTO) */}
                                 <div className="p-4 flex flex-col shrink-0">
@@ -196,19 +205,19 @@ const WelfareWall = ({ limit, showFilters = true, sortBy = 'newest', layout = 'v
                                             <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                         </div>
                                     ) : (
-                                        <div 
+                                        <div
                                             className="w-full h-full flex items-center justify-center border-t border-slate-50 relative overflow-hidden rounded-b-[1.8rem]"
-                                            style={{ 
-                                                background: `linear-gradient(135deg, ${catColor}15 0%, ${catColor}40 100%)` 
+                                            style={{
+                                                background: `linear-gradient(135deg, ${catColor}15 0%, ${catColor}40 100%)`
                                             }}
                                         >
                                             {/* Patrón sutil de fondo */}
                                             <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `radial-gradient(${catColor} 1px, transparent 1px)`, backgroundSize: '15px 15px' }} />
-                                            
+
                                             <div className="relative group-hover:scale-110 transition-transform duration-500">
                                                 <LucidIcon name={cat?.icono} className="w-12 h-12 opacity-20" style={{ color: catColor }} />
                                             </div>
-                                            
+
                                             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 opacity-20">
                                                 <span className="text-[8px] font-black uppercase tracking-[0.3em]" style={{ color: catColor }}>SGAF Bienestar</span>
                                             </div>

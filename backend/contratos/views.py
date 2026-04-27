@@ -1,5 +1,6 @@
 from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
+from establecimientos.pagination import LargeResultsSetPagination
 from .models import ProcesoCompra, EstadoContrato, CategoriaContrato, Contrato, OrientacionLicitacion, DocumentoContrato, HistorialContrato
 from .serializers import ProcesoCompraSerializer, EstadoContratoSerializer, CategoriaContratoSerializer, ContratoSerializer, OrientacionLicitacionSerializer, DocumentoContratoSerializer
 
@@ -27,6 +28,7 @@ class DocumentoContratoViewSet(viewsets.ModelViewSet):
 class ContratoViewSet(viewsets.ModelViewSet):
     queryset = Contrato.objects.all()
     serializer_class = ContratoSerializer
+    pagination_class = LargeResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['proceso', 'estado', 'categoria', 'orientacion']
     search_fields = ['codigo_mercado_publico', 'descripcion']

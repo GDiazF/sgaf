@@ -62,6 +62,13 @@ const EstablishmentMapModal = ({ isOpen, onClose, establishment, allEstablishmen
                         exit={{ opacity: 0, scale: 0.9, y: 20 }}
                         className={`relative w-full ${isGlobalView ? 'max-w-6xl' : 'max-w-5xl'} bg-white rounded-[2.5rem] shadow-2xl overflow-hidden h-[85vh] md:h-[750px] border border-white/20`}
                     >
+                        {/* Botón Cerrar Universal */}
+                        <button
+                            onClick={onClose}
+                            className="absolute top-5 right-5 z-[1100] p-3 bg-white/95 backdrop-blur-md text-slate-500 hover:text-slate-900 rounded-2xl shadow-2xl border border-white transition-all active:scale-95 hover:bg-white"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
                         {/* Cabecera Flotante para Vista Global */}
                         {isGlobalView && (
                             <div className="absolute top-6 left-6 right-6 z-[1000] flex justify-between items-start pointer-events-none">
@@ -77,12 +84,6 @@ const EstablishmentMapModal = ({ isOpen, onClose, establishment, allEstablishmen
                                         </div>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={onClose}
-                                    className="bg-white/95 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-slate-100 text-slate-400 hover:text-slate-900 transition-all pointer-events-auto active:scale-95"
-                                >
-                                    <X className="w-6 h-6" />
-                                </button>
                             </div>
                         )}
 
@@ -168,9 +169,6 @@ const EstablishmentMapModal = ({ isOpen, onClose, establishment, allEstablishmen
                         {/* Sidebar solo si NO es vista global */}
                         {!isGlobalView && (
                             <div className="w-full md:w-[380px] p-10 flex flex-col bg-white overflow-y-auto border-l border-slate-100 no-scrollbar">
-                                <button onClick={onClose} className="self-end p-2.5 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-full transition-all mb-8">
-                                    <X className="w-6 h-6" />
-                                </button>
                                 <div className="space-y-8">
                                     <div>
                                         <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-4">

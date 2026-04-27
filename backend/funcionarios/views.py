@@ -20,6 +20,7 @@ class GrupoViewSet(viewsets.ModelViewSet):
     """ViewSet para Grupos de Funcionarios"""
     queryset = Grupo.objects.all()
     serializer_class = GrupoSerializer
+    pagination_class = LargeResultsSetPagination
     filter_backends = [filters.SearchFilter]
     search_fields = ['nombre']
 
@@ -28,6 +29,7 @@ class SubdireccionViewSet(viewsets.ModelViewSet):
     """ViewSet para Subdirecciones"""
     queryset = Subdireccion.objects.all()
     serializer_class = SubdireccionSerializer
+    pagination_class = LargeResultsSetPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['nombre']
     ordering_fields = ['nombre', 'piso']
@@ -38,6 +40,7 @@ class DepartamentoViewSet(viewsets.ModelViewSet):
     """ViewSet para Departamentos con filtro por subdirección"""
     queryset = Departamento.objects.select_related('subdireccion').all()
     serializer_class = DepartamentoSerializer
+    pagination_class = LargeResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['subdireccion', 'activo']
     search_fields = ['nombre', 'subdireccion__nombre']
@@ -49,6 +52,7 @@ class UnidadViewSet(viewsets.ModelViewSet):
     """ViewSet para Unidades con filtro por departamento"""
     queryset = Unidad.objects.select_related('departamento', 'departamento__subdireccion').all()
     serializer_class = UnidadSerializer
+    pagination_class = LargeResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['departamento', 'departamento__subdireccion', 'activo']
     search_fields = ['nombre', 'departamento__nombre', 'departamento__subdireccion__nombre']

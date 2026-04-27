@@ -73,7 +73,7 @@ const DirectoryModal = ({ isOpen, onClose, funcionarios }) => {
                         </div>
                         <div>
                             <h3 className="text-lg font-bold text-slate-800">Directorio de Contactos</h3>
-                            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest leading-none mt-1">Funcionarios e Internos</p>
+                            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest leading-none mt-1">Anexos de Funcionarios</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-xl transition-all">
@@ -86,7 +86,7 @@ const DirectoryModal = ({ isOpen, onClose, funcionarios }) => {
                     <div className="hidden md:flex w-64 border-r border-slate-50 bg-slate-50/20 flex-col overflow-hidden">
                         <div className="p-4">
                             <h4 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <Layers className="w-3 h-3" /> Centros de Costo
+                                <Layers className="w-3 h-3" /> Departamentos / Áreas
                             </h4>
                             <div className="space-y-1">
                                 <button

@@ -61,17 +61,17 @@ const FuncionariosDashboard = () => {
             animate="visible"
         >
             {/* Header */}
-            <div className="flex justify-between items-end border-b border-slate-200/60 pb-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-6 border-b border-slate-200/60 pb-8 sm:pb-6">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Portal de Funcionarios</h1>
-                    <p className="text-sm font-medium text-slate-500 mt-1 flex items-center gap-2">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Portal de Funcionarios</h1>
+                    <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1.5 flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                         Gestión Institucional y Recursos Humanos
                     </p>
                 </div>
                 <Link
                     to="/funcionarios/list"
-                    className="group relative inline-flex items-center gap-2 px-6 py-3 bg-slate-900 text-white text-sm font-semibold rounded-xl overflow-hidden transition-all hover:bg-slate-800 hover:shadow-lg hover:shadow-slate-900/20 active:scale-95"
+                    className="group relative inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-slate-900 text-white text-xs sm:text-sm font-semibold rounded-xl overflow-hidden transition-all hover:bg-slate-800 hover:shadow-lg hover:shadow-slate-900/20 active:scale-95 w-full sm:w-auto"
                 >
                     <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
                     <span>Ir a Lista</span>
@@ -84,7 +84,7 @@ const FuncionariosDashboard = () => {
                 <div className="col-span-12 lg:col-span-4">
                     <motion.div
                         variants={itemVariants}
-                        className="h-full bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[2rem] p-8 text-white relative overflow-hidden shadow-2xl shadow-indigo-500/20 group flex flex-col justify-between"
+                        className="h-full bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl p-8 text-white relative overflow-hidden shadow-2xl shadow-indigo-500/20 group flex flex-col justify-between"
                     >
                         <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity duration-500">
                             <Users className="w-32 h-32 transform rotate-12 translate-x-8 -translate-y-8" />
@@ -121,7 +121,7 @@ const FuncionariosDashboard = () => {
                 <div className="col-span-12 lg:col-span-8">
                     <motion.div variants={itemVariants} className="h-full">
                         <Link to="/funcionarios/list" className="block group h-full">
-                            <div className="h-full bg-white rounded-[2rem] p-10 border border-slate-100 shadow-md hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300 relative overflow-hidden flex flex-col justify-center">
+                            <div className="h-full bg-white rounded-2xl p-8 lg:p-10 border border-slate-100 shadow-md hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300 relative overflow-hidden flex flex-col justify-center">
                                 <div className="absolute inset-0 bg-gradient-to-r from-slate-50 to-white opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                 <div className="relative flex justify-between items-center z-10">
                                     <div className="max-w-xl">
@@ -152,15 +152,15 @@ const FuncionariosDashboard = () => {
                     <motion.div
                         variants={itemVariants}
                         whileHover={{ y: -5 }}
-                        className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-violet-200/50 transition-all h-full relative overflow-hidden"
+                        className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-violet-200/50 transition-all h-full relative overflow-hidden"
                     >
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-violet-50 rounded-bl-[2rem] transition-colors group-hover:bg-violet-100"></div>
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-violet-50 rounded-bl-2xl transition-colors group-hover:bg-violet-100"></div>
                         <div className="relative z-10 flex flex-col h-full">
                             <div className="w-12 h-12 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center mb-4 group-hover:bg-violet-600 group-hover:text-white transition-all shadow-sm">
                                 <Building2 className="w-6 h-6" />
                             </div>
                             <h4 className="text-lg font-bold text-slate-900 mb-1">Subdirecciones</h4>
-                            <p className="text-xs text-slate-500 mb-4 font-medium italic">Estructura Estratégica</p>
+                            <p className="text-xs text-slate-500 mb-4 font-medium italic">Estructura Organizacional</p>
                             <div className="flex items-center justify-between mt-auto">
                                 <span className="text-3xl font-black text-slate-800 tracking-tight">{stats?.subdirecciones || 0}</span>
                                 <div className="flex items-center gap-1.5 text-violet-600 text-[10px] font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">
@@ -175,15 +175,15 @@ const FuncionariosDashboard = () => {
                     <motion.div
                         variants={itemVariants}
                         whileHover={{ y: -5 }}
-                        className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-blue-200/50 transition-all h-full relative overflow-hidden"
+                        className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-blue-200/50 transition-all h-full relative overflow-hidden"
                     >
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-blue-50 rounded-bl-[2rem] transition-colors group-hover:bg-blue-100"></div>
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-blue-50 rounded-bl-2xl transition-colors group-hover:bg-blue-100"></div>
                         <div className="relative z-10 flex flex-col h-full">
                             <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
                                 <Briefcase className="w-6 h-6" />
                             </div>
                             <h4 className="text-lg font-bold text-slate-900 mb-1">Departamentos</h4>
-                            <p className="text-xs text-slate-500 mb-4 font-medium italic">Gestión Táctica</p>
+                            <p className="text-xs text-slate-500 mb-4 font-medium italic">Administración de Departamentos</p>
                             <div className="flex items-center justify-between mt-auto">
                                 <span className="text-3xl font-black text-slate-800 tracking-tight">{stats?.departamentos || 0}</span>
                                 <div className="flex items-center gap-1.5 text-blue-600 text-[10px] font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">
@@ -198,15 +198,15 @@ const FuncionariosDashboard = () => {
                     <motion.div
                         variants={itemVariants}
                         whileHover={{ y: -5 }}
-                        className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-amber-200/50 transition-all h-full relative overflow-hidden"
+                        className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-amber-200/50 transition-all h-full relative overflow-hidden"
                     >
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-amber-50 rounded-bl-[2rem] transition-colors group-hover:bg-amber-100"></div>
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-amber-50 rounded-bl-2xl transition-colors group-hover:bg-amber-100"></div>
                         <div className="relative z-10 flex flex-col h-full">
                             <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4 group-hover:bg-amber-500 group-hover:text-white transition-all shadow-sm">
                                 <Layers className="w-6 h-6" />
                             </div>
                             <h4 className="text-lg font-bold text-slate-900 mb-1">Unidades</h4>
-                            <p className="text-xs text-slate-500 mb-4 font-medium italic">Nivel Operativo</p>
+                            <p className="text-xs text-slate-500 mb-4 font-medium italic">Administración de Unidades</p>
                             <div className="flex items-center justify-between mt-auto">
                                 <span className="text-3xl font-black text-slate-800 tracking-tight">{stats?.unidades || 0}</span>
                                 <div className="flex items-center gap-1.5 text-amber-600 text-[10px] font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">
@@ -221,15 +221,15 @@ const FuncionariosDashboard = () => {
                     <motion.div
                         variants={itemVariants}
                         whileHover={{ y: -5 }}
-                        className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-orange-200/50 transition-all h-full relative overflow-hidden"
+                        className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-orange-200/50 transition-all h-full relative overflow-hidden"
                     >
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-orange-50 rounded-bl-[2rem] transition-colors group-hover:bg-orange-100"></div>
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-orange-50 rounded-bl-2xl transition-colors group-hover:bg-orange-100"></div>
                         <div className="relative z-10 flex flex-col h-full">
                             <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center mb-4 group-hover:bg-orange-600 group-hover:text-white transition-all shadow-sm">
                                 <Users className="w-6 h-6" />
                             </div>
                             <h4 className="text-lg font-bold text-slate-900 mb-1">Grupos</h4>
-                            <p className="text-xs text-slate-500 mb-4 font-medium italic">Firmas y Organización</p>
+                            <p className="text-xs text-slate-500 mb-4 font-medium italic">Equipos de Trabajo</p>
                             <div className="flex items-center justify-between mt-auto">
                                 <span className="text-3xl font-black text-slate-800 tracking-tight">{stats?.grupos || 0}</span>
                                 <div className="flex items-center gap-1.5 text-orange-600 text-[10px] font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">

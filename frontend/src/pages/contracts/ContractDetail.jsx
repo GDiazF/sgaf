@@ -44,24 +44,39 @@ const ContractDetail = () => {
         providers: [],
         deliveryTypes: [],
         groups: [],
-        establishmentTypes: []
+        establishmentTypes: [],
+        procesos: [],
+        estados: [],
+        categorias: [],
+        orientaciones: []
     });
 
     const fetchLookups = async () => {
         try {
-            const [estRes, provRes, delRes, grpRes, typRes] = await Promise.all([
+            const [estRes, provRes, delRes, grpRes, typRes, procRes, estsRes, catRes, oriRes] = await Promise.all([
                 api.get('establecimientos/', { params: { page_size: 1000, activo: true } }),
                 api.get('proveedores/', { params: { page_size: 1000 } }),
                 api.get('tipos-entrega/', { params: { page_size: 1000 } }),
                 api.get('grupos/', { params: { page_size: 1000 } }),
-                api.get('tipos-establecimiento/')
+                api.get('tipos-establecimiento/'),
+                api.get('contratos/procesos/'),
+                api.get('contratos/estados/'),
+                api.get('contratos/categorias/'),
+                api.get('contratos/orientaciones/')
             ]);
             setLookups({
                 establishments: estRes.data.results || estRes.data,
+                establecimientos: estRes.data.results || estRes.data,
                 providers: provRes.data.results || provRes.data,
+                proveedores: provRes.data.results || provRes.data,
                 deliveryTypes: delRes.data.results || delRes.data,
                 groups: grpRes.data.results || grpRes.data,
-                establishmentTypes: typRes.data.results || typRes.data
+                establishmentTypes: typRes.data.results || typRes.data,
+                tiposEstablecimiento: typRes.data.results || typRes.data,
+                procesos: procRes.data.results || procRes.data,
+                estados: estsRes.data.results || estsRes.data,
+                categorias: catRes.data.results || catRes.data,
+                orientaciones: oriRes.data.results || oriRes.data
             });
         } catch (error) {
             console.error("Error fetching lookups:", error);
@@ -268,166 +283,78 @@ const ContractDetail = () => {
         : 0;
 
     const calculateTimeExecution = () => {
-        if (!contract?.fecha_inicio || !contract?.plazo_meses) return { percentage: 0, monthsLeft: 0 };
+        if (!contract?.fecha_inicio || (!contract?.fecha_termino && !contract?.plazo_meses)) {
+            return { percentage: 0, monthsLeft: 0 };
+        }
+
         const start = new Date(contract.fecha_inicio);
+        let end;
+
+        if (contract.fecha_termino) {
+            end = new Date(contract.fecha_termino);
+        } else {
+            end = new Date(start);
+            end.setMonth(start.getMonth() + contract.plazo_meses);
+        }
+
         const now = new Date();
-        const end = new Date(start);
-        end.setMonth(start.getMonth() + contract.plazo_meses);
         const totalDuration = end.getTime() - start.getTime();
+
+        if (totalDuration <= 0) return { percentage: 100, monthsLeft: 0 };
+
         const elapsed = now.getTime() - start.getTime();
-        const percentage = Math.min(Math.round((elapsed / totalDuration) * 100), 100);
-        const monthsLeft = Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30.44)));
+        const percentage = Math.max(0, Math.min(Math.round((elapsed / totalDuration) * 100), 100));
+
+        const diffTime = end.getTime() - now.getTime();
+        const monthsLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30.44)));
+
         return { percentage, monthsLeft };
     };
 
     const { percentage: timePercentage, monthsLeft } = calculateTimeExecution();
 
     return (
-        <div className="space-y-6">
-            {/* Breadcrumbs & Actions */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => navigate('/contracts')}
-                        className="p-2 hover:bg-white rounded-xl transition-colors text-slate-400 hover:text-blue-600 shadow-sm border border-transparent hover:border-slate-100"
-                    >
-                        <ArrowLeft className="w-5 h-5" />
-                    </button>
-                    <div>
-                        <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
-                            <Link to="/contracts" className="hover:text-blue-600">Contratos</Link>
-                            <ChevronRight className="w-3 h-3" />
-                            <span className="text-blue-600">Expediente Digital</span>
-                        </div>
-                        <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                            {contract.codigo_mercado_publico}
-                        </h2>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm ${contract.estado_nombre === 'VIGENTE' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                        contract.estado_nombre === 'TERMINADO' ? 'bg-slate-50 text-slate-500 border border-slate-100' :
-                            'bg-blue-50 text-blue-600 border border-blue-100'
-                        }`}>
-                        {contract.estado_nombre}
-                    </span>
-                </div>
-            </div>
-
-            {/* Dashboard Top Section: Stats Grid + Execution Chart */}
-            <div className="grid grid-cols-12 gap-6">
-                {/* 2x2 Stats Grid */}
-                <div className="col-span-12 lg:col-span-5 grid grid-cols-2 gap-4">
-                    <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm flex flex-col justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-50 rounded-xl text-blue-600"><DollarSign className="w-4 h-4" /></div>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Presupuesto<br />Total</span>
-                        </div>
-                        <p className="text-xl font-black text-slate-900 mt-4">{formatCurrency(contract.monto_total)}</p>
-                    </div>
-
-                    <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm flex flex-col justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-amber-50 rounded-xl text-amber-600"><Activity className="w-4 h-4" /></div>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Monto<br />Ejecutado</span>
-                        </div>
-                        <div className="mt-4">
-                            <p className="text-xl font-black text-slate-900 leading-none">{formatCurrency(contract.monto_ejecutado)}</p>
-                            <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                                <div
-                                    className="bg-amber-500 h-full rounded-full transition-all duration-1000"
-                                    style={{ width: `${executionPercentage}%` }}
-                                />
+        <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden">
+            {/* Header & Tabs Area */}
+            <div className="shrink-0 space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => navigate('/contracts')}
+                            className="p-2 hover:bg-white rounded-xl transition-colors text-slate-400 hover:text-blue-600 shadow-sm border border-transparent hover:border-slate-100"
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                        </button>
+                        <div>
+                            <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
+                                <Link to="/contracts" className="hover:text-blue-600">Contratos</Link>
+                                <ChevronRight className="w-3 h-3" />
+                                <span className="text-blue-600">Expediente Digital</span>
                             </div>
+                            <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                                {contract.codigo_mercado_publico}
+                            </h2>
                         </div>
                     </div>
 
-                    <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm flex flex-col justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600"><CheckCircle2 className="w-4 h-4" /></div>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Presupuesto<br />Disponible</span>
-                        </div>
-                        <p className="text-xl font-black text-slate-900 mt-4">{formatCurrency(contract.monto_restante)}</p>
-                    </div>
-
-                    <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm flex flex-col justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600"><Clock className="w-4 h-4" /></div>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Duración del<br />Contrato</span>
-                        </div>
-                        <p className="text-xl font-black text-slate-900 mt-4">{contract.plazo_meses} <span className="text-[10px] font-bold text-slate-400 uppercase">Meses</span></p>
-                    </div>
-                </div>
-
-                {/* Execution Chart - Adjacent to the stats */}
-                <div className="col-span-12 lg:col-span-7">
-                    <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm h-full flex flex-col">
-                        <h3 className="text-xs font-black text-slate-800 mb-6 flex items-center gap-2 uppercase tracking-widest">
-                            <TrendingUp className="w-4 h-4 text-indigo-500" />
-                            Curva de Ejecución Mensual
-                        </h3>
-                        <div className="flex-1 min-h-[160px] w-full">
-                            {contract.gastos_mensuales?.length > 0 ? (
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={contract.gastos_mensuales} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="colorMonto" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1} />
-                                                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis
-                                            dataKey="mes"
-                                            axisLine={false}
-                                            tickLine={false}
-                                            tick={{ fill: '#94a3b8', fontSize: 10 }}
-                                        />
-                                        <YAxis
-                                            axisLine={false}
-                                            tickLine={false}
-                                            tick={{ fill: '#94a3b8', fontSize: 10 }}
-                                            tickFormatter={(val) => `$${val / 1000000}M`}
-                                        />
-                                        <Tooltip
-                                            content={({ active, payload, label }) => {
-                                                if (active && payload && payload.length) {
-                                                    return (
-                                                        <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl border border-slate-700">
-                                                            <p className="text-[10px] font-black uppercase text-slate-400 mb-1">{label}</p>
-                                                            <p className="text-sm font-bold">{formatCurrency(payload[0].value)}</p>
-                                                        </div>
-                                                    );
-                                                }
-                                                return null;
-                                            }}
-                                        />
-                                        <Area
-                                            type="monotone"
-                                            dataKey="monto"
-                                            stroke="#6366f1"
-                                            strokeWidth={3}
-                                            fillOpacity={1}
-                                            fill="url(#colorMonto)"
-                                        />
-                                    </AreaChart>
-                                </ResponsiveContainer>
-                            ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-3 border-2 border-dashed border-slate-50 rounded-2xl">
-                                    <TrendingUp className="w-8 h-8 opacity-20" />
-                                    <p className="text-[10px] font-black uppercase tracking-widest">Sin datos de ejecución aún</p>
-                                </div>
-                            )}
-                        </div>
+                    <div className="flex items-center gap-3">
+                        <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm border ${getStatusColor(contract.estado_nombre)}`}>
+                            {contract.estado_nombre}
+                        </span>
+                        {can('contratos.change_contrato') && (
+                            <button
+                                onClick={() => setEditModalOpen(true)}
+                                className="flex items-center gap-2 bg-white text-slate-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-50 hover:text-blue-600 border border-slate-200 transition-all active:scale-95"
+                            >
+                                <Pencil className="w-3.5 h-3.5" />
+                                Editar Proyecto
+                            </button>
+                        )}
                     </div>
                 </div>
-            </div>
 
-            {/* Bottom Section: Unified Tabs & Content */}
-            <div className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden flex flex-col min-h-[500px]">
                 {/* Tab Header Strip */}
-                <div className="flex items-center gap-1 p-2 bg-slate-50/50 border-b border-slate-100 overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-1 p-1 bg-slate-100/50 rounded-2xl border border-slate-200/60 overflow-x-auto no-scrollbar">
                     {[
                         { id: 'info', label: 'General', icon: <Info className="w-4 h-4" /> },
                         { id: 'receptions', label: 'Recepciones', icon: <ShoppingBag className="w-4 h-4" />, count: receptions?.length },
@@ -437,164 +364,180 @@ const ContractDetail = () => {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`px-6 py-2.5 rounded-2xl text-[13px] font-bold transition-all flex items-center gap-2.5 whitespace-nowrap ${activeTab === tab.id ? 'bg-white text-blue-600 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'}`}
+                            className={`px-6 py-2 rounded-xl text-[12px] font-bold transition-all flex items-center gap-2.5 whitespace-nowrap ${activeTab === tab.id ? 'bg-white text-blue-600 shadow-sm border border-slate-200/50' : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'}`}
                         >
                             <span className={activeTab === tab.id ? 'text-blue-600' : 'opacity-50'}>{tab.icon}</span>
                             {tab.label}
                             {tab.count !== undefined && (
-                                <span className={`px-2 py-0.5 rounded-lg text-[9px] ${activeTab === tab.id ? 'bg-blue-50 text-blue-600' : 'bg-slate-200/50 text-slate-500'}`}>
+                                <span className={`px-2 py-0.5 rounded-lg text-[9px] ${activeTab === tab.id ? 'bg-blue-50 text-blue-600' : 'bg-slate-200 text-slate-500'}`}>
                                     {tab.count}
                                 </span>
                             )}
                         </button>
                     ))}
                 </div>
+            </div>
 
-                <div className="flex-1 overflow-hidden">
+            {/* Main Content Area */}
+            <div className="flex-1 bg-white rounded-[24px] shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0">
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
                     <AnimatePresence mode="wait">
                         {activeTab === 'info' && (
                             <motion.div
                                 key="info"
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 10 }}
-                                className="p-6 lg:p-8"
+                                initial={{ opacity: 0, scale: 0.99 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.99 }}
+                                className="p-6 space-y-6"
                             >
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                    <div className="lg:col-span-2 space-y-8">
-                                        <section>
-                                            <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-600" /> Resumen del Contrato
-                                            </h3>
-                                            <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 relative">
-                                                <div className="absolute top-0 right-0 p-4 opacity-5">
-                                                    <FileText className="w-16 h-16" />
-                                                </div>
-                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Descripción General</label>
-                                                <p className="text-slate-700 leading-relaxed font-bold text-sm italic">
-                                                    "{contract.descripcion}"
-                                                </p>
-                                            </div>
-                                        </section>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            <section>
-                                                <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2 mb-4">Datos del Proceso</h3>
-                                                <div className="space-y-3">
-                                                    <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-50 shadow-sm">
-                                                        <span className="text-[9px] text-slate-400 font-black uppercase">Tipo Proceso</span>
-                                                        <span className="text-xs font-bold text-slate-800 bg-blue-50 px-2 py-0.5 rounded-md">{contract.proceso_nombre}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-50 shadow-sm">
-                                                        <span className="text-[9px] text-slate-400 font-black uppercase">Orientación</span>
-                                                        <span className="text-xs font-bold text-slate-800 bg-indigo-50 px-2 py-0.5 rounded-md">{contract.orientacion_nombre || "No definida"}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-50 shadow-sm">
-                                                        <span className="text-[9px] text-slate-400 font-black uppercase">Tipo OC</span>
-                                                        <span className="text-xs font-bold text-slate-800 bg-amber-50 px-2 py-0.5 rounded-md">{contract.tipo_oc === 'UNICA' ? 'Única' : 'Múltiple'}</span>
-                                                    </div>
-                                                    {contract.tipo_oc === 'UNICA' && contract.nro_oc && (
-                                                        <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-50 shadow-sm">
-                                                            <span className="text-[9px] text-slate-400 font-black uppercase">Nº OC</span>
-                                                            <span className="text-xs font-mono font-bold text-blue-700">{contract.nro_oc}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </section>
-                                            <section>
-                                                <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2 mb-4">Fechas Clave</h3>
-                                                <div className="space-y-3">
-                                                    {[
-                                                        { label: 'Adjudicación', val: contract.fecha_adjudicacion, color: 'bg-emerald-50 text-emerald-700' },
-                                                        { label: 'Inicio Vigencia', val: contract.fecha_inicio, color: 'bg-blue-50 text-blue-700' }
-                                                    ].map((f, i) => (
-                                                        <div key={i} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-50 shadow-sm">
-                                                            <span className="text-[9px] text-slate-400 font-black uppercase">{f.label}</span>
-                                                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${f.color} font-mono`}>
-                                                                {new Date(f.val).toLocaleDateString('es-CL')}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </section>
+                                {/* AREA SUPERIOR: Estadísticas y Gráfico */}
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                    {/* Izquierda: 4 Stats en rejilla 2x2 */}
+                                    <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Presupuesto Total</span>
+                                            <p className="text-xl font-black text-slate-900 leading-none">{formatCurrency(contract.monto_total)}</p>
+                                        </div>
+                                        <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Monto Ejecutado</span>
+                                            <p className="text-xl font-black text-slate-900 leading-none">{formatCurrency(contract.monto_ejecutado)}</p>
+                                        </div>
+                                        <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Disponible</span>
+                                            <p className="text-xl font-black text-emerald-600 leading-none">{formatCurrency(contract.monto_restante)}</p>
+                                        </div>
+                                        <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Plazo Restante</span>
+                                            <p className="text-xl font-black text-slate-900 leading-none">{monthsLeft} <span className="text-xs font-bold text-slate-400 uppercase">Meses</span></p>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-4 flex flex-col">
-                                        {/* Metadata Card (Neutral) */}
-                                        <div className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm relative overflow-hidden flex-1 flex flex-col justify-center">
-                                            <div className="absolute -right-2 -top-2 opacity-[0.03] transform rotate-12">
-                                                <Activity className="w-24 h-24" />
-                                            </div>
-                                            <h4 className="font-black text-[9px] uppercase tracking-[0.2em] mb-4 text-slate-400 flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-slate-300" /> Resumen Técnico
-                                            </h4>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="p-3 bg-slate-50/50 rounded-2xl border border-slate-100">
-                                                    <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">ID Mercado Público</span>
-                                                    <span className="text-[11px] font-mono font-black text-blue-600 truncate block">{contract.codigo_mercado_publico || 'N/A'}</span>
+                                    {/* Derecha: Gráfico Grande */}
+                                    <div className="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col min-h-[220px]">
+                                        <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                                            <TrendingUp className="w-3.5 h-3.5 text-indigo-500" /> Gráfico Histórico de Ejecución Mensual
+                                        </h4>
+                                        <div className="flex-1 min-h-0">
+                                            {contract.gastos_mensuales?.length > 0 ? (
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <AreaChart data={contract.gastos_mensuales} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                                                        <defs>
+                                                            <linearGradient id="colorMonto" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.1} />
+                                                                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                                        <XAxis dataKey="mes" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 9 }} />
+                                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 9 }} tickFormatter={(val) => `$${val / 1000000}M`} />
+                                                        <Tooltip
+                                                            content={({ active, payload, label }) => {
+                                                                if (active && payload && payload.length) {
+                                                                    return (
+                                                                        <div className="bg-white p-3 rounded-xl shadow-2xl border border-slate-100">
+                                                                            <p className="text-[8px] font-black uppercase text-slate-400 mb-1">{label}</p>
+                                                                            <p className="text-[14px] font-black text-slate-900">{formatCurrency(payload[0].value)}</p>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            }}
+                                                        />
+                                                        <Area type="monotone" dataKey="monto" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorMonto)" />
+                                                    </AreaChart>
+                                                </ResponsiveContainer>
+                                            ) : (
+                                                <div className="h-full flex flex-col items-center justify-center text-slate-300">
+                                                    <Activity className="w-8 h-8 opacity-20" />
+                                                    <p className="text-[9px] font-black uppercase mt-3 opacity-40 italic tracking-widest">Sin registros de ejecución mensual</p>
                                                 </div>
-                                                <div className="p-3 bg-slate-50/50 rounded-2xl border border-slate-100">
-                                                    <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Última Edición</span>
-                                                    <span className="text-[10px] font-bold text-slate-700 block text-ellipsis overflow-hidden whitespace-nowrap">
-                                                        {new Date(contract.updated_at).toLocaleString('es-CL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                                    </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* AREA INFERIOR: 3 Columnas Sincronizadas */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3 px-1 mb-2">
+                                        <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-widest shrink-0">Resumen del Contrato</h3>
+                                        <p className="text-[11px] font-black text-blue-600 uppercase tracking-tight truncate leading-none">
+                                            {contract.descripcion}
+                                        </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:h-[260px]">
+                                        {/* Col 1: 4 ítems */}
+                                        <div className="flex flex-col justify-between h-full space-y-3 lg:space-y-0">
+                                            {[
+                                                { label: 'Tipo de Proceso', val: contract.proceso_nombre },
+                                                { label: 'Orientación', val: contract.orientacion_nombre || "No definida" },
+                                                { label: 'Tipo de OC', val: contract.tipo_oc === 'UNICA' ? 'Única' : 'Múltiple' },
+                                                { label: 'Nº de OC', val: contract.nro_oc || "No aplica" }
+                                            ].map((item, i) => (
+                                                <div key={i} className="flex justify-between items-center px-5 py-3.5 lg:py-0 bg-white rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-blue-200 lg:h-[22%] min-h-[50px]">
+                                                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">{item.label}</span>
+                                                    <span className="text-[10px] font-black text-slate-900 uppercase tracking-tight">{item.val}</span>
                                                 </div>
-                                            </div>
+                                            ))}
                                         </div>
 
-                                        {/* Budget Execution Card (Green) */}
-                                        <div className="bg-gradient-to-br from-emerald-600 to-teal-800 rounded-[32px] p-6 text-white shadow-lg shadow-emerald-500/10 relative overflow-hidden group flex-1 flex flex-col justify-center">
-                                            <div className="absolute -right-3 -bottom-3 opacity-10 transform scale-150 rotate-12 transition-transform group-hover:scale-175 group-hover:rotate-6">
-                                                <DollarSign className="w-20 h-20" />
-                                            </div>
-                                            <h4 className="font-black text-[9px] uppercase tracking-[0.2em] mb-4 relative z-10 flex items-center gap-2 text-emerald-100">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" /> Control Presupuestario
-                                            </h4>
-                                            <div className="space-y-3 relative z-10">
-                                                <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/20">
-                                                    <div className="flex justify-between items-center mb-1.5">
-                                                        <p className="text-[9px] font-black text-emerald-50 tracking-widest">Presupuesto Ejecutado</p>
-                                                        <span className="text-[10px] font-black">{executionPercentage}%</span>
+                                        {/* Col 2: 3 ítems */}
+                                        <div className="flex flex-col justify-between h-full space-y-3 lg:space-y-0">
+                                            {[
+                                                { label: 'Adjudicación', val: contract.fecha_adjudicacion },
+                                                { label: 'Inicio Vigencia', val: contract.fecha_inicio },
+                                                { label: 'Término Contractual', val: contract.fecha_termino }
+                                            ].map((f, i) => (
+                                                <div key={i} className="flex justify-between items-center px-6 lg:px-6 py-4 lg:py-0 bg-white rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-blue-200 lg:h-[30%] min-h-[60px]">
+                                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{f.label}</span>
+                                                    <span className="text-[11px] font-mono font-black text-slate-800">{new Date(f.val).toLocaleDateString('es-CL')}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Col 3: 2 ítems Premium */}
+                                        <div className="flex flex-col justify-between h-full space-y-4 lg:space-y-0">
+                                            <div className="bg-emerald-600 p-6 lg:p-7 rounded-2xl shadow-xl shadow-emerald-600/20 flex flex-col justify-between transition-all hover:scale-[1.01] lg:h-[48%] min-h-[120px] relative overflow-hidden group">
+                                                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
+                                                    <DollarSign className="w-16 lg:w-20 h-16 lg:h-20 text-white" />
+                                                </div>
+                                                <div className="flex items-center gap-2 relative z-10">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                                    <h4 className="text-[9px] font-black text-emerald-50 uppercase tracking-widest leading-none">Control Presupuestario</h4>
+                                                </div>
+                                                <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 lg:p-5 border border-white/10 relative z-10 my-1">
+                                                    <div className="flex justify-between items-center mb-2 lg:mb-2.5">
+                                                        <span className="text-[10px] font-black text-white uppercase tracking-tight">Presupuesto</span>
+                                                        <span className="text-sm font-black text-white">{executionPercentage}%</span>
                                                     </div>
-                                                    <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-emerald-400 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(52,211,153,0.4)]"
-                                                            style={{ width: `${executionPercentage}%` }}
-                                                        />
+                                                    <div className="w-full bg-emerald-900/30 rounded-full h-2.5 overflow-hidden">
+                                                        <div className="bg-emerald-400 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, executionPercentage)}%` }} />
                                                     </div>
                                                 </div>
-                                                <p className="text-[10px] font-bold text-emerald-50 leading-relaxed opacity-90">
-                                                    Quedan {formatCurrency(contract.monto_restante)} disponibles.
+                                                <p className="text-[9px] font-bold text-emerald-100/80 uppercase tracking-tight relative z-10 italic">
+                                                    {formatCurrency(contract.monto_restante)} disponibles
                                                 </p>
                                             </div>
-                                        </div>
 
-                                        {/* Time Execution Card (Blue) */}
-                                        <div className="bg-gradient-to-br from-blue-600 to-indigo-800 rounded-[32px] p-6 text-white shadow-lg shadow-blue-500/10 relative overflow-hidden group flex-1 flex flex-col justify-center">
-                                            <div className="absolute -right-3 -bottom-3 opacity-10 transform scale-150 rotate-12 transition-transform group-hover:scale-175 group-hover:rotate-6">
-                                                <Clock className="w-20 h-20" />
-                                            </div>
-                                            <h4 className="font-black text-[9px] uppercase tracking-[0.2em] mb-4 relative z-10 flex items-center gap-2 text-blue-100">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-pulse" /> Control de Plazos
-                                            </h4>
-                                            <div className="space-y-3 relative z-10">
-                                                <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/20">
-                                                    <div className="flex justify-between items-center mb-1.5">
-                                                        <p className="text-[9px] font-black text-blue-50 tracking-widest">Ejecución de Tiempo</p>
-                                                        <span className="text-[10px] font-black">{timePercentage}%</span>
+                                            <div className="bg-blue-600 p-6 lg:p-7 rounded-2xl shadow-xl shadow-blue-600/20 flex flex-col justify-between transition-all hover:scale-[1.01] lg:h-[48%] min-h-[120px] relative overflow-hidden group">
+                                                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
+                                                    <Clock className="w-16 lg:w-20 h-16 lg:h-20 text-white" />
+                                                </div>
+                                                <div className="flex items-center gap-2 relative z-10">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-pulse" />
+                                                    <h4 className="text-[9px] font-black text-blue-50 uppercase tracking-widest leading-none">Control de Plazos</h4>
+                                                </div>
+                                                <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 lg:p-5 border border-white/10 relative z-10 my-1">
+                                                    <div className="flex justify-between items-center mb-2 lg:mb-2.5">
+                                                        <span className="text-[10px] font-black text-white uppercase tracking-tight">Tiempo</span>
+                                                        <span className="text-sm font-black text-white">{timePercentage}%</span>
                                                     </div>
-                                                    <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-blue-400 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(96,165,250,0.4)]"
-                                                            style={{ width: `${timePercentage}%` }}
-                                                        />
+                                                    <div className="w-full bg-blue-900/30 rounded-full h-2.5 overflow-hidden">
+                                                        <div className="bg-blue-300 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, timePercentage)}%` }} />
                                                     </div>
                                                 </div>
-                                                <p className="text-[10px] font-bold text-blue-50 leading-relaxed opacity-90">
-                                                    {monthsLeft > 0
-                                                        ? `Quedan ${monthsLeft} meses de vigencia.`
-                                                        : "Contrato cumplió su plazo."}
+                                                <p className="text-[9px] font-bold text-blue-100/80 uppercase tracking-tight relative z-10 italic">
+                                                    {monthsLeft} meses restantes
                                                 </p>
                                             </div>
                                         </div>
@@ -839,17 +782,17 @@ const ContractDetail = () => {
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                className="p-6 lg:p-8"
+                                className="p-6 lg:p-8 h-full flex flex-col"
                             >
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
+                                <div className="space-y-4 flex flex-col flex-1 min-h-0">
+                                    <div className="flex items-center justify-between shrink-0">
                                         <div>
                                             <h3 className="text-lg font-black text-slate-800 tracking-tight">Bitácora de Cambios</h3>
                                             <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1">Auditoría completa del proceso</p>
                                         </div>
                                     </div>
 
-                                    <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm flex flex-col h-[500px]">
+                                    <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm flex flex-col flex-1 min-h-0">
                                         <div className="overflow-x-auto overflow-y-auto custom-scrollbar flex-1">
                                             <table className="w-full text-left">
                                                 <thead className="sticky top-0 z-20 bg-slate-50 border-b border-slate-100">
@@ -860,7 +803,7 @@ const ContractDetail = () => {
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-50">
-                                                    {history?.map((log, index) => (
+                                                    {history?.map((log) => (
                                                         <tr key={log.id} className="hover:bg-slate-50/50 transition-colors group">
                                                             <td className="px-6 py-4 align-top">
                                                                 <div className="flex flex-col gap-1.5">
@@ -1053,33 +996,37 @@ const ContractDetail = () => {
                 )}
             </AnimatePresence>
 
-            {isReceptionModalOpen && (
-                <ContractReceptionModal
-                    isOpen={isReceptionModalOpen}
-                    onClose={() => {
-                        setReceptionModalOpen(false);
-                        setEditingRC(null);
-                    }}
-                    onSave={handleCreateReception}
-                    contract={contract}
-                    lookups={lookups}
-                    editingRC={editingRC}
-                />
-            )}
+            {
+                isReceptionModalOpen && (
+                    <ContractReceptionModal
+                        isOpen={isReceptionModalOpen}
+                        onClose={() => {
+                            setReceptionModalOpen(false);
+                            setEditingRC(null);
+                        }}
+                        onSave={handleCreateReception}
+                        contract={contract}
+                        lookups={lookups}
+                        editingRC={editingRC}
+                    />
+                )
+            }
 
-            {isEditModalOpen && (
-                <ContractModal
-                    isOpen={isEditModalOpen}
-                    onClose={() => setEditModalOpen(false)}
-                    onSave={() => {
-                        setEditModalOpen(false);
-                        fetchContract();
-                    }}
-                    contract={contract}
-                    lookups={lookups}
-                />
-            )}
-        </div>
+            {
+                isEditModalOpen && (
+                    <ContractModal
+                        isOpen={isEditModalOpen}
+                        onClose={() => setEditModalOpen(false)}
+                        onSave={() => {
+                            setEditModalOpen(false);
+                            fetchContract();
+                        }}
+                        contract={contract}
+                        lookups={lookups}
+                    />
+                )
+            }
+        </div >
     );
 };
 

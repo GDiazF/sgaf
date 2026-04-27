@@ -34,36 +34,36 @@ const BaseModal = ({
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.95, opacity: 0, y: 20 }}
                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                            className={`bg-white rounded-3xl shadow-2xl w-full ${maxWidth} overflow-hidden relative z-10 border border-slate-200 flex flex-col max-h-[90vh]`}
+                            className={`bg-white rounded-2xl shadow-2xl w-full ${maxWidth} overflow-hidden relative z-10 border border-slate-200 flex flex-col max-h-[90vh]`}
                         >
                             {/* Header */}
-                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-slate-50 to-white shrink-0">
+                            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-slate-50 to-white shrink-0">
                                 <div className="flex items-center gap-3">
                                     {Icon && (
-                                        <div className="p-2.5 bg-blue-600 rounded-2xl shadow-lg shadow-blue-200">
-                                            <Icon className="w-6 h-6 text-white" />
+                                        <div className="p-2 bg-blue-600 rounded-2xl shadow-lg shadow-blue-200">
+                                            <Icon className="w-5 h-5 text-white" />
                                         </div>
                                     )}
                                     <div>
                                         <h3 className="text-xl font-bold text-slate-800">{title}</h3>
-                                        {subtitle && <p className="text-xs text-slate-400 font-medium">{subtitle}</p>}
+                                        {subtitle && <p className="text-[10px] text-slate-400 font-medium">{subtitle}</p>}
                                     </div>
                                 </div>
                                 <button
                                     onClick={onClose}
-                                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
+                                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
                                 >
-                                    <X className="w-6 h-6" />
+                                    <X className="w-5 h-5" />
                                 </button>
                             </div>
 
                             {/* Body */}
-                            <div className="p-6 md:p-8 overflow-y-auto custom-scrollbar flex-grow">
+                            <div className="p-4 overflow-y-auto custom-scrollbar flex-grow">
                                 {children}
                             </div>
 
                             {/* Footer */}
-                            <div className="p-6 border-t border-slate-100 bg-slate-50/30 flex justify-end gap-3 shrink-0">
+                            <div className="p-4 border-t border-slate-100 bg-slate-50/30 flex justify-end gap-3 shrink-0">
                                 <button
                                     type="button"
                                     onClick={onClose}

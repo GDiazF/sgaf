@@ -42,14 +42,14 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
         : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion || nombre)}`;
 
     const InfoBox = ({ icon: Icon, label, value, subValue, highlight = false }) => (
-        <div className={`flex gap-3 p-1.5 rounded-xl border transition-all ${highlight ? 'bg-slate-900 border-slate-800 shadow-sm text-white' : 'bg-slate-50 border-slate-100 hover:bg-white hover:shadow-sm'}`}>
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 border shadow-sm ${highlight ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-50 text-slate-400'}`}>
-                <Icon className="w-3.5 h-3.5" />
+        <div className={`flex gap-3 p-2.5 rounded-2xl border transition-all ${highlight ? 'bg-blue-50 border-blue-100 shadow-sm shadow-blue-500/5' : 'bg-slate-50/50 border-slate-100 hover:bg-white hover:shadow-sm'}`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 border shadow-sm ${highlight ? 'bg-white border-blue-200 text-blue-600' : 'bg-white border-slate-100 text-slate-400'}`}>
+                <Icon className="w-4 h-4" />
             </div>
             <div className="min-w-0 flex-1">
-                <span className={`text-[7px] font-bold uppercase tracking-widest block leading-none mb-0.5 ${highlight ? 'text-slate-400' : 'text-slate-400'}`}>{label}</span>
-                <p className={`text-[12px] font-semibold leading-tight break-words ${highlight ? 'text-white' : 'text-slate-700'}`}>{value || 'No declarado'}</p>
-                {subValue && <p className={`text-[8px] mt-0.5 font-medium ${highlight ? 'text-slate-400' : 'text-slate-500'}`}>{subValue}</p>}
+                <span className={`text-[8px] font-bold uppercase tracking-widest block leading-none mb-1 ${highlight ? 'text-blue-400' : 'text-slate-400'}`}>{label}</span>
+                <p className={`text-[13px] font-bold leading-tight break-words ${highlight ? 'text-blue-900' : 'text-slate-700'}`}>{value || 'No declarado'}</p>
+                {subValue && <p className={`text-[9px] mt-0.5 font-semibold uppercase tracking-tighter ${highlight ? 'text-blue-500' : 'text-slate-400'}`}>{subValue}</p>}
             </div>
         </div>
     );
@@ -98,7 +98,7 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
                         initial={{ opacity: 0, scale: 0.95, y: 10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                        className="relative w-full max-w-6xl bg-white rounded-3xl md:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-[90vh] md:h-[660px]"
+                        className="relative w-full max-w-lg md:max-w-6xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[660px] max-h-[90vh] border border-white/20"
                     >
                         {/* Botón Cerrar Absoluto */}
                         <button
@@ -108,8 +108,8 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
                             <X className="w-5 h-5" />
                         </button>
 
-                        {/* Map Area */}
-                        <div className="flex-1 relative bg-slate-100 overflow-hidden min-h-[200px] md:min-h-full">
+                        {/* Map Area - Visible only on Desktop */}
+                        <div className="hidden md:block flex-1 relative bg-slate-100 overflow-hidden min-h-full">
                             {hasCoordinates ? (
                                 <MapContainer center={position} zoom={16} className="w-full h-full" scrollWheelZoom={true} zoomControl={false}>
                                     <TileLayer attribution='&copy; CARTO' url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
@@ -134,27 +134,28 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
                                 </div>
                             )}
                             <div className="absolute top-5 left-5 z-[1000] flex flex-col gap-2">
-                                <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white shadow-lg flex items-center gap-2">
-                                    <div className="bg-emerald-500 w-2 h-2 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                                    <span className="text-[8px] font-bold text-slate-700 tracking-widest uppercase">Consulta Geográfica Unificada</span>
+                                <div className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-white shadow-xl flex items-center gap-2">
+                                    <div className="bg-emerald-500 w-2.5 h-2.5 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)] animate-pulse" />
+                                    <span className="text-[9px] font-black text-slate-800 tracking-[1.5px] uppercase">G.I.S SLEP IQUIQUE</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Sidebar */}
-                        <div className="w-full md:w-[360px] p-4 lg:p-5 flex flex-col bg-white overflow-y-auto border-l border-slate-100 custom-scrollbar">
+                        <div className="w-full md:w-[380px] p-6 lg:p-8 flex flex-col bg-white overflow-y-auto md:border-l border-slate-100 custom-scrollbar">
                             <div className="flex-1 space-y-2.5 pt-6">
                                 {/* Header */}
-                                <div className="flex items-center gap-3 mb-1 bg-slate-900 p-3 rounded-[1.5rem] shadow-lg border border-slate-800">
-                                    <div className="w-10 h-10 rounded-xl bg-white p-1.5 shadow-inner flex items-center justify-center flex-shrink-0">
+                                <div className="flex items-center gap-4 mb-2 bg-white p-4 rounded-[1.8rem] border border-slate-100 shadow-sm">
+                                    <div className="w-12 h-12 rounded-2xl bg-slate-50 p-2 shadow-inner border border-slate-100 flex items-center justify-center flex-shrink-0">
                                         {logo ? <img src={logo} alt={nombre} className="w-full h-full object-contain" /> : <Building className="w-6 h-6 text-slate-300" />}
                                     </div>
                                     <div className="min-w-0">
-                                        <div className="flex gap-1.5 mb-0.5">
-                                            <span className={`text-[6px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${activo ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>{activo ? 'ACTIVO' : 'INACTIVO'}</span>
-                                            <p className="text-[7px] text-blue-400 font-bold uppercase tracking-widest truncate">{tipo_nombre}</p>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${activo ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                                {activo ? 'Activo' : 'Inactivo'}
+                                            </span>
+                                            <p className="text-[9px] text-blue-600 font-bold uppercase tracking-widest truncate">{tipo_nombre}</p>
                                         </div>
-                                        <h3 className="text-[14px] font-bold text-white leading-tight break-words pr-2">{nombre}</h3>
+                                        <h3 className="text-base font-black text-slate-800 leading-tight break-words pr-2 uppercase italic">{nombre}</h3>
                                     </div>
                                 </div>
 

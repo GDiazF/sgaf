@@ -67,16 +67,16 @@ const GlobalDashboard = () => {
     return (
         <div className="w-full h-full bg-[#fcfdfe] flex flex-col overflow-hidden font-sans">
             {/* 1. Header Hero - Restaurado */}
-            <header className="px-6 md:px-8 pt-4 pb-2 shrink-0">
+            <header className="px-4 md:px-6 pt-4 pb-2 shrink-0">
                 <div className="flex items-center justify-between">
                     <div>
-                        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] mb-1">Panel de Control</p>
-                        <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight uppercase">
-                            Buen día, {firstName}
+                        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] mb-1">Dashboard Principal</p>
+                        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight leading-tight">
+                            ¡Hola!, {firstName}
                         </h1>
                     </div>
 
-                    <div className="hidden lg:flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                         {socialLinks.map(link => {
                             const Icon = IconMap[link.icono] || Globe;
                             const brand = BrandColors[link.icono] || BrandColors.Globe;
@@ -86,10 +86,10 @@ const GlobalDashboard = () => {
                                     href={link.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className={`p-2.5 bg-white border border-slate-100 text-slate-400 rounded-xl transition-all shadow-sm group hover:border-transparent hover:text-white hover:scale-110 active:scale-95 ${brand.bg} ${brand.shadow} hover:shadow-lg`}
+                                    className={`p-2 md:p-2.5 bg-white border border-slate-100 text-slate-400 rounded-xl transition-all shadow-sm group hover:border-transparent hover:text-white hover:scale-110 active:scale-95 ${brand.bg} ${brand.shadow} hover:shadow-lg`}
                                     title={link.nombre}
                                 >
-                                    <Icon className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                    <Icon className="w-3.5 h-3.5 md:w-4 h-4 transition-transform group-hover:scale-110" />
                                 </a>
                             );
                         })}
@@ -97,75 +97,81 @@ const GlobalDashboard = () => {
                 </div>
             </header>
 
-            {/* 2. Botones de Acción - RESTAURADOS A H-24 */}
-            <div className="px-6 md:px-8 py-2 grid grid-cols-1 md:grid-cols-3 gap-5 shrink-0">
-                <button
-                    onClick={() => window.location.href = '/reservas'}
-                    className="h-24 bg-indigo-600 rounded-3xl text-white flex items-center justify-between px-8 shadow-2xl shadow-indigo-100 hover:bg-indigo-700 transition-all group overflow-hidden relative active:scale-95"
-                >
-                    <div className="z-10 text-left">
-                        <span className="text-[9px] font-semibold text-indigo-200 uppercase tracking-widest block mb-0.5 opacity-70">Módulo de Sala</span>
-                        <h3 className="text-lg font-semibold uppercase tracking-tight">Gestión Reservas</h3>
-                    </div>
-                    <Calendar className="w-16 h-16 absolute -right-2 opacity-10 group-hover:scale-110 transition-transform" />
-                </button>
+            {/* 2. Área Principal - ESTRUCTURA DE COLUMNAS SEGÚN MAQUETA */}
+            <main className="flex-1 min-h-0 px-4 md:px-6 pb-6 overflow-hidden">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
 
-                <button
-                    onClick={() => setShowMapModal(true)}
-                    className="h-24 bg-white border border-slate-100 rounded-3xl text-slate-800 flex items-center justify-between px-8 shadow-sm hover:border-indigo-500 hover:shadow-xl transition-all group relative overflow-hidden active:scale-95"
-                >
-                    <div className="z-10 text-left">
-                        <span className="text-[9px] font-semibold text-indigo-600 uppercase tracking-widest block mb-0.5">Mapa Interactivo</span>
-                        <h3 className="text-lg font-semibold uppercase tracking-tight">Establecimientos</h3>
-                    </div>
-                    <Map className="w-16 h-16 absolute -right-2 text-slate-50 group-hover:scale-110 transition-transform" />
-                </button>
+                    {/* COLUMNA IZQUIERDA: Botones + Novedades (3/4 del ancho) */}
+                    <div className="lg:col-span-3 flex flex-col space-y-4 min-h-0">
 
-                <button
-                    onClick={() => setShowDirectoryModal(true)}
-                    className="h-24 bg-white border border-slate-100 rounded-3xl text-slate-800 flex items-center justify-between px-8 shadow-sm hover:border-indigo-500 hover:shadow-xl transition-all group relative overflow-hidden active:scale-95"
-                >
-                    <div className="z-10 text-left">
-                        <span className="text-[9px] font-semibold text-indigo-600 uppercase tracking-widest block mb-0.5">Contactos SLEP</span>
-                        <h3 className="text-lg font-semibold uppercase tracking-tight">Directorio Interno</h3>
-                    </div>
-                    <Users2 className="w-16 h-16 absolute -right-2 text-slate-50 group-hover:scale-110 transition-transform" />
-                </button>
-            </div>
+                        {/* 2.1 Botones de Acción (Ahora dentro de la columna) */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 shrink-0">
+                            <button
+                                onClick={() => window.location.href = '/reservas'}
+                                className="h-24 bg-white border border-indigo-100 rounded-2xl text-indigo-700 flex items-center justify-between px-8 shadow-md hover:shadow-2xl hover:border-indigo-400 transition-all group overflow-hidden relative active:scale-95"
+                            >
+                                <div className="z-10 text-left">
+                                    <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest block mb-0.5">Calendario de Solicitudes</span>
+                                    <h3 className="text-lg font-black uppercase tracking-tight">Gestión Reservas</h3>
+                                </div>
+                                <Calendar className="w-16 h-16 absolute -right-2 text-indigo-50 group-hover:scale-110 transition-transform" />
+                            </button>
 
-            {/* 3. Área Principal - ESTRUCTURA VERTICAL TOTAL SIN SCROLL GLOBAL */}
-            <main className="flex-1 min-h-0 px-6 md:px-8 pb-6 flex flex-col space-y-2">
+                            <button
+                                onClick={() => setShowMapModal(true)}
+                                className="h-24 bg-white border border-emerald-100 rounded-2xl text-emerald-700 flex items-center justify-between px-8 shadow-md hover:shadow-2xl hover:border-emerald-400 transition-all group overflow-hidden relative active:scale-95"
+                            >
+                                <div className="z-10 text-left">
+                                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest block mb-0.5">Mapa Interactivo</span>
+                                    <h3 className="text-lg font-black uppercase tracking-tight">Establecimientos</h3>
+                                </div>
+                                <Map className="w-16 h-16 absolute -right-2 text-emerald-50 group-hover:scale-110 transition-transform" />
+                            </button>
 
-                {/* NOVEDADES Y CONVENIOS (Prioridad Alta - Una sola línea) */}
-                <section className="flex-[4] bg-white border border-slate-200 rounded-[2.5rem] shadow-xl flex flex-col min-h-0 overflow-hidden">
-                    <div className="px-8 py-2 flex items-center justify-between shrink-0 border-b border-slate-50">
-                        <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500">
-                                <Star className="w-5 h-5 fill-rose-500/10" />
-                            </div>
-                            <div>
-                                <h2 className="text-base font-bold text-slate-800 uppercase tracking-tight">Novedades y Beneficios</h2>
-                                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Comunicados recientes</p>
-                            </div>
+                            <button
+                                onClick={() => setShowDirectoryModal(true)}
+                                className="h-24 bg-white border border-blue-100 rounded-2xl text-blue-600 flex items-center justify-between px-8 shadow-md hover:shadow-2xl hover:border-blue-400 transition-all group overflow-hidden relative active:scale-95"
+                            >
+                                <div className="z-10 text-left">
+                                    <span className="text-[9px] font-bold text-blue-600 uppercase tracking-widest block mb-0.5">Anexo de Funcionarios</span>
+                                    <h3 className="text-lg font-black uppercase tracking-tight">Directorio Interno</h3>
+                                </div>
+                                <Users2 className="w-16 h-16 absolute -right-2 text-blue-50 group-hover:scale-110 transition-transform" />
+                            </button>
                         </div>
-                        <button
-                            onClick={() => window.location.href = '/bienestar/muro'}
-                            className="px-5 py-2 bg-slate-900 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-rose-500 transition-all shadow-md"
-                        >
-                            Explorar Todo
-                        </button>
+
+                        {/* 2.2 NOVEDADES Y CONVENIOS (Se expande para llenar el espacio) */}
+                        <section className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col min-h-0 overflow-hidden">
+                            <div className="px-6 md:px-8 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 border-b border-slate-50">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 shrink-0">
+                                        <Star className="w-5 h-5 fill-rose-500/10" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h2 className="text-base font-bold text-slate-800 uppercase tracking-tight truncate sm:whitespace-normal">Novedades y Beneficios</h2>
+                                        <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest truncate">Comunicados recientes</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => window.location.href = '/bienestar/muro'}
+                                    className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-rose-500 transition-all shadow-md active:scale-95"
+                                >
+                                    Explorar Todo
+                                </button>
+                            </div>
+
+                            <div className="flex-1 p-0 overflow-hidden">
+                                <WelfareWall limit={5} showFilters={false} sortBy="newest" />
+                            </div>
+                        </section>
                     </div>
 
-                    <div className="flex-1 p-0 overflow-hidden">
-                        <WelfareWall limit={5} showFilters={false} sortBy="newest" />
+                    {/* COLUMNA DERECHA: Links de Interés (1/4 del ancho) */}
+                    <div className="lg:col-span-1 h-[600px] min-h-0">
+                        <InterestLinksSection isSidebar={true} onRefresh={fetchSocialLinks} />
                     </div>
-                </section>
 
-                {/* LINKS DE INTERÉS (ALTURA FIJA CON SCROLL INTERNO) */}
-                <div className="h-[280px] shrink-0 min-h-0 overflow-hidden">
-                    <InterestLinksSection isCompact={true} />
                 </div>
-
             </main>
 
             {/* Modales */}

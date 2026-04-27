@@ -83,7 +83,7 @@ const ContractModal = ({ isOpen, onClose, onSave, editingId, initialData, lookup
                         <SearchableSelect
                             label="Proveedor Adjudicado"
                             icon={<Building2 className="w-3.5 h-3.5" />}
-                            options={proveedores ? proveedores.map(p => ({ value: p.id, label: p.nombre })) : []}
+                            options={(proveedores || []).map(p => ({ value: p.id, label: p.nombre }))}
                             value={formData.proveedor}
                             onChange={val => setFormData({ ...formData, proveedor: val })}
                             placeholder="Seleccione Proveedor..."
@@ -180,7 +180,7 @@ const ContractModal = ({ isOpen, onClose, onSave, editingId, initialData, lookup
                             icon={<Tag className="text-indigo-500" />}
                             value={formData.categoria}
                             onChange={e => setFormData({ ...formData, categoria: e.target.value })}
-                            options={categorias.map(c => ({ value: c.id, label: c.nombre }))}
+                            options={(categorias || []).map(c => ({ value: c.id, label: c.nombre }))}
                             placeholder="Seleccione..."
                         />
 
@@ -189,7 +189,7 @@ const ContractModal = ({ isOpen, onClose, onSave, editingId, initialData, lookup
                             icon={<Tag className="text-amber-500" />}
                             value={formData.orientacion}
                             onChange={e => setFormData({ ...formData, orientacion: e.target.value })}
-                            options={orientaciones.map(o => ({ value: o.id, label: o.nombre }))}
+                            options={(orientaciones || []).map(o => ({ value: o.id, label: o.nombre }))}
                             placeholder="No definida"
                         />
 
@@ -198,7 +198,7 @@ const ContractModal = ({ isOpen, onClose, onSave, editingId, initialData, lookup
                             icon={<Tag className="text-emerald-500" />}
                             value={formData.estado}
                             onChange={e => setFormData({ ...formData, estado: e.target.value })}
-                            options={estados.map(e => ({ value: e.id, label: e.nombre }))}
+                            options={(estados || []).map(e => ({ value: e.id, label: e.nombre }))}
                             placeholder="Seleccione..."
                         />
 
@@ -207,7 +207,7 @@ const ContractModal = ({ isOpen, onClose, onSave, editingId, initialData, lookup
                             icon={<Tag className="text-blue-500" />}
                             value={formData.proceso}
                             onChange={e => setFormData({ ...formData, proceso: e.target.value })}
-                            options={procesos.map(p => ({ value: p.id, label: p.nombre }))}
+                            options={(procesos || []).map(p => ({ value: p.id, label: p.nombre }))}
                             placeholder="Seleccione..."
                         />
                     </div>
@@ -217,7 +217,7 @@ const ContractModal = ({ isOpen, onClose, onSave, editingId, initialData, lookup
                             <MultiSearchableSelect
                                 label="Alcance: Establecimientos Asociados"
                                 icon={<Building2 className="w-3.5 h-3.5" />}
-                                options={establecimientos.map(e => ({ value: e.id, label: e.nombre }))}
+                                options={(establecimientos || []).map(e => ({ value: e.id, label: e.nombre }))}
                                 value={formData.establecimientos || []}
                                 onChange={(val) => handleSelectChange('establecimientos', val)}
                                 placeholder="Seleccione uno o muchos..."
