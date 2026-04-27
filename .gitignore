@@ -61,6 +61,6 @@ Thumbs.db
 
 # --- SGAF Specific ---
 backend/import_postgres_to_sqlite.py
-backend/full_system_activation.py
-.global_email_counter.json
+# Archivos de estado del sistema
+**/.email_counter.json
 core_email_debug.log
