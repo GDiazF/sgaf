@@ -69,7 +69,7 @@ const VehiculosDashboard = () => {
             const params = { anio: year };
             const statsRes = await api.get(`vehiculos/registros/estadisticas_anuales/`, { params });
             const listRes = await api.get(`vehiculos/registros/`, { params });
-            
+
             setStats(statsRes.data);
             setRegistros(listRes.data.results || listRes.data);
         } catch (error) {
@@ -341,14 +341,14 @@ const VehiculosDashboard = () => {
     const summedRegistros = Object.values(registros.reduce((acc, curr) => {
         const key = `${curr.anio}-${curr.mes}`;
         if (!acc[key]) {
-            acc[key] = { 
-                ...curr, 
+            acc[key] = {
+                ...curr,
                 id: `sum-${key}`,
-                kilometros_recorridos: 0, 
-                gasto_bencina: 0, 
-                gasto_peajes: 0, 
-                gasto_seguros: 0, 
-                vehiculo_detalle: { display_name: 'RESUMEN MENSUAL (SUMA)', patente: 'FLOTA' } 
+                kilometros_recorridos: 0,
+                gasto_bencina: 0,
+                gasto_peajes: 0,
+                gasto_seguros: 0,
+                vehiculo_detalle: { display_name: 'RESUMEN MENSUAL (SUMA)', patente: 'FLOTA' }
             };
         }
         acc[key].kilometros_recorridos += curr.kilometros_recorridos;
@@ -388,13 +388,13 @@ const VehiculosDashboard = () => {
                 </div>
                 <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     <div className="flex bg-slate-100 p-1 rounded-xl">
-                        <button 
+                        <button
                             onClick={() => setViewMode('individual')}
                             className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${viewMode === 'individual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                         >
                             INDIVIDUAL
                         </button>
-                        <button 
+                        <button
                             onClick={() => setViewMode('general')}
                             className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${viewMode === 'general' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                         >
@@ -545,10 +545,10 @@ const VehiculosDashboard = () => {
                                             return (
                                                 <tr key={registro.id} className="hover:bg-slate-50/80 transition-all duration-200 group">
                                                     <td className="px-4 py-3">
-                                                       <div className="flex flex-col">
+                                                        <div className="flex flex-col">
                                                             <span className="font-bold text-slate-800 text-[13px]">{registro.mes_nombre}</span>
                                                             <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">{registro.vehiculo_detalle?.display_name || registro.vehiculo_detalle?.patente}</span>
-                                                       </div>
+                                                        </div>
                                                     </td>
                                                     <td className="px-3 py-3 text-right tabular-nums text-slate-600 font-medium text-[12px] tracking-tight">{registro.kilometros_recorridos.toLocaleString()}</td>
                                                     <td className="px-3 py-3 text-right tabular-nums">
@@ -662,12 +662,12 @@ const VehiculosDashboard = () => {
                                         <div className="space-y-2">
                                             <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Km Inicial del mes</label>
                                             <div className="relative">
-                                                <input 
-                                                    type="number" 
-                                                    name="km_inicial" 
-                                                    value={formData.km_inicial} 
-                                                    onChange={handleInputChange} 
-                                                    className="w-full px-6 h-14 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 outline-none font-bold text-slate-700 bg-slate-50 transition-all" 
+                                                <input
+                                                    type="number"
+                                                    name="km_inicial"
+                                                    value={formData.km_inicial}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-6 h-14 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 outline-none font-bold text-slate-700 bg-slate-50 transition-all"
                                                     placeholder="Ej: 10500"
                                                 />
                                             </div>
@@ -675,12 +675,12 @@ const VehiculosDashboard = () => {
                                         <div className="space-y-2">
                                             <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Km Final del mes</label>
                                             <div className="relative">
-                                                <input 
-                                                    type="number" 
-                                                    name="km_final" 
-                                                    value={formData.km_final} 
-                                                    onChange={handleInputChange} 
-                                                    className="w-full px-6 h-14 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 outline-none font-bold text-slate-700 bg-slate-50 transition-all" 
+                                                <input
+                                                    type="number"
+                                                    name="km_final"
+                                                    value={formData.km_final}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-6 h-14 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 outline-none font-bold text-slate-700 bg-slate-50 transition-all"
                                                     placeholder="Ej: 11000"
                                                 />
                                             </div>
@@ -690,12 +690,12 @@ const VehiculosDashboard = () => {
                                     <div className="space-y-2">
                                         <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Lectura de Odómetro Mensual (Calculado)</label>
                                         <div className="relative">
-                                            <input 
-                                                type="number" 
-                                                name="kilometros_recorridos" 
-                                                value={formData.kilometros_recorridos} 
-                                                onChange={handleInputChange} 
-                                                className="w-full px-8 py-5 rounded-[24px] border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none font-black text-2xl text-slate-900 bg-slate-100/50 transition-all pr-20" 
+                                            <input
+                                                type="number"
+                                                name="kilometros_recorridos"
+                                                value={formData.kilometros_recorridos}
+                                                onChange={handleInputChange}
+                                                className="w-full px-8 py-5 rounded-[24px] border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none font-black text-2xl text-slate-900 bg-slate-100/50 transition-all pr-20"
                                                 placeholder="0"
                                                 readOnly
                                             />
@@ -718,16 +718,16 @@ const VehiculosDashboard = () => {
                                                             <Plus className="w-3 h-3" /> AGREGAR
                                                         </button>
                                                     </div>
-                                                    
+
                                                     {/* Historial de adiciones */}
                                                     <div className="flex flex-wrap gap-1 min-h-[1.5rem] px-1 overflow-hidden">
                                                         {history[field].map((val, idx) => (
-                                                            <motion.button 
+                                                            <motion.button
                                                                 type="button"
-                                                                initial={{ scale: 0.5, opacity: 0 }} 
-                                                                animate={{ scale: 1, opacity: 1 }} 
+                                                                initial={{ scale: 0.5, opacity: 0 }}
+                                                                animate={{ scale: 1, opacity: 1 }}
                                                                 whileHover={{ scale: 1.05, opacity: 0.8 }}
-                                                                key={`${field}-${idx}`} 
+                                                                key={`${field}-${idx}`}
                                                                 onClick={() => removeAddition(field, idx)}
                                                                 className={`text-[9px] font-bold ${c.bg} ${c.text} px-2 py-0.5 rounded-md border ${c.border} cursor-pointer hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex items-center gap-1 group/chip`}
                                                                 title="Haga clic para eliminar este monto"
@@ -740,17 +740,17 @@ const VehiculosDashboard = () => {
 
                                                     <div className={`flex items-center gap-2 w-full h-14 rounded-2xl border-2 ${c.border} ${c.bgLight} px-5 transition-all group`}>
                                                         <DollarSign className={`w-5 h-5 ${c.icon} shrink-0`} />
-                                                        <input 
-                                                            type="number" 
-                                                            name={field} 
-                                                            value={formData[field]} 
-                                                            readOnly 
-                                                            className="flex-1 bg-transparent border-none outline-none font-bold text-slate-700 cursor-not-allowed" 
+                                                        <input
+                                                            type="number"
+                                                            name={field}
+                                                            value={formData[field]}
+                                                            readOnly
+                                                            className="flex-1 bg-transparent border-none outline-none font-bold text-slate-700 cursor-not-allowed"
                                                         />
-                                                        <button 
-                                                            type="button" 
-                                                            onClick={() => resetField(field)} 
-                                                            className="p-1 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" 
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => resetField(field)}
+                                                            className="p-1 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                                                             title="Reiniciar a 0"
                                                         >
                                                             <X className="w-4 h-4" />
@@ -831,9 +831,9 @@ const VehiculosDashboard = () => {
                             </div>
                             <div className="p-6">
                                 <form onSubmit={handleSaveFlota} className="grid grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                    <input placeholder="Marca" className="px-3 py-2 border rounded-xl" value={flotaFormData.marca} onChange={e => setFlotaFormData({...flotaFormData, marca: e.target.value})} required />
-                                    <input placeholder="Modelo" className="px-3 py-2 border rounded-xl" value={flotaFormData.modelo} onChange={e => setFlotaFormData({...flotaFormData, modelo: e.target.value})} required />
-                                    <input placeholder="Patente" className="px-3 py-2 border rounded-xl" value={flotaFormData.patente} onChange={e => setFlotaFormData({...flotaFormData, patente: e.target.value.toUpperCase()})} required />
+                                    <input placeholder="Marca" className="px-3 py-2 border rounded-xl" value={flotaFormData.marca} onChange={e => setFlotaFormData({ ...flotaFormData, marca: e.target.value })} required />
+                                    <input placeholder="Modelo" className="px-3 py-2 border rounded-xl" value={flotaFormData.modelo} onChange={e => setFlotaFormData({ ...flotaFormData, modelo: e.target.value })} required />
+                                    <input placeholder="Patente" className="px-3 py-2 border rounded-xl" value={flotaFormData.patente} onChange={e => setFlotaFormData({ ...flotaFormData, patente: e.target.value.toUpperCase() })} required />
                                     <button type="submit" disabled={submitting} className="col-span-3 bg-indigo-600 text-white py-2 rounded-xl font-bold hover:bg-indigo-700 transition-colors uppercase text-xs tracking-widest">Agregar Vehículo</button>
                                 </form>
                                 <div className="max-h-[300px] overflow-y-auto space-y-2">
@@ -866,8 +866,8 @@ const VehiculosDashboard = () => {
                                 <div className="space-y-3">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Selección de Flota</label>
                                     <div className="max-h-[200px] overflow-y-auto space-y-2 pr-2 scrollbar-thin">
-                                        <div 
-                                            key="all" 
+                                        <div
+                                            key="all"
                                             className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center gap-3 ${selectedVehicles.length === 0 ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100'}`}
                                             onClick={() => setSelectedVehicles([])}
                                         >
@@ -875,11 +875,11 @@ const VehiculosDashboard = () => {
                                             <span className="text-sm font-bold">Todos los Vehículos</span>
                                         </div>
                                         {flota.map(v => (
-                                            <div 
-                                                key={v.id} 
+                                            <div
+                                                key={v.id}
                                                 className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center gap-3 ${selectedVehicles.includes(v.id) ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100'}`}
                                                 onClick={() => {
-                                                    if(selectedVehicles.includes(v.id)) {
+                                                    if (selectedVehicles.includes(v.id)) {
                                                         setSelectedVehicles(selectedVehicles.filter(i => i !== v.id));
                                                     } else {
                                                         setSelectedVehicles([...selectedVehicles, v.id]);
@@ -897,14 +897,14 @@ const VehiculosDashboard = () => {
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
-                                    <button 
+                                    <button
                                         onClick={() => handleExportExcel(false)}
                                         className="flex flex-col items-center justify-center p-4 bg-slate-50 border-2 border-slate-100 rounded-3xl hover:border-indigo-500 transition-all group gap-2"
                                     >
                                         <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform"><Activity className="text-slate-400 group-hover:text-indigo-600" /></div>
                                         <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">Detallado</span>
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={() => handleExportExcel(true)}
                                         className="flex flex-col items-center justify-center p-4 bg-slate-50 border-2 border-slate-100 rounded-3xl hover:border-emerald-500 transition-all group gap-2"
                                     >

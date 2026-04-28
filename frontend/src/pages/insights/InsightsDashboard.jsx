@@ -20,7 +20,7 @@ const InsightsDashboard = () => {
     const [units, setUnits] = useState([]);
 
     // Filtros Seleccionados
-    const [resourceType, setResourceType] = useState(''); 
+    const [resourceType, setResourceType] = useState('');
     const [selectedRecurso, setSelectedRecurso] = useState('');
     const [selectedSub, setSelectedSub] = useState('');
     const [selectedDept, setSelectedDept] = useState('');
@@ -39,7 +39,7 @@ const InsightsDashboard = () => {
                 api.get(`insights/main/reservations_ranking/${query}`),
                 api.get(`insights/main/activity_time/${query}`)
             ]);
-            
+
             setRankingData(resRanking.data.main_ranking);
             setRankingTitle(resRanking.data.title);
             setTimeData(resTime.data);
@@ -95,7 +95,7 @@ const InsightsDashboard = () => {
                     <p className="text-slate-500 font-medium">Análisis profundo de la gestión por áreas</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button 
+                    <button
                         onClick={() => {
                             setSelectedSub(''); setSelectedDept(''); setSelectedUnit('');
                             setResourceType(''); setSelectedRecurso('');
@@ -174,14 +174,14 @@ const InsightsDashboard = () => {
             {/* Vista Toggle */}
             <div className="flex justify-center">
                 <div className="bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100 flex gap-1">
-                    <button 
+                    <button
                         onClick={() => setViewMode('ranking')}
                         className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${viewMode === 'ranking' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
                     >
                         <LayoutDashboard className="w-4 h-4" />
                         Rankings de Consumo
                     </button>
-                    <button 
+                    <button
                         onClick={() => setViewMode('time')}
                         className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${viewMode === 'time' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
                     >
@@ -205,7 +205,7 @@ const InsightsDashboard = () => {
                                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                                             <XAxis type="number" hide />
                                             <YAxis dataKey="label" type="category" axisLine={false} tickLine={false} width={140} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
-                                            <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '16px', border: 'none' }} />
+                                            <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '16px', border: 'none' }} />
                                             <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={24}>
                                                 {rankingData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                                             </Bar>
@@ -221,8 +221,8 @@ const InsightsDashboard = () => {
                                 <div className="h-[400px]">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
-                                            <Pie data={rankingData} dataKey="value" nameKey="label" cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} label={({name, percent}) => `${name.substring(0,10)}... ${(percent * 100).toFixed(0)}%`}>
-                                                {rankingData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[(index+1) % COLORS.length]} />)}
+                                            <Pie data={rankingData} dataKey="value" nameKey="label" cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} label={({ name, percent }) => `${name.substring(0, 10)}... ${(percent * 100).toFixed(0)}%`}>
+                                                {rankingData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[(index + 1) % COLORS.length]} />)}
                                             </Pie>
                                             <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
                                         </PieChart>
@@ -243,7 +243,7 @@ const InsightsDashboard = () => {
                         <div className="h-[450px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={timeData}>
-                                    <defs><linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/><stop offset="95%" stopColor="#6366f1" stopOpacity={0}/></linearGradient></defs>
+                                    <defs><linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6366f1" stopOpacity={0.1} /><stop offset="95%" stopColor="#6366f1" stopOpacity={0} /></linearGradient></defs>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                     <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }} dy={10} />
                                     <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }} />

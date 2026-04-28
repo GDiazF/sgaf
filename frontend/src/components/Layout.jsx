@@ -748,7 +748,7 @@ const Layout = () => {
                                 </span>
                             </div>
 
-<div className="relative">
+                            <div className="relative">
                                 <button
                                     onClick={() => setIsProfileOpen(!isProfileOpen)}
                                     className="relative group transition-transform active:scale-95"
@@ -856,7 +856,7 @@ const Layout = () => {
                                                     setIsProfileOpen(false);
                                                     logout();
                                                 }}
-className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 font-medium text-sm group"
                                             >
                                                 <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-red-100 transition-colors">
                                                     <LogOut className="w-4 h-4" />
@@ -944,7 +944,7 @@ className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:text-
                     </div>
                 </header>
 
-                <div className="p-4 md:p-8 w-full">
+                <div className="p-4 md:px-4 md:pt-4 md:pb-8 w-full">
                     <motion.div
                         key={location.pathname}
                         initial={{ opacity: 0, x: -10 }}

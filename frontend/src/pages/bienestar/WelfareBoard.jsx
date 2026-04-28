@@ -231,11 +231,11 @@ const WelfareBoard = () => {
 
     return (
         <div className="h-[calc(100vh-170px)] sm:h-[calc(100vh-180px)] flex flex-col space-y-4 overflow-hidden">
-            <div className="flex flex-col sm:flex-row items-center justify-between px-4 sm:px-6 pt-4 gap-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between px-1 gap-4">
                 <div className="flex items-center gap-3 w-full sm:w-auto">
                     <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 shadow-sm shrink-0"><Heart className="w-5 h-5 fill-rose-500/10" /></div>
                     <div className="flex flex-col min-w-0">
-                        <h2 className="text-lg sm:text-xl font-bold text-slate-800 tracking-tight leading-none mb-1 truncate">Muro de Comunicaciones</h2>
+                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight uppercase leading-none mb-1 truncate">Muro de Comunicaciones</h2>
                         <span className="text-[10px] font-medium text-slate-400 uppercase tracking-widest truncate">Tablero de Gestión</span>
                     </div>
                 </div>
@@ -258,7 +258,7 @@ const WelfareBoard = () => {
 
 
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-y-auto lg:overflow-x-auto lg:overflow-y-hidden pb-4 px-4 sm:px-6 custom-scrollbar scroll-smooth">
+                <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-y-auto lg:overflow-x-auto lg:overflow-y-hidden pb-4 px-1 custom-scrollbar scroll-smooth">
                     {['BORRADOR', 'PUBLICADO'].map(colId => (
                         <div key={colId} className={`${colId === 'BORRADOR' ? 'lg:flex-[1] lg:min-w-[320px]' : 'lg:flex-[2] lg:min-w-[600px]'} w-full lg:w-auto bg-slate-50 border border-slate-100 rounded-[1.5rem] sm:rounded-[2.5rem] flex flex-col p-4 sm:p-6 shadow-sm min-h-[400px] lg:min-h-0 shrink-0`}>
                             <div className="flex items-center justify-between mb-4 sm:mb-6 px-2 sm:px-4">

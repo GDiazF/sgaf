@@ -298,8 +298,8 @@ const Establishments = () => {
                 </div>
 
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                    <div className="flex flex-col sm:flex-row flex-1 gap-2">
-                        <div className="relative w-full lg:max-w-md">
+                    <div className="flex flex-row flex-1 gap-2">
+                        <div className="relative w-full lg:max-w-md flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                             <input
                                 type="text"
@@ -323,7 +323,7 @@ const Establishments = () => {
                             <select
                                 value={pageSize}
                                 onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                                className="w-20 px-2 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-500 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm text-center"
+                                className="w-[84px] pl-3 pr-7 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm cursor-pointer"
                             >
                                 <option value={10}>10</option>
                                 <option value={20}>20</option>

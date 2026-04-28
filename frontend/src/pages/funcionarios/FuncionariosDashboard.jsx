@@ -61,9 +61,9 @@ const FuncionariosDashboard = () => {
             animate="visible"
         >
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-6 border-b border-slate-200/60 pb-8 sm:pb-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-6 border-b border-slate-200/60 pb-8 sm:pb-6 px-1">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Portal de Funcionarios</h1>
+                    <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight uppercase leading-none">Portal de Funcionarios</h2>
                     <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1.5 flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                         Gestión Institucional y Recursos Humanos

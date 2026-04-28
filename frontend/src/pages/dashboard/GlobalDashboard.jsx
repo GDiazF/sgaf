@@ -67,7 +67,7 @@ const GlobalDashboard = () => {
     return (
         <div className="w-full h-full bg-[#fcfdfe] flex flex-col overflow-hidden font-sans">
             {/* 1. Header Hero - Restaurado */}
-            <header className="px-4 md:px-6 pt-4 pb-2 shrink-0">
+            <header className="px-1 pt-0 pb-2 shrink-0">
                 <div className="flex items-center justify-between">
                     <div>
                         <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] mb-1">Dashboard Principal</p>
@@ -98,7 +98,7 @@ const GlobalDashboard = () => {
             </header>
 
             {/* 2. Área Principal - ESTRUCTURA DE COLUMNAS SEGÚN MAQUETA */}
-            <main className="flex-1 min-h-0 px-4 md:px-6 pb-6 overflow-hidden">
+            <main className="flex-1 min-h-0 px-1 pb-6 overflow-hidden">
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
 
                     {/* COLUMNA IZQUIERDA: Botones + Novedades (3/4 del ancho) */}

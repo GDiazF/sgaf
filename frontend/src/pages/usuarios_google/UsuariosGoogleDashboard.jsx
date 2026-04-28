@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { 
-    Users, Upload, Search, Filter, CheckCircle2, XCircle, AlertCircle, 
+import {
+    Users, Upload, Search, Filter, CheckCircle2, XCircle, AlertCircle,
     MoreHorizontal, ChevronLeft, ChevronRight, FileSpreadsheet, Eye, EyeOff,
     Monitor, Calendar, Building2, Briefcase, RefreshCw, X, GraduationCap, UserX, Copy, Check,
     BookOpen, Award, Users2, ShieldAlert, Clock, BarChart3, PieChart, Settings2
@@ -24,9 +24,9 @@ const UsuariosGoogleDashboard = () => {
     const [users, setUsers] = useState([]);
     const [orgUnits, setOrgUnits] = useState([]);
     const [totalCount, setTotalCount] = useState(0);
-    const [stats, setStats] = useState({ 
-        administrativos: 0, docentes: 0, asistentes: 0, alumnos: 0, 
-        desuso: 0, id_faltantes: 0, id_duplicados: 0, total: 0 
+    const [stats, setStats] = useState({
+        administrativos: 0, docentes: 0, asistentes: 0, alumnos: 0,
+        desuso: 0, id_faltantes: 0, id_duplicados: 0, total: 0
     });
     const [lastUpload, setLastUpload] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -63,7 +63,7 @@ const UsuariosGoogleDashboard = () => {
                 api.get('usuarios-google/usuarios/stats/'),
                 api.get('usuarios-google/unidades/')
             ]);
-            
+
             if (usersRes.data.results) {
                 setUsers(usersRes.data.results);
                 setTotalCount(usersRes.data.count);
@@ -149,9 +149,9 @@ const UsuariosGoogleDashboard = () => {
                     </h1>
                     <p className="text-slate-500 text-sm mt-1">Gestión Dinámica e Institucional.</p>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
-                    <button 
+                    <button
                         onClick={fetchSummary}
                         className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl shadow-lg hover:bg-slate-900 transition-all font-bold text-sm"
                     >
@@ -225,7 +225,7 @@ const UsuariosGoogleDashboard = () => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input type="text" placeholder="Buscar por email, nombre o ID..." className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm font-bold shadow-sm" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} />
                     </div>
-                    
+
                     <div className="w-full lg:w-64">
                         <select className="w-full px-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm font-bold shadow-sm cursor-pointer" value={filterOrg} onChange={(e) => { setFilterOrg(e.target.value); setCurrentPage(1); }}>
                             <option value="">Todas las Unidades</option>
@@ -243,7 +243,7 @@ const UsuariosGoogleDashboard = () => {
                     <button onClick={() => setShowColumnPicker(!showColumnPicker)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm ${showColumnPicker ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-100 text-slate-600 hover:bg-slate-50'}`}>
                         <Filter className="w-4 h-4" /> Columnas
                     </button>
-                    
+
                     {showColumnPicker && (
                         <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 z-50 animate-in fade-in zoom-in duration-200">
                             <div className="flex items-center justify-between mb-3 border-b pb-2">
@@ -337,7 +337,7 @@ const UsuariosGoogleDashboard = () => {
                                 <X className="w-6 h-6 text-slate-400" />
                             </button>
                         </div>
-                        
+
                         <div className="flex-1 overflow-y-auto p-8 bg-white font-sans">
                             {loadingSummary ? (
                                 <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -384,7 +384,7 @@ const UsuariosGoogleDashboard = () => {
                                 </div>
                             )}
                         </div>
-                        
+
                         <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
                             <div className="flex items-center gap-3">
                                 <Settings2 className="w-4 h-4 text-slate-400" />

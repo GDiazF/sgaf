@@ -26,6 +26,7 @@ const ContractModal = ({ isOpen, onClose, onSave, editingId, initialData, lookup
         nro_oc: '',
         cdp: '',
         monto_total: 0,
+        monto_consumido_previo: 0,
         establecimientos: []
     });
 
@@ -110,6 +111,14 @@ const ContractModal = ({ isOpen, onClose, onSave, editingId, initialData, lookup
                             placeholder="Ej: 5000000"
                             value={formData.monto_total}
                             onChange={e => setFormData({ ...formData, monto_total: parseInt(e.target.value) || 0 })}
+                        />
+                        <FormInput
+                            label="Monto Consumido Previo ($)"
+                            icon={<DollarSign />}
+                            type="number"
+                            placeholder="Monto ejecutado previo al sistema..."
+                            value={formData.monto_consumido_previo}
+                            onChange={e => setFormData({ ...formData, monto_consumido_previo: parseInt(e.target.value) || 0 })}
                         />
                     </div>
 

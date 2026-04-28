@@ -120,13 +120,13 @@ const WelfareWall = ({ limit, showFilters = true, sortBy = 'newest', layout = 'v
     return (
         <div className="w-full flex flex-col h-full overflow-hidden">
             {showFilters && (
-                <div className="px-6 py-4 border-b border-slate-50 flex flex-col gap-4">
+                <div className="px-1 pt-0 pb-4 border-b border-slate-50 flex flex-col gap-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
                                 <Star className="w-5 h-5 fill-indigo-600/10" />
                             </div>
-                            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-widest">Beneficios y Convenios</h2>
+                            <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight uppercase leading-none">Beneficios y Convenios</h2>
                         </div>
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
@@ -156,7 +156,7 @@ const WelfareWall = ({ limit, showFilters = true, sortBy = 'newest', layout = 'v
                 </div>
             )}
 
-            <div className={`grid gap-5 text-left px-8 py-6 flex-1 overflow-y-auto custom-scrollbar ${layout === 'horizontal'
+            <div className={`grid gap-5 text-left ${showFilters ? 'px-1 pt-2 pb-6' : 'px-6 md:px-8 py-2'} flex-1 overflow-y-auto custom-scrollbar ${layout === 'horizontal'
                 ? 'grid-cols-1 xl:grid-cols-2'
                 : limit === 5
                     ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'

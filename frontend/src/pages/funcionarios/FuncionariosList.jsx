@@ -137,7 +137,7 @@ const FuncionariosList = () => {
                         <span className="text-xs font-bold uppercase tracking-wider">Volver al Portal</span>
                     </Link>
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Funcionarios</h1>
+                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight uppercase leading-none">Funcionarios</h2>
                         <p className="text-sm font-medium text-slate-500 mt-1 flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span>
                             Gestionar Funcionarios ({totalResults})

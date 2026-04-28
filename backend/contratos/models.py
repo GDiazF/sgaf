@@ -65,6 +65,7 @@ class Contrato(models.Model):
     nro_oc = models.CharField(max_length=50, blank=True, null=True, verbose_name="Número de OC")
     cdp = models.CharField(max_length=100, blank=True, null=True, verbose_name="Nº CDP")
     monto_total = models.IntegerField(default=0, verbose_name="Monto Total Adjudicado")
+    monto_consumido_previo = models.IntegerField(default=0, verbose_name="Monto Consumido Previo")
     
     # Establecimientos asociados al contrato
     establecimientos = models.ManyToManyField('establecimientos.Establecimiento', related_name='contratos', blank=True, verbose_name="Establecimientos Asociados")
@@ -78,10 +79,9 @@ class Contrato(models.Model):
 
     @property
     def monto_ejecutado(self):
-        # Sum of total_pagar from all related receptions (FacturaAdquisicion)
-        # Assuming recepciones is the related_name in FacturaAdquisicion
+        # Sum of total_pagar from all related receptions + the previous consumed amount
         total = self.recepciones.aggregate(total=models.Sum('total_pagar'))['total'] or 0
-        return total
+        return total + self.monto_consumido_previo
 
     @property
     def monto_restante(self):

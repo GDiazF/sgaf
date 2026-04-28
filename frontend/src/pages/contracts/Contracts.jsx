@@ -52,6 +52,9 @@ const Contracts = () => {
         fecha_termino: '',
         tipo_oc: 'UNICA',
         nro_oc: '',
+        cdp: '',
+        monto_total: 0,
+        monto_consumido_previo: 0,
         establecimientos: []
     });
 
@@ -142,6 +145,9 @@ const Contracts = () => {
             fecha_termino: '',
             tipo_oc: 'UNICA',
             nro_oc: '',
+            cdp: '',
+            monto_total: 0,
+            monto_consumido_previo: 0,
             establecimientos: []
         });
         setEditingId(null);
@@ -162,6 +168,9 @@ const Contracts = () => {
             fecha_termino: item.fecha_termino,
             tipo_oc: item.tipo_oc || 'UNICA',
             nro_oc: item.nro_oc || '',
+            cdp: item.cdp || '',
+            monto_total: item.monto_total || 0,
+            monto_consumido_previo: item.monto_consumido_previo || 0,
             establecimientos: item.establecimientos || []
         });
         setEditingId(item.id);
@@ -200,23 +209,23 @@ const Contracts = () => {
     return (
         <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden">
             {/* Header Limpio */}
-            <div className="shrink-0 flex flex-row justify-between items-end gap-3 border-b border-slate-200/60 pb-4">
+            <div className="shrink-0 flex flex-row justify-between items-start lg:items-end gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                    <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight flex items-center gap-2 leading-none uppercase">
                         Contratos y Licitaciones
-                    </h1>
-                    <p className="text-sm font-medium text-slate-500 mt-1 flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                    </h2>
+                    <p className="text-[10px] md:text-xs font-medium text-slate-500 mt-1.5 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
                         Gestión de convenios ({totalCount})
                     </p>
                 </div>
                 {can('contratos.add_contrato') && (
                     <button
                         onClick={handleNew}
-                        className="group relative inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl overflow-hidden transition-all hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-900/20 active:scale-95 shadow-xl shadow-blue-500/20"
+                        className="group relative inline-flex items-center justify-center p-2.5 lg:px-5 lg:py-2 bg-blue-600 text-white text-sm font-semibold rounded-[14px] lg:rounded-xl overflow-hidden transition-all hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-500/20 shrink-0"
                     >
-                        <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
-                        <span>Nuevo Contrato</span>
+                        <Plus className="w-5 h-5 lg:w-4 lg:h-4 lg:mr-2" />
+                        <span className="hidden lg:inline">Nuevo Contrato</span>
                     </button>
                 )}
             </div>
@@ -235,21 +244,39 @@ const Contracts = () => {
                 {/* Search & Filters Bar */}
                 <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3 shrink-0">
                     <div className="flex flex-col md:flex-row flex-1 gap-3">
-                        <div className="relative flex-1 max-w-md">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                            <input
-                                type="text"
-                                placeholder="Buscar por código o descripción..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-[11px] focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                            />
+                        <div className="flex flex-row flex-1 gap-2">
+                            <div className="relative flex-1 max-w-md">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por código o descripción..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-[11px] focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                />
+                            </div>
+                            <div className="flex lg:hidden shrink-0">
+                                <select
+                                    value={pageSize}
+                                    onChange={(e) => {
+                                        const newSize = Number(e.target.value);
+                                        setPageSize(newSize);
+                                        fetchData(1, newSize);
+                                    }}
+                                    className="w-[76px] sm:w-[84px] pl-3 pr-7 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={20}>20</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                </select>
+                            </div>
                         </div>
                         <div className="flex flex-row gap-2">
                             <select
                                 value={filterOrientacion}
                                 onChange={(e) => setFilterOrientacion(e.target.value)}
-                                className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm min-w-[140px]"
+                                className="flex-1 lg:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm min-w-[140px]"
                             >
                                 <option value="">Orientaciones</option>
                                 {orientaciones.map(o => <option key={o.id} value={o.id}>{o.nombre}</option>)}
@@ -257,15 +284,15 @@ const Contracts = () => {
                             <select
                                 value={filterCategoria}
                                 onChange={(e) => setFilterCategoria(e.target.value)}
-                                className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm min-w-[140px]"
+                                className="flex-1 lg:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm min-w-[140px]"
                             >
                                 <option value="">Categorías</option>
                                 {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                             </select>
                         </div>
                     </div>
-                    <div className="flex items-center justify-between lg:justify-end gap-2 shrink-0">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest lg:ml-4">Mostrar:</span>
+                    <div className="hidden lg:flex items-center justify-end gap-2 shrink-0">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-4">Mostrar:</span>
                         <select
                             value={pageSize}
                             onChange={(e) => {
@@ -273,7 +300,7 @@ const Contracts = () => {
                                 setPageSize(newSize);
                                 fetchData(1, newSize);
                             }}
-                            className="w-[70px] sm:w-[80px] px-3 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-all pr-8 appearance-none"
+                            className="w-[76px] sm:w-[84px] pl-3 pr-7 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
                         >
                             <option value={10}>10</option>
                             <option value={20}>20</option>
@@ -325,11 +352,11 @@ const Contracts = () => {
                                         </div>
                                     </div>
 
-                                    <div className="flex justify-end gap-2" onClick={e => e.stopPropagation()}>
+                                    <div className="grid grid-cols-2 gap-2 mt-auto pt-4 border-t border-slate-50" onClick={e => e.stopPropagation()}>
                                         {can('contratos.change_contrato') && (
                                             <button
                                                 onClick={() => handleEdit(item)}
-                                                className="flex-1 flex items-center justify-center gap-2 bg-slate-50 text-slate-900 py-2.5 rounded-xl font-black text-[10px] uppercase shadow-sm active:scale-95 transition-all"
+                                                className="flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 py-2.5 rounded-xl font-semibold text-[10px] uppercase shadow-sm active:scale-95 transition-all"
                                             >
                                                 <Pencil className="w-3.5 h-3.5" /> Editar
                                             </button>
@@ -337,9 +364,9 @@ const Contracts = () => {
                                         {can('contratos.delete_contrato') && (
                                             <button
                                                 onClick={() => handleDelete(item.id)}
-                                                className="flex items-center justify-center p-2.5 bg-red-50 text-red-600 rounded-xl active:scale-95 transition-all border border-red-100 shadow-sm"
+                                                className="flex items-center justify-center gap-2 bg-red-50 text-red-600 py-2.5 rounded-xl font-semibold text-[10px] uppercase shadow-sm active:scale-95 transition-all"
                                             >
-                                                <Trash2 className="w-4 h-4" />
+                                                <Trash2 className="w-3.5 h-3.5" /> Borrar
                                             </button>
                                         )}
                                     </div>
