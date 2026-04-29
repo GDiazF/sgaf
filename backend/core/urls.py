@@ -68,6 +68,7 @@ urlpatterns = [
     path('api/conectividad/', include('conectividad.urls')),
     path('api/insights/', include('insights.urls')),
     path('api/bienestar/', include('bienestar.urls')),
+    path('api/biometrico/', include('biometrico.urls')),
 ]
 
 from django.conf import settings

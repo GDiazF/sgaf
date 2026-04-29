@@ -39,6 +39,7 @@ import ReservasDashboard from './pages/reservas/ReservasDashboard';
 import PublicReservas from './pages/reservas/PublicReservas';
 import PersonalTIDashboard from './pages/personal_ti/PersonalTIDashboard';
 import UsuariosGoogleDashboard from './pages/usuarios_google/UsuariosGoogleDashboard';
+import BiometricoDashboard from './pages/biometrico/BiometricoDashboard';
 import MonitoreoRed from './pages/conectividad/MonitoreoRed';
 import InsightsDashboard from './pages/insights/InsightsDashboard';
 import WelfareBoard from './pages/bienestar/WelfareBoard';
@@ -203,6 +204,7 @@ function App() {
                 </Route>
                 <Route element={<ProtectedRoute permission="usuarios_google.view_googleuser" />}>
                   <Route path="usuarios-google" element={<UsuariosGoogleDashboard />} />
+                  <Route path="biometrico" element={<BiometricoDashboard />} />
                 </Route>
                 <Route element={<ProtectedRoute permission="conectividad.view_escuelared" />}>
                   <Route path="monitoreo-red" element={<MonitoreoRed />} />

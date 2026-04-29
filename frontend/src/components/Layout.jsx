@@ -371,7 +371,7 @@ const Layout = () => {
 
 
                     {/* Main SSGG Submenu */}
-                    {(can('contratos.view_contrato') || can('servicios.view_proveedor') || can('servicios.view_facturaadquisicion') || can('prestamo_llaves.view_prestamo') || can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('servicios.view_servicio') || can('servicios.view_registropago') || can('servicios.view_recepcionconforme') || can('servicios.view_cdp')) && (
+                    {(can('contratos.view_contrato') || can('servicios.view_proveedor') || can('servicios.view_facturaadquisicion') || can('prestamo_llaves.view_prestamo') || can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('servicios.view_servicio') || can('servicios.view_registropago') || can('servicios.view_recepcionconforme') || can('servicios.view_cdp') || can('usuarios_google.view_googleuser')) && (
                         <div>
                             <button
                                 onClick={() => {
@@ -456,7 +456,7 @@ const Layout = () => {
                                         )}
 
                                         {/* Section: RECURSOS */}
-                                        {(can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo') || can('personal_ti.view_personalti') || can('solicitudes_reservas.view_solicitudreserva')) && (
+                                        {(can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo') || can('personal_ti.view_personalti') || can('solicitudes_reservas.view_solicitudreserva') || can('usuarios_google.view_googleuser')) && (
                                             <div className="space-y-0.5 pt-2">
                                                 <div className="px-4 mb-1">
                                                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Recursos</span>
@@ -498,11 +498,28 @@ const Layout = () => {
 
 
 
-                                                {can('usuarios_google.view_googleuser') && (
-                                                    <Link to="/usuarios-google" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/usuarios-google') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                                                        <Chrome className="w-4 h-4 flex-shrink-0" />
-                                                        <span className="font-medium whitespace-nowrap">Usuarios Google</span>
-                                                    </Link>
+                                                {(can('usuarios_google.view_googleuser') || can('biometrico.view_biometrico')) && (
+                                                    <div>
+                                                        <button onClick={() => setActiveSubMenu(activeSubMenu === 'usuarios' ? null : 'usuarios')} className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'usuarios' || isActive('/usuarios-google') || isActive('/biometrico') ? 'text-blue-400' : ''}`}>
+                                                            <div className="flex items-center gap-3">
+                                                                <Users className="w-4 h-4 flex-shrink-0" />
+                                                                <span className="font-medium whitespace-nowrap">Usuarios</span>
+                                                            </div>
+                                                            {activeSubMenu === 'usuarios' ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                                        </button>
+                                                        {activeSubMenu === 'usuarios' && (
+                                                            <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
+                                                                {can('usuarios_google.view_googleuser') && (
+                                                                    <Link to="/usuarios-google" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/usuarios-google') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                                        GoogleWorkspace
+                                                                    </Link>
+                                                                )}
+                                                                <Link to="/biometrico" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/biometrico') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                                    Biométrico
+                                                                </Link>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
 
                                                 {can('conectividad.view_escuelared') && (
