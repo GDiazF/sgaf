@@ -1,94 +1,88 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, RefreshCw, LogOut } from 'lucide-react';
 
 const SessionTimeoutManager = () => {
     const { logout, user } = useAuth();
+    const location = useLocation();
     const [showModal, setShowModal] = useState(false);
     const [secondsLeft, setSecondsLeft] = useState(60);
 
-    // TIEMPOS REALES (Cierre en 30 min, Aviso a los 29 min para que dure 1 min)
+    // TIEMPOS REALES (Cierre en 30 min, Aviso a los 29 min)
     const SESSION_TIME = 30 * 60 * 1000;
     const WARNING_TIME = 1 * 60 * 1000;
 
-    const timeoutRef = useRef(null);
-    const countdownRef = useRef(null);
+    // Rutas donde NO aplica el timeout
+    const publicPaths = ['/login', '/forgot-password', '/reset-password', '/reservas-externas'];
+    const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
+
     const lastActivityRef = useRef(Date.now());
 
-    const startOrResetTimer = useCallback((sync = true) => {
-        if (!user) return;
-
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        if (countdownRef.current) clearInterval(countdownRef.current);
-
-        if (sync) {
-            localStorage.setItem('lastActivity', Date.now().toString());
+    // 1. Registro de actividad (solo si está logueado y no en ruta pública)
+    const updateActivity = () => {
+        if (!user || showModal || isPublic) return;
+        const now = Date.now();
+        // Prevenir excesivas escrituras, solo registrar cada 1 segundo
+        if (now - lastActivityRef.current > 1000) {
+            lastActivityRef.current = now;
+            localStorage.setItem('lastActivity', now.toString());
         }
-
-        setShowModal(false);
-        setSecondsLeft(Math.floor(WARNING_TIME / 1000));
-
-        timeoutRef.current = setTimeout(() => {
-            setShowModal(true);
-        }, SESSION_TIME - WARNING_TIME);
-    }, [user, SESSION_TIME, WARNING_TIME]);
+    };
 
     useEffect(() => {
-        if (user) {
-            startOrResetTimer(false);
-        }
-        return () => {
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            if (countdownRef.current) clearInterval(countdownRef.current);
-        };
-    }, [user, startOrResetTimer]);
-
-    useEffect(() => {
-        if (showModal) {
-            countdownRef.current = setInterval(() => {
-                setSecondsLeft(prev => {
-                    if (prev <= 1) {
-                        clearInterval(countdownRef.current);
-                        logout();
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-        }
-        return () => {
-            if (countdownRef.current) clearInterval(countdownRef.current);
-        };
-    }, [showModal, logout]);
-
-    useEffect(() => {
-        if (!user) return;
-
-        const handleActivity = () => {
-            const now = Date.now();
-            if (now - lastActivityRef.current > 2000 && !showModal) {
-                lastActivityRef.current = now;
-                startOrResetTimer(true);
-            }
-        };
-
         const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-        events.forEach(ev => window.addEventListener(ev, handleActivity));
-        return () => events.forEach(ev => window.removeEventListener(ev, handleActivity));
-    }, [user, startOrResetTimer, showModal]);
+        events.forEach(ev => window.addEventListener(ev, updateActivity));
+        return () => events.forEach(ev => window.removeEventListener(ev, updateActivity));
+    }, [user, showModal, isPublic]);
 
+    // 2. Sincronización entre diferentes pestañas de SGAF
     useEffect(() => {
         const handleSync = (e) => {
             if (e.key === 'lastActivity' && !showModal) {
-                startOrResetTimer(false);
+                lastActivityRef.current = parseInt(e.newValue || Date.now().toString());
             }
         };
         window.addEventListener('storage', handleSync);
         return () => window.removeEventListener('storage', handleSync);
-    }, [startOrResetTimer, showModal]);
+    }, [showModal]);
 
-    if (!user) return null;
+    // 3. El Reloj Real (Resistente a suspensiones de PC)
+    useEffect(() => {
+        if (!user || isPublic) {
+            setShowModal(false);
+            return;
+        }
+
+        const interval = setInterval(() => {
+            const now = Date.now();
+            const elapsed = now - lastActivityRef.current;
+            
+            if (elapsed >= SESSION_TIME) {
+                clearInterval(interval);
+                logout(); // Cierre instantáneo si ya pasó el tiempo (ej. PC suspendido)
+            } else if (elapsed >= SESSION_TIME - WARNING_TIME) {
+                if (!showModal) setShowModal(true);
+                // Calcula los segundos exactos restantes basados en el reloj real
+                const remaining = Math.max(0, Math.ceil((SESSION_TIME - elapsed) / 1000));
+                setSecondsLeft(remaining);
+            } else {
+                if (showModal) setShowModal(false);
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [user, isPublic, showModal, logout]);
+
+    const handleKeepAlive = () => {
+        setShowModal(false);
+        const now = Date.now();
+        lastActivityRef.current = now;
+        localStorage.setItem('lastActivity', now.toString());
+    };
+
+    if (!user || isPublic) return null;
 
     const formatTime = (s) => {
         const m = Math.floor(s / 60);
@@ -115,7 +109,7 @@ const SessionTimeoutManager = () => {
 
                         <div className="grid grid-cols-2 gap-3">
                             <button
-                                onClick={() => startOrResetTimer(true)}
+                                onClick={handleKeepAlive}
                                 className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-blue-500/20"
                             >
                                 <RefreshCw className="w-3 h-3" /> Mantener

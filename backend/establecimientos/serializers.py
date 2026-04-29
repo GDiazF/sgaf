@@ -23,7 +23,7 @@ class EstablecimientoSerializer(serializers.ModelSerializer):
         model = Establecimiento
         fields = [
             'id', 'rbd', 'nombre', 'tipo', 'tipo_nombre', 'director', 'direccion', 
-            'email', 'logo', 'activo', 'telefonos', 'latitud', 'longitud', 
+            'email', 'url_web', 'logo', 'activo', 'telefonos', 'latitud', 'longitud', 
             'telefonos_json', 'telefono_principal'
         ]
 

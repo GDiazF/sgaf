@@ -67,6 +67,7 @@ urlpatterns = [
     path('api/usuarios-google/', include('usuarios_google.urls')),
     path('api/conectividad/', include('conectividad.urls')),
     path('api/insights/', include('insights.urls')),
+    path('api/comunicaciones/', include('comunicaciones.urls')),
     path('api/bienestar/', include('bienestar.urls')),
     path('api/biometrico/', include('biometrico.urls')),
 ]

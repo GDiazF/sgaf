@@ -1,1 +1,1 @@
-# commands package
+# Package for reservation commands

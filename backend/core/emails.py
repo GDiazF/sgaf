@@ -134,31 +134,19 @@ def _base_template(titulo, contenido_html):
     """
 
 def enviar_correo_reset_password(email, nombre, reset_url):
-    subject = "🔑 Restablecer tu contraseña - SGAF"
-    contenido = f"""
-    <p style="color:#475569;font-size:16px;margin:0 0 24px;">Hola <strong>{nombre}</strong>,</p>
-    <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 32px;">
-        Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en el Sistema de Gestión del SLEP Iquique. 
-        Si no realizaste esta solicitud, puedes ignorar este mensaje de forma segura.
-    </p>
+    from comunicaciones.utils import enviar_correo_maestro
     
-    <div style="text-align:center;margin:40px 0;">
-        <a href="{reset_url}" style="background:#2563eb;color:#ffffff;padding:16px 32px;border-radius:16px;text-decoration:none;font-size:15px;font-weight:700;display:inline-block;box-shadow:0 4px 12px rgba(37,99,235,0.2);transition:all 0.3s;">
-            Restablecer Contraseña Ahora
-        </a>
-    </div>
+    contexto = {
+        'nombre': nombre,
+        'reset_url': reset_url
+    }
+    
+    # Verificación de límite diario (opcional, pero buena práctica mantenerla)
+    daily_limit = getattr(settings, 'EMAIL_DAILY_LIMIT', 200)
+    with _counter_lock:
+        if _get_daily_count() >= daily_limit:
+            _log_event(f"[BLOQUEADO] Límite diario alcanzado para Reset Password: {email}")
+            return False
+        _increment_daily_count()
 
-    <div style="background:#f1f5f9;border-radius:16px;padding:24px;border:1px solid #e2e8f0;">
-        <p style="margin:0 0 12px;color:#475569;font-size:13px;font-weight:700;">¿El botón no funciona?</p>
-        <p style="margin:0;color:#64748b;font-size:12px;word-break:break-all;">
-            Copia y pega este enlace en tu navegador:<br>
-            <a href="{reset_url}" style="color:#2563eb;text-decoration:none;">{reset_url}</a>
-        </p>
-    </div>
-
-    <p style="color:#94a3b8;font-size:13px;margin:32px 0 0;text-align:center;">
-        Este enlace expirará en 24 horas por motivos de seguridad.
-    </p>
-    """
-    body = _base_template("Recuperación de Cuenta", contenido)
-    _safe_email([email], subject, body)
+    return enviar_correo_maestro('RESET_PASSWORD', [email], contexto)

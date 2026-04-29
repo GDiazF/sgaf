@@ -502,71 +502,64 @@ from rest_framework.permissions import IsAdminUser
 from .models import SecurityConfig
 
 class SecurityConfigView(APIView):
-    permission_classes = [IsAdminUser]
-
     def get(self, request):
+        if not request.user.has_perm('core.view_securityconfig'):
+            return Response({'error': 'No tienes permiso'}, status=403)
         config = SecurityConfig.get_config()
-        return Response({
-            'force_mfa_all': config.force_mfa_all
-        })
+        return Response({'force_mfa_all': config.force_mfa_all})
 
     def post(self, request):
+        if not request.user.has_perm('core.change_securityconfig'):
+            return Response({'error': 'No tienes permiso'}, status=403)
         config = SecurityConfig.get_config()
         config.force_mfa_all = request.data.get('force_mfa_all', config.force_mfa_all)
         config.save()
-        return Response({
-            'message': 'Configuración actualizada',
-            'force_mfa_all': config.force_mfa_all
-        })
+        return Response({'message': 'Configuración actualizada', 'force_mfa_all': config.force_mfa_all})
 
 class AdminMFAUserManagementView(APIView):
-    permission_classes = [IsAdminUser]
-
     def get(self, request):
+        if not request.user.has_perm('auth.view_user'):
+            return Response({'error': 'No tienes permiso'}, status=403)
         users = User.objects.select_related('profile').all().order_by('username')
-        data = []
-        for u in users:
-            data.append({
-                'id': u.id,
-                'username': u.username,
-                'email': u.email,
-                'mfa_enabled': u.profile.mfa_enabled,
-                'mfa_enforced': u.profile.mfa_enforced,
-                'mfa_method': u.profile.mfa_method,
-            })
+        data = [{
+            'id': u.id,
+            'username': u.username,
+            'email': u.email,
+            'mfa_enabled': u.profile.mfa_enabled,
+            'mfa_enforced': u.profile.mfa_enforced,
+            'mfa_method': u.profile.mfa_method,
+        } for u in users]
         return Response(data)
 
     def post(self, request):
+        if not request.user.has_perm('auth.change_user'):
+            return Response({'error': 'No tienes permiso'}, status=403)
         user_id = request.data.get('user_id')
-        action = request.data.get('action') # 'ENFORCE', 'UNENFORCE', 'RESET'
-        
+        action = request.data.get('action')
         target_user = User.objects.get(pk=user_id)
         profile = target_user.profile
         
-        if action == 'ENFORCE':
-            profile.mfa_enforced = True
-            profile.save()
-        elif action == 'UNENFORCE':
-            profile.mfa_enforced = False
-            profile.save()
+        if action == 'ENFORCE': profile.mfa_enforced = True
+        elif action == 'UNENFORCE': profile.mfa_enforced = False
         elif action == 'RESET':
             profile.mfa_enabled = False
             profile.mfa_enforced = False
-            profile.save()
             TOTPDevice.objects.filter(user=target_user).delete()
             TrustedDevice.objects.filter(user=target_user).delete()
-            
-        return Response({'message': f'Acción {action} realizada con éxito para {target_user.username}'})
+        profile.save()
+        return Response({'message': f'Acción {action} realizada con éxito'})
 
 class EmailConfigurationView(APIView):
-    permission_classes = [IsAdminUser]
-
     def get(self, request):
+        if not request.user.has_perm('core.view_emailconfiguration'):
+            return Response({'error': 'No tienes permiso'}, status=403)
         config = EmailConfiguration.get_config()
         serializer = EmailConfigurationSerializer(config)
         return Response(serializer.data)
 
     def post(self, request):
+        if not request.user.has_perm('core.change_emailconfiguration'):
+            return Response({'error': 'No tienes permiso'}, status=403)
         config = EmailConfiguration.get_config()
         serializer = EmailConfigurationSerializer(config, data=request.data, partial=True)
         if serializer.is_valid():

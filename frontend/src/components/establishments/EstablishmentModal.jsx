@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import BaseModal from '../common/BaseModal';
 import FormInput from '../common/FormInput';
 import FormSelect from '../common/FormSelect';
-import { School, Info, User, Mail, Phone, MapPin, Hash, Activity, Image as ImageIcon, Camera } from 'lucide-react';
+import { School, Info, User, Mail, Phone, MapPin, Hash, Activity, Image as ImageIcon, Camera, Globe } from 'lucide-react';
 
 const EstablishmentModal = ({
     isOpen,
@@ -19,6 +19,7 @@ const EstablishmentModal = ({
         direccion: '',
         director: '',
         email: '',
+        url_web: '',
         latitud: '',
         longitud: '',
         activo: true,
@@ -48,6 +49,7 @@ const EstablishmentModal = ({
                 direccion: '',
                 director: '',
                 email: '',
+                url_web: '',
                 latitud: '',
                 longitud: '',
                 activo: true,
@@ -162,7 +164,7 @@ const EstablishmentModal = ({
 
                 {/* Section: Contacto y Ubicación */}
                 <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <FormInput
                             label="Director(a) / Responsable"
                             icon={<User className="w-4 h-4" />}
@@ -177,6 +179,14 @@ const EstablishmentModal = ({
                             placeholder="ejemplo@slep.cl"
                             value={formData.email}
                             onChange={e => setFormData({ ...formData, email: e.target.value })}
+                        />
+                        <FormInput
+                            label="Página Web Oficial"
+                            icon={<Globe className="w-4 h-4" />}
+                            type="url"
+                            placeholder="https://www.ejemplo.cl"
+                            value={formData.url_web || ''}
+                            onChange={e => setFormData({ ...formData, url_web: e.target.value })}
                         />
                     </div>
 
