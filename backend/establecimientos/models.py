@@ -37,6 +37,7 @@ class Establecimiento(models.Model):
     logo = models.ImageField(upload_to='establecimientos/logos/', null=True, blank=True)
     latitud = models.FloatField(null=True, blank=True, verbose_name="Latitud")
     longitud = models.FloatField(null=True, blank=True, verbose_name="Longitud")
+    url_web = models.URLField(max_length=500, blank=True, null=True, verbose_name="Página Web")
     activo = models.BooleanField(default=True)
  
     class Meta:

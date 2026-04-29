@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MapPin, Navigation, Info, ExternalLink, Building, User, Mail, Phone, Activity, Hash } from 'lucide-react';
+import { X, MapPin, Navigation, Info, ExternalLink, Building, User, Mail, Phone, Activity, Hash, Globe } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -29,7 +29,7 @@ const ChangeView = ({ center }) => {
 const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablishments = [] }) => {
     if (!isOpen || !establishment) return null;
 
-    const { nombre, direccion, latitud, longitud, director, email, tipo_nombre, logo, rbd, activo } = establishment;
+    const { nombre, direccion, latitud, longitud, director, email, url_web, tipo_nombre, logo, rbd, activo } = establishment;
     const phones = establishment.telefonos || [];
     const principalPhone = phones.find(p => p.es_principal) || phones[0];
 
@@ -42,7 +42,7 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
         : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion || nombre)}`;
 
     const InfoBox = ({ icon: Icon, label, value, subValue, highlight = false }) => (
-        <div className={`flex gap-3 p-2.5 rounded-2xl border transition-all ${highlight ? 'bg-blue-50 border-blue-100 shadow-sm shadow-blue-500/5' : 'bg-slate-50/50 border-slate-100 hover:bg-white hover:shadow-sm'}`}>
+        <div className={`flex gap-3 p-2 rounded-2xl border transition-all ${highlight ? 'bg-blue-50 border-blue-100 shadow-sm shadow-blue-500/5' : 'bg-slate-50/50 border-slate-100 hover:bg-white hover:shadow-sm'}`}>
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 border shadow-sm ${highlight ? 'bg-white border-blue-200 text-blue-600' : 'bg-white border-slate-100 text-slate-400'}`}>
                 <Icon className="w-4 h-4" />
             </div>
@@ -98,7 +98,7 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
                         initial={{ opacity: 0, scale: 0.95, y: 10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                        className="relative w-full max-w-lg md:max-w-6xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[660px] max-h-[90vh] border border-white/20"
+                        className="relative w-full max-w-lg md:max-w-6xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[700px] max-h-[90vh] border border-white/20"
                     >
                         {/* Botón Cerrar Absoluto */}
                         <button
@@ -141,8 +141,8 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
                             </div>
                         </div>
 
-                        <div className="w-full md:w-[380px] p-6 lg:p-8 flex flex-col bg-white overflow-y-auto md:border-l border-slate-100 custom-scrollbar">
-                            <div className="flex-1 space-y-2.5 pt-6">
+                        <div className="w-full md:w-[380px] p-6 lg:p-7 flex flex-col bg-white overflow-y-auto md:border-l border-slate-100 custom-scrollbar">
+                            <div className="flex-1 space-y-2 pt-4">
                                 {/* Header */}
                                 <div className="flex items-center gap-4 mb-2 bg-white p-4 rounded-[1.8rem] border border-slate-100 shadow-sm">
                                     <div className="w-12 h-12 rounded-2xl bg-slate-50 p-2 shadow-inner border border-slate-100 flex items-center justify-center flex-shrink-0">
@@ -187,8 +187,15 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
                                 )}
                             </div>
 
-                            {/* Redirect Button */}
-                            <div className="mt-2 pt-2 border-t border-slate-50">
+                            {/* Redirect Buttons */}
+                            <div className="mt-2 pt-2 border-t border-slate-50 flex flex-col gap-2">
+                                {url_web && (
+                                    <a href={url_web} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-2 rounded-2xl font-bold text-[10px] uppercase tracking-[1px] hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 group">
+                                        <Globe className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                                        Sitio Web Oficial
+                                        <ExternalLink className="w-3.5 h-3.5 text-white/50" />
+                                    </a>
+                                )}
                                 <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-2xl font-bold text-[10px] uppercase tracking-[1px] hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 group">
                                     <img src="https://www.google.com/images/branding/product/ico/maps_32dp.ico" alt="Maps" className="w-4 h-4 group-hover:scale-110 transition-transform" />
                                     Google Maps

@@ -33,7 +33,8 @@ export const groupPermissions = (permissions) => {
         else if (name.includes('anexo')) module = 'Telecomunicaciones';
         else if (name.includes('procedimiento') || name.includes('tipo de documento')) module = 'Gestor Documental';
         else if (name.includes('beneficio') || name.includes('bienestar')) module = 'Bienestar y Beneficios';
-        else if (name.includes('user') || name.includes('group') || name.includes('permission') || name.includes('correo') || name.includes('email')) module = 'Seguridad y Usuarios';
+        else if (appLabel === 'comunicaciones' || name.includes('plantilla') || name.includes('smtp')) module = 'Comunicaciones y Notificaciones';
+        else if (name.includes('user') || name.includes('group') || name.includes('permission')) module = 'Seguridad y Usuarios';
         else if (name.includes('log entry') || name.includes('logentry')) module = 'Auditoría';
         else if (name.includes('link de interes') || name.includes('linkinteres')) module = 'Dashboard, Links y Redes';
 
@@ -118,7 +119,9 @@ export const getFriendlyPermName = (perm) => {
         'beneficioarchivo': 'Adjuntos de Beneficios',
         'linkinteres': 'Links y Redes Sociales / Dashboard',
         'logentry': 'Logs de Auditoría',
-        'emailconfiguration': 'Configuración de Correo'
+        'emailconfiguration': 'Configuración Global de Correo',
+        'plantillacorreo': 'Plantillas de Correo',
+        'cuentasmtp': 'Cuentas SMTP (Servidores)'
     };
 
     const modelKey = codename.split('_')[1];

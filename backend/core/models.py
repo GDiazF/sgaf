@@ -125,8 +125,13 @@ class EmailConfiguration(models.Model):
     smtp_use_ssl = models.BooleanField(default=False, verbose_name="Usar SSL")
     default_from_email = models.CharField(max_length=255, default='SLEP Iquique <noreply@slepiquique.cl>', verbose_name="Remitente por Defecto")
     
-    # Notificaciones específicas
-    reservas_admin_email = models.EmailField(default='ssgg@slepiquique.cl', help_text="Email que recibe avisos de nuevas reservas", verbose_name="Email Admin Reservas")
+    # Notificaciones específicas (soporta lista separada por comas)
+    reservas_admin_email = models.CharField(max_length=500, default='ssgg@slepiquique.cl', help_text="Emails que reciben avisos (separar por comas para varios)", verbose_name="Emails Admin Reservas")
+
+    def get_reservas_emails_list(self):
+        if not self.reservas_admin_email:
+            return []
+        return [e.strip() for e in self.reservas_admin_email.split(',') if e.strip()]
 
     class Meta:
         verbose_name = "Configuración de Correo"

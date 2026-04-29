@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'django_filters',
     'rest_framework_simplejwt',
     # Apps del Sistema
+    'comunicaciones',
     'core',
     'bienestar',
     'conectividad',
@@ -157,6 +158,7 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 # ────────────────────────────────────────────────────────────
 # CORREO Y OTROS
 # ────────────────────────────────────────────────────────────
+FRONTEND_URL        = config('FRONTEND_URL', default='http://localhost:5173')
 EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST          = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT          = config('EMAIL_PORT', default=587, cast=int)

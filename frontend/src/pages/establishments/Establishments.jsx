@@ -48,6 +48,7 @@ const Establishments = () => {
         director: '',
         direccion: '',
         email: '',
+        url_web: '',
         latitud: '',
         longitud: '',
         activo: true
@@ -217,6 +218,7 @@ const Establishments = () => {
             director: '',
             direccion: '',
             email: '',
+            url_web: '',
             latitud: '',
             longitud: '',
             activo: true
