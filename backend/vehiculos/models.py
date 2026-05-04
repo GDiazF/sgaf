@@ -1,9 +1,39 @@
 from django.db import models
 
+class VehiculoTipoCombustible(models.Model):
+    nombre = models.CharField(max_length=50, unique=True)
+
+    class Meta:
+        verbose_name = "Tipo de Combustible"
+        verbose_name_plural = "Tipos de Combustible"
+
+    def __str__(self):
+        return self.nombre
+
+class VehiculoTipoDocumento(models.Model):
+    nombre = models.CharField(max_length=100)
+    icono = models.CharField(max_length=50, default='FileText')
+    color = models.CharField(max_length=20, default='indigo')
+    requerido = models.BooleanField(default=False)
+    dias_aviso_defecto = models.PositiveIntegerField(default=15, help_text="Días antes del vencimiento para avisar")
+
+    class Meta:
+        verbose_name = "Tipo de Documento"
+        verbose_name_plural = "Tipos de Documentos"
+
+    def __str__(self):
+        return self.nombre
+
+
 class Vehiculo(models.Model):
     marca = models.CharField(max_length=100)
     modelo = models.CharField(max_length=100)
+    anio = models.IntegerField(verbose_name="Año", default=2024)
     patente = models.CharField(max_length=10, unique=True)
+    tipo_combustible = models.CharField(max_length=50, blank=True, null=True)
+    nro_chasis = models.CharField(max_length=100, blank=True, null=True)
+    nro_motor = models.CharField(max_length=100, blank=True, null=True)
+    imagen = models.ImageField(upload_to='vehiculos/fotos/', blank=True, null=True)
     activo = models.BooleanField(default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
 
@@ -14,6 +44,25 @@ class Vehiculo(models.Model):
 
     def __str__(self):
         return f"{self.marca} {self.modelo} ({self.patente})"
+
+class VehiculoDocumento(models.Model):
+    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE, related_name='documentos')
+    tipo = models.ForeignKey(VehiculoTipoDocumento, on_delete=models.PROTECT, related_name='documentos')
+    archivo = models.FileField(upload_to='vehiculos/documentos/')
+    fecha_vencimiento = models.DateField(null=True, blank=True)
+    observaciones = models.TextField(blank=True, null=True)
+    dias_aviso = models.PositiveIntegerField(null=True, blank=True, help_text="Personalizar días de aviso (si está vacío usa el defecto del tipo)")
+    ultima_notificacion = models.DateField(null=True, blank=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Documento de Vehículo"
+        verbose_name_plural = "Documentos de Vehículos"
+        ordering = ['-creado_en']
+
+    def __str__(self):
+        return f"{self.get_tipo_display()} - {self.vehiculo.patente}"
 
 
 class RegistroMensual(models.Model):

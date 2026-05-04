@@ -59,6 +59,12 @@ const Layout = () => {
         if (windowWidth <= 1366) {
             setSidebarOpen(false);
         }
+
+        // Auto-expand submenus based on path
+        if (location.pathname.startsWith('/vehiculos')) {
+            setActiveMainGroup('ssgg');
+            setActiveSubMenu('vehiculos');
+        }
     }, [location.pathname, location.state, windowWidth]);
 
     // Block scroll when mobile menu is open
@@ -474,10 +480,28 @@ const Layout = () => {
                                                     </Link>
                                                 )}
                                                 {can('vehiculos.view_registromensual') && (
-                                                    <Link to="/vehiculos" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/vehiculos') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                                                        <Truck className="w-4 h-4 flex-shrink-0" />
-                                                        <span className="font-medium whitespace-nowrap">Vehículos</span>
-                                                    </Link>
+                                                    <div>
+                                                        <button 
+                                                            onClick={() => setActiveSubMenu(activeSubMenu === 'vehiculos' ? null : 'vehiculos')} 
+                                                            className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'vehiculos' || (isActive('/vehiculos') || isActive('/vehiculos/flota')) ? 'text-blue-400' : ''}`}
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                <Truck className="w-4 h-4 flex-shrink-0" />
+                                                                <span className="font-medium whitespace-nowrap">Vehículos</span>
+                                                            </div>
+                                                            {activeSubMenu === 'vehiculos' ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                                        </button>
+                                                        {activeSubMenu === 'vehiculos' && (
+                                                            <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
+                                                                <Link to="/vehiculos" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/vehiculos') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                                    Control Gastos
+                                                                </Link>
+                                                                <Link to="/vehiculos/flota" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/vehiculos/flota') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                                    Gestión Flota
+                                                                </Link>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
 
                                                 {can('personal_ti.view_personalti') && (

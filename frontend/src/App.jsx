@@ -181,6 +181,7 @@ function App() {
                 {/* Vehiculos */}
                 <Route element={<ProtectedRoute permission="vehiculos.view_registromensual" />}>
                   <Route path="vehiculos" element={<VehiculosDashboard />} />
+                  <Route path="vehiculos/flota" element={<VehiculosDashboard />} />
                 </Route>
                 {/* Tesorería */}
                 <Route element={<ProtectedRoute permission="remuneraciones.view_remuneracion" />}>

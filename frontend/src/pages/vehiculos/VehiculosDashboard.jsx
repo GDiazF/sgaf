@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Truck, Fuel, DollarSign, Activity, TrendingUp, Plus, ChevronRight, X, Save, Download, Calculator, Car, Trash2, Pencil, Sigma } from 'lucide-react';
+import { Truck, Fuel, DollarSign, Activity, TrendingUp, Plus, ChevronRight, X, Save, Download, Calculator, Car, Trash2, Pencil, Sigma, Settings } from 'lucide-react';
 import api from '../../api';
+import VehiculoDetalle from './VehiculoDetalle';
+import TipoDocumentoMantenedor from './TipoDocumentoMantenedor';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { usePermission } from '../../hooks/usePermission';
 
@@ -14,12 +17,15 @@ const VehiculosDashboard = () => {
     const [viewMode, setViewMode] = useState('individual'); // 'individual' or 'general'
     const [selectedVehicles, setSelectedVehicles] = useState([]); // Array of IDs for filtering/export
     const { can } = usePermission();
+    const location = useLocation();
 
     // Modal State
     const [isModalOpen, setModalOpen] = useState(false);
     const [isFlotaModalOpen, setFlotaModalOpen] = useState(false);
     const [isExportModalOpen, setExportModalOpen] = useState(false);
     const [editingRecord, setEditingRecord] = useState(null);
+    const [isTipoMantenedorOpen, setIsTipoMantenedorOpen] = useState(false);
+    const [selectedVehiculoForDetail, setSelectedVehiculoForDetail] = useState(null);
     const [formData, setFormData] = useState({
         anio: new Date().getFullYear(),
         mes: new Date().getMonth() + 1,
@@ -57,6 +63,12 @@ const VehiculosDashboard = () => {
     useEffect(() => {
         fetchData();
     }, [year]);
+
+    useEffect(() => {
+        if (location.pathname === '/vehiculos/flota') {
+            setFlotaModalOpen(true);
+        }
+    }, [location.pathname]);
 
 
 
@@ -261,6 +273,11 @@ const VehiculosDashboard = () => {
         }
     };
 
+    const handleUpdateVehiculoInList = (updatedVehiculo) => {
+        setFlota(prev => prev.map(v => v.id === updatedVehiculo.id ? updatedVehiculo : v));
+        setSelectedVehiculoForDetail(updatedVehiculo);
+    };
+
     const handleExportExcel = async (shouldSum = false) => {
         try {
             const params = { anio: year, sumar: shouldSum };
@@ -368,6 +385,141 @@ const VehiculosDashboard = () => {
         kilometros: r.kilometros_recorridos
     }));
 
+    if (location.pathname === '/vehiculos/flota') {
+        return (
+            <motion.div
+                className="relative flex flex-col h-full lg:h-[calc(100vh-170px)] gap-4 lg:overflow-hidden pr-2"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+            >
+                {/* Header Flota */}
+                <div className="flex justify-between items-center border-b border-slate-200 pb-4">
+                    <div>
+                        <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                            <Car className="w-8 h-8 text-indigo-600" /> Gestión de Flota Vehicular
+                        </h1>
+                        <div className="flex items-center gap-2 ml-11 mt-1">
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Control Técnico y Documental de Activos</p>
+                            <button 
+                                onClick={() => setIsTipoMantenedorOpen(true)}
+                                className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
+                            >
+                                <Settings className="w-3 h-3" /> Configurar Tipos
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <form onSubmit={handleSaveFlota} className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+                        <input placeholder="Marca" className="px-4 h-10 border-none bg-slate-50 rounded-xl text-xs font-bold outline-none focus:ring-2 ring-indigo-500/20" value={flotaFormData.marca} onChange={e => setFlotaFormData({ ...flotaFormData, marca: e.target.value })} required />
+                        <input placeholder="Modelo" className="px-4 h-10 border-none bg-slate-50 rounded-xl text-xs font-bold outline-none focus:ring-2 ring-indigo-500/20" value={flotaFormData.modelo} onChange={e => setFlotaFormData({ ...flotaFormData, modelo: e.target.value })} required />
+                        <input placeholder="Patente" className="px-4 h-10 border-none bg-slate-50 rounded-xl text-xs font-bold outline-none focus:ring-2 ring-indigo-500/20 w-28" value={flotaFormData.patente} onChange={e => setFlotaFormData({ ...flotaFormData, patente: e.target.value.toUpperCase() })} required />
+                        <button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 h-10 rounded-xl font-bold transition-all text-[10px] uppercase tracking-widest flex items-center gap-2">
+                            <Plus className="w-4 h-4" /> Agregar
+                        </button>
+                    </form>
+                </div>
+
+                {/* Grid de Vehículos */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar pb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {flota.map(v => {
+                            const hasDocuments = v.documentos?.length > 0;
+                            return (
+                                <motion.div 
+                                    key={v.id} 
+                                    variants={itemVariants}
+                                    whileHover={{ y: -8, shadow: '0 25px 30px -10px rgb(0 0 0 / 0.15)' }}
+                                    className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 group transition-all relative overflow-hidden flex flex-col cursor-pointer h-full"
+                                    onClick={() => setSelectedVehiculoForDetail(v)}
+                                >
+                                    {/* Hero Image Section */}
+                                    <div className="relative h-44 overflow-hidden">
+                                        {v.imagen ? (
+                                            <img src={v.imagen} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={v.patente} />
+                                        ) : (
+                                            <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center">
+                                                <Car className="w-12 h-12 text-slate-200" />
+                                            </div>
+                                        )}
+                                        
+                                        {/* Glassmorphism Plate Label */}
+                                        <div className="absolute top-4 left-4">
+                                            <div className="bg-white/70 backdrop-blur-md border border-white/40 px-3 py-1.5 rounded-xl shadow-lg">
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-900">{v.patente}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Delete Button Overlay */}
+                                        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all">
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteFlota(v.id); }}
+                                                className="w-9 h-9 bg-rose-500/20 hover:bg-rose-500 backdrop-blur-md text-white rounded-xl flex items-center justify-center transition-all"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Body Content */}
+                                    <div className="p-6 flex-1 flex flex-col">
+                                        <div className="mb-4">
+                                            <h3 className="text-lg font-black text-slate-800 tracking-tight leading-tight group-hover:text-indigo-600 transition-colors uppercase">
+                                                {v.marca} {v.modelo}
+                                            </h3>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 flex items-center gap-1.5">
+                                                <Fuel className="w-3.5 h-3.5 text-amber-500" /> {v.tipo_combustible || 'Sin definir'}
+                                            </p>
+                                        </div>
+
+                                        <div className="mt-auto space-y-3">
+                                            <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                                                <span className="text-slate-400">Documentación</span>
+                                                <span className={hasDocuments ? 'text-emerald-500' : 'text-slate-300'}>
+                                                    {v.documentos?.length || 0} Archivos
+                                                </span>
+                                            </div>
+                                            <div className="h-2 bg-slate-50 rounded-full overflow-hidden shadow-inner">
+                                                <motion.div 
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${Math.min(100, (v.documentos?.length || 0) * 20)}%` }}
+                                                    className={`h-full rounded-full ${hasDocuments ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-slate-200'}`}
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between border-t border-slate-50 pt-4 mt-2">
+                                                <div className="flex items-center gap-1 text-indigo-600 font-black text-[9px] uppercase tracking-widest group-hover:translate-x-1 transition-transform">
+                                                    Ver Ficha <ChevronRight className="w-3.5 h-3.5" />
+                                                </div>
+                                                {v.anio && (
+                                                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Año {v.anio}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <AnimatePresence>
+                    {selectedVehiculoForDetail && (
+                        <VehiculoDetalle 
+                            vehiculo={selectedVehiculoForDetail} 
+                            onClose={() => setSelectedVehiculoForDetail(null)}
+                            onUpdate={handleUpdateVehiculoInList}
+                        />
+                    )}
+                </AnimatePresence>
+
+                <TipoDocumentoMantenedor 
+                    isOpen={isTipoMantenedorOpen}
+                    onClose={() => setIsTipoMantenedorOpen(false)}
+                />
+            </motion.div>
+        );
+    }
+
     return (
         <motion.div
             className="flex flex-col h-full lg:h-[calc(100vh-170px)] gap-4 lg:overflow-hidden pr-2"
@@ -410,13 +562,7 @@ const VehiculosDashboard = () => {
                         {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
 
-                    <button
-                        onClick={() => setFlotaModalOpen(true)}
-                        className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center gap-2 flex-1 sm:flex-none"
-                    >
-                        <Car className="w-4 h-4 text-indigo-500" />
-                        Flota
-                    </button>
+
 
                     <button
                         onClick={() => setExportModalOpen(true)}
@@ -836,18 +982,43 @@ const VehiculosDashboard = () => {
                                     <input placeholder="Patente" className="px-3 py-2 border rounded-xl" value={flotaFormData.patente} onChange={e => setFlotaFormData({ ...flotaFormData, patente: e.target.value.toUpperCase() })} required />
                                     <button type="submit" disabled={submitting} className="col-span-3 bg-indigo-600 text-white py-2 rounded-xl font-bold hover:bg-indigo-700 transition-colors uppercase text-xs tracking-widest">Agregar Vehículo</button>
                                 </form>
-                                <div className="max-h-[300px] overflow-y-auto space-y-2">
+                                <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 scrollbar-thin">
                                     {flota.map(v => (
-                                        <div key={v.id} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-2xl hover:bg-slate-50 transition-colors group">
-                                            <div>
-                                                <p className="font-bold text-slate-800 text-sm">{v.marca} {v.modelo}</p>
-                                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{v.patente}</p>
+                                        <div key={v.id} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl hover:border-indigo-500 hover:bg-white transition-all group cursor-pointer" onClick={() => setSelectedVehiculoForDetail(v)}>
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                                    <Car className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-slate-800 text-sm">{v.marca} {v.modelo}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{v.patente}</p>
+                                                        {v.documentos?.length > 0 && (
+                                                            <span className="text-[8px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md font-black border border-emerald-100 uppercase">DOCS</span>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <button onClick={() => handleDeleteFlota(v.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                            <div className="flex items-center gap-2">
+                                                <button className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all bg-indigo-50 px-3 py-1.5 rounded-xl">
+                                                    Controlar <ChevronRight className="w-3 h-3" />
+                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteFlota(v.id); }} className="text-slate-300 hover:text-red-500 transition-colors p-2"><Trash2 className="w-4 h-4" /></button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
                             </div>
+
+                            <AnimatePresence>
+                                {selectedVehiculoForDetail && (
+                                    <VehiculoDetalle 
+                                        vehiculo={selectedVehiculoForDetail} 
+                                        onClose={() => setSelectedVehiculoForDetail(null)}
+                                        onUpdate={handleUpdateVehiculoInList}
+                                    />
+                                )}
+                            </AnimatePresence>
                         </motion.div>
                     </div>
                 )}
