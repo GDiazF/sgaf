@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'usuarios_google',
     'vehiculos',
     'biometrico',
+    'conciliacion',
 ]
 
 MIDDLEWARE = [
