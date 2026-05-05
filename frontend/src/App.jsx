@@ -39,6 +39,7 @@ import ReservasDashboard from './pages/reservas/ReservasDashboard';
 import PublicReservas from './pages/reservas/PublicReservas';
 import PersonalTIDashboard from './pages/personal_ti/PersonalTIDashboard';
 import UsuariosGoogleDashboard from './pages/usuarios_google/UsuariosGoogleDashboard';
+import BiometricoDashboard from './pages/biometrico/BiometricoDashboard';
 import MonitoreoRed from './pages/conectividad/MonitoreoRed';
 import InsightsDashboard from './pages/insights/InsightsDashboard';
 import WelfareBoard from './pages/bienestar/WelfareBoard';
@@ -57,6 +58,7 @@ import UserManagement from './pages/admin/UserManagement';
 import RolesManagement from './pages/admin/RolesManagement';
 import AuditLog from './pages/admin/AuditLog';
 import EmailSettings from './pages/admin/EmailSettings';
+import ConciliacionDashboard from './pages/admin/ConciliacionDashboard';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -180,6 +182,7 @@ function App() {
                 {/* Vehiculos */}
                 <Route element={<ProtectedRoute permission="vehiculos.view_registromensual" />}>
                   <Route path="vehiculos" element={<VehiculosDashboard />} />
+                  <Route path="vehiculos/flota" element={<VehiculosDashboard />} />
                 </Route>
                 {/* Tesorería */}
                 <Route element={<ProtectedRoute permission="remuneraciones.view_remuneracion" />}>
@@ -203,6 +206,7 @@ function App() {
                 </Route>
                 <Route element={<ProtectedRoute permission="usuarios_google.view_googleuser" />}>
                   <Route path="usuarios-google" element={<UsuariosGoogleDashboard />} />
+                  <Route path="biometrico" element={<BiometricoDashboard />} />
                 </Route>
                 <Route element={<ProtectedRoute permission="conectividad.view_escuelared" />}>
                   <Route path="monitoreo-red" element={<MonitoreoRed />} />
@@ -219,6 +223,7 @@ function App() {
                   <Route path="admin/roles" element={<RolesManagement />} />
                   <Route path="admin/audit-log" element={<AuditLog />} />
                   <Route path="admin/email-settings" element={<EmailSettings />} />
+                  <Route path="admin/conciliacion" element={<ConciliacionDashboard />} />
                 </Route>
               </Route>
             </Route>

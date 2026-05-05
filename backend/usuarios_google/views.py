@@ -12,7 +12,32 @@ class GoogleOrgUnitViewSet(viewsets.ModelViewSet):
     queryset = GoogleOrgUnit.objects.all().order_by('name')
     serializer_class = GoogleOrgUnitSerializer
     permission_classes = [permissions.IsAuthenticated]
-    pagination_class = None # Desactivar paginación para obtener lista completa
+    pagination_class = None
+
+    def list(self, request, *args, **kwargs):
+        if GoogleOrgUnit.objects.count() == 0:
+            initial_units = [
+                "Administracion Central", "CENTRO DE CAPACITACION LABORAL",
+                "COLEGIO DEPORTIVO TEC. PROF. ELENA DUVAUCHELLE A-11",
+                "COLEGIO ESPANA E-79", "COLEGIO SIMON BOLIVAR",
+                "ESC ALMIRANTE PATRICIO LYNCH D-90", "ESC ARTISTICA VIOLETA PARRA E-86",
+                "ESC CALETA SAN MARCOS", "ESC CENTENARIO E-76", "ESC CHIPANA",
+                "ESC EDUARDO LLANOS D-89", "ESC ESP FLOR DEL INCA F-81",
+                "ESC GABRIELA MISTRAL D-72", "ESC LENGUAJE OASIS DEL SABER",
+                "ESC PAULA JARAQUEMADA E-75", "ESC PLACIDO VILLARROEL D-92",
+                "ESC PROFESOR MANUEL CASTRO RAMOS F-85", "ESC REPUB DE ITALIA F-88",
+                "ESC REPUBLICA DE CROACIA E-70", "ESC THILDA PORTILLO E-78",
+                "ESCUELA CALETA CHANAVAYITA", "Escuela Especial Oasis del Saber",
+                "INS. COM. DE IQUIQUE BALDOMERO WOLNITZKI A-6",
+                "LICEO BICENTENARIO DOMINGO STA. MARIA DE IQQ",
+                "LICEO CEIA JOSE ALEJANDRO SORIA VARAS",
+                "LICEO LIB. BERNADOR O`HIGGINS LA-7", "LICEO LUIS CRUZ MARTINEZ",
+                "LICEO POLITEC. JOSE GUTIERREZ LA FUENTE LA-9", "LICEO TP DE ADULTOS",
+            ]
+            units_to_create = [GoogleOrgUnit(name=name) for name in initial_units]
+            GoogleOrgUnit.objects.bulk_create(units_to_create)
+            
+        return super().list(request, *args, **kwargs)
 
 class GoogleUserViewSet(viewsets.ModelViewSet):
     queryset = GoogleUser.objects.all().order_by('email')

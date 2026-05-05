@@ -49,6 +49,8 @@ INSTALLED_APPS = [
     'tesoreria',
     'usuarios_google',
     'vehiculos',
+    'biometrico',
+    'conciliacion',
 ]
 
 MIDDLEWARE = [

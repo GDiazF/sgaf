@@ -19,6 +19,15 @@ const SessionTimeoutManager = () => {
     const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
 
     const lastActivityRef = useRef(Date.now());
+    
+    // Reiniciar temporizador cuando el usuario inicia sesión (cambia de null a objeto)
+    useEffect(() => {
+        if (user) {
+            const now = Date.now();
+            lastActivityRef.current = now;
+            localStorage.setItem('lastActivity', now.toString());
+        }
+    }, [!!user]);
 
     // 1. Registro de actividad (solo si está logueado y no en ruta pública)
     const updateActivity = () => {

@@ -4,14 +4,37 @@ from rest_framework.response import Response
 from django.db.models import Sum
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import RegistroMensual, Vehiculo
-from .serializers import RegistroMensualSerializer, VehiculoSerializer
+from .models import RegistroMensual, Vehiculo, VehiculoDocumento, VehiculoTipoDocumento, VehiculoTipoCombustible
+from .serializers import (
+    RegistroMensualSerializer, 
+    VehiculoSerializer, 
+    VehiculoDocumentoSerializer,
+    VehiculoTipoDocumentoSerializer,
+    VehiculoTipoCombustibleSerializer
+)
 import openpyxl
+
+class VehiculoTipoCombustibleViewSet(viewsets.ModelViewSet):
+    queryset = VehiculoTipoCombustible.objects.all()
+    serializer_class = VehiculoTipoCombustibleSerializer
+    permission_classes = []
+
+class VehiculoTipoDocumentoViewSet(viewsets.ModelViewSet):
+    queryset = VehiculoTipoDocumento.objects.all()
+    serializer_class = VehiculoTipoDocumentoSerializer
+    permission_classes = []
 
 class VehiculoViewSet(viewsets.ModelViewSet):
     queryset = Vehiculo.objects.filter(activo=True)
     serializer_class = VehiculoSerializer
-    permission_classes = [] # Adjust if needed
+    permission_classes = []
+
+class VehiculoDocumentoViewSet(viewsets.ModelViewSet):
+    queryset = VehiculoDocumento.objects.all()
+    serializer_class = VehiculoDocumentoSerializer
+    permission_classes = []
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['vehiculo', 'tipo']
 
 class RegistroMensualViewSet(viewsets.ModelViewSet):
     queryset = RegistroMensual.objects.select_related('vehiculo').all()
