@@ -52,9 +52,9 @@ const Contracts = () => {
         fecha_termino: '',
         tipo_oc: 'UNICA',
         nro_oc: '',
+        nro_oc: '',
         cdp: '',
-        monto_total: 0,
-        monto_consumido_previo: 0,
+        proveedores_asociados: [],
         establecimientos: []
     });
 
@@ -146,8 +146,7 @@ const Contracts = () => {
             tipo_oc: 'UNICA',
             nro_oc: '',
             cdp: '',
-            monto_total: 0,
-            monto_consumido_previo: 0,
+            proveedores_asociados: [],
             establecimientos: []
         });
         setEditingId(null);
@@ -169,8 +168,7 @@ const Contracts = () => {
             tipo_oc: item.tipo_oc || 'UNICA',
             nro_oc: item.nro_oc || '',
             cdp: item.cdp || '',
-            monto_total: item.monto_total || 0,
-            monto_consumido_previo: item.monto_consumido_previo || 0,
+            proveedores_asociados: item.proveedores_asociados || [],
             establecimientos: item.establecimientos || []
         });
         setEditingId(item.id);
@@ -191,7 +189,6 @@ const Contracts = () => {
         try {
             const finalData = { ...dataToSubmit };
             if (finalData.orientacion === '') delete finalData.orientacion;
-            if (finalData.proveedor === '') delete finalData.proveedor;
 
             if (editingId) {
                 await api.put(`contratos/contratos/${editingId}/`, finalData);
@@ -343,8 +340,12 @@ const Contracts = () => {
 
                                     <div className="grid grid-cols-2 gap-3 py-3 border-y border-slate-50" onClick={() => navigate(`/contracts/${item.id}`)}>
                                         <div className="flex flex-col cursor-pointer">
-                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Proveedor</span>
-                                            <span className="text-xs font-black text-slate-700 truncate">{item.proveedor_nombre || 'N/A'}</span>
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Proveedores</span>
+                                            <span className="text-xs font-black text-slate-700 truncate" title={item.proveedores_asociados?.map(p => p.proveedor_nombre).join(', ') || 'N/A'}>
+                                                {item.proveedores_asociados?.length > 0 
+                                                    ? item.proveedores_asociados.map(p => p.proveedor_nombre).join(', ') 
+                                                    : 'N/A'}
+                                            </span>
                                         </div>
                                         <div className="flex flex-col text-right cursor-pointer">
                                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Vencimiento</span>
@@ -387,7 +388,7 @@ const Contracts = () => {
                                         <SortableHeader label="Contrato / Código MP" sortKey="codigo_mercado_publico" currentOrdering={ordering} onSort={handleSort} />
                                         <SortableHeader label="Estado" sortKey="estado__nombre" currentOrdering={ordering} onSort={handleSort} />
                                         <SortableHeader label="Categoría / Proceso" sortKey="categoria__nombre" currentOrdering={ordering} onSort={handleSort} />
-                                        <SortableHeader label="Proveedor" sortKey="proveedor__nombre" currentOrdering={ordering} onSort={handleSort} />
+                                        <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-left">Proveedores Adjudicados</th>
                                         <SortableHeader label="Vencimiento" sortKey="fecha_termino" currentOrdering={ordering} onSort={handleSort} />
                                         <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Plazo</th>
                                         <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
@@ -421,8 +422,16 @@ const Contracts = () => {
                                             </td>
                                             <td className="py-2 px-4">
                                                 <div className="flex items-center gap-2 font-normal text-slate-500 text-[10px] uppercase tracking-tight">
-                                                    <Building2 className="w-3 h-3 opacity-30" />
-                                                    <span className="truncate max-w-[150px]">{item.proveedor_nombre || <span className="text-slate-300 italic text-[9px]">S/A</span>}</span>
+                                                    <Building2 className="w-3 h-3 opacity-30 shrink-0" />
+                                                    <div className="flex flex-col gap-0.5 truncate max-w-[200px]" title={item.proveedores_asociados?.map(p => p.proveedor_nombre).join(', ')}>
+                                                        {item.proveedores_asociados?.length > 0 ? (
+                                                            item.proveedores_asociados.map((p, idx) => (
+                                                                <span key={idx} className="truncate">{p.proveedor_nombre}</span>
+                                                            ))
+                                                        ) : (
+                                                            <span className="text-slate-300 italic text-[9px]">S/A</span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td className="py-2 px-4 font-mono font-medium text-[11px] text-rose-500">

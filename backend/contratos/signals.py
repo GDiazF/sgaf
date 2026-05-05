@@ -1,6 +1,6 @@
 from django.db.models.signals import post_save, post_delete, pre_save, m2m_changed
 from django.dispatch import receiver
-from .models import Contrato, DocumentoContrato, HistorialContrato
+from .models import Contrato, DocumentoContrato, HistorialContrato, ContratoProveedor
 from servicios.models import FacturaAdquisicion
 
 @receiver(pre_save, sender=Contrato)
@@ -30,11 +30,9 @@ def log_contrato_save(sender, instance, created, **kwargs):
                 'estado': 'Estado',
                 'categoria': 'Categoría',
                 'orientacion': 'Orientación',
-                'proveedor': 'Proveedor',
                 'tipo_oc': 'Tipo OC',
                 'nro_oc': 'Nº OC',
                 'cdp': 'CDP',
-                'monto_total': 'Monto Total',
                 'fecha_adjudicacion': 'Fecha Adjudicación',
                 'fecha_inicio': 'Fecha Inicio',
                 'fecha_termino': 'Fecha Término',
@@ -60,7 +58,7 @@ def log_contrato_save(sender, instance, created, **kwargs):
         detalle=detalle
     )
 
-@receiver(m2m_changed, sender=Contrato.establecimientos.through)
+@receiver(m2m_changed, sender=ContratoProveedor.establecimientos.through)
 def log_contrato_establecimientos_change(sender, instance, action, pk_set, **kwargs):
     if action in ["post_add", "post_remove"]:
         from establecimientos.models import Establecimiento
@@ -68,10 +66,10 @@ def log_contrato_establecimientos_change(sender, instance, action, pk_set, **kwa
         nombres = ", ".join(establecimientos)
         
         accion_label = "asignó" if action == "post_add" else "quitó"
-        detalle = f"Se {accion_label} los establecimientos: {nombres}"
+        detalle = f"Se {accion_label} los establecimientos: {nombres} al proveedor {instance.proveedor.nombre}"
         
         HistorialContrato.objects.create(
-            contrato=instance,
+            contrato=instance.contrato,
             accion='MODIFICACION_ESTABLECIMIENTOS',
             detalle=detalle
         )

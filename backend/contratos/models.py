@@ -55,7 +55,6 @@ class Contrato(models.Model):
     estado = models.ForeignKey(EstadoContrato, on_delete=models.PROTECT, related_name='contratos', verbose_name="Estado")
     categoria = models.ForeignKey(CategoriaContrato, on_delete=models.PROTECT, related_name='contratos', verbose_name="Categoría")
     orientacion = models.ForeignKey(OrientacionLicitacion, on_delete=models.PROTECT, related_name='contratos', verbose_name="Orientación", null=True, blank=True)
-    proveedor = models.ForeignKey(Proveedor, on_delete=models.PROTECT, related_name='contratos', verbose_name="Proveedor", null=True, blank=True)
     
     TIPO_OC_CHOICES = [
         ('UNICA', 'OC Única'),
@@ -64,11 +63,17 @@ class Contrato(models.Model):
     tipo_oc = models.CharField(max_length=10, choices=TIPO_OC_CHOICES, default='AGREEMENT', verbose_name="Tipo de OC")
     nro_oc = models.CharField(max_length=50, blank=True, null=True, verbose_name="Número de OC")
     cdp = models.CharField(max_length=100, blank=True, null=True, verbose_name="Nº CDP")
-    monto_total = models.IntegerField(default=0, verbose_name="Monto Total Adjudicado")
-    monto_consumido_previo = models.IntegerField(default=0, verbose_name="Monto Consumido Previo")
     
-    # Establecimientos asociados al contrato
-    establecimientos = models.ManyToManyField('establecimientos.Establecimiento', related_name='contratos', blank=True, verbose_name="Establecimientos Asociados")
+    @property
+    def monto_total(self):
+        return sum(p.monto_adjudicado for p in self.proveedores_asociados.all())
+        
+    @property
+    def monto_consumido_previo(self):
+        return sum(p.monto_consumido_previo for p in self.proveedores_asociados.all())
+    
+    # Establecimientos asociados al contrato (Movido a ContratoProveedor)
+    # establecimientos = models.ManyToManyField('establecimientos.Establecimiento', related_name='contratos', blank=True, verbose_name="Establecimientos Asociados")
 
     fecha_adjudicacion = models.DateField(verbose_name="Fecha de Adjudicación")
     fecha_inicio = models.DateField(verbose_name="Fecha de Inicio")
@@ -161,3 +166,31 @@ class HistorialContrato(models.Model):
         verbose_name = "Historial de Contrato"
         verbose_name_plural = "Historial de Contratos"
         ordering = ['-fecha']
+
+class ContratoProveedor(models.Model):
+    contrato = models.ForeignKey(Contrato, on_delete=models.CASCADE, related_name='proveedores_asociados')
+    proveedor = models.ForeignKey('servicios.Proveedor', on_delete=models.PROTECT, related_name='contratos_asociados')
+    monto_adjudicado = models.IntegerField(default=0, verbose_name="Monto Adjudicado")
+    monto_consumido_previo = models.IntegerField(default=0, verbose_name="Monto Consumido Histórico")
+    establecimientos = models.ManyToManyField('establecimientos.Establecimiento', blank=True, verbose_name="Establecimientos Asociados")
+
+    class Meta:
+        verbose_name = "Proveedor de Contrato"
+        verbose_name_plural = "Proveedores de Contratos"
+        unique_together = ('contrato', 'proveedor')
+
+    @property
+    def monto_ejecutado(self):
+        # Calculates what has been spent of this specific provider's budget for this contract
+        from django.db.models import Sum
+        total_recepciones = self.contrato.recepciones.filter(
+            proveedor=self.proveedor
+        ).aggregate(total=Sum('total_pagar'))['total'] or 0
+        return total_recepciones + self.monto_consumido_previo
+
+    @property
+    def monto_restante(self):
+        return self.monto_adjudicado - self.monto_ejecutado
+
+    def __str__(self):
+        return f"{self.proveedor.nombre} - {self.contrato.codigo_mercado_publico}"

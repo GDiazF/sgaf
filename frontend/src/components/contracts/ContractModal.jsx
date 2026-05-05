@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import BaseModal from '../common/BaseModal';
-import { FileText, Tag, Hash, Calendar, Info, Building2, DollarSign } from 'lucide-react';
+import { FileText, Tag, Hash, Calendar, Info, Building2, DollarSign, Trash2, Plus, ShoppingBag } from 'lucide-react';
 import { motion } from 'framer-motion';
 import DateInput from '../common/DateInput';
 import SearchableSelect from '../common/SearchableSelect';
@@ -18,16 +18,8 @@ const ContractModal = ({ isOpen, onClose, onSave, editingId, initialData, lookup
         estado: '',
         categoria: '',
         orientacion: '',
-        proveedor: '',
-        fecha_adjudicacion: '',
-        fecha_inicio: '',
-        fecha_termino: '',
-        tipo_oc: 'AGREEMENT',
-        nro_oc: '',
         cdp: '',
-        monto_total: 0,
-        monto_consumido_previo: 0,
-        establecimientos: []
+        proveedores_asociados: []
     });
 
     useEffect(() => {
@@ -40,7 +32,29 @@ const ContractModal = ({ isOpen, onClose, onSave, editingId, initialData, lookup
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleBulkSelect = (type) => {
+    const handleAddProvider = () => {
+        setFormData(prev => ({
+            ...prev,
+            proveedores_asociados: [...(prev.proveedores_asociados || []), { proveedor: '', monto_adjudicado: '', monto_consumido_previo: '', establecimientos: [] }]
+        }));
+    };
+
+    const handleRemoveProvider = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            proveedores_asociados: prev.proveedores_asociados.filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleProviderChange = (index, field, value) => {
+        setFormData(prev => {
+            const newProviders = [...(prev.proveedores_asociados || [])];
+            newProviders[index] = { ...newProviders[index], [field]: value };
+            return { ...prev, proveedores_asociados: newProviders };
+        });
+    };
+
+    const handleBulkSelect = (index, type) => {
         let selectedIds = [];
         if (type === 'ALL') {
             selectedIds = establecimientos.map(e => e.id);
@@ -55,7 +69,11 @@ const ContractModal = ({ isOpen, onClose, onSave, editingId, initialData, lookup
                 .filter(e => typesInArea.includes(e.tipo))
                 .map(e => e.id);
         }
-        setFormData(prev => ({ ...prev, establecimientos: selectedIds }));
+        setFormData(prev => {
+            const newProviders = [...(prev.proveedores_asociados || [])];
+            newProviders[index] = { ...newProviders[index], establecimientos: selectedIds };
+            return { ...prev, proveedores_asociados: newProviders };
+        });
     };
 
     const handleFormSave = () => {
@@ -73,25 +91,25 @@ const ContractModal = ({ isOpen, onClose, onSave, editingId, initialData, lookup
             maxWidth="max-w-3xl"
             saveLabel={editingId ? 'Actualizar Contrato' : 'Guardar Contrato'}
         >
-            <div className="space-y-8">
-                {/* Section: Identificación */}
-                <div className="space-y-6">
-                    <h4 className="form-section-header">
-                        <Hash className="w-3.5 h-3.5" /> IDENTIFICACIÓN DEL PROCESO
+            <div className="space-y-10 px-1 py-2">
+                
+                {/* Section 1: Información General */}
+                <div className="space-y-5">
+                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">
+                        1. Información General
                     </h4>
+                    
+                    <FormInput
+                        label="Nombre / Descripción Corta del Proceso"
+                        required
+                        placeholder="Ej: Adquisición de materiales de oficina..."
+                        value={formData.descripcion}
+                        onChange={e => setFormData({ ...formData, descripcion: e.target.value })}
+                    />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                        <SearchableSelect
-                            label="Proveedor Adjudicado"
-                            icon={<Building2 className="w-3.5 h-3.5" />}
-                            options={(proveedores || []).map(p => ({ value: p.id, label: p.nombre }))}
-                            value={formData.proveedor}
-                            onChange={val => setFormData({ ...formData, proveedor: val })}
-                            placeholder="Seleccione Proveedor..."
-                        />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <FormInput
                             label="Código Mercado Público"
-                            icon={<Tag />}
                             required
                             placeholder="Ej: 1234-56-LP24"
                             value={formData.codigo_mercado_publico}
@@ -99,183 +117,50 @@ const ContractModal = ({ isOpen, onClose, onSave, editingId, initialData, lookup
                         />
                         <FormInput
                             label="Nº CDP"
-                            icon={<Hash />}
                             placeholder="Certificado de Disponibilidad..."
                             value={formData.cdp}
                             onChange={e => setFormData({ ...formData, cdp: e.target.value })}
                         />
-                        <FormInput
-                            label="Monto Total Adjudicado ($)"
-                            icon={<DollarSign />}
-                            type="number"
-                            placeholder="Ej: 5000000"
-                            value={formData.monto_total}
-                            onChange={e => setFormData({ ...formData, monto_total: parseInt(e.target.value) || 0 })}
-                        />
-                        <FormInput
-                            label="Monto Consumido Previo ($)"
-                            icon={<DollarSign />}
-                            type="number"
-                            placeholder="Monto ejecutado previo al sistema..."
-                            value={formData.monto_consumido_previo}
-                            onChange={e => setFormData({ ...formData, monto_consumido_previo: parseInt(e.target.value) || 0 })}
-                        />
-                    </div>
-
-                    <FormInput
-                        label="Nombre / Descripción Corta del Proceso"
-                        icon={<FileText />}
-                        required
-                        placeholder="Nombre del servicio o adquisición..."
-                        value={formData.descripcion}
-                        onChange={e => setFormData({ ...formData, descripcion: e.target.value })}
-                    />
-
-                    {/* OC LOGIC */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-4 bg-slate-50/50 rounded-2xl border border-slate-200/50">
-                        <div className="flex flex-col space-y-3">
-                            <label className="form-label">Tipo de Orden de Compra</label>
-                            <div className="flex gap-4">
-                                {[
-                                    { id: 'UNICA', label: 'OC Única' },
-                                    { id: 'MULTIPLE', label: 'OC Múltiple' }
-                                ].map(option => (
-                                    <label key={option.id} className="flex items-center gap-2 cursor-pointer group">
-                                        <div className="relative flex items-center justify-center">
-                                            <input
-                                                type="radio"
-                                                name="tipo_oc"
-                                                className="peer appearance-none w-5 h-5 border-2 border-slate-300 rounded-full checked:border-blue-500 transition-all cursor-pointer bg-white"
-                                                checked={formData.tipo_oc === option.id}
-                                                onChange={() => setFormData({ ...formData, tipo_oc: option.id })}
-                                            />
-                                            <div className="absolute w-2.5 h-2.5 bg-blue-500 rounded-full opacity-0 peer-checked:opacity-100 transition-opacity" />
-                                        </div>
-                                        <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${formData.tipo_oc === option.id ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
-                                            {option.label}
-                                        </span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-
-                        {formData.tipo_oc === 'UNICA' && (
-                            <FormInput
-                                label="Nº Orden de Compra (Opcional)"
-                                placeholder="Ej: 1234-56-LP24"
-                                labelClassName="!text-blue-500"
-                                inputClassName="!bg-white !border-blue-100 !text-blue-600"
-                                icon={Hash}
-                                value={formData.nro_oc}
-                                onChange={e => setFormData({ ...formData, nro_oc: e.target.value })}
-                            />
-                        )}
-                        {formData.tipo_oc === 'MULTIPLE' && (
-                            <div className="flex items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider italic p-2">
-                                La OC se ingresará individualmente en cada recepción.
-                            </div>
-                        )}
                     </div>
                 </div>
 
-                {/* Section: Clasificación */}
-                <div className="space-y-6">
-                    <h4 className="form-section-header">
-                        <Tag className="w-3.5 h-3.5" /> Clasificación y Destino
+                {/* Section 2: Clasificación y Plazos */}
+                <div className="space-y-5">
+                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">
+                        2. Clasificación y Plazos
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-2">
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <FormSelect
                             label="Categoría"
-                            icon={<Tag className="text-indigo-500" />}
                             value={formData.categoria}
                             onChange={e => setFormData({ ...formData, categoria: e.target.value })}
                             options={(categorias || []).map(c => ({ value: c.id, label: c.nombre }))}
                             placeholder="Seleccione..."
                         />
-
-                        <FormSelect
-                            label="Orientación"
-                            icon={<Tag className="text-amber-500" />}
-                            value={formData.orientacion}
-                            onChange={e => setFormData({ ...formData, orientacion: e.target.value })}
-                            options={(orientaciones || []).map(o => ({ value: o.id, label: o.nombre }))}
-                            placeholder="No definida"
-                        />
-
-                        <FormSelect
-                            label="Estado"
-                            icon={<Tag className="text-emerald-500" />}
-                            value={formData.estado}
-                            onChange={e => setFormData({ ...formData, estado: e.target.value })}
-                            options={(estados || []).map(e => ({ value: e.id, label: e.nombre }))}
-                            placeholder="Seleccione..."
-                        />
-
                         <FormSelect
                             label="Proceso"
-                            icon={<Tag className="text-blue-500" />}
                             value={formData.proceso}
                             onChange={e => setFormData({ ...formData, proceso: e.target.value })}
                             options={(procesos || []).map(p => ({ value: p.id, label: p.nombre }))}
                             placeholder="Seleccione..."
                         />
+                        <FormSelect
+                            label="Orientación"
+                            value={formData.orientacion}
+                            onChange={e => setFormData({ ...formData, orientacion: e.target.value })}
+                            options={(orientaciones || []).map(o => ({ value: o.id, label: o.nombre }))}
+                            placeholder="No definida"
+                        />
+                        <FormSelect
+                            label="Estado"
+                            value={formData.estado}
+                            onChange={e => setFormData({ ...formData, estado: e.target.value })}
+                            options={(estados || []).map(e => ({ value: e.id, label: e.nombre }))}
+                            placeholder="Seleccione..."
+                        />
                     </div>
 
-                    <div className="pt-4">
-                        <div className="space-y-2">
-                            <MultiSearchableSelect
-                                label="Alcance: Establecimientos Asociados"
-                                icon={<Building2 className="w-3.5 h-3.5" />}
-                                options={(establecimientos || []).map(e => ({ value: e.id, label: e.nombre }))}
-                                value={formData.establecimientos || []}
-                                onChange={(val) => handleSelectChange('establecimientos', val)}
-                                placeholder="Seleccione uno o muchos..."
-                            />
-                            <div className="flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => handleBulkSelect('ALL')}
-                                    className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent bg-slate-100 text-slate-600 hover:bg-slate-200"
-                                >
-                                    Todos
-                                </button>
-
-                                {[
-                                    { key: 'ESTABLECIMIENTO', label: 'Establecimientos', color: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
-                                    { key: 'JARDIN', label: 'Jardines VTF', color: 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' },
-                                    { key: 'OFICINA', label: 'Oficina Central', color: 'bg-amber-50 text-amber-600 hover:bg-amber-100' }
-                                ].map(area => (
-                                    <button
-                                        key={area.key}
-                                        type="button"
-                                        onClick={() => handleBulkSelect(area.key)}
-                                        className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent ${area.color}`}
-                                    >
-                                        {area.label}
-                                    </button>
-                                ))}
-
-                                <button
-                                    type="button"
-                                    onClick={() => handleBulkSelect('CLEAR')}
-                                    className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent text-red-500 hover:bg-red-50"
-                                >
-                                    Limpiar
-                                </button>
-                            </div>
-                        </div>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-2 flex items-center gap-2">
-                            <Info className="w-3 h-3" />
-                            Defina qué instituciones están cubiertas por este convenio para facilitar futuras recepciones.
-                        </p>
-                    </div>
-                </div>
-
-                {/* Section: Plazos */}
-                <div className="space-y-6">
-                    <h4 className="form-section-header">
-                        <Calendar className="w-3.5 h-3.5" /> Plazos y Vigencia
-                    </h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
                         <DateInput
                             label="Fecha Adjudicación"
@@ -283,14 +168,12 @@ const ContractModal = ({ isOpen, onClose, onSave, editingId, initialData, lookup
                             value={formData.fecha_adjudicacion}
                             onChange={val => setFormData({ ...formData, fecha_adjudicacion: val })}
                         />
-
                         <DateInput
                             label="Fecha Inicio"
                             required
                             value={formData.fecha_inicio}
                             onChange={val => setFormData({ ...formData, fecha_inicio: val })}
                         />
-
                         <DateInput
                             label="Fecha Término"
                             required
@@ -300,13 +183,168 @@ const ContractModal = ({ isOpen, onClose, onSave, editingId, initialData, lookup
                     </div>
                 </div>
 
-                {/* Note */}
-                <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex gap-3">
-                    <Info className="w-5 h-5 text-blue-500 mt-0.5" />
-                    <p className="text-[11px] text-blue-700 leading-relaxed font-medium">
-                        El plazo total será calculado automáticamente por el sistema basándose en las fechas de vigencia ingresadas una vez guardado el contrato.
-                    </p>
+                {/* Section 3: Proveedores */}
+                <div className="space-y-5">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                        <h4 className="text-sm font-bold text-slate-800">
+                            3. Proveedores Adjudicados
+                        </h4>
+                        <button
+                            type="button"
+                            onClick={handleAddProvider}
+                            className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1.5 transition-colors"
+                        >
+                            <Plus className="w-4 h-4" /> Añadir Proveedor
+                        </button>
+                    </div>
+                    
+                    {(formData.proveedores_asociados || []).length === 0 ? (
+                        <div className="p-6 bg-slate-50 border border-slate-200 border-dashed rounded-xl text-center">
+                            <span className="text-sm text-slate-500">No hay proveedores asignados. Haz clic en "Añadir Proveedor".</span>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {(formData.proveedores_asociados || []).map((prov, index) => (
+                                <div key={index} className="p-5 bg-slate-50 border border-slate-200 rounded-xl relative group">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => handleRemoveProvider(index)}
+                                        className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition-colors"
+                                        title="Eliminar Proveedor"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-5 pr-8">
+                                        <div className="md:col-span-6">
+                                            <SearchableSelect
+                                                label={`Proveedor ${index + 1}`}
+                                                options={(proveedores || []).map(p => ({ value: p.id, label: p.nombre }))}
+                                                value={prov.proveedor}
+                                                onChange={val => handleProviderChange(index, 'proveedor', val)}
+                                                placeholder="Seleccione..."
+                                            />
+                                        </div>
+                                        <div className="md:col-span-3">
+                                            <FormInput
+                                                label="Monto Adjudicado ($)"
+                                                type="number"
+                                                placeholder="Ej: 5000000"
+                                                value={prov.monto_adjudicado}
+                                                onChange={e => handleProviderChange(index, 'monto_adjudicado', e.target.value === '' ? '' : parseInt(e.target.value))}
+                                            />
+                                        </div>
+                                        <div className="md:col-span-3">
+                                            <FormInput
+                                                label="Consumo Previo ($)"
+                                                type="number"
+                                                placeholder="Opcional"
+                                                value={prov.monto_consumido_previo}
+                                                onChange={e => handleProviderChange(index, 'monto_consumido_previo', e.target.value === '' ? '' : parseInt(e.target.value))}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Establecimientos asociados al proveedor */}
+                                    <div className="mt-4 pt-4 border-t border-slate-200">
+                                        <div className="space-y-4">
+                                            <MultiSearchableSelect
+                                                label="Establecimientos Asignados a este Proveedor"
+                                                options={(establecimientos || []).map(e => ({ value: e.id, label: e.nombre }))}
+                                                value={prov.establecimientos || []}
+                                                onChange={(val) => handleProviderChange(index, 'establecimientos', val)}
+                                                placeholder="Seleccione establecimientos..."
+                                            />
+                                            
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleBulkSelect(index, 'ALL')}
+                                                    className="px-3 py-1.5 rounded text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                                                >
+                                                    Todos
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleBulkSelect(index, 'ESTABLECIMIENTO')}
+                                                    className="px-3 py-1.5 rounded text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                                                >
+                                                    Escuelas/Liceos
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleBulkSelect(index, 'JARDIN')}
+                                                    className="px-3 py-1.5 rounded text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                                                >
+                                                    Jardines VTF
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleBulkSelect(index, 'OFICINA')}
+                                                    className="px-3 py-1.5 rounded text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                                                >
+                                                    Oficina Central
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleBulkSelect(index, 'CLEAR')}
+                                                    className="px-3 py-1.5 rounded text-xs font-medium text-red-600 hover:bg-red-50 transition-colors ml-auto"
+                                                >
+                                                    Limpiar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
+
+                {/* Section 4: Orden de Compra */}
+                <div className="space-y-5">
+                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">
+                        4. Orden de Compra
+                    </h4>
+
+                    <div className="space-y-6 pt-2 max-w-md">
+                        <div className="space-y-3">
+                            <label className="block text-xs font-bold text-slate-700">Tipo de Orden de Compra</label>
+                            <div className="flex items-center gap-6">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="tipo_oc"
+                                        checked={formData.tipo_oc === 'UNICA'}
+                                        onChange={() => setFormData({ ...formData, tipo_oc: 'UNICA' })}
+                                        className="text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                                    />
+                                    <span className="text-sm text-slate-700">OC Única</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="tipo_oc"
+                                        checked={formData.tipo_oc === 'MULTIPLE'}
+                                        onChange={() => setFormData({ ...formData, tipo_oc: 'MULTIPLE' })}
+                                        className="text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                                    />
+                                    <span className="text-sm text-slate-700">Múltiples OC (Por RC)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {formData.tipo_oc === 'UNICA' && (
+                            <FormInput
+                                label="Nº Orden de Compra (General)"
+                                placeholder="Ej: 1234-56-LP24"
+                                value={formData.nro_oc}
+                                onChange={e => setFormData({ ...formData, nro_oc: e.target.value })}
+                            />
+                        )}
+                    </div>
+                </div>
+
             </div>
         </BaseModal>
     );

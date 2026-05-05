@@ -17,12 +17,12 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
         fecha_recepcion: new Date().toISOString().split('T')[0],
         descripcion: contract?.descripcion || '',
         periodo: '',
-        proveedor: contract?.proveedor || '',
+        proveedor: contract?.proveedores_asociados?.length === 1 ? contract.proveedores_asociados[0].proveedor : '',
         establecimientos: contract?.establecimientos || [],
         tipo_entrega: '',
         total_neto: '',
-        iva: 0,
-        total_pagar: 0,
+        iva: '',
+        total_pagar: '',
         grupo_firmante: '',
         firmante: '',
         folio: ''
@@ -52,17 +52,26 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                     cdp: contract.cdp || '',
                     nro_oc: contract.tipo_oc === 'UNICA' ? (contract.nro_oc || '') : '',
                     descripcion: contract.descripcion,
-                    proveedor: contract.proveedor,
+                    proveedor: contract.proveedores_asociados?.length === 1 ? contract.proveedores_asociados[0].proveedor : '',
                     establecimientos: contract.establecimientos || []
                 });
             }
         }
     }, [isOpen, contract, editingRC]);
 
+    // Filter establishments based on selected provider
+    const allowedEstablishmentIds = formData.proveedor 
+        ? contract?.proveedores_asociados?.find(p => p.proveedor.toString() === formData.proveedor.toString())?.establecimientos || []
+        : [];
+        
+    const filteredEstablishments = formData.proveedor && allowedEstablishmentIds.length > 0
+        ? establishments.filter(e => allowedEstablishmentIds.includes(e.id))
+        : establishments;
+
     const handleBulkSelect = (type) => {
         let selectedIds = [];
         if (type === 'ALL') {
-            selectedIds = establishments.map(e => e.id);
+            selectedIds = filteredEstablishments.map(e => e.id);
         } else if (type === 'CLEAR') {
             selectedIds = [];
         } else {
@@ -72,8 +81,8 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                 .filter(t => t.area_gestion === type)
                 .map(t => t.id);
 
-            // 2. Select establishments belonging to those types
-            selectedIds = establishments
+            // 2. Select establishments belonging to those types from the filtered list
+            selectedIds = filteredEstablishments
                 .filter(e => typesInArea.includes(e.tipo))
                 .map(e => e.id);
         }
@@ -155,13 +164,13 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
             maxWidth="max-w-3xl"
             saveLabel={editingRC ? "Actualizar Recepción" : "Guardar Recepción"}
         >
-            <div className="space-y-6">
-                {/* Section: Identificación del Documento */}
-                <div className="space-y-4">
-                    <h4 className="form-section-header">
-                        <Hash className="w-3.5 h-3.5" /> Detalles de Facturación
+            <div className="space-y-10 px-1 py-2">
+                {/* Section 1: Identificación del Documento */}
+                <div className="space-y-5">
+                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">
+                        1. Detalles de Facturación
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                         <FormInput
                             label="Folio RC"
                             icon={<FileText />}
@@ -201,49 +210,49 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                     </div>
                 </div>
 
-                {/* Section: Actores Involucrados */}
-                <div className="space-y-4">
-                    <h4 className="form-section-header">
-                        <Building2 className="w-3.5 h-3.5" /> Proveedor y Destino
+                {/* Section 2: Actores Involucrados */}
+                <div className="space-y-5">
+                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">
+                        2. Proveedor y Destino
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                        <div className="form-container">
-                            <label className="form-label space-x-2">
-                                <Building2 className="w-3.5 h-3.5 text-blue-500" />
-                                <span>Proveedor (Vinculado)</span>
-                            </label>
-                            <div className="form-input-base flex items-center bg-slate-100/50 border-slate-200 text-slate-500 italic">
-                                {contract?.proveedor_nombre || 'Cargando...'}
-                            </div>
-                        </div>
-                        <MultiSearchableSelect
-                            label="Establecimientos de Destino"
-                            icon={<Building2 className="w-3.5 h-3.5" />}
-                            options={establishments.map(e => ({ value: e.id, label: e.nombre }))}
-                            value={formData.establecimientos || []}
-                            onChange={(val) => handleSelectChange('establecimientos', val)}
-                            placeholder="Seleccione uno o muchos..."
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <FormSelect
+                            label="Proveedor (Vinculado)"
+                            name="proveedor"
+                            value={formData.proveedor || ''}
+                            onChange={handleChange}
+                            required
+                            placeholder="Seleccione el proveedor..."
+                            options={(contract?.proveedores_asociados || []).map(p => ({ value: p.proveedor, label: p.proveedor_nombre }))}
                         />
-                        <div className="flex flex-wrap gap-2 mt-2">
-                            <button
-                                type="button"
-                                onClick={() => handleBulkSelect('ALL')}
-                                className="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent bg-slate-100 text-slate-600 hover:bg-slate-200"
-                            >
-                                Todos
-                            </button>
+                        <div className="space-y-4">
+                            <MultiSearchableSelect
+                                label="Establecimientos de Destino"
+                                options={filteredEstablishments.map(e => ({ value: e.id, label: e.nombre }))}
+                                value={formData.establecimientos || []}
+                                onChange={(val) => handleSelectChange('establecimientos', val)}
+                                placeholder="Seleccione uno o muchos..."
+                            />
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => handleBulkSelect('ALL')}
+                                    className="px-3 py-1.5 rounded text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                                >
+                                    Todos
+                                </button>
 
                             {/* Dynamic Buttons by Area */}
                             {[
-                                { key: 'ESTABLECIMIENTO', label: 'Establecimientos', color: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
-                                { key: 'JARDIN', label: 'Jardines VTF', color: 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' },
-                                { key: 'OFICINA', label: 'Oficina Central', color: 'bg-amber-50 text-amber-600 hover:bg-amber-100' }
+                                { key: 'ESTABLECIMIENTO', label: 'Establecimientos' },
+                                { key: 'JARDIN', label: 'Jardines VTF' },
+                                { key: 'OFICINA', label: 'Oficina Central' }
                             ].map(area => (
                                 <button
                                     key={area.key}
                                     type="button"
                                     onClick={() => handleBulkSelect(area.key)}
-                                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent ${area.color}`}
+                                    className="px-3 py-1.5 rounded text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
                                 >
                                     {area.label}
                                 </button>
@@ -252,27 +261,28 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                             <button
                                 type="button"
                                 onClick={() => handleBulkSelect('CLEAR')}
-                                className="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent text-red-500 hover:bg-red-50"
+                                className="px-3 py-1.5 rounded text-xs font-medium text-red-600 hover:bg-red-50 transition-colors ml-auto"
                             >
                                 Limpiar
                             </button>
                         </div>
+                    </div>
 
                         {/* Split Option Checkbox */}
                         {!editingRC && formData.establecimientos?.length > 1 && (
                             <div className="md:col-span-2 mt-2">
-                                <label className="flex items-start gap-3 p-3 bg-amber-50/50 rounded-xl border border-amber-100 cursor-pointer hover:bg-amber-50 transition-colors">
+                                <label className="flex items-start gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
                                     <input
                                         type="checkbox"
                                         checked={isSplit}
                                         onChange={(e) => setIsSplit(e.target.checked)}
-                                        className="mt-0.5 rounded text-amber-600 focus:ring-amber-500 bg-white border-amber-300 w-4 h-4 cursor-pointer"
+                                        className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                                     />
                                     <div className="flex flex-col">
-                                        <span className="text-[11px] font-black text-amber-800 uppercase tracking-tight">
+                                        <span className="text-xs font-bold text-slate-800">
                                             Generar recepciones individuales por establecimiento ({formData.establecimientos.length} RCs separadas)
                                         </span>
-                                        <span className="text-[10px] text-amber-700/80 font-medium leading-tight mt-0.5">
+                                        <span className="text-xs text-slate-500 mt-1">
                                             Si se especifica un folio manual (ej. RCI-01), este se incrementará automáticamente (ej. RCI-02, RCI-03) por cada registro generado.
                                         </span>
                                     </div>
@@ -282,15 +292,15 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                     </div>
                 </div>
 
-                {/* Section: Tiempos y Entrega */}
-                <div className="space-y-4">
-                    <h4 className="form-section-header">
-                        <Calendar className="w-3.5 h-3.5" /> Cronología y Entrega
+                {/* Section 3: Tiempos y Entrega */}
+                <div className="space-y-5">
+                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">
+                        3. Cronología y Entrega
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="space-y-2">
-                            <label className="form-label">
-                                <Calendar className="w-3.5 h-3.5 text-blue-500" /> Fecha Recepción
+                            <label className="form-label block text-xs font-bold text-slate-700">
+                                Fecha Recepción
                             </label>
                             <DateInput
                                 value={formData.fecha_recepcion}
@@ -306,7 +316,6 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                         />
                         <FormSelect
                             label="Tipo de Entrega"
-                            icon={<List />}
                             name="tipo_entrega"
                             value={formData.tipo_entrega}
                             onChange={handleChange}
@@ -317,16 +326,15 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                     </div>
                 </div>
 
-                {/* Section: Detalle y Costos */}
-                <div className="space-y-4">
-                    <h4 className="form-section-header">
-                        <PenLine className="w-3.5 h-3.5" /> Contenido y Finanzas
+                {/* Section 4: Detalle y Costos */}
+                <div className="space-y-5">
+                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">
+                        4. Contenido y Finanzas
                     </h4>
-                    <div className="space-y-4 pt-2">
+                    <div className="space-y-4">
                         <div className="space-y-3">
                             <FormInput
                                 label="Concepto / Glosa Base"
-                                icon={<PenLine />}
                                 name="descripcion"
                                 value={formData.descripcion || ''}
                                 onChange={handleChange}
@@ -335,9 +343,9 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                             />
 
                             {/* Preview of the final combined description */}
-                            <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Vista Previa Glosa Final (PDF)</span>
-                                <p className="text-[11px] text-slate-600 font-bold leading-tight italic whitespace-pre-line">
+                            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                                <span className="text-xs font-bold text-slate-700 block">Vista Previa Glosa Final (PDF)</span>
+                                <p className="text-xs text-slate-500 leading-relaxed italic whitespace-pre-line">
                                     {formData.descripcion || ''}
                                     {formData.periodo && (() => {
                                         const [year, month] = formData.periodo.split('-');
@@ -354,7 +362,6 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                                 <FormInput
                                     type="number"
                                     label="Monto Neto ($)"
-                                    icon={<DollarSign />}
                                     name="total_neto"
                                     value={formData.total_neto}
                                     onChange={handleChange}
@@ -364,7 +371,6 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                                 <FormInput
                                     type="number"
                                     label="IVA ($)"
-                                    icon={<DollarSign className="text-slate-300" />}
                                     name="iva"
                                     value={formData.iva}
                                     onChange={handleChange}
@@ -372,19 +378,17 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                                     placeholder="0"
                                 />
                             </div>
-                            <div className="flex justify-center">
+                            <div className="flex justify-start">
                                 <div className="w-full md:w-1/2">
                                     <FormInput
                                         type="number"
-                                        label="Total a Pagar"
-                                        icon={<CreditCard className="text-blue-500" />}
+                                        label="Total a Pagar ($)"
                                         name="total_pagar"
                                         value={formData.total_pagar}
                                         onChange={handleChange}
                                         required
                                         placeholder="0"
-                                        inputClassName="bg-blue-50/50 border-blue-200 text-blue-700 font-black text-center"
-                                        labelClassName="text-blue-600 text-center block w-full"
+                                        inputClassName="font-bold"
                                     />
                                 </div>
                             </div>
@@ -392,15 +396,14 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                     </div>
                 </div>
 
-                {/* Section: Aprobación */}
-                <div className="space-y-4">
-                    <h4 className="form-section-header">
-                        <PenLine className="w-3.5 h-3.5" /> Firmante de la RC
+                {/* Section 5: Aprobación */}
+                <div className="space-y-5">
+                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">
+                        5. Firmante de la RC
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <FormSelect
                             label="Grupo de Firmantes"
-                            icon={<Users className="text-blue-500" />}
                             name="grupo_firmante"
                             value={formData.grupo_firmante || ''}
                             onChange={(e) => {
@@ -414,12 +417,9 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                             }}
                             placeholder="Seleccione grupo..."
                             options={lookups.groups?.map(g => ({ value: g.id, label: g.nombre }))}
-                            inputClassName="bg-blue-50/50 border-blue-100 text-blue-700 font-bold"
-                            labelClassName="text-blue-600"
                         />
                         <FormSelect
                             label="Funcionario Firmante"
-                            icon={<Users className="text-amber-500" />}
                             name="firmante"
                             value={formData.firmante || ''}
                             onChange={handleChange}
@@ -429,18 +429,16 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                                 value: m.id,
                                 label: `${m.nombre} ${m.id === lookups.groups?.find(g => g.id.toString() === formData.grupo_firmante.toString())?.jefe ? '(Jefe)' : ''}`
                             })) || []}
-                            inputClassName="bg-amber-50/50 border-amber-100 text-amber-700 font-bold"
-                            labelClassName="text-amber-600"
                         />
                     </div>
                 </div>
 
                 {/* Info Box */}
-                <div className="p-3 bg-blue-50/50 rounded-2xl border border-blue-100/50 flex gap-3">
-                    <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-                    <p className="text-[10px] text-blue-700/70 leading-relaxed font-bold uppercase tracking-tight">
-                        Nota: Esta recepción quedará vinculada permanentemente al expediente del contrato {contract?.codigo_mercado_publico}.
-                    </p>
+                <div className="flex items-center gap-2.5 text-slate-400 mt-2 pb-2">
+                    <Info className="w-4 h-4" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">
+                        Nota: Esta recepción quedará vinculada permanentemente al contrato.
+                    </span>
                 </div>
             </div>
         </BaseModal>

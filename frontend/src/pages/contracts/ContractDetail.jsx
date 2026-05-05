@@ -357,6 +357,7 @@ const ContractDetail = () => {
                 <div className="flex items-center gap-1 p-1 bg-slate-100/50 rounded-2xl border border-slate-200/60 overflow-x-auto no-scrollbar">
                     {[
                         { id: 'info', label: 'General', icon: <Info className="w-4 h-4" /> },
+                        { id: 'providers', label: 'Proveedores', icon: <Building2 className="w-4 h-4" />, count: contract.proveedores_asociados?.length },
                         { id: 'receptions', label: 'Recepciones', icon: <ShoppingBag className="w-4 h-4" />, count: receptions?.length },
                         { id: 'docs', label: 'Archivos', icon: <FileSearch className="w-4 h-4" />, count: contract.documentos?.length },
                         { id: 'history', label: 'Historial', icon: <History className="w-4 h-4" />, count: history?.length }
@@ -542,6 +543,74 @@ const ContractDetail = () => {
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'providers' && (
+                            <motion.div
+                                key="providers"
+                                initial={{ opacity: 0, scale: 0.99 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.99 }}
+                                className="p-6 lg:p-8 space-y-6"
+                            >
+                                <div>
+                                    <h3 className="text-lg font-black text-slate-800 tracking-tight">Proveedores Adjudicados</h3>
+                                    <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1">Líneas de adjudicación y presupuestos individuales</p>
+                                </div>
+
+                                <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+                                    <table className="w-full text-left whitespace-nowrap">
+                                        <thead className="bg-slate-50 border-b border-slate-100">
+                                            <tr>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Proveedor</th>
+                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Monto Adjudicado</th>
+                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Monto Ejecutado</th>
+                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo Disponible</th>
+                                                <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Consumo</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {(contract.proveedores_asociados || []).map(p => {
+                                                const provPercentage = p.monto_adjudicado > 0 ? Math.min(100, Math.round((p.monto_ejecutado / p.monto_adjudicado) * 100)) : 0;
+                                                return (
+                                                    <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center">
+                                                                    <Building2 className="w-4 h-4" />
+                                                                </div>
+                                                                <span className="font-bold text-slate-700 text-xs">{p.proveedor_nombre}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right font-black text-slate-800">{formatCurrency(p.monto_adjudicado)}</td>
+                                                        <td className="px-6 py-4 text-right font-black text-slate-600">
+                                                            {formatCurrency(p.monto_ejecutado)}
+                                                            {p.monto_consumido_previo > 0 && (
+                                                                <div className="text-[9px] text-slate-400 italic font-medium">Incluye {formatCurrency(p.monto_consumido_previo)} previo</div>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right font-black text-emerald-600">{formatCurrency(p.monto_restante)}</td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex flex-col gap-1 items-center">
+                                                                <div className="w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                                                    <div className="bg-indigo-500 h-full rounded-full transition-all" style={{ width: `${provPercentage}%` }}></div>
+                                                                </div>
+                                                                <span className="text-[9px] font-black text-slate-500">{provPercentage}%</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                    {(!contract.proveedores_asociados || contract.proveedores_asociados.length === 0) && (
+                                        <div className="py-16 text-center">
+                                            <Building2 className="w-8 h-8 text-slate-100 mx-auto mb-4" />
+                                            <p className="font-black text-slate-300 uppercase tracking-widest text-[10px]">Sin proveedores asignados</p>
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
                         )}
@@ -1021,7 +1090,8 @@ const ContractDetail = () => {
                             setEditModalOpen(false);
                             fetchContract();
                         }}
-                        contract={contract}
+                        editingId={contract.id}
+                        initialData={contract}
                         lookups={lookups}
                     />
                 )
