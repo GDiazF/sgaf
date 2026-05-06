@@ -389,33 +389,33 @@ const ContractDetail = () => {
                                 initial={{ opacity: 0, scale: 0.99 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.99 }}
-                                className="p-6 space-y-6"
+                                className="p-5 space-y-4"
                             >
                                 {/* AREA SUPERIOR: Estadísticas y Gráfico */}
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                                     {/* Izquierda: 4 Stats en rejilla 2x2 */}
-                                    <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
-                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Presupuesto Total</span>
+                                    <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">Presupuesto Total</span>
                                             <p className="text-xl font-black text-slate-900 leading-none">{formatCurrency(contract.monto_total)}</p>
                                         </div>
-                                        <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
-                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Monto Ejecutado</span>
+                                        <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">Monto Ejecutado</span>
                                             <p className="text-xl font-black text-slate-900 leading-none">{formatCurrency(contract.monto_ejecutado)}</p>
                                         </div>
-                                        <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
-                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Disponible</span>
+                                        <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">Disponible</span>
                                             <p className="text-xl font-black text-emerald-600 leading-none">{formatCurrency(contract.monto_restante)}</p>
                                         </div>
-                                        <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
-                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Plazo Restante</span>
+                                        <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">Plazo Restante</span>
                                             <p className="text-xl font-black text-slate-900 leading-none">{monthsLeft} <span className="text-xs font-bold text-slate-400 uppercase">Meses</span></p>
                                         </div>
                                     </div>
 
                                     {/* Derecha: Gráfico Grande */}
-                                    <div className="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col min-h-[220px]">
-                                        <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                                    <div className="lg:col-span-7 bg-white rounded-2xl p-5 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col h-[200px] lg:h-[210px]">
+                                        <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
                                             <TrendingUp className="w-3.5 h-3.5 text-indigo-500" /> Gráfico Histórico de Ejecución Mensual
                                         </h4>
                                         <div className="flex-1 min-h-0">
@@ -458,17 +458,17 @@ const ContractDetail = () => {
                                 </div>
 
                                 {/* AREA INFERIOR: 3 Columnas Sincronizadas */}
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-3 px-1 mb-2">
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-3 px-1 mb-1">
                                         <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-widest shrink-0">Resumen del Contrato</h3>
                                         <p className="text-[11px] font-black text-blue-600 uppercase tracking-tight truncate leading-none">
                                             {contract.descripcion}
                                         </p>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:h-[260px]">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 lg:h-[240px]">
                                         {/* Col 1: 4 ítems */}
-                                        <div className="flex flex-col justify-between h-full space-y-3 lg:space-y-0">
+                                        <div className="flex flex-col justify-between h-full space-y-2.5 lg:space-y-0">
                                             {[
                                                 { label: 'Tipo de Proceso', val: contract.proceso_nombre },
                                                 { label: 'Orientación', val: contract.orientacion_nombre || "No definida" },
@@ -497,10 +497,10 @@ const ContractDetail = () => {
                                         </div>
 
                                         {/* Col 3: 2 ítems Premium */}
-                                        <div className="flex flex-col justify-between h-full space-y-4 lg:space-y-0">
-                                            <div className="bg-emerald-600 p-6 lg:p-7 rounded-2xl shadow-xl shadow-emerald-600/20 flex flex-col justify-between transition-all hover:scale-[1.01] lg:h-[48%] min-h-[120px] relative overflow-hidden group">
+                                        <div className="flex flex-col justify-between h-full space-y-3 lg:space-y-0">
+                                            <div className="bg-emerald-600 p-5 lg:p-6 rounded-2xl shadow-xl shadow-emerald-600/20 flex flex-col justify-between transition-all hover:scale-[1.01] lg:h-[48%] min-h-[110px] relative overflow-hidden group">
                                                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
-                                                    <DollarSign className="w-16 lg:w-20 h-16 lg:h-20 text-white" />
+                                                    <DollarSign className="w-14 lg:w-16 h-14 lg:h-16 text-white" />
                                                 </div>
                                                 <div className="flex items-center gap-2 relative z-10">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -520,9 +520,9 @@ const ContractDetail = () => {
                                                 </p>
                                             </div>
 
-                                            <div className="bg-blue-600 p-6 lg:p-7 rounded-2xl shadow-xl shadow-blue-600/20 flex flex-col justify-between transition-all hover:scale-[1.01] lg:h-[48%] min-h-[120px] relative overflow-hidden group">
+                                            <div className="bg-blue-600 p-5 lg:p-6 rounded-2xl shadow-xl shadow-blue-600/20 flex flex-col justify-between transition-all hover:scale-[1.01] lg:h-[48%] min-h-[110px] relative overflow-hidden group">
                                                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
-                                                    <Clock className="w-16 lg:w-20 h-16 lg:h-20 text-white" />
+                                                    <Clock className="w-14 lg:w-16 h-14 lg:h-16 text-white" />
                                                 </div>
                                                 <div className="flex items-center gap-2 relative z-10">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-pulse" />
@@ -1086,9 +1086,18 @@ const ContractDetail = () => {
                     <ContractModal
                         isOpen={isEditModalOpen}
                         onClose={() => setEditModalOpen(false)}
-                        onSave={() => {
-                            setEditModalOpen(false);
-                            fetchContract();
+                        onSave={async (dataToSubmit) => {
+                            try {
+                                const finalData = { ...dataToSubmit };
+                                if (finalData.orientacion === '') delete finalData.orientacion;
+                                
+                                await api.put(`contratos/contratos/${contract.id}/`, finalData);
+                                setEditModalOpen(false);
+                                fetchContract();
+                            } catch (error) {
+                                console.error(error);
+                                alert("Error al actualizar el contrato.");
+                            }
                         }}
                         editingId={contract.id}
                         initialData={contract}
