@@ -385,6 +385,8 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
         }
 
         pago = self.get_object()
+        rc = pago.recepcion_conforme # Check if linked to an RC
+        
         buffer = io.BytesIO()
         
         # Custom margins
@@ -393,8 +395,8 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
             pagesize=FOLIO,
             rightMargin=50,
             leftMargin=50,
-            topMargin=40,
-            bottomMargin=40
+            topMargin=25,
+            bottomMargin=25
         )
 
         # Container for elements
@@ -414,6 +416,11 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
             name='NormalText', parent=styles['Normal'], fontSize=9, leading=13,
             spaceBefore=10, spaceAfter=10, alignment=4 # Justified
         ))
+        
+        styles.add(ParagraphStyle(
+            name='FolioStyle', parent=styles['Normal'], alignment=2,
+            fontSize=9, fontName='Helvetica-Bold', spaceAfter=5
+        ))
 
         def get_scaled_image(path, max_w, max_h):
             img_reader = ImageReader(path)
@@ -426,8 +433,9 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
                 w = h / aspect
             return Image(path, width=w, height=h)
 
-        logo_slep_path = os.path.join(settings.BASE_DIR, 'frontend', 'public', 'Logo SLEP.png')
-        logo_iquique_path = os.path.join(settings.BASE_DIR, 'frontend', 'public', 'Iquique.png')
+        # Logos: Iquique (Left) and SLEP (Right)
+        logo_iquique_path = os.path.join(settings.BASE_DIR, '..', 'frontend', 'public', 'Iquique.png')
+        logo_slep_path = os.path.join(settings.BASE_DIR, '..', 'frontend', 'public', 'Logo SLEP.png')
 
         header_data = [[]]
         if os.path.exists(logo_iquique_path):
@@ -436,18 +444,23 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
             header_data[0].append("")
         header_data[0].append(Paragraph("", styles['Normal']))
         if os.path.exists(logo_slep_path):
-            header_data[0].append(get_scaled_image(logo_slep_path, 1.8*inch, 1.5*inch))
+            header_data[0].append(get_scaled_image(logo_slep_path, 1.8*inch, 1.2*inch))
         else:
             header_data[0].append("")
 
-        header_table = Table(header_data, colWidths=[2*inch, 3*inch, 2*inch])
+        header_table = Table(header_data, colWidths=[2.5*inch, 2.2*inch, 2.5*inch])
         header_table.setStyle(TableStyle([
-            ('ALIGN', (0,0), (0,0), 'LEFT'), ('ALIGN', (2,0), (2,0), 'RIGHT'), ('ALIGN', (1,0), (1,0), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'TOP'), ('TOPPADDING', (0,0), (-1,-1), 0), ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+            ('ALIGN', (0,0), (0,0), 'LEFT'), ('ALIGN', (2,0), (2,0), 'RIGHT'),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ]))
         elements.append(header_table)
-        elements.append(Spacer(1, 40))
+        elements.append(Spacer(1, 10))
         elements.append(Paragraph("RECEPCIÓN CONFORME", styles['MainTitle']))
+
+        # Folio if exists
+        if rc:
+            elements.append(Paragraph(f"FOLIO: {rc.folio}", styles['FolioStyle']))
+            elements.append(Spacer(1, 5))
 
         fecha = pago.fecha_pago
         intro_text = (
@@ -469,14 +482,13 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
             f"${pago.monto_total:,}".replace(",", ".")
         ])
 
-        available_width = FOLIO[0] - 100
-        # Compact widths for individual RC
+        available_width = doc.width
         col_widths = [
-            available_width * 0.18, # N° Cliente (wider for ~15 digits)
-            available_width * 0.44, # Establecimiento
-            available_width * 0.14, # Factura
-            available_width * 0.12, # Monto JUNJI
-            available_width * 0.12  # Monto Final
+            available_width * 0.18, 
+            available_width * 0.44, 
+            available_width * 0.14, 
+            available_width * 0.12, 
+            available_width * 0.12 
         ]
 
         t_body = Table(data_body, colWidths=col_widths)
@@ -486,27 +498,67 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
             ('BACKGROUND', (0,0), (-1,0), azul_oscuro), ('TEXTCOLOR', (0,0), (-1,0), colors.white),
             ('BACKGROUND', (0,1), (-1,-1), gris_claro), ('GRID', (0,0), (-1,-1), 0.5, gris_lineas),
             ('BOX', (0,0), (-1,-1), 1, azul_oscuro), ('TOPPADDING', (0,0), (-1,0), 6), ('BOTTOMPADDING', (0,0), (-1,0), 6),
-            ('TOPPADDING', (0,1), (-1,-1), 3), ('BOTTOMPADDING', (0,1), (-1,-1), 3), # Compact
+            ('TOPPADDING', (0,1), (-1,-1), 3), ('BOTTOMPADDING', (0,1), (-1,-1), 3),
             ('LEFTPADDING', (0,0), (-1,-1), 3), ('RIGHTPADDING', (0,0), (-1,-1), 3),
         ]))
         elements.append(t_body)
-        elements.append(Spacer(1, 150))
+        elements.append(Spacer(1, 80))
 
-        # Generic signature section (No signer details)
-        signature_width = 200
-        signature_line = Table([['']], colWidths=[signature_width])
-        signature_line.setStyle(TableStyle([
-            ('LINEABOVE', (0,0), (-1,-1), 0.8, colors.black),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('TOPPADDING', (0,0), (-1,-1), 5),
-        ]))
-        elements.append(signature_line)
-        elements.append(Spacer(1, 5))
-        elements.append(Paragraph("RECIBE CONFORME", ParagraphStyle(
-            'SigStyle', parent=styles['Normal'], fontSize=9, alignment=TA_CENTER, fontName='Helvetica-Bold'
-        )))
+        # Signature Section
+        sig_p_style = ParagraphStyle(
+            'SigText', parent=styles['Normal'], fontSize=8.5, alignment=TA_CENTER, fontName='Helvetica-Bold', leading=10,
+            spaceBefore=0, spaceAfter=0
+        )
 
-        doc.build(elements) # Color strips removed
+        left_sig = [
+            [Spacer(1, 40)],
+            [Paragraph("_________________________________", sig_p_style)],
+            [Paragraph("RECIBE CONFORME", sig_p_style)]
+        ]
+        t_left = Table(left_sig, colWidths=[3*inch])
+        t_left.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'BOTTOM')]))
+
+        # Handle Firmante from RC if available
+        firmante_details = []
+        firmante = rc.firmante if rc else None
+        
+        if firmante:
+            name = firmante.nombre_funcionario.upper()
+            cargo = firmante.cargo.upper() if firmante.cargo else ""
+            org_unit = ""
+            if firmante.departamento:
+                d_name = firmante.departamento.nombre.upper()
+                org_unit = f"DEPARTAMENTO {d_name}" if "DEPARTAMENTO" not in d_name else d_name
+            elif firmante.subdireccion:
+                s_name = firmante.subdireccion.nombre.upper()
+                org_unit = s_name if "SUBDIRECCIÓN" in s_name else f"SUBDIRECCIÓN {s_name}"
+            else:
+                org_unit = "DIRECCIÓN"
+            
+            cargo_line = f"{cargo} DE {org_unit}" if cargo and org_unit else (cargo or org_unit)
+            
+            firmante_details = [
+                [Spacer(1, 40)],
+                [Paragraph("_________________________________", sig_p_style)],
+                [Paragraph(name, sig_p_style)],
+                [Paragraph(cargo_line, sig_p_style)]
+            ]
+        else:
+            firmante_details = [
+                [Spacer(1, 40)],
+                [Paragraph("_________________________________", sig_p_style)],
+                [Paragraph("FIRMANTE DEL DOCUMENTO", sig_p_style)]
+            ]
+
+        t_right = Table(firmante_details, colWidths=[3*inch])
+        t_right.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'BOTTOM')]))
+
+        main_sig_table = Table([[t_right, t_left]], colWidths=[available_width/2, available_width/2])
+        main_sig_table.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
+        elements.append(main_sig_table)
+
+        # build without strips for RC
+        doc.build(elements)
         buffer.seek(0)
         return FileResponse(buffer, as_attachment=True, filename=f'RC_{pago.nro_documento}.pdf')
 
@@ -543,6 +595,14 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
         }
 
         rc = self.get_object()
+        
+        # Get tipo from query params if available, otherwise use model default or ESTANDAR
+        tipo_param = request.query_params.get('tipo', '').upper()
+        if tipo_param in ['PAGO', 'ESTANDAR']:
+            current_tipo = tipo_param
+        else:
+            current_tipo = getattr(rc, 'tipo_rc', 'ESTANDAR')
+
         buffer = io.BytesIO()
         
         # Custom margins
@@ -551,8 +611,8 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
             pagesize=FOLIO,
             rightMargin=50,
             leftMargin=50,
-            topMargin=40,
-            bottomMargin=40
+            topMargin=25,
+            bottomMargin=25
         )
 
         # Container for elements
@@ -570,8 +630,8 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
             parent=styles['Heading1'],
             alignment=TA_CENTER,
             fontSize=12,
-            spaceAfter=15,
-            spaceBefore=15,
+            spaceAfter=5,
+            spaceBefore=5,
             fontName='Helvetica-Bold'
         ))
         
@@ -600,7 +660,7 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
             parent=styles['Normal'],
             alignment=2, # Right
             fontSize=9,
-            fontName='Helvetica-Bold',
+            fontName='Helvetica-Bold', # Restored to Bold
             spaceAfter=5
         ))
 
@@ -619,38 +679,31 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
                 
             return Image(path, width=w, height=h)
 
-        # Logos paths
-        logo_slep_path = os.path.join(settings.BASE_DIR, 'frontend', 'public', 'Logo SLEP.png')
-        logo_iquique_path = os.path.join(settings.BASE_DIR, 'frontend', 'public', 'Iquique.png')
+        # Logos: Iquique (Left) and SLEP (Right)
+        logo_iquique_path = os.path.join(settings.BASE_DIR, '..', 'frontend', 'public', 'Iquique.png')
+        logo_slep_path = os.path.join(settings.BASE_DIR, '..', 'frontend', 'public', 'Logo SLEP.png')
 
         header_data = [[]]
         if os.path.exists(logo_iquique_path):
-            # Decrease Iquique logo size slightly
-            img_iquique = get_scaled_image(logo_iquique_path, 1.6*inch, 0.9*inch)
-            header_data[0].append(img_iquique)
+            header_data[0].append(get_scaled_image(logo_iquique_path, 1.6*inch, 0.9*inch))
         else:
             header_data[0].append("")
 
         header_data[0].append(Paragraph("", styles['Normal'])) # Spacer
 
         if os.path.exists(logo_slep_path):
-            # Enlarge SLEP logo size as requested
-            img_slep = get_scaled_image(logo_slep_path, 1.8*inch, 1.5*inch)
-            header_data[0].append(img_slep)
+            header_data[0].append(get_scaled_image(logo_slep_path, 1.8*inch, 1.2*inch))
         else:
             header_data[0].append("")
 
-        header_table = Table(header_data, colWidths=[2*inch, 3*inch, 2*inch])
+        header_table = Table(header_data, colWidths=[2.5*inch, 2.2*inch, 2.5*inch])
         header_table.setStyle(TableStyle([
             ('ALIGN', (0,0), (0,0), 'LEFT'),
             ('ALIGN', (2,0), (2,0), 'RIGHT'),
-            ('ALIGN', (1,0), (1,0), 'CENTER'),
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
-            ('TOPPADDING', (0,0), (-1,-1), 0),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 0),
         ]))
         elements.append(header_table)
-        elements.append(Spacer(1, 40))
+        elements.append(Spacer(1, 10))
 
         # Title
         elements.append(Paragraph("RECEPCIÓN CONFORME", styles['MainTitle']))
@@ -672,12 +725,19 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
         elements.append(Spacer(1, 5))
 
         # Detail Table
-        headers = ['N° Cliente', 'RBD', 'Establecimiento', 'Factura', 'Fecha Venc.', 'Interés', 'Saldo Final']
+        if current_tipo == 'PAGO':
+            headers = ['N° Cliente', 'RBD', 'Establecimiento', 'Factura', 'Fecha Venc.', 'Interés', 'Monto Total']
+        else:
+            # Standard layout (Current one)
+            headers = ['N° Cliente', 'RBD', 'Establecimiento', 'Factura', 'Fecha Venc.', 'Interés', 'Saldo Final']
+        
         data_body = [headers]
+        total_interes = 0
+        total_monto = 0
         
         for p in rc.registros.all():
-            saldo_final = p.monto_total
-            interes = p.monto_interes
+            total_interes += p.monto_interes
+            total_monto += p.monto_total
             
             row = [
                 p.servicio.numero_cliente,
@@ -686,32 +746,42 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
                          ParagraphStyle(
                              'EstStyle',
                              parent=styles['Normal'],
-                             fontSize=8,
-                             leading=10,
+                             fontSize=7,
+                             leading=9,
+                             alignment=0, # Left aligned
                              wordWrap='LTR',
                          )),
                 p.nro_documento,
                 p.fecha_vencimiento.strftime("%d-%m-%Y"),
-                f"${interes:,}".replace(",", "."),
-                f"${saldo_final:,}".replace(",", ".")
+                f"${p.monto_interes:,}".replace(",", "."),
+                f"${p.monto_total:,}".replace(",", ".")
             ]
             data_body.append(row)
         
+        # Add Totals Row for PAGO type
+        if current_tipo == 'PAGO':
+            footer_row = [
+                '', '', '', '', 
+                Paragraph("<b>TOTALES</b>", ParagraphStyle('TotalStyle', parent=styles['Normal'], fontSize=7, alignment=2)),
+                f"${total_interes:,}".replace(",", "."),
+                f"${total_monto:,}".replace(",", ".")
+            ]
+            data_body.append(footer_row)
+        
         # Calculate available width (8.5 inch - 100 points margins)
         available_width = FOLIO[0] - 100
-        # 7 columns: Optimized further for 'Establecimiento'
         col_widths = [
-            available_width * 0.15,  # N° Cliente (wider for ~15 digits)
+            available_width * 0.15,  # N° Cliente
             available_width * 0.06,  # RBD
             available_width * 0.37,  # Establecimiento
             available_width * 0.12,  # Factura
             available_width * 0.12,  # Fecha Venc.
             available_width * 0.09,  # Interés
-            available_width * 0.09   # Saldo Final
+            available_width * 0.09   # Saldo Final / Monto Total
         ]
 
         t_body = Table(data_body, colWidths=col_widths)
-        t_body.setStyle(TableStyle([
+        t_body_style = [
             ('ALIGN', (0,0), (-1,0), 'CENTER'),
             ('ALIGN', (0,1), (1,-1), 'CENTER'),
             ('ALIGN', (2,1), (2,-1), 'LEFT'),
@@ -720,7 +790,7 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
             ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
-            ('FONTSIZE', (0,0), (-1,-1), 8),
+            ('FONTSIZE', (0,0), (-1,-1), 7),
             ('BACKGROUND', (0,0), (-1,0), azul_oscuro),
             ('TEXTCOLOR', (0,0), (-1,0), colors.white),
             ('BACKGROUND', (0,1), (-1,-1), gris_claro),
@@ -732,33 +802,42 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
             ('BOTTOMPADDING', (0,1), (-1,-1), 2.5),
             ('LEFTPADDING', (0,0), (-1,-1), 3),
             ('RIGHTPADDING', (0,0), (-1,-1), 3),
-        ]))
+        ]
+        
+        # Style for the footer row if it exists
+        if current_tipo == 'PAGO':
+            t_body_style.append(('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'))
+            t_body_style.append(('BACKGROUND', (0, -1), (-1, -1), colors.white))
+            t_body_style.append(('TEXTCOLOR', (4, -1), (-1, -1), azul_oscuro))
+
+        t_body.setStyle(TableStyle(t_body_style))
         elements.append(t_body)
-        elements.append(Spacer(1, 40))
+        elements.append(Spacer(1, 20)) 
 
-        # Signature
+        # Dual Signature Section
         firmante = rc.firmante
+        sig_p_style = ParagraphStyle(
+            'SigText', parent=styles['Normal'], fontSize=8.5, alignment=TA_CENTER, fontName='Helvetica-Bold', leading=10,
+            spaceBefore=0, spaceAfter=0
+        )
 
+        # 1. Signature Box for "RECIBE CONFORME" (Now on the Right)
+        left_signature = [
+            [Spacer(1, 20)], # Signature space
+            [Paragraph("_________________________________", sig_p_style)],
+            [Paragraph("RECIBE CONFORME", sig_p_style)]
+        ]
+        t_left = Table(left_signature, colWidths=[3*inch])
+        t_left.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'BOTTOM'),
+        ]))
+
+        # 2. Signature Box for "FIRMANTE" (Now on the Left)
+        firmante_details = []
         if firmante:
-            # Signature Line
-            sig_line = Table([[""]], colWidths=[2.5*inch])
-            sig_line.setStyle(TableStyle([
-                ('LINEABOVE', (0,0), (-1,-1), 0.8, colors.black),
-                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                ('TOPPADDING', (0,0), (-1,-1), 0),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 0),
-            ]))
-            elements.append(sig_line)
-
-            sig_p_style = ParagraphStyle(
-                'SigText', parent=styles['Normal'], fontSize=8.5, alignment=TA_CENTER, fontName='Helvetica-Bold', leading=10,
-                spaceBefore=0, spaceAfter=0
-            )
-
-            # 1. Name
-            elements.append(Paragraph(firmante.nombre_funcionario.upper(), sig_p_style))
-            # 2. Cargo + Dept/Subdiv
-            cargo_line = firmante.cargo.upper() if firmante.cargo else ""
+            name = firmante.nombre_funcionario.upper() # Explicitly uppercase
+            cargo = firmante.cargo.upper() if firmante.cargo else "" # Explicitly uppercase
             org_unit = ""
             if firmante.departamento:
                 d_name = firmante.departamento.nombre.upper()
@@ -769,25 +848,36 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
             else:
                 org_unit = "DIRECCIÓN"
             
-            if cargo_line and org_unit:
-                elements.append(Paragraph(f"{cargo_line} DE {org_unit}", sig_p_style))
-            elif cargo_line or org_unit:
-                elements.append(Paragraph(cargo_line or org_unit, sig_p_style))
+            cargo_line = f"{cargo} DE {org_unit}" if cargo and org_unit else (cargo or org_unit)
+            
+            firmante_details = [
+                [Spacer(1, 20)], # Signature space
+                [Paragraph("_________________________________", sig_p_style)],
+                [Paragraph(name, sig_p_style)],
+                [Paragraph(cargo_line, sig_p_style)]
+            ]
         else:
-            # Fallback for generic signature line
-            signature_width = 200
-            signature_line = Table([['']], colWidths=[signature_width])
-            signature_line.setStyle(TableStyle([
-                ('LINEABOVE', (0,0), (-1,-1), 1, colors.black),
-                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                ('TOPPADDING', (0,0), (-1,-1), 5),
-            ]))
-            elements.append(signature_line)
-            elements.append(Spacer(1, 5))
-            elements.append(Paragraph("RECIBE CONFORME", ParagraphStyle(
-                'SigStyle', parent=styles['Normal'], fontSize=9, alignment=TA_CENTER, fontName='Helvetica-Bold'
-            )))
+            firmante_details = [
+                [Spacer(1, 40)],
+                [Paragraph("_________________________________", sig_p_style)],
+                [Paragraph("FIRMANTE DEL DOCUMENTO", sig_p_style)]
+            ]
 
+        t_right = Table(firmante_details, colWidths=[3*inch])
+        t_right.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'BOTTOM'),
+        ]))
+
+        # Main Signature Table (Swapped: Firmante on the Left, Recibe Conforme on the Right)
+        main_sig_table = Table([[t_right, t_left]], colWidths=[available_width/2, available_width/2])
+        main_sig_table.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ]))
+        elements.append(main_sig_table)
+
+        # Build without strips for RC
         doc.build(elements)
         buffer.seek(0)
         return FileResponse(buffer, as_attachment=True, filename=f'{rc.folio}.pdf')
@@ -936,9 +1026,9 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
                 w = h / aspect
             return Image(path, width=w, height=h)
 
-        # Logos
-        logo_dep_path = os.path.join(settings.BASE_DIR, 'frontend', 'public', 'Logo DEP.png')
-        logo_slep_path = os.path.join(settings.BASE_DIR, 'frontend', 'public', 'Logo SLEP.png')
+        # Logos Standardized for Factura
+        logo_dep_path = os.path.join(settings.BASE_DIR, '..', 'frontend', 'public', 'Logo DEP.png')
+        logo_slep_path = os.path.join(settings.BASE_DIR, '..', 'frontend', 'public', 'Logo SLEP.png')
 
         header_data = [[]]
         if os.path.exists(logo_dep_path):
@@ -998,14 +1088,12 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
         elements.append(Spacer(1, 12))
 
         # Section: Identificación Producto
-        elements.append(Paragraph("<b>IDENTIFICACIÓN DEL PRODUCTO O SERVICIO ADQUIRIDO</b>", section_style))
+        elements.append(Paragraph("<b>IDENTIFICACIÓN DEL PRODUCTO OR SERVICIO ADQUIRIDO</b>", section_style))
         fecha_recepcion = factura.fecha_recepcion.strftime("%d-%m-%Y")
         
         # Format establishments string
         establecimientos_str = ", ".join([e.nombre for e in factura.establecimientos.all()])
         
-        # Format combined description: {descripcion} - {periodo} - {establecimientos}
-        # Avoid duplicating period if it's already in the description text
         descripcion_final = factura.descripcion or ""
         period_str = ""
         if factura.periodo:
@@ -1019,7 +1107,6 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
                 descripcion_final = period_str
                 
         if establecimientos_str and establecimientos_str.lower() not in descripcion_final.lower():
-            # Create a vertical list for establishments
             est_list = [f"- {e.nombre}" for e in factura.establecimientos.all()]
             vertical_est_str = "<br/>" + "<br/>".join(est_list)
             
@@ -1028,7 +1115,6 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
             else:
                 descripcion_final = vertical_est_str.replace("<br/>", "", 1) # remove leading br if empty
 
-        # Get OC from factura or contract
         nro_oc_final = factura.nro_oc
         if not nro_oc_final and factura.contrato:
             nro_oc_final = factura.contrato.nro_oc
@@ -1070,10 +1156,10 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
         proveedor_table.setStyle(TableStyle([
             ("GRID", (0, 0), (-1, -1), 0.6, colors.black),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1,-1), 4),
+            ("RIGHTPADDING", (0, 0), (-1,-1), 4),
+            ("TOPPADDING", (0, 0), (-1,-1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1,-1), 4),
         ]))
         elements.append(proveedor_table)
         elements.append(Spacer(1, 12))
@@ -1088,7 +1174,6 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
             ["IMPUESTOS", format_clp(factura.iva)],
             ["TOTAL A PAGAR", format_clp(factura.total_pagar)],
         ]
-        # Match image width (approx 60% of doc width)
         pago_table = Table(
             [[Paragraph(label, cell_label_style), Paragraph(value, cell_value_style)] for label, value in pago_rows],
             colWidths=[2.2*inch, 1.8*inch]
@@ -1102,7 +1187,6 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
             ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
             ("ALIGN", (0,0), (-1,-1), "LEFT"),
         ]))
-        # Wrap in another table to keep it left-aligned but short
         pago_wrapper = Table([[pago_table]], colWidths=[doc.width])
         pago_wrapper.setStyle(TableStyle([
             ("ALIGN", (0, 0), (-1, -1), "LEFT"),
@@ -1111,29 +1195,29 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
         elements.append(pago_wrapper)
         elements.append(Spacer(1, 80))
 
-        # Signature
+        # Signature Table Styles
+        sig_p_style = ParagraphStyle(
+            'SigText', parent=styles['Normal'], fontSize=8.5, alignment=TA_CENTER, fontName='Helvetica-Bold', leading=10,
+            spaceBefore=0, spaceAfter=0
+        )
+
+        left_signature = [
+            [Spacer(1, 40)], 
+            [Paragraph("_________________________________", sig_p_style)],
+            [Paragraph("RECIBE CONFORME", sig_p_style)]
+        ]
+        t_left = Table(left_signature, colWidths=[3*inch])
+        t_left.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'BOTTOM'),
+        ]))
+
+        # Signature Box for "FIRMANTE" (Now on the Left)
         firmante = factura.firmante
-
+        firmante_details = []
         if firmante:
-            # Signature Line
-            sig_line = Table([[""]], colWidths=[2.5*inch])
-            sig_line.setStyle(TableStyle([
-                ('LINEABOVE', (0,0), (-1,-1), 0.8, colors.black),
-                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                ('TOPPADDING', (0,0), (-1,-1), 0),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 0),
-            ]))
-            elements.append(sig_line)
-
-            sig_p_style = ParagraphStyle(
-                'SigText', parent=styles['Normal'], fontSize=8.5, alignment=TA_CENTER, fontName='Helvetica-Bold', leading=10,
-                spaceBefore=0, spaceAfter=0
-            )
-
-            # 1. Name
-            elements.append(Paragraph(firmante.nombre_funcionario.upper(), sig_p_style))
-            # 2. Cargo + Dept/Subdiv
-            cargo_line = firmante.cargo.upper() if firmante.cargo else ""
+            name = firmante.nombre_funcionario.upper()
+            cargo = firmante.cargo.upper() if firmante.cargo else ""
             org_unit = ""
             if firmante.departamento:
                 d_name = firmante.departamento.nombre.upper()
@@ -1144,28 +1228,36 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
             else:
                 org_unit = "DIRECCIÓN"
             
-            if cargo_line and org_unit:
-                elements.append(Paragraph(f"{cargo_line} DE {org_unit}", sig_p_style))
-            elif cargo_line or org_unit:
-                elements.append(Paragraph(cargo_line or org_unit, sig_p_style))
-
-            # 3. Administrador del Contrato
-            # Line removed as requested
-            # 4. Institution
-            # Line removed as requested
+            cargo_line = f"{cargo} DE {org_unit}" if cargo and org_unit else (cargo or org_unit)
+            
+            firmante_details = [
+                [Spacer(1, 40)],
+                [Paragraph("_________________________________", sig_p_style)],
+                [Paragraph(name, sig_p_style)],
+                [Paragraph(cargo_line, sig_p_style)]
+            ]
         else:
-            # Fallback if no signer found
-            signature_line = Table([['']], colWidths=[2.5*inch])
-            signature_line.setStyle(TableStyle([
-                ('LINEABOVE', (0,0), (-1,-1), 1, colors.black),
-                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ]))
-            elements.append(signature_line)
-            elements.append(Spacer(1, 5))
-            elements.append(Paragraph("RECIBE CONFORME", ParagraphStyle(
-                'SigStyle', parent=styles['Normal'], fontSize=9, alignment=TA_CENTER, fontName='Helvetica-Bold'
-            )))
+            firmante_details = [
+                [Spacer(1, 40)],
+                [Paragraph("_________________________________", sig_p_style)],
+                [Paragraph("FIRMANTE DEL DOCUMENTO", sig_p_style)]
+            ]
 
+        t_right = Table(firmante_details, colWidths=[3*inch])
+        t_right.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'BOTTOM'),
+        ]))
+
+        available_width = doc.width
+        main_sig_table = Table([[t_right, t_left]], colWidths=[available_width/2, available_width/2])
+        main_sig_table.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ]))
+        elements.append(main_sig_table)
+
+        # Factura KEEP color strips as requested in previous design rules (if not specified otherwise)
         doc.build(elements, onFirstPage=draw_color_strips, onLaterPages=draw_color_strips)
         buffer.seek(0)
         return FileResponse(buffer, as_attachment=True, filename=f'{factura.folio}.pdf')

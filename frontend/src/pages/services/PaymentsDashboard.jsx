@@ -59,6 +59,11 @@ const PaymentsDashboard = () => {
     const [formData, setFormData] = useState(initialFormState);
     const [statusFilter, setStatusFilter] = useState('all'); // all, paid, pending
 
+    // Generate RC Modal State
+    const [showRCModal, setShowRCModal] = useState(false);
+    const [rcForm, setRCForm] = useState({ grupo_firmante: '', firmante: '' });
+    const [groups, setGroups] = useState([]);
+
     const fetchData = async (page = 1, search = searchQuery, status = statusFilter, order = ordering) => {
         setLoading(true);
         try {
@@ -111,12 +116,14 @@ const PaymentsDashboard = () => {
     useEffect(() => {
         const fetchFilters = async () => {
             try {
-                const [typesRes, provRes] = await Promise.all([
+                const [typesRes, provRes, grpRes] = await Promise.all([
                     api.get('tipos-proveedores/', { params: { page_size: 1000 } }),
-                    api.get('proveedores/', { params: { page_size: 1000 } })
+                    api.get('proveedores/', { params: { page_size: 1000 } }),
+                    api.get('grupos/', { params: { page_size: 1000 } })
                 ]);
                 setProviderTypes(typesRes.data.results || typesRes.data);
                 setProviders(provRes.data.results || provRes.data);
+                setGroups(grpRes.data.results || grpRes.data);
 
             } catch (error) {
                 console.error("Error fetching filter data:", error);
@@ -127,7 +134,7 @@ const PaymentsDashboard = () => {
 
     useEffect(() => {
         fetchData(currentPage, searchQuery, statusFilter, ordering);
-    }, [currentPage, statusFilter, ordering, selectedType, selectedProvider, pageSize, esHistoricoFilter]);
+    }, [currentPage, searchQuery, statusFilter, ordering, selectedType, selectedProvider, pageSize, esHistoricoFilter]);
 
     const handleTypeChange = async (e) => {
         const typeId = e.target.value;
@@ -268,14 +275,29 @@ const PaymentsDashboard = () => {
             }
         }
 
-        if (!window.confirm(`¿Generar Recepción Conforme para ${selectedIds.size} pagos?`)) return;
+        // Instead of window.confirm, show the modal
+        setShowRCModal(true);
+        setRCForm({ grupo_firmante: '', firmante: '' });
+    };
+
+    const confirmGenerateRC = async () => {
+        if (!rcForm.firmante) {
+            alert("Debe seleccionar un firmante.");
+            return;
+        }
+
+        const selectedPayments = payments.filter(p => selectedIds.has(p.id));
+        const providerId = services.find(s => s.id === selectedPayments[0].servicio).proveedor;
 
         try {
             await api.post('recepciones-conformes/', {
                 proveedor: providerId,
-                registros_ids: Array.from(selectedIds)
+                registros_ids: Array.from(selectedIds),
+                grupo_firmante: rcForm.grupo_firmante,
+                firmante: rcForm.firmante
             });
             alert("Recepción Conforme generada exitosamente.");
+            setShowRCModal(false);
             fetchData(currentPage, searchQuery);
             setSelectedIds(new Set());
         } catch (error) {
@@ -284,9 +306,9 @@ const PaymentsDashboard = () => {
         }
     };
 
-    const handleDownloadRC = async (payment) => {
+    const handleDownloadRC = async (payment, tipo = 'PAGO') => {
         try {
-            const response = await api.get(`registros-pagos/${payment.id}/generate_pdf/`, {
+            const response = await api.get(`registros-pagos/${payment.id}/generate_pdf/?tipo=${tipo}`, {
                 responseType: 'blob'
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -510,6 +532,80 @@ const PaymentsDashboard = () => {
                 errors={bulkErrors}
             />
 
+            {/* Generate RC Modal */}
+            <AnimatePresence>
+                {showRCModal && (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+                            onClick={() => setShowRCModal(false)}
+                        />
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden relative z-10 flex flex-col border border-white/20"
+                        >
+                            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                <div className="space-y-1">
+                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight leading-none">Generar Recepción Conforme</h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Se procesarán {selectedIds.size} pagos seleccionados</p>
+                                </div>
+                                <button onClick={() => setShowRCModal(false)} className="p-2 bg-white text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all shadow-sm">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <div className="p-8 space-y-6">
+                                <FormSelect
+                                    label="Grupo de Firmante"
+                                    value={rcForm.grupo_firmante}
+                                    onChange={e => {
+                                        const gid = e.target.value;
+                                        const grp = groups.find(g => g.id.toString() === gid);
+                                        setRCForm({ ...rcForm, grupo_firmante: gid, firmante: grp ? (grp.jefe || '') : '' });
+                                    }}
+                                    options={groups.map(g => ({ value: g.id, label: g.nombre.toUpperCase() }))}
+                                    placeholder="SELECCIONE GRUPO..."
+                                    inputClassName="!py-3 !h-auto !rounded-2xl !bg-slate-50 font-bold text-slate-700 uppercase !text-[12px]"
+                                    labelClassName="!text-[10px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-1"
+                                />
+
+                                <FormSelect
+                                    label="Firmante Específico"
+                                    value={rcForm.firmante}
+                                    onChange={e => setRCForm({ ...rcForm, firmante: e.target.value })}
+                                    disabled={!rcForm.grupo_firmante}
+                                    options={groups.find(g => g.id.toString() === rcForm.grupo_firmante?.toString())?.miembros_detalle?.map(m => {
+                                        const group = groups.find(g => g.id.toString() === rcForm.grupo_firmante?.toString());
+                                        return { value: m.id, label: `${m.nombre.toUpperCase()} ${m.id === group?.jefe ? '(JEFE)' : ''}` };
+                                    }) || []}
+                                    placeholder="SELECCIONE FIRMANTE..."
+                                    inputClassName="!py-3 !h-auto !rounded-2xl !bg-slate-50 font-bold text-slate-700 uppercase !text-[12px]"
+                                    labelClassName="!text-[10px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-1"
+                                />
+
+                                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mt-4">
+                                    <p className="text-[10px] font-bold text-blue-600 leading-relaxed uppercase tracking-tight">
+                                        ESTA ACCIÓN CREARÁ UN NUEVO DOCUMENTO PDF CON LOS LOGOS INSTITUCIONALES Y LA FIRMA DEL FUNCIONARIO SELECCIONADO.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="p-8 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50">
+                                <button type="button" onClick={() => setShowRCModal(false)} className="px-8 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-500 hover:text-slate-700 rounded-2xl transition-all">Cancelar</button>
+                                <button onClick={confirmGenerateRC} className="px-10 py-3.5 bg-blue-600 text-white text-[11px] font-black uppercase tracking-[0.15em] rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-500/20 transition-all flex items-center gap-3">
+                                    <FileCheck className="w-4 h-4" /> Generar Documento
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
             {/* Table Container con Zero-Scroll */}
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-0">
                 {/* Mobile Cards View */}
@@ -574,12 +670,20 @@ const PaymentsDashboard = () => {
                                     </button>
                                 )}
                                 <button
-                                    onClick={() => handleDownloadRC(item)}
+                                    onClick={() => handleDownloadRC(item, 'ESTANDAR')}
                                     disabled={!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA'}
-                                    className={`flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-[10px] uppercase shadow-sm active:scale-95 transition-all
+                                    className={`flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-[9px] uppercase shadow-sm active:scale-95 transition-all
+                                        ${(!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA') ? 'bg-slate-50 text-slate-300' : 'bg-blue-50 text-blue-700'}`}
+                                >
+                                    <FileText className="w-3.5 h-3.5" /> STD
+                                </button>
+                                <button
+                                    onClick={() => handleDownloadRC(item, 'PAGO')}
+                                    disabled={!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA'}
+                                    className={`flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-[9px] uppercase shadow-sm active:scale-95 transition-all
                                         ${(!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA') ? 'bg-slate-50 text-slate-300' : 'bg-emerald-50 text-emerald-700'}`}
                                 >
-                                    <Download className="w-3.5 h-3.5" /> PDF
+                                    <Download className="w-3.5 h-3.5" /> PAGO
                                 </button>
                                 {can('servicios.delete_registropago') && !item.recepcion_conforme && (
                                     <button
@@ -665,7 +769,10 @@ const PaymentsDashboard = () => {
                                     </td>
                                     <td className="px-4 py-1 text-right">
                                         <div className="flex justify-end gap-1 px-1">
-                                            <button onClick={() => handleDownloadRC(item)} disabled={!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA'} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all disabled:opacity-10" title="PDF">
+                                            <button onClick={() => handleDownloadRC(item, 'ESTANDAR')} disabled={!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA'} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all disabled:opacity-10" title="RC Estándar">
+                                                <FileText className="w-4 h-4" />
+                                            </button>
+                                            <button onClick={() => handleDownloadRC(item, 'PAGO')} disabled={!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA'} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all disabled:opacity-10" title="RC Pago">
                                                 <Download className="w-4 h-4" />
                                             </button>
                                             {can('servicios.change_registropago') && (

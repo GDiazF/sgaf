@@ -64,7 +64,7 @@ const RecepcionConformeList = () => {
 
     useEffect(() => {
         fetchData(currentPage, searchQuery, ordering);
-    }, [currentPage, pageSize, ordering]);
+    }, [currentPage, pageSize, ordering, searchQuery]);
 
     const handleSearch = (query) => {
         setSearchQuery(query);
@@ -95,9 +95,9 @@ const RecepcionConformeList = () => {
         }
     };
 
-    const handleDownloadPDF = async (item) => {
+    const handleDownloadPDF = async (item, tipo = 'ESTANDAR') => {
         try {
-            const response = await api.get(`recepciones-conformes/${item.id}/generate_pdf/`, {
+            const response = await api.get(`recepciones-conformes/${item.id}/generate_pdf/?tipo=${tipo}`, {
                 responseType: 'blob'
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -365,7 +365,10 @@ const RecepcionConformeList = () => {
                                             </button>
                                             {item.estado !== 'ANULADA' && (
                                                 <>
-                                                    <button onClick={() => handleDownloadPDF(item)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all" title="Descargar">
+                                                    <button onClick={() => handleDownloadPDF(item, 'ESTANDAR')} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="RC Estándar (Gestión)">
+                                                        <FileText className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={() => handleDownloadPDF(item, 'PAGO')} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all" title="RC Pago (Con Intereses)">
                                                         <Download className="w-4 h-4" />
                                                     </button>
                                                     {can('servicios.change_recepcionconforme') && (

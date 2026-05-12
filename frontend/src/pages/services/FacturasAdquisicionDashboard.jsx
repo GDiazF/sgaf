@@ -80,7 +80,7 @@ const FacturasAdquisicionDashboard = () => {
 
     useEffect(() => {
         fetchData(currentPage, searchQuery, ordering, pageSize);
-    }, [currentPage, ordering, pageSize]);
+    }, [currentPage, searchQuery, ordering, pageSize]);
 
     const handleSearch = (query) => {
         setSearchQuery(query);

@@ -63,11 +63,16 @@ class RecepcionConforme(models.Model):
         ('EMITIDA', 'Emitida'),
         ('ANULADA', 'Anulada'),
     ]
+    TIPO_CHOICES = [
+        ('ESTANDAR', 'Estándar (Resumen por Servicio)'),
+        ('PAGO', 'Pago (Detalle con Intereses)'),
+    ]
     proveedor = models.ForeignKey(Proveedor, on_delete=models.PROTECT, related_name='recepciones')
     folio = models.CharField(max_length=50, unique=True, blank=True)
     fecha_emision = models.DateField(auto_now_add=True)
     observaciones = models.TextField(blank=True, null=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='EMITIDA')
+    tipo_rc = models.CharField(max_length=20, choices=TIPO_CHOICES, default='ESTANDAR')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

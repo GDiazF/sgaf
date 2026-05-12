@@ -49,21 +49,44 @@ const Layout = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Close sidebar/mobile menu when route changes
+    // Auto-expand submenus based on path
     useEffect(() => {
+        const path = location.pathname;
+
+        // Reset if at root
+        if (path === '/') return;
+
+        // SSGG Group
+        const ssggPaths = [
+            '/services', '/contracts', '/telecomunicaciones', '/impresoras', '/vehiculos', 
+            '/personal-ti', '/insights', '/usuarios-google', '/biometrico', '/monitoreo-red', 
+            '/keys', '/loans', '/history', '/admin/conciliacion'
+        ];
+        
+        if (ssggPaths.some(p => path.startsWith(p))) {
+            setActiveMainGroup('ssgg');
+            if (path.startsWith('/contracts')) setActiveSubMenu('contratos');
+            else if (path.startsWith('/services')) setActiveSubMenu('services');
+            else if (path.startsWith('/vehiculos')) setActiveSubMenu('vehiculos');
+            else if (path.startsWith('/usuarios-google') || path.startsWith('/biometrico') || path.startsWith('/admin/conciliacion')) setActiveSubMenu('usuarios');
+            else if (path.startsWith('/loans') || path.startsWith('/keys') || path.startsWith('/history')) setActiveSubMenu('loans');
+        } 
+        else if (path.startsWith('/tesoreria')) {
+            setActiveMainGroup('tesoreria');
+        } 
+        else if (path.startsWith('/orden-compra') || path.startsWith('/licitaciones')) {
+            setActiveMainGroup('mp');
+        } 
+        else if (path.startsWith('/bienestar')) {
+            setActiveMainGroup('bienestar');
+        }
+
         setMobileMenuOpen(false);
-        // Si venimos con instrucción de configurar MFA, abrimos el modal
         if (location.state?.setup_mfa) {
             setIsProfileModalOpen(true);
         }
         if (windowWidth <= 1366) {
             setSidebarOpen(false);
-        }
-
-        // Auto-expand submenus based on path
-        if (location.pathname.startsWith('/vehiculos')) {
-            setActiveMainGroup('ssgg');
-            setActiveSubMenu('vehiculos');
         }
     }, [location.pathname, location.state, windowWidth]);
 
