@@ -172,3 +172,8 @@ RESERVAS_ADMIN_EMAIL = config('RESERVAS_ADMIN_EMAIL', default='')
 
 OTP_TOTP_ISSUER = 'SGAF - SLEP Iquique'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Límites de subida aumentados para procesamiento de múltiples PDFs
+DATA_UPLOAD_MAX_MEMORY_SIZE = 209715200  # 200MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 209715200  # 200MB
+

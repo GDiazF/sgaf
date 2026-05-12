@@ -71,9 +71,10 @@ const Contracts = () => {
                 ...(filterOrientacion && { orientacion: filterOrientacion })
             };
             const response = await api.get('contratos/contratos/', { params });
-            setContracts(response.data.results || []);
-            setTotalCount(response.data.count || 0);
-            setTotalPages(Math.ceil((response.data.count || 0) / size));
+            const data = response.data.results || (Array.isArray(response.data) ? response.data : []);
+            setContracts(data);
+            setTotalCount(response.data.count || data.length);
+            setTotalPages(response.data.count ? Math.ceil(response.data.count / size) : 1);
             setCurrentPage(page);
         } catch (error) {
             console.error("Error fetching contracts:", error);
@@ -209,11 +210,11 @@ const Contracts = () => {
             <div className="shrink-0 flex flex-row justify-between items-start lg:items-end gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
                 <div>
                     <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight flex items-center gap-2 leading-none uppercase">
-                        Contratos y Licitaciones
+                        Contratos Vigentes
                     </h2>
                     <p className="text-[10px] md:text-xs font-medium text-slate-500 mt-1.5 flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                        Gestión de convenios ({totalCount})
+                        Gestión de convenios y compras ({totalCount})
                     </p>
                 </div>
                 {can('contratos.add_contrato') && (
@@ -385,7 +386,7 @@ const Contracts = () => {
                             <table className="w-full text-left whitespace-nowrap">
                                 <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200">
                                     <tr>
-                                        <SortableHeader label="Contrato / Código MP" sortKey="codigo_mercado_publico" currentOrdering={ordering} onSort={handleSort} />
+                                        <SortableHeader label="Código / Referencia" sortKey="codigo_mercado_publico" currentOrdering={ordering} onSort={handleSort} />
                                         <SortableHeader label="Estado" sortKey="estado__nombre" currentOrdering={ordering} onSort={handleSort} />
                                         <SortableHeader label="Categoría / Proceso" sortKey="categoria__nombre" currentOrdering={ordering} onSort={handleSort} />
                                         <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-left">Proveedores Adjudicados</th>
@@ -469,7 +470,7 @@ const Contracts = () => {
             {/* Pagination Footer */}
             <div className="shrink-0 pt-2 flex flex-col sm:flex-row items-center justify-between gap-4 pb-2">
                 <div className="order-2 sm:order-1 flex items-center gap-3">
-                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em]">Gestión de Contratos</span>
+                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em]">Registro de Compras</span>
                     <div className="hidden sm:flex bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5 items-center gap-2">
                         <Info className="w-3.5 h-3.5 text-blue-500" />
                         <span className="text-[10px] font-bold text-blue-600 uppercase tracking-tight">El plazo es estimado según vigencia digitalizada.</span>

@@ -35,9 +35,6 @@ const FileUploader = ({ title, description, endpoint, buttonLabel }) => {
         const formData = new FormData();
         filesToUpload.forEach(f => {
             formData.append('files', f); // Usamos 'files' para el backend
-            // Si es la versión vieja de un solo archivo, backend podría esperar 'file'
-            // Pero mi nueva vista espera 'files'
-            formData.append('file', f);
         });
 
         try {

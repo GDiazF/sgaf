@@ -138,6 +138,8 @@ const WelfareBoard = () => {
 
     const handleSaveCategory = async (e) => {
         e.preventDefault();
+        const hasPerm = editingCategoryId ? can('bienestar.change_categoriabienestar') : can('bienestar.add_categoriabienestar');
+        if (!hasPerm) return;
         try {
             if (editingCategoryId) {
                 await api.patch(`bienestar/categorias/${editingCategoryId}/`, newCategory);
@@ -159,6 +161,7 @@ const WelfareBoard = () => {
     };
 
     const handleDeleteCategory = async (id) => {
+        if (!can('bienestar.delete_categoriabienestar')) return;
         // Verificar si hay beneficios que usan esta categoría
         const isUsed = beneficios.some(b => b.categoria === id);
         if (isUsed) {
@@ -185,6 +188,8 @@ const WelfareBoard = () => {
     };
 
     const handleSave = async () => {
+        const hasPerm = editingId ? can('bienestar.change_beneficio') : can('bienestar.add_beneficio');
+        if (!hasPerm) return;
         if (!newData.titulo || !newData.categoria) { alert("Título y Categoría son obligatorios"); return; }
         setLoading(true);
         try {
@@ -210,11 +215,13 @@ const WelfareBoard = () => {
     };
 
     const handleMove = async (id, newStatus) => {
+        if (!can('bienestar.change_beneficio')) return;
         setBeneficios(prev => prev.map(b => b.id === id ? { ...b, estado: newStatus } : b));
         try { await api.patch(`bienestar/beneficios/${id}/`, { estado: newStatus }); } catch (e) { fetchData(); }
     };
 
     const handleDelete = async (id) => {
+        if (!can('bienestar.delete_beneficio')) return;
         if (!window.confirm("¿Eliminar este beneficio?")) return;
         try { await api.delete(`bienestar/beneficios/${id}/`); setBeneficios(prev => prev.filter(b => b.id !== id)); } catch (e) { console.error(e); }
     };
@@ -275,10 +282,12 @@ const WelfareBoard = () => {
                                         <SortableBenefit key={b.id} b={b} categorias={categorias} onDelete={handleDelete} onMove={handleMove} onEdit={openEdit} />
                                     ))}
                                 </SortableContext>
-                                <button onClick={() => { setEditingId(null); setNewData({ ...newData, estado: colId }); setIsModalOpen(true); }} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[1.5rem] sm:rounded-[1.8rem] text-slate-300 flex flex-col items-center justify-center gap-1 hover:border-indigo-200 hover:text-indigo-400 hover:bg-white/50 transition-all group">
-                                    <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform" />
-                                    <span className="text-[10px] font-bold uppercase tracking-widest">Añadir Post-it</span>
-                                </button>
+                                {can('bienestar.add_beneficio') && (
+                                    <button onClick={() => { setEditingId(null); setNewData({ ...newData, estado: colId }); setIsModalOpen(true); }} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[1.5rem] sm:rounded-[1.8rem] text-slate-300 flex flex-col items-center justify-center gap-1 hover:border-indigo-200 hover:text-indigo-400 hover:bg-white/50 transition-all group">
+                                        <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform" />
+                                        <span className="text-[10px] font-bold uppercase tracking-widest">Añadir Post-it</span>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -428,8 +437,12 @@ const WelfareBoard = () => {
                                                         <span className="text-xs font-bold text-slate-700">{cat.nombre}</span>
                                                     </div>
                                                     <div className="flex items-center gap-1">
-                                                        <button onClick={() => handleEditCategory(cat)} className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"><Edit3 className="w-3.5 h-3.5" /></button>
-                                                        <button onClick={() => handleDeleteCategory(cat.id)} className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                        {can('bienestar.change_categoriabienestar') && (
+                                                            <button onClick={() => handleEditCategory(cat)} className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"><Edit3 className="w-3.5 h-3.5" /></button>
+                                                        )}
+                                                        {can('bienestar.delete_categoriabienestar') && (
+                                                            <button onClick={() => handleDeleteCategory(cat.id)} className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}

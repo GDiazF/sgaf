@@ -1,5 +1,31 @@
 from django.contrib import admin
-from .models import ProcesoCompra, EstadoContrato, CategoriaContrato, Contrato, OrientacionLicitacion
+from .models import (
+    ProcesoCompra, EstadoContrato, CategoriaContrato, Contrato, OrientacionLicitacion,
+    TipoServicioOperativo, ServicioContrato, RutaTransporte, FeriadoNacional, PeriodoCobro
+)
+
+@admin.register(TipoServicioOperativo)
+class TipoServicioOperativoAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'icono')
+
+@admin.register(ServicioContrato)
+class ServicioContratoAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'contrato', 'tipo_servicio')
+    list_filter = ('tipo_servicio', 'contrato')
+
+@admin.register(RutaTransporte)
+class RutaTransporteAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'servicio', 'proveedor', 'valor_diario')
+    list_filter = ('servicio', 'proveedor')
+
+@admin.register(FeriadoNacional)
+class FeriadoNacionalAdmin(admin.ModelAdmin):
+    list_display = ('fecha', 'descripcion')
+
+@admin.register(PeriodoCobro)
+class PeriodoCobroAdmin(admin.ModelAdmin):
+    list_display = ('ruta', 'mes_referencia', 'anio_referencia', 'estado')
+    list_filter = ('estado', 'mes_referencia', 'anio_referencia')
 
 @admin.register(ProcesoCompra)
 class ProcesoCompraAdmin(admin.ModelAdmin):

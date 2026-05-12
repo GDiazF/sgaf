@@ -16,8 +16,15 @@ class DjangoModelViewPermissions(permissions.DjangoModelPermissions):
         self.perms_map['GET'] = ['%(app_label)s.view_%(model_name)s']
 
 class ProcedimientoViewSet(viewsets.ModelViewSet):
-    queryset = Procedimiento.objects.filter(activo=True)
     serializer_class = ProcedimientoSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        user = self.request.user
+        # Si puede editar, puede ver los inactivos
+        if user.is_staff or user.has_perm('procedimientos.change_procedimiento'):
+            return Procedimiento.objects.all()
+        return Procedimiento.objects.filter(activo=True)
     
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -30,4 +37,4 @@ class ProcedimientoViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'titulo']
     
     def perform_create(self, serializer):
-        serializer.save(autor=self.request.user)
+        serializer.save(autor=self.request.user, activo=True)

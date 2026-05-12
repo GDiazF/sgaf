@@ -52,6 +52,7 @@ class TipoProveedorViewSet(viewsets.ModelViewSet):
 class ProveedorViewSet(viewsets.ModelViewSet):
     queryset = Proveedor.objects.all()
     serializer_class = ProveedorSerializer
+    pagination_class = None # Desactivar paginación para ver todos los proveedores en selectores
     filterset_fields = {
         'tipo_proveedor': ['exact'],
     }

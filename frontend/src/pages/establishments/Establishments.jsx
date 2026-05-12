@@ -253,16 +253,32 @@ const Establishments = () => {
     const handleSave = async (dataToSubmit) => {
         try {
             const formDataToSend = new FormData();
+            
             Object.keys(dataToSubmit).forEach(key => {
-                if (key === 'logo' && dataToSubmit[key] instanceof File) {
-                    formDataToSend.append(key, dataToSubmit[key]);
-                } else if (key !== 'logo' && key !== 'telefonos') {
-                    formDataToSend.append(key, dataToSubmit[key]);
+                const value = dataToSubmit[key];
+                
+                // 1. Manejo del Logo: Solo si es un archivo nuevo
+                if (key === 'logo') {
+                    if (value instanceof File) {
+                        formDataToSend.append(key, value);
+                    }
+                } 
+                // 2. Manejo de campos numéricos: Evitar enviar strings vacíos ""
+                else if (['latitud', 'longitud', 'rbd'].includes(key)) {
+                    if (value !== '' && value !== null && value !== undefined) {
+                        formDataToSend.append(key, value);
+                    }
+                }
+                // 3. Otros campos (excepto la lista de teléfonos que se maneja aparte)
+                else if (key !== 'telefonos' && key !== 'telefonos_detalle') {
+                    // Asegurarse de no enviar null como string "null"
+                    formDataToSend.append(key, value === null ? '' : value);
                 }
             });
 
             if (editingId) {
-                await api.put(`establecimientos/${editingId}/`, formDataToSend, {
+                // Usar PATCH para actualizaciones parciales es más robusto con FormData
+                await api.patch(`establecimientos/${editingId}/`, formDataToSend, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             } else {
@@ -270,11 +286,15 @@ const Establishments = () => {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             }
+            
             setShowForm(false);
             fetchData(currentPage, searchQuery, filterType, ordering);
         } catch (error) {
-            console.error(error);
-            alert("Error al guardar.");
+            console.error("Error saving establishment:", error.response?.data || error);
+            const errorMsg = error.response?.data 
+                ? Object.entries(error.response.data).map(([k, v]) => `${k}: ${v}`).join('\n')
+                : "Error al guardar.";
+            alert("Error al guardar:\n" + errorMsg);
         }
     };
 

@@ -9,8 +9,9 @@ import {
     FileText, Calendar, Building2, User, Clock, CheckCircle2, AlertCircle,
     Upload, Download, Trash2, Plus, ArrowRight, Shield, Globe, Hash, Info,
     Users, TrendingUp, Activity, DollarSign, Pencil, X, ArrowLeft, Eye, History,
-    FileSearch, ShieldCheck, ShoppingBag, ChevronRight, Tag, Save
+    FileSearch, ShieldCheck, ShoppingBag, ChevronRight, Tag, Save, Truck
 } from 'lucide-react';
+import ContratoServiciosTab from './ContratoServiciosTab';
 import { usePermission } from '../../hooks/usePermission';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -358,6 +359,7 @@ const ContractDetail = () => {
                     {[
                         { id: 'info', label: 'General', icon: <Info className="w-4 h-4" /> },
                         { id: 'providers', label: 'Proveedores', icon: <Building2 className="w-4 h-4" />, count: contract.proveedores_asociados?.length },
+                        { id: 'servicios', label: 'Gestión de Contratos', icon: <Truck className="w-4 h-4" /> },
                         { id: 'receptions', label: 'Recepciones', icon: <ShoppingBag className="w-4 h-4" />, count: receptions?.length },
                         { id: 'docs', label: 'Archivos', icon: <FileSearch className="w-4 h-4" />, count: contract.documentos?.length },
                         { id: 'history', label: 'Historial', icon: <History className="w-4 h-4" />, count: history?.length }
@@ -612,6 +614,18 @@ const ContractDetail = () => {
                                         </div>
                                     )}
                                 </div>
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'servicios' && (
+                            <motion.div
+                                key="servicios"
+                                initial={{ opacity: 0, scale: 0.99 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.99 }}
+                                className="p-6 lg:p-8"
+                            >
+                                <ContratoServiciosTab contractId={contract.id} />
                             </motion.div>
                         )}
 

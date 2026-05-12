@@ -97,3 +97,86 @@ class ContratoSerializer(serializers.ModelSerializer):
                     cp.establecimientos.set(est_data)
                 
         return instance
+
+# =====================================================================
+# MÓDULO DE SERVICIOS OPERATIVOS (TRANSPORTE, ETC.)
+# =====================================================================
+
+from .models import TipoServicioOperativo, ServicioContrato, RutaTransporte, PeriodoCobro, AusenciaRuta, FeriadoNacional, GrupoPresetRutas
+
+class GrupoPresetRutasSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GrupoPresetRutas
+        fields = '__all__'
+
+class TipoServicioOperativoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TipoServicioOperativo
+        fields = '__all__'
+
+class ServicioContratoSerializer(serializers.ModelSerializer):
+    contrato_nombre = serializers.ReadOnlyField(source='contrato.codigo_mercado_publico')
+    tipo_servicio_nombre = serializers.ReadOnlyField(source='tipo_servicio.nombre')
+    tipo_servicio_icono = serializers.ReadOnlyField(source='tipo_servicio.icono')
+    
+    class Meta:
+        model = ServicioContrato
+        fields = '__all__'
+
+class PeriodoCobroSerializer(serializers.ModelSerializer):
+    nombre_estandarizado = serializers.ReadOnlyField()
+    dias_trabajados = serializers.ReadOnlyField()
+    monto_total = serializers.ReadOnlyField()
+    ausencias = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PeriodoCobro
+        fields = '__all__'
+
+    def get_ausencias(self, obj):
+        return [ausencia.fecha.strftime('%Y-%m-%d') for ausencia in obj.ausencias.all()]
+
+class RutaTransporteSerializer(serializers.ModelSerializer):
+    proveedor_nombre = serializers.ReadOnlyField(source='proveedor.nombre')
+    establecimientos_detalle = EstablecimientoSerializer(source='establecimientos', many=True, read_only=True)
+    periodos = PeriodoCobroSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = RutaTransporte
+        fields = '__all__'
+
+class AusenciaRutaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AusenciaRuta
+        fields = '__all__'
+
+    def validate(self, data):
+        # We handle validation for both creation and updates
+        periodo = data.get('periodo', getattr(self.instance, 'periodo', None))
+        fecha = data.get('fecha', getattr(self.instance, 'fecha', None))
+
+        if not periodo:
+            raise serializers.ValidationError({"periodo": "El periodo es requerido."})
+
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        if fecha:
+            try:
+                periodo.validar_fecha(fecha)
+            except DjangoValidationError as e:
+                raise serializers.ValidationError({"fecha": e.messages[0]})
+
+        return data
+
+    def create(self, validated_data):
+        from django.db import IntegrityError
+        try:
+            return super().create(validated_data)
+        except IntegrityError:
+            raise serializers.ValidationError({
+                "fecha": "Ya existe una ausencia registrada para esta fecha en el periodo."
+            })
+
+class FeriadoNacionalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeriadoNacional
+        fields = '__all__'

@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import {
     FileText, Search, Plus, Filter, Download, Eye,
-    Trash2, FilePlus, Building2, MapPin, Edit2
+    Trash2, FilePlus, Building2, MapPin, Edit2, ChevronDown
 } from 'lucide-react';
 import api from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission as usePerm } from '../../hooks/usePermission';
 
 const ProceduresDashboard = () => {
+    // Force hide native select arrows globally for this component
+    const selectStyle = {
+        WebkitAppearance: 'none',
+        MozAppearance: 'none',
+        appearance: 'none'
+    };
+
     const { can } = usePerm();
     const canAdd = can('procedimientos.add_procedimiento');
     const canDelete = can('procedimientos.delete_procedimiento');
@@ -23,7 +30,10 @@ const ProceduresDashboard = () => {
 
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterType, setFilterType] = useState('all');
+    const [filterType, setFilterType] = useState([]); 
+    const [filterStatus, setFilterStatus] = useState('all');
+    const [filterSubdireccion, setFilterSubdireccion] = useState('');
+    const [filterDepartamento, setFilterDepartamento] = useState('');
 
     // Modal states
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -40,18 +50,21 @@ const ProceduresDashboard = () => {
         subdireccion: '',
         departamento: '',
         unidad: '',
-        archivo: null
+        archivo: null,
+        activo: true
     });
 
     const fetchData = async () => {
         setLoading(true);
         try {
+            // Force non-cached request with timestamp
+            const ts = new Date().getTime();
             const [procRes, typeRes, subRes, depRes, uniRes] = await Promise.all([
-                api.get('procedimientos/procedimientos/'),
-                api.get('procedimientos/tipos/'),
-                api.get('subdirecciones/'),
-                api.get('departamentos/'),
-                api.get('unidades/')
+                api.get(`procedimientos/procedimientos/?_ts=${ts}`),
+                api.get(`procedimientos/tipos/?_ts=${ts}`),
+                api.get(`subdirecciones/?_ts=${ts}`),
+                api.get(`departamentos/?_ts=${ts}`),
+                api.get(`unidades/?_ts=${ts}`)
             ]);
             const data = procRes.data.results || procRes.data || [];
             console.log("Procedures fetched:", data);
@@ -78,10 +91,22 @@ const ProceduresDashboard = () => {
     const filteredUnis = unidades.filter(u => !formData.departamento || String(u.departamento) === String(formData.departamento));
 
     const filteredProcedures = procedures.filter(p => {
-        const matchesSearch = p.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.descripcion.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesType = filterType === 'all' || (p.tipo && String(p.tipo) === String(filterType));
-        return matchesSearch && matchesType;
+        const matchesSearch = (p.titulo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (p.descripcion || '').toLowerCase().includes(searchTerm.toLowerCase());
+        
+        // Multi-select types
+        const matchesType = filterType.length === 0 || (p.tipo && filterType.includes(String(p.tipo)));
+        
+        // Organizational filters
+        const matchesSub = !filterSubdireccion || String(p.subdireccion) === String(filterSubdireccion);
+        const matchesDep = !filterDepartamento || String(p.departamento) === String(filterDepartamento);
+
+        // Status filter (only for staff/editors)
+        let matchesStatus = true;
+        if (filterStatus === 'active') matchesStatus = p.activo === true;
+        if (filterStatus === 'inactive') matchesStatus = p.activo === false;
+
+        return matchesSearch && matchesType && matchesSub && matchesDep && matchesStatus;
     });
 
     const handleEdit = (doc) => {
@@ -92,7 +117,8 @@ const ProceduresDashboard = () => {
             subdireccion: doc.subdireccion || '',
             departamento: doc.departamento || '',
             unidad: doc.unidad || '',
-            archivo: null
+            archivo: null,
+            activo: doc.activo
         });
         setEditingId(doc.id);
         setIsModalOpen(true);
@@ -121,8 +147,9 @@ const ProceduresDashboard = () => {
             }
             setIsModalOpen(false);
             setEditingId(null);
-            setFormData({ titulo: '', descripcion: '', tipo: '', subdireccion: '', departamento: '', unidad: '', archivo: null });
-            fetchData();
+            setFormData({ titulo: '', descripcion: '', tipo: '', subdireccion: '', departamento: '', unidad: '', archivo: null, activo: true });
+            alert('¡Procedimiento guardado con éxito!');
+            await fetchData();
         } catch (error) {
             console.error('Error saving:', error);
             alert('Error al guardar el documento');
@@ -165,8 +192,12 @@ const ProceduresDashboard = () => {
                         <FileText className="w-5 h-5 text-white" />
                     </div>
                     <div className="min-w-0">
-                        <h1 className="text-lg font-black text-slate-900 leading-none truncate">Gestor de Documentos</h1>
-                        <p className="text-[10px] md:text-xs text-slate-500 font-medium mt-1">Estructura Organizacional SLEP</p>
+                        <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                            Gestor de Documentos
+                        </h1>
+                        <p className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full inline-block mt-1">
+                            {filteredProcedures.length} documentos disponibles
+                        </p>
                     </div>
                 </div>
 
@@ -192,24 +223,91 @@ const ProceduresDashboard = () => {
                 </div>
             </div>
 
-            {/* TYPE BAR */}
-            <div className="flex items-center gap-2 px-6 py-3 bg-white border-b border-slate-100 overflow-x-auto no-scrollbar">
-                <button
-                    onClick={() => setFilterType('all')}
-                    className={`px-4 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${filterType === 'all' ? 'bg-slate-900 border-slate-900 text-white shadow-md' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}`}
-                >
-                    Todos
-                </button>
-                {types.map((t) => (
-                    <button
-                        key={t.id}
-                        onClick={() => setFilterType(t.id)}
-                        className={`px-4 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${String(filterType) === String(t.id) ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}`}
-                    >
-                        {t.nombre}
-                    </button>
-                ))}
+            {/* FILTER BAR - Ultra Compact & Left Aligned */}
+            <div className="bg-white border-b border-slate-100 shadow-sm z-20">
+                <div className="px-4 py-2 flex items-center justify-between gap-4">
+                    {/* Lado Izquierdo: Icono y Tipo */}
+                    <div className="flex items-center gap-3">
+                        <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                            <Filter className="w-3.5 h-3.5" />
+                        </div>
+                        
+                        <div className="relative">
+                            <select 
+                                style={selectStyle}
+                                className="appearance-none w-[160px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer pr-8 overflow-hidden text-ellipsis whitespace-nowrap"
+                                value={filterType[0] || ''}
+                                onChange={(e) => setFilterType(e.target.value ? [e.target.value] : [])}
+                            >
+                                <option value="">TIPO: TODOS</option>
+                                {types.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                            </select>
+                        </div>
+
+                        {/* Estructura Organizacional */}
+                        <div className="relative">
+                            <select 
+                                style={selectStyle}
+                                className="appearance-none w-[190px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer pr-8 overflow-hidden text-ellipsis whitespace-nowrap"
+                                value={filterSubdireccion}
+                                onChange={(e) => { setFilterSubdireccion(e.target.value); setFilterDepartamento(''); }}
+                            >
+                                <option value="">SUBDIRECCIÓN: TODAS</option>
+                                {subdirecciones.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                            </select>
+                        </div>
+
+                        <div className="relative">
+                            <select 
+                                style={selectStyle}
+                                className="appearance-none w-[190px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer pr-8 disabled:opacity-30 overflow-hidden text-ellipsis whitespace-nowrap"
+                                disabled={!filterSubdireccion}
+                                value={filterDepartamento}
+                                onChange={(e) => setFilterDepartamento(e.target.value)}
+                            >
+                                <option value="">DEPARTAMENTO: TODOS</option>
+                                {departamentos.filter(d => String(d.subdireccion) === String(filterSubdireccion)).map(d => (
+                                    <option key={d.id} value={d.id}>{d.nombre}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <button
+                            onClick={() => { setFilterType([]); setFilterStatus('all'); setFilterSubdireccion(''); setFilterDepartamento(''); setSearchTerm(''); }}
+                            className="px-3 py-1.5 text-slate-400 hover:text-rose-500 text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                            LIMPIAR
+                        </button>
+                    </div>
+
+                    {/* Lado Derecho: Estado */}
+                    <div className="flex items-center gap-3">
+                        {(canChange || canAdd) && (
+                            <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200/50">
+                                <button 
+                                    onClick={() => setFilterStatus('all')}
+                                    className={`px-2.5 py-1 rounded-md text-[9px] font-black transition-all ${filterStatus === 'all' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    TODO
+                                </button>
+                                <button 
+                                    onClick={() => setFilterStatus('active')}
+                                    className={`px-2.5 py-1 rounded-md text-[9px] font-black transition-all ${filterStatus === 'active' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    ACTIVOS
+                                </button>
+                                <button 
+                                    onClick={() => setFilterStatus('inactive')}
+                                    className={`px-2.5 py-1 rounded-md text-[9px] font-black transition-all ${filterStatus === 'inactive' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    BORRADOR
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
+
 
             {/* MAIN CONTENT */}
             <div className="flex-1 overflow-y-auto p-4 md:p-6">
@@ -219,120 +317,133 @@ const ProceduresDashboard = () => {
                             <div key={i} className="h-44 bg-white rounded-2xl border border-slate-100 animate-pulse" />
                         ))}
                     </div>
-                ) : filteredProcedures.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        {filteredProcedures.map(doc => {
-                            const typeColor = doc.tipo_data?.color || '#6366f1';
-                            return (
-                                <div key={doc.id} className="group bg-white rounded-2xl border border-slate-200/60 p-4 hover:shadow-xl hover:shadow-slate-200/50 hover:border-indigo-200 transition-all duration-300 relative flex flex-col h-full">
-                                    <div className="flex items-start justify-between mb-3">
-                                        <div className="p-2 rounded-xl bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                                            <FileText className="w-5 h-5" />
-                                        </div>
-                                        <div className="flex gap-1">
-                                            {canChange && (
-                                                <button
-                                                    onClick={() => handleEdit(doc)}
-                                                    className="opacity-100 sm:opacity-0 group-hover:opacity-100 text-slate-300 hover:text-indigo-600 transition-all p-1"
-                                                    title="Editar"
-                                                >
-                                                    <Edit2 className="w-4 h-4" />
-                                                </button>
-                                            )}
-                                            {canDelete && (
-                                                <button
-                                                    onClick={() => handleDelete(doc.id)}
-                                                    className="opacity-100 sm:opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all p-1"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <h3 className="font-bold text-slate-900 text-sm leading-tight mb-2 group-hover:text-indigo-600 transition-colors">{doc.titulo}</h3>
-
-                                    <div className="space-y-1.5 mb-4 flex-1">
-                                        {/* Area Tags */}
-                                        <div className="flex flex-wrap gap-1">
-                                            {doc.subdireccion_nombre && (
-                                                <span className="text-[9px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded flex items-center gap-1">
-                                                    <Building2 className="w-2.5 h-2.5" /> {doc.subdireccion_nombre}
-                                                </span>
-                                            )}
-                                            {doc.departamento_nombre && (
-                                                <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded flex items-center gap-1">
-                                                    <MapPin className="w-2.5 h-2.5" /> {doc.departamento_nombre}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed italic">
-                                            "{doc.descripcion || 'Sin descripción.'}"
-                                        </p>
-                                    </div>
-
-                                    <div className="mt-auto flex items-center justify-between pt-3 border-t border-slate-50">
-                                        <span className="text-[10px] font-black text-slate-400">
-                                            {new Date(doc.created_at).toLocaleDateString('es-CL')}
-                                        </span>
-                                        <div className="flex items-center gap-1">
-                                            <button
-                                                onClick={() => { setSelectedDoc(doc); setIsViewerOpen(true); }}
-                                                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all"
-                                                title="Previsualizar"
-                                            >
-                                                <Eye className="w-3.5 h-3.5" />
-                                                <span className="hidden sm:inline">Ver</span>
-                                            </button>
-                                            <a
-                                                href={getFileUrl(doc.archivo)} download target="_blank" rel="noopener noreferrer"
-                                                className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                                                title="Descargar"
-                                            >
-                                                <Download className="w-4 h-4" />
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
                 ) : (
-                    <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                            <FilePlus className="w-10 h-10 text-slate-300" />
-                        </div>
-                        <h3 className="text-lg font-bold text-slate-800">No hay documentos</h3>
-                        <p className="text-sm text-slate-500 max-w-xs mx-auto">Prueba con otros términos o filtros.</p>
-                    </div>
+                    <>
+                        {filteredProcedures.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {filteredProcedures.map(doc => {
+                                    const typeColor = doc.tipo_data?.color || '#6366f1';
+                                    return (
+                                        <div key={doc.id} className="group bg-white rounded-2xl border border-slate-200/60 p-4 hover:shadow-xl hover:shadow-slate-200/50 hover:border-indigo-200 transition-all duration-300 relative flex flex-col h-full">
+                                            <div className="flex items-start justify-between mb-3">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="p-2 rounded-xl bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                                                        <FileText className="w-5 h-5" />
+                                                    </div>
+                                                    {!doc.activo && (
+                                                        <span className="text-[9px] font-black bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                                            Inactivo
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    {canChange && (
+                                                        <button
+                                                            onClick={() => handleEdit(doc)}
+                                                            className="opacity-100 sm:opacity-0 group-hover:opacity-100 text-slate-300 hover:text-indigo-600 transition-all p-1"
+                                                            title="Editar"
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    {canDelete && (
+                                                        <button
+                                                            onClick={() => handleDelete(doc.id)}
+                                                            className="opacity-100 sm:opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all p-1"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <h3 className="font-bold text-slate-900 text-sm leading-tight mb-2 group-hover:text-indigo-600 transition-colors">{doc.titulo}</h3>
+
+                                            <div className="space-y-1.5 mb-4 flex-1">
+                                                {/* Area Tags */}
+                                                <div className="flex flex-wrap gap-1">
+                                                    {doc.subdireccion_nombre && (
+                                                        <span className="text-[9px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded flex items-center gap-1">
+                                                            <Building2 className="w-2.5 h-2.5" /> {doc.subdireccion_nombre}
+                                                        </span>
+                                                    )}
+                                                    {doc.departamento_nombre && (
+                                                        <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded flex items-center gap-1">
+                                                            <MapPin className="w-2.5 h-2.5" /> {doc.departamento_nombre}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed italic">
+                                                    "{doc.descripcion || 'Sin descripción.'}"
+                                                </p>
+                                            </div>
+
+                                            <div className="mt-auto flex items-center justify-between pt-3 border-t border-slate-50">
+                                                <span className="text-[10px] font-black text-slate-400">
+                                                    {new Date(doc.created_at).toLocaleDateString('es-CL')}
+                                                </span>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => { setSelectedDoc(doc); setIsViewerOpen(true); }}
+                                                        className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all"
+                                                        title="Previsualizar"
+                                                    >
+                                                        <Eye className="w-3.5 h-3.5" />
+                                                        <span className="hidden sm:inline">Ver</span>
+                                                    </button>
+                                                    <a
+                                                        href={getFileUrl(doc.archivo)} download target="_blank" rel="noopener noreferrer"
+                                                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                                        title="Descargar"
+                                                    >
+                                                        <Download className="w-4 h-4" />
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-20 text-center">
+                                <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                                    <FilePlus className="w-10 h-10 text-slate-300" />
+                                </div>
+                                <h3 className="text-lg font-bold text-slate-800">No hay documentos</h3>
+                                <p className="text-sm text-slate-500 max-w-xs mx-auto">Prueba con otros términos o filtros.</p>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 
             {/* MODAL UPLOAD */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-end md:items-center justify-center p-0 md:p-4">
-                    <div className="bg-white rounded-t-[2.5rem] md:rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom md:zoom-in-95 duration-300">
-                        <div className="px-6 md:px-8 py-5 md:py-6 border-b border-slate-100 flex justify-between items-center bg-indigo-600 text-white">
-                            <div>
-                                <h3 className="font-black text-lg">{editingId ? 'Editar Documento' : 'Nuevo Documento'}</h3>
-                                <p className="text-xs text-white/70">{editingId ? 'Actualiza la información' : 'Completa los campos requeridos'}</p>
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-3xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-300">
+                        {/* Header Compacto */}
+                        <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="p-1.5 bg-indigo-500 rounded-lg"><FilePlus className="w-4 h-4" /></div>
+                                <h3 className="font-bold text-base">{editingId ? 'Editar Documento' : 'Nuevo Procedimiento'}</h3>
                             </div>
-                            <button onClick={() => { setIsModalOpen(false); setEditingId(null); }} className="bg-white/10 p-2.5 rounded-full hover:bg-white/20 transition-colors">
+                            <button onClick={() => { setIsModalOpen(false); setEditingId(null); }} className="text-slate-400 hover:text-white transition-colors">
                                 <Plus className="w-6 h-6 rotate-45" />
                             </button>
                         </div>
-                        <form onSubmit={handleFileUpload} className="p-8 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="md:col-span-2">
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Título</label>
-                                    <input required type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                                        placeholder="Ej: Manual de Uso de Vehículos"
+
+                        <form onSubmit={handleFileUpload} className="p-6">
+                            <div className="grid grid-cols-12 gap-5">
+                                {/* Fila 1: Título y Tipo (8/12 y 4/12) */}
+                                <div className="col-span-8">
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Título del Documento</label>
+                                    <input required type="text" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                                        placeholder="Ej: Manual de Operaciones"
                                         value={formData.titulo}
                                         onChange={e => setFormData({ ...formData, titulo: e.target.value })} />
                                 </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Tipo de Documento</label>
-                                    <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                <div className="col-span-4">
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Tipo</label>
+                                    <select required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                         value={formData.tipo}
                                         onChange={e => setFormData({ ...formData, tipo: e.target.value })}>
                                         <option value="">Seleccionar...</option>
@@ -340,59 +451,85 @@ const ProceduresDashboard = () => {
                                     </select>
                                 </div>
 
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Subdirección</label>
-                                    <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        value={formData.subdireccion}
-                                        onChange={e => setFormData({ ...formData, subdireccion: e.target.value, departamento: '', unidad: '' })}>
-                                        <option value="">Todas las áreas</option>
-                                        {subdirecciones.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Departamento</label>
-                                    <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
-                                        disabled={!formData.subdireccion}
-                                        value={formData.departamento}
-                                        onChange={e => setFormData({ ...formData, departamento: e.target.value, unidad: '' })}>
-                                        <option value="">Cualquier Departamento</option>
-                                        {filteredDeps.map((d) => <option key={d.id} value={d.id}>{d.nombre}</option>)}
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Unidad (Opcional)</label>
-                                    <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
-                                        disabled={!formData.departamento}
-                                        value={formData.unidad}
-                                        onChange={e => setFormData({ ...formData, unidad: e.target.value })}>
-                                        <option value="">Sin unidad específica</option>
-                                        {filteredUnis.map((u) => <option key={u.id} value={u.id}>{u.nombre}</option>)}
-                                    </select>
-                                </div>
-
-                                <div className="md:col-span-2">
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Descripción corta</label>
-                                    <textarea className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none"
-                                        placeholder="¿De qué trata este procedimiento?"
+                                {/* Fila 2: Descripción (Full Width) */}
+                                <div className="col-span-12">
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Descripción Corta</label>
+                                    <input type="text" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                                        placeholder="Resumen del contenido..."
                                         value={formData.descripcion}
                                         onChange={e => setFormData({ ...formData, descripcion: e.target.value })} />
                                 </div>
 
-                                <div className="md:col-span-2">
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Archivo del Procedimiento</label>
-                                    <div className="border-2 border-dashed border-slate-200 rounded-[2rem] p-4 text-center hover:border-indigo-400 transition-colors bg-slate-50/50">
-                                        <input required type="file" className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-6 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white"
+                                {/* Fila 3: Áreas (Simetría 1/3 cada una) */}
+                                <div className="col-span-4">
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Subdirección</label>
+                                    <select className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                                        value={formData.subdireccion}
+                                        onChange={e => setFormData({ ...formData, subdireccion: e.target.value, departamento: '', unidad: '' })}>
+                                        <option value="">General</option>
+                                        {subdirecciones.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                                    </select>
+                                </div>
+                                <div className="col-span-4">
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Departamento</label>
+                                    <select className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 outline-none disabled:opacity-40"
+                                        disabled={!formData.subdireccion}
+                                        value={formData.departamento}
+                                        onChange={e => setFormData({ ...formData, departamento: e.target.value, unidad: '' })}>
+                                        <option value="">Cualquiera</option>
+                                        {filteredDeps.map((d) => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+                                    </select>
+                                </div>
+                                <div className="col-span-4">
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Unidad</label>
+                                    <select className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 outline-none disabled:opacity-40"
+                                        disabled={!formData.departamento}
+                                        value={formData.unidad}
+                                        onChange={e => setFormData({ ...formData, unidad: e.target.value })}>
+                                        <option value="">Cualquiera</option>
+                                        {filteredUnis.map((u) => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+                                    </select>
+                                </div>
+
+                                {/* Fila 4: Archivo y Visibilidad (50/50 Split) */}
+                                <div className="col-span-6">
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Archivo del Documento</label>
+                                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 h-[42px]">
+                                        <FilePlus className={`w-4 h-4 ${formData.archivo ? 'text-emerald-500' : 'text-slate-400'}`} />
+                                        <input required={!editingId} type="file" className="text-[10px] w-full file:bg-indigo-600 file:text-white file:border-0 file:px-2 file:py-0.5 file:rounded-md file:mr-2 file:cursor-pointer"
                                             onChange={e => setFormData({ ...formData, archivo: e.target.files[0] })} />
+                                    </div>
+                                </div>
+
+                                <div className="col-span-6">
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Estado de Visibilidad</label>
+                                    <div className="flex items-center justify-between px-4 bg-slate-900 border border-slate-800 rounded-xl h-[42px] shadow-sm">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-2 h-2 rounded-full ${formData.activo ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-slate-500'}`} />
+                                            <span className="text-[11px] font-bold text-white uppercase tracking-tighter">{formData.activo ? 'Público' : 'Borrador'}</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, activo: !formData.activo })}
+                                            className={`w-9 h-5 rounded-full transition-all relative ${formData.activo ? 'bg-emerald-500' : 'bg-slate-700'}`}
+                                        >
+                                            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-all ${formData.activo ? 'left-4.5' : 'left-0.5'}`} />
+                                        </button>
                                     </div>
                                 </div>
                             </div>
 
-                            <button type="submit" disabled={submitting}
-                                className="w-full py-4 bg-indigo-600 text-white rounded-[2rem] font-black text-sm hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 active:scale-[0.98] disabled:opacity-50 mt-4">
-                                {submitting ? 'Procesando subida...' : 'Publicar Procedimiento'}
-                            </button>
+                            {/* Botones de Acción: Simetría Final */}
+                            <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-end gap-3">
+                                <button type="button" onClick={() => { setIsModalOpen(false); setEditingId(null); }} 
+                                    className="px-6 py-2.5 text-slate-500 font-bold text-sm hover:bg-slate-100 rounded-xl transition-all">
+                                    Cancelar
+                                </button>
+                                <button type="submit" disabled={submitting}
+                                    className="min-w-[180px] py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-[11px] hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 uppercase tracking-widest">
+                                    {submitting ? 'Procesando...' : (editingId ? 'Actualizar' : 'Publicar Documento')}
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>

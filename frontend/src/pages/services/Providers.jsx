@@ -49,10 +49,11 @@ const Providers = () => {
                 api.get('tipos-proveedores/', { params: { page_size: 1000 } })
             ]);
 
-            // Handle Pagination
-            setProviders(provRes.data.results || []);
-            setTotalCount(provRes.data.count || 0);
-            setTotalPages(Math.ceil((provRes.data.count || 0) / pageSize));
+            // Handle Pagination and Data Structure
+            const provData = provRes.data.results || (Array.isArray(provRes.data) ? provRes.data : []);
+            setProviders(provData);
+            setTotalCount(provRes.data.count || provData.length);
+            setTotalPages(provRes.data.count ? Math.ceil(provRes.data.count / pageSize) : 1);
 
             setProviderTypes(typesRes.data.results || typesRes.data);
 

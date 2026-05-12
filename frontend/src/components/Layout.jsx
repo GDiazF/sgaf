@@ -104,13 +104,13 @@ const Layout = () => {
             '/establishments': 'Establecimientos',
             '/funcionarios': 'Funcionarios',
             '/reservas-externas': 'Reservas Externas',
-            '/contracts': 'Contratos',
+            '/contracts': 'Compras',
             '/services/providers': 'Proveedores',
             '/services/adquisiciones': 'Factura sin OC',
-            '/services': 'Servicios',
-            '/services/payments': 'Pagos de Servicios',
+            '/services': 'Gestión de Rutas',
+            '/services/payments': 'Pagos de Contratos',
             '/services/reporte-consumos': 'Reporte Consumos',
-            '/services/rc': 'Recepción Conforme',
+            '/services/rc': 'Recepciones de Contratos',
             '/services/cdp': 'CDPs',
             '/telecomunicaciones': 'Teléfonos',
             '/impresoras': 'Impresoras',
@@ -284,57 +284,6 @@ const Layout = () => {
                         </Link>
                     )}
 
-                    {/* Grupo: Bienestar */}
-                    <div>
-                        <button
-                            onClick={() => {
-                                setActiveMainGroup(activeMainGroup === 'bienestar' ? null : 'bienestar');
-                                setActiveSubMenu(null);
-                            }}
-                            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'bienestar' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <Heart className="w-5 h-5 flex-shrink-0 text-rose-400" />
-                                <motion.span
-                                    initial={false}
-                                    animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                                    className="font-medium whitespace-nowrap"
-                                >
-                                    Bienestar
-                                </motion.span>
-                            </div>
-                            <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
-                                {activeMainGroup === 'bienestar' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                            </motion.div>
-                        </button>
-
-                        <AnimatePresence>
-                            {activeMainGroup === 'bienestar' && (sidebarOpen || mobileMenuOpen) && (
-                                <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: "auto", opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    className="overflow-hidden space-y-1 mt-2 pl-2 border-l border-slate-700/50 ml-6"
-                                >
-                                    <Link
-                                        to="/bienestar/muro"
-                                        className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/bienestar/muro') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                                    >
-                                        <Globe className="w-4 h-4 flex-shrink-0" />
-                                        <span className="font-medium whitespace-nowrap">Bienestar</span>
-                                    </Link>
-                                    <Link
-                                        to="/bienestar"
-                                        className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/bienestar') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                                    >
-                                        <Settings className="w-4 h-4 flex-shrink-0" />
-                                        <span className="font-medium whitespace-nowrap">Beneficios</span>
-                                    </Link>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-
 
 
                     {can('solicitudes_reservas.view_solicitudreserva') && (
@@ -416,10 +365,30 @@ const Layout = () => {
                                                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Finanzas</span>
                                                 </div>
                                                 {can('contratos.view_contrato') && (
-                                                    <Link to="/contracts" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/contracts') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                                                        <FileText className="w-4 h-4 flex-shrink-0" />
-                                                        <span className="font-medium whitespace-nowrap">Contratos</span>
-                                                    </Link>
+                                                    <div>
+                                                        <button 
+                                                            onClick={() => setActiveSubMenu(activeSubMenu === 'contratos' ? null : 'contratos')} 
+                                                            className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'contratos' || isActive('/contracts') || isActive('/contracts/servicios') ? 'text-blue-400' : ''}`}
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                <FileText className="w-4 h-4 flex-shrink-0" />
+                                                                <span className="font-medium whitespace-nowrap">Compras</span>
+                                                            </div>
+                                                            {activeSubMenu === 'contratos' ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                                        </button>
+                                                        {activeSubMenu === 'contratos' && (
+                                                            <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
+                                                                <Link to="/contracts" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/contracts') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                                    Contratos
+                                                                </Link>
+                                                                {can('contratos.view_rutatransporte') && (
+                                                                    <Link to="/contracts/servicios" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/contracts/servicios') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                                        Gestión de Rutas
+                                                                    </Link>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
                                                 {can('servicios.view_proveedor') && (
                                                     <Link to="/services/providers" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/services/providers') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
@@ -439,13 +408,13 @@ const Layout = () => {
                                                         <button onClick={() => setActiveSubMenu(activeSubMenu === 'services' ? null : 'services')} className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'services' || (isActive('/services') || isActive('/services/payments') || isActive('/services/rc') || isActive('/services/cdp')) ? 'text-blue-400' : ''}`}>
                                                             <div className="flex items-center gap-3">
                                                                 <ClipboardList className="w-4 h-4 flex-shrink-0" />
-                                                                <span className="font-medium whitespace-nowrap">Servicios</span>
+                                                                <span className="font-medium whitespace-nowrap">Servicios Básicos</span>
                                                             </div>
                                                             {activeSubMenu === 'services' ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                                                         </button>
                                                         {activeSubMenu === 'services' && (
                                                             <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
-                                                                {can('servicios.view_servicio') && <Link to="/services" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Panel Principal</Link>}
+                                                                {can('servicios.view_servicio') && <Link to="/services" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Panel Operativo</Link>}
                                                                 {can('servicios.view_registropago') && (
                                                                     <>
                                                                         <Link to="/services/payments" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/payments') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Pagos</Link>
@@ -462,7 +431,7 @@ const Layout = () => {
                                         )}
 
                                         {/* Section: RECURSOS */}
-                                        {(can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo') || can('personal_ti.view_personalti') || can('solicitudes_reservas.view_solicitudreserva') || can('usuarios_google.view_googleuser')) && (
+                                        {(can('servicios.view_servicio') || can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('personal_ti.view_personalti') || can('insights.view_dashboardmetric') || can('usuarios_google.view_googleuser') || can('biometrico.view_biometrico')) && (
                                             <div className="space-y-0.5 pt-2">
                                                 <div className="px-4 mb-1">
                                                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Recursos</span>
@@ -698,6 +667,67 @@ const Layout = () => {
                                             <Link to="/licitaciones" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/licitaciones') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
                                                 <FileStack className="w-4 h-4 flex-shrink-0" />
                                                 <span className="font-medium whitespace-nowrap">Visor Licitaciones</span>
+                                            </Link>
+                                        )}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
+
+                    <div className="py-2 px-4">
+                        <div className="border-t border-slate-700/50" />
+                    </div>
+
+                    {/* Grupo: Bienestar */}
+                    {can('bienestar.view_beneficio') && (
+                        <div>
+                            <button
+                                onClick={() => {
+                                    setActiveMainGroup(activeMainGroup === 'bienestar' ? null : 'bienestar');
+                                    setActiveSubMenu(null);
+                                }}
+                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'bienestar' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <Heart className="w-5 h-5 flex-shrink-0 text-rose-400" />
+                                    <motion.span
+                                        initial={false}
+                                        animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                                        className="font-medium whitespace-nowrap"
+                                    >
+                                        Bienestar
+                                    </motion.span>
+                                </div>
+                                <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
+                                    {activeMainGroup === 'bienestar' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                </motion.div>
+                            </button>
+
+                            <AnimatePresence>
+                                {activeMainGroup === 'bienestar' && (sidebarOpen || mobileMenuOpen) && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="overflow-hidden space-y-1 mt-2 pl-2 border-l border-slate-700/50 ml-6"
+                                    >
+                                        {can('bienestar.view_beneficio') && (
+                                            <Link
+                                                to="/bienestar/muro"
+                                                className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/bienestar/muro') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                            >
+                                                <Globe className="w-4 h-4 flex-shrink-0" />
+                                                <span className="font-medium whitespace-nowrap">Beneficios</span>
+                                            </Link>
+                                        )}
+                                        {(can('bienestar.add_beneficio') || can('bienestar.change_beneficio')) && (
+                                            <Link
+                                                to="/bienestar"
+                                                className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/bienestar') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                            >
+                                                <Settings className="w-4 h-4 flex-shrink-0" />
+                                                <span className="font-medium whitespace-nowrap">Configuración</span>
                                             </Link>
                                         )}
                                     </motion.div>

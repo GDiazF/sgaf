@@ -18,6 +18,7 @@ export const groupPermissions = (permissions) => {
         if (name.includes('llave') || name.includes('prestamo') || name.includes('solicitante')) module = 'Préstamo de Llaves';
         else if (name.includes('establecimiento')) module = 'Establecimientos';
         else if (name.includes('proveedor')) module = 'Proveedores';
+        else if (name.includes('ruta') || name.includes('periodo de cobro') || name.includes('periodo cobro') || name.includes('ausencia de ruta') || name.includes('ausencia ruta') || name.includes('feriado nacional') || name.includes('servicio de contrato') || name.includes('servicio contrato') || name.includes('tipo de servicio operativo') || name.includes('grupo de rutas')) module = 'Gestión de Rutas';
         else if (name.includes('contrato') || name.includes('proceso') || name.includes('licitacion')) module = 'Contratos y Licitaciones';
         else if (name.includes('orden de compra') || name.includes('ordencompra')) module = 'Órdenes de Compra';
         else if (appLabel === 'solicitudes_reservas' || name.includes('reserva') || name.includes('bloqueo') || name.includes('recurso')) module = 'Reservas de Espacios';
@@ -121,7 +122,14 @@ export const getFriendlyPermName = (perm) => {
         'logentry': 'Logs de Auditoría',
         'emailconfiguration': 'Configuración Global de Correo',
         'plantillacorreo': 'Plantillas de Correo',
-        'cuentasmtp': 'Cuentas SMTP (Servidores)'
+        'cuentasmtp': 'Cuentas SMTP (Servidores)',
+        'rutatransporte': 'Rutas de Transporte',
+        'serviciocontrato': 'Gestión Operativa de Rutas',
+        'periodocobro': 'Periodos de Cobro / Asistencia',
+        'ausenciaruta': 'Registros de Asistencia',
+        'feriadonacional': 'Calendario de Feriados',
+        'grupopresetrutas': 'Grupos / Presets de Rutas',
+        'tiposerviciooperativo': 'Categorías Operativas'
     };
 
     const modelKey = codename.split('_')[1];

@@ -66,8 +66,8 @@ const GlobalDashboard = () => {
 
     return (
         <div className="w-full h-full bg-[#fcfdfe] flex flex-col overflow-hidden font-sans">
-            {/* 1. Header Hero - Restaurado */}
-            <header className="px-1 pt-0 pb-2 shrink-0">
+            {/* 1. Header Hero - Espacio para "Hola" preservado */}
+            <header className="px-1 pt-4 pb-10 shrink-0">
                 <div className="flex items-center justify-between">
                     <div>
                         <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] mb-1">Dashboard Principal</p>
@@ -76,7 +76,8 @@ const GlobalDashboard = () => {
                         </h1>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    {/* Redes Sociales - Bajadas con translate para cerrar el hueco sin afectar el layout */}
+                    <div className="flex items-center gap-2 translate-y-12">
                         {socialLinks.map(link => {
                             const Icon = IconMap[link.icono] || Globe;
                             const brand = BrandColors[link.icono] || BrandColors.Globe;
@@ -97,14 +98,14 @@ const GlobalDashboard = () => {
                 </div>
             </header>
 
-            {/* 2. Área Principal - ESTRUCTURA DE COLUMNAS SEGÚN MAQUETA */}
+            {/* 2. Área Principal - SIMETRÍA RESTAURADA */}
             <main className="flex-1 min-h-0 px-1 pb-6 overflow-hidden">
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
 
                     {/* COLUMNA IZQUIERDA: Botones + Novedades (3/4 del ancho) */}
                     <div className="lg:col-span-3 flex flex-col space-y-4 min-h-0">
 
-                        {/* 2.1 Botones de Acción (Ahora dentro de la columna) */}
+                        {/* 2.1 Botones de Acción */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 shrink-0">
                             <button
                                 onClick={() => window.location.href = '/reservas'}
@@ -140,7 +141,7 @@ const GlobalDashboard = () => {
                             </button>
                         </div>
 
-                        {/* 2.2 NOVEDADES Y CONVENIOS (Se expande para llenar el espacio) */}
+                        {/* 2.2 NOVEDADES Y CONVENIOS */}
                         <section className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col min-h-0 overflow-hidden">
                             <div className="px-6 md:px-8 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 border-b border-slate-50">
                                 <div className="flex items-center gap-3">
@@ -166,7 +167,7 @@ const GlobalDashboard = () => {
                         </section>
                     </div>
 
-                    {/* COLUMNA DERECHA: Links de Interés (1/4 del ancho) */}
+                    {/* COLUMNA DERECHA: Links de Interés - SIMETRÍA TOTAL */}
                     <div className="lg:col-span-1 h-[600px] min-h-0">
                         <InterestLinksSection isSidebar={true} onRefresh={fetchSocialLinks} />
                     </div>
