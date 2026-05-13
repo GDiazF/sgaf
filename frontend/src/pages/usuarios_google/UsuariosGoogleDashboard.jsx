@@ -41,8 +41,6 @@ const UsuariosGoogleDashboard = () => {
     );
     const [showColumnPicker, setShowColumnPicker] = useState(false);
     const [showSummaryModal, setShowSummaryModal] = useState(false);
-    const [summaryData, setSummaryData] = useState([]);
-    const [loadingSummary, setLoadingSummary] = useState(false);
     const [copiedId, setCopiedId] = useState(null);
 
     const pageSize = 10;
