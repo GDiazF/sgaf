@@ -16,7 +16,7 @@ class BancoUploadView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        file_obj = request.FILES.get('file')
+        file_obj = request.FILES.get('file') or request.FILES.get('files')
         if not file_obj:
             return Response({"error": "No file uploaded"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -37,7 +37,7 @@ class ValeVistaUploadView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        file_obj = request.FILES.get('file')
+        file_obj = request.FILES.get('file') or request.FILES.get('files')
         if not file_obj:
             return Response({"error": "No file uploaded"}, status=status.HTTP_400_BAD_REQUEST)
 

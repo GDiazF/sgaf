@@ -14,6 +14,7 @@ from .serializers import (
     CDPSerializer, TipoEntregaSerializer, FacturaAdquisicionSerializer
 )
 from reportlab.lib.colors import HexColor
+from core.utils.report_utils import get_report_assets
 
 # --- Corporate Branding for PDFs ---
 COLOR_VERDE = HexColor('#92D050')
@@ -403,10 +404,11 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
         elements = []
         styles = getSampleStyleSheet()
         
-
-        azul_oscuro = HexColor('#1F4970')
-        gris_claro = HexColor('#F5F5F5')
-        gris_lineas = HexColor('#CCCCCC')
+        # Get dynamic configuration
+        assets = get_report_assets('RC_BASIC')
+        azul_oscuro = assets['color_primario']
+        gris_claro = assets['color_secundario']
+        gris_lineas = assets['color_lineas']
 
         styles.add(ParagraphStyle(
             name='MainTitle', parent=styles['Heading1'], alignment=TA_CENTER,
@@ -433,18 +435,25 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
                 w = h / aspect
             return Image(path, width=w, height=h)
 
-        # Logos: Iquique (Left) and SLEP (Right)
-        logo_iquique_path = os.path.join(settings.BASE_DIR, '..', 'frontend', 'public', 'Iquique.png')
-        logo_slep_path = os.path.join(settings.BASE_DIR, '..', 'frontend', 'public', 'Logo SLEP.png')
+        # Get dynamic configuration
+        assets = get_report_assets('RC_BASIC')
+        azul_oscuro = assets['color_primario']
+        gris_claro = assets['color_secundario']
+        gris_lineas = assets['color_lineas']
 
         header_data = [[]]
-        if os.path.exists(logo_iquique_path):
-            header_data[0].append(get_scaled_image(logo_iquique_path, 1.6*inch, 0.9*inch))
+        
+        # Logo Izquierdo
+        if assets['logo_izquierdo'] and os.path.exists(assets['logo_izquierdo']):
+            header_data[0].append(get_scaled_image(assets['logo_izquierdo'], 1.6*inch, 0.9*inch))
         else:
             header_data[0].append("")
+            
         header_data[0].append(Paragraph("", styles['Normal']))
-        if os.path.exists(logo_slep_path):
-            header_data[0].append(get_scaled_image(logo_slep_path, 1.8*inch, 1.2*inch))
+        
+        # Logo Derecho
+        if assets['logo_derecho'] and os.path.exists(assets['logo_derecho']):
+            header_data[0].append(get_scaled_image(assets['logo_derecho'], 1.8*inch, 1.2*inch))
         else:
             header_data[0].append("")
 
@@ -621,9 +630,11 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
         # Styles from reference code
         styles = getSampleStyleSheet()
         
-        azul_oscuro = HexColor('#1F4970')
-        gris_claro = HexColor('#F5F5F5')
-        gris_lineas = HexColor('#CCCCCC')
+        # Get dynamic configuration
+        assets = get_report_assets('RC_BASIC')
+        azul_oscuro = assets['color_primario']
+        gris_claro = assets['color_secundario']
+        gris_lineas = assets['color_lineas']
 
         styles.add(ParagraphStyle(
             name='MainTitle',
@@ -679,20 +690,19 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
                 
             return Image(path, width=w, height=h)
 
-        # Logos: Iquique (Left) and SLEP (Right)
-        logo_iquique_path = os.path.join(settings.BASE_DIR, '..', 'frontend', 'public', 'Iquique.png')
-        logo_slep_path = os.path.join(settings.BASE_DIR, '..', 'frontend', 'public', 'Logo SLEP.png')
-
         header_data = [[]]
-        if os.path.exists(logo_iquique_path):
-            header_data[0].append(get_scaled_image(logo_iquique_path, 1.6*inch, 0.9*inch))
+        
+        # Logo Izquierdo
+        if assets['logo_izquierdo'] and os.path.exists(assets['logo_izquierdo']):
+            header_data[0].append(get_scaled_image(assets['logo_izquierdo'], 1.6*inch, 0.9*inch))
         else:
             header_data[0].append("")
-
-        header_data[0].append(Paragraph("", styles['Normal'])) # Spacer
-
-        if os.path.exists(logo_slep_path):
-            header_data[0].append(get_scaled_image(logo_slep_path, 1.8*inch, 1.2*inch))
+            
+        header_data[0].append(Paragraph("", styles['Normal']))
+        
+        # Logo Derecho
+        if assets['logo_derecho'] and os.path.exists(assets['logo_derecho']):
+            header_data[0].append(get_scaled_image(assets['logo_derecho'], 1.8*inch, 1.2*inch))
         else:
             header_data[0].append("")
 
@@ -1026,20 +1036,22 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
                 w = h / aspect
             return Image(path, width=w, height=h)
 
-        # Logos Standardized for Factura
-        logo_dep_path = os.path.join(settings.BASE_DIR, '..', 'frontend', 'public', 'Logo DEP.png')
-        logo_slep_path = os.path.join(settings.BASE_DIR, '..', 'frontend', 'public', 'Logo SLEP.png')
-
+        # Dynamic configuration for Adquisiciones
+        assets = get_report_assets('RC_ADQ')
+        
         header_data = [[]]
-        if os.path.exists(logo_dep_path):
-            header_data[0].append(get_scaled_image(logo_dep_path, 1.8*inch, 0.9*inch))
+        
+        # Logo Izquierdo (DEP or dynamic)
+        if assets['logo_izquierdo'] and os.path.exists(assets['logo_izquierdo']):
+            header_data[0].append(get_scaled_image(assets['logo_izquierdo'], 1.8*inch, 0.9*inch))
         else:
             header_data[0].append("")
-
-        header_data[0].append(Paragraph("", styles['Normal'])) # Spacer
-
-        if os.path.exists(logo_slep_path):
-            header_data[0].append(get_scaled_image(logo_slep_path, 1.8*inch, 1.2*inch))
+            
+        header_data[0].append(Paragraph("", styles['Normal']))
+        
+        # Logo Derecho (SLEP or dynamic)
+        if assets['logo_derecho'] and os.path.exists(assets['logo_derecho']):
+            header_data[0].append(get_scaled_image(assets['logo_derecho'], 1.8*inch, 1.2*inch))
         else:
             header_data[0].append("")
 

@@ -37,9 +37,15 @@ const Grupos = () => {
     const fetchFuncionarios = async () => {
         try {
             const response = await api.get('funcionarios/', { params: { nopaginate: true } });
-            setFuncionarios(response.data);
+            // Handle both paginated and non-paginated responses
+            if (response.data && response.data.results) {
+                setFuncionarios(response.data.results);
+            } else {
+                setFuncionarios(Array.isArray(response.data) ? response.data : []);
+            }
         } catch (error) {
             console.error('Error fetching funcionarios:', error);
+            setFuncionarios([]);
         }
     };
 

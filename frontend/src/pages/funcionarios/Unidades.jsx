@@ -36,7 +36,7 @@ const Unidades = () => {
     const fetchDepartamentos = async () => {
         try {
             const response = await api.get('departamentos/', { params: { nopaginate: true } });
-            setDepartamentos(response.data);
+            setDepartamentos(response.data.results || (Array.isArray(response.data) ? response.data : []));
         } catch (error) {
             console.error('Error fetching departamentos:', error);
         }

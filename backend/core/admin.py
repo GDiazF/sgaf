@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Profile, LinkInteres
+from .models import Profile, LinkInteres, DocumentAsset, ReportConfiguration
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
@@ -12,3 +12,13 @@ class LinkInteresAdmin(admin.ModelAdmin):
     list_editable = ('orden', 'activo')
     search_fields = ('titulo', 'url', 'descripcion')
     list_filter = ('tipo', 'activo')
+
+@admin.register(DocumentAsset)
+class DocumentAssetAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'fecha_subida')
+    search_fields = ('nombre', 'descripcion')
+
+@admin.register(ReportConfiguration)
+class ReportConfigurationAdmin(admin.ModelAdmin):
+    list_display = ('report_type', 'logo_izquierdo', 'logo_derecho', 'color_primario')
+    list_filter = ('report_type',)

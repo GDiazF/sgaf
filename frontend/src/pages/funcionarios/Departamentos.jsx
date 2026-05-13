@@ -36,7 +36,7 @@ const Departamentos = () => {
     const fetchSubdirecciones = async () => {
         try {
             const response = await api.get('subdirecciones/', { params: { nopaginate: true } });
-            setSubdirecciones(response.data);
+            setSubdirecciones(response.data.results || (Array.isArray(response.data) ? response.data : []));
         } catch (error) {
             console.error('Error fetching subdirecciones:', error);
         }

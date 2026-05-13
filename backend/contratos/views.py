@@ -22,6 +22,8 @@ from .serializers import (
     GrupoPresetRutasSerializer
 )
 
+from core.utils.report_utils import get_report_assets
+
 logger = logging.getLogger(__name__)
 
 class ProcesoCompraViewSet(viewsets.ModelViewSet):
@@ -116,11 +118,10 @@ class ServicioContratoViewSet(viewsets.ModelViewSet):
         styles.add(ParagraphStyle(name='GridHeader', parent=styles['Normal'], fontSize=7, fontName='Helvetica-Bold', alignment=TA_CENTER))
 
         # 1. ENCABEZADO
-        # Subir un nivel desde backend para llegar a la raíz del proyecto
-        PROJECT_ROOT = os.path.dirname(settings.BASE_DIR)
-        logo_slep_path = os.path.join(PROJECT_ROOT, 'frontend', 'public', 'Logo SLEP.png')
+        assets = get_report_assets('ACTA_CONTRATO')
+        
         def get_img(path, w):
-            if os.path.exists(path):
+            if path and os.path.exists(path):
                 img = ImageReader(path)
                 iw, ih = img.getSize()
                 aspect = ih / float(iw)
@@ -128,10 +129,10 @@ class ServicioContratoViewSet(viewsets.ModelViewSet):
             return Paragraph("", styles['Normal'])
 
         header_data = [
-            [get_img(logo_slep_path, 1.4*inch), 
+            [get_img(assets['logo_izquierdo'], 1.4*inch), 
              [Paragraph("SERVICIO LOCAL DE EDUCACIÓN PÚBLICA DE IQUIQUE", styles['ActaTitle']),
               Paragraph("VISTO BUENO DE RECORRIDOS DE BUSES", styles['ActaSubTitle'])], 
-             ""]
+             get_img(assets['logo_derecho'], 1.2*inch)]
         ]
         TOTAL_W = 216*mm - 40
         header_table = Table(header_data, colWidths=[1.5*inch, TOTAL_W - 3*inch, 1.5*inch])
