@@ -38,6 +38,7 @@ export const groupPermissions = (permissions) => {
         else if (name.includes('user') || name.includes('group') || name.includes('permission')) module = 'Seguridad y Usuarios';
         else if (name.includes('log entry') || name.includes('logentry')) module = 'Auditoría';
         else if (name.includes('link de interes') || name.includes('linkinteres')) module = 'Dashboard, Links y Redes';
+        else if (appLabel === 'tickets' || name.includes('ticket')) module = 'Mesa de Ayuda (Tickets)';
 
         if (!groups[module]) groups[module] = [];
         groups[module].push(perm);
@@ -129,7 +130,12 @@ export const getFriendlyPermName = (perm) => {
         'ausenciaruta': 'Registros de Asistencia',
         'feriadonacional': 'Calendario de Feriados',
         'grupopresetrutas': 'Grupos / Presets de Rutas',
-        'tiposerviciooperativo': 'Categorías Operativas'
+        'tiposerviciooperativo': 'Categorías Operativas',
+        'ticket': 'Tickets / Solicitudes',
+        'ticketcategory': 'Categorías de Tickets',
+        'ticketmessage': 'Mensajes y Chat de Soporte',
+        'supportagent': 'Agentes de Mesa de Ayuda',
+        'ticketattachment': 'Adjuntos de Tickets'
     };
 
     const modelKey = codename.split('_')[1];

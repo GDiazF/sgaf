@@ -52,7 +52,6 @@ const Contracts = () => {
         fecha_termino: '',
         tipo_oc: 'UNICA',
         nro_oc: '',
-        nro_oc: '',
         cdp: '',
         proveedores_asociados: [],
         establecimientos: []

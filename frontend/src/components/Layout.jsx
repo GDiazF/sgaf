@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShieldCheck, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Chrome, Box, Globe, UserCircle2, Settings, History, Info, Bell, Trash2, Check, X, TrendingUp, Heart, Mail } from 'lucide-react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShieldCheck, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Chrome, Box, Globe, UserCircle2, Settings, History, Info, Bell, Trash2, Check, X, TrendingUp, Heart, Mail, HelpCircle, MessageSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../hooks/usePermission';
@@ -11,6 +11,7 @@ import { APP_VERSION } from '../version';
 
 const Layout = () => {
     const location = useLocation();
+    const navigate = useNavigate();
     const { user, logout, checkUserStatus } = useAuth();
     const { can, hasRole } = usePermission();
     const [sidebarOpen, setSidebarOpen] = useState(true); // Desktop: Collapsed/Expanded
@@ -22,6 +23,7 @@ const Layout = () => {
     const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
     const [isOnline, setIsOnline] = useState(true); // Backend status
     const [pendingReservas, setPendingReservas] = useState([]);
+    const [notifications, setNotifications] = useState([]);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const profileRef = useRef(null);
     const notificationsRef = useRef(null);
@@ -180,6 +182,36 @@ const Layout = () => {
             window.removeEventListener('refresh-notifications', handleRefresh);
         };
     }, [user]);
+    
+    // Check general notifications
+    useEffect(() => {
+        if (!user) return;
+        
+        const fetchNotifications = async () => {
+            try {
+                const res = await api.get('notificaciones/');
+                let fetchedNotifs = res.data.results || res.data || [];
+                
+                // Si el usuario ya está en la página del ticket, marcamos esas notificaciones como leídas automáticamente
+                const currentPath = location.pathname;
+                const matchNotifs = fetchedNotifs.filter(n => !n.leida && n.link === currentPath);
+                
+                if (matchNotifs.length > 0) {
+                    await Promise.all(matchNotifs.map(n => api.post(`notificaciones/${n.id}/marcar_leida/`)));
+                    // Actualizamos localmente para no esperar al siguiente fetch
+                    fetchedNotifs = fetchedNotifs.map(n => n.link === currentPath ? {...n, leida: true} : n);
+                }
+                
+                setNotifications(fetchedNotifs);
+            } catch (error) {
+                console.warn('Error fetching general notifications');
+            }
+        };
+
+        fetchNotifications();
+        const interval = setInterval(fetchNotifications, 30000); // Check every 30s
+        return () => clearInterval(interval);
+    }, [user, location.pathname]);
 
     // Check backend status
     useEffect(() => {
@@ -272,6 +304,20 @@ const Layout = () => {
                             className="font-medium whitespace-nowrap"
                         >
                             Dashboard
+                        </motion.span>
+                    </Link>
+
+                    <Link
+                        to="/tickets"
+                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/tickets') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                    >
+                        <HelpCircle className="w-5 h-5 flex-shrink-0" />
+                        <motion.span
+                            initial={false}
+                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                            className="font-medium whitespace-nowrap"
+                        >
+                            Mesa de Ayuda
                         </motion.span>
                     </Link>
 
@@ -647,6 +693,58 @@ const Layout = () => {
                         <div className="border-t border-slate-700/50" />
                     </div>
 
+                    {/* Comunicaciones Submenu */}
+                    {(can('establecimientos.view_establecimiento') || user?.is_superuser) && (
+                        <div>
+                            <button
+                                onClick={() => {
+                                    setActiveMainGroup(activeMainGroup === 'comunicaciones' ? null : 'comunicaciones');
+                                    setActiveSubMenu(null);
+                                }}
+                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'comunicaciones' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <MessageSquare className="w-5 h-5 flex-shrink-0" />
+                                    <motion.span
+                                        initial={false}
+                                        animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                                        className="font-medium whitespace-nowrap"
+                                    >
+                                        Comunicaciones
+                                    </motion.span>
+                                </div>
+                                <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
+                                    {activeMainGroup === 'comunicaciones' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                </motion.div>
+                            </button>
+
+                            <AnimatePresence>
+                                {activeMainGroup === 'comunicaciones' && (sidebarOpen || mobileMenuOpen) && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="overflow-hidden space-y-3 mt-2 pl-2 border-l border-slate-700/50 ml-6"
+                                    >
+                                        <div className="space-y-0.5">
+                                            <Link
+                                                to="/comunicaciones/ejecutivos"
+                                                className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/comunicaciones/ejecutivos') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                            >
+                                                <Users className="w-4 h-4 flex-shrink-0" />
+                                                <span className="font-medium whitespace-nowrap">Ejecutivos</span>
+                                            </Link>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
+
+                    <div className="py-2 px-4">
+                        <div className="border-t border-slate-700/50" />
+                    </div>
+
                     {/* Mercado Público Submenu */}
                     {(can('orden_compra.view_ordencompramp') || can('licitaciones.view_licitacionmp')) && (
                         <div>
@@ -970,75 +1068,114 @@ const Layout = () => {
 
                         {/* Notifications Bell */}
                         <div className="relative" ref={notificationsRef}>
-                            <button
-                                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                                className={`p-2.5 rounded-xl transition-all duration-300 relative group ${isNotificationsOpen ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                            >
-                                <Bell className={`w-5 h-5 ${pendingReservas.length > 0 && !isNotificationsOpen ? 'animate-[bounce_2s_infinite]' : ''}`} />
-                                {pendingReservas.length > 0 && (
-                                    <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 bg-rose-600 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white shadow-lg shadow-rose-500/40 animate-pulse-subtle">
-                                        {pendingReservas.length}
-                                    </span>
-                                )}
-                            </button>
-
-                            {/* Notifications Drawer */}
-                            <AnimatePresence>
-                                {isNotificationsOpen && (
-                                    <motion.div
-                                        initial={{ opacity: 0, x: 20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: 20 }}
-                                        className="absolute right-0 mt-3 w-80 md:w-96 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-[60]"
-                                    >
-                                        <div className="p-5 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
-                                            <div className="flex items-center gap-2">
-                                                <Bell className="w-4 h-4 text-indigo-600" />
-                                                <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Notificaciones</h3>
-                                            </div>
-                                            {pendingReservas.length > 0 && (
-                                                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-                                                    {pendingReservas.length} Pendientes
+                            {(() => {
+                                const unreadNotifications = notifications.filter(n => !n.leida);
+                                const totalCount = pendingReservas.length + unreadNotifications.length;
+                                return (
+                                    <>
+                                        <button
+                                            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                                            className={`p-2.5 rounded-xl transition-all duration-300 relative group ${isNotificationsOpen ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                        >
+                                            <Bell className={`w-5 h-5 ${totalCount > 0 && !isNotificationsOpen ? 'animate-[bounce_2s_infinite]' : ''}`} />
+                                            {totalCount > 0 && (
+                                                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 bg-rose-600 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white shadow-lg shadow-rose-500/40 animate-pulse-subtle">
+                                                    {totalCount}
                                                 </span>
                                             )}
-                                        </div>
+                                        </button>
 
-                                        <div className="max-h-[70vh] overflow-y-auto p-2 space-y-2">
-                                            {pendingReservas.length === 0 ? (
-                                                <div className="p-10 text-center space-y-3">
-                                                    <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto">
-                                                        <Check className="w-6 h-6 text-slate-300" />
-                                                    </div>
-                                                    <p className="text-sm font-medium text-slate-400">Todo al día, no hay reservas pendientes.</p>
-                                                </div>
-                                            ) : (
-                                                pendingReservas.map((res) => (
-                                                    <Link
-                                                        key={res.id}
-                                                        to="/reservas"
-                                                        onClick={() => setIsNotificationsOpen(false)}
-                                                        className="block p-3 rounded-2xl hover:bg-indigo-50/50 transition-all border border-transparent hover:border-indigo-100 group"
-                                                    >
-                                                        <div className="flex gap-3">
-                                                            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-sm">
-                                                                <Truck className="w-5 h-5" />
-                                                            </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <div className="flex justify-between items-start">
-                                                                    <p className="text-xs font-black text-slate-800 uppercase tracking-tighter truncate">{res.titulo || 'Sin título'}</p>
-                                                                    <span className="text-[9px] font-bold text-slate-400">{new Date(res.fecha_inicio).toLocaleDateString()}</span>
-                                                                </div>
-                                                                <p className="text-[11px] font-bold text-slate-500 truncate mt-0.5">Por: {res.nombre_funcionario}</p>
-                                                            </div>
+                                        {/* Notifications Drawer */}
+                                        <AnimatePresence>
+                                            {isNotificationsOpen && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, x: 20 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    exit={{ opacity: 0, x: 20 }}
+                                                    className="absolute right-0 mt-3 w-80 md:w-96 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-[60]"
+                                                >
+                                                    <div className="p-5 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
+                                                        <div className="flex items-center gap-2">
+                                                            <Bell className="w-4 h-4 text-indigo-600" />
+                                                            <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Notificaciones</h3>
                                                         </div>
-                                                    </Link>
-                                                ))
-                                            )}
+                                                        {totalCount > 0 && (
+                                                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                                                {totalCount} Pendientes
+                                                            </span>
+                                                        )}
+                                                    </div>
 
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
+                                                    <div className="max-h-[70vh] overflow-y-auto p-2 space-y-1">
+                                                        {totalCount === 0 ? (
+                                                            <div className="p-10 text-center space-y-3">
+                                                                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto">
+                                                                    <Check className="w-6 h-6 text-slate-300" />
+                                                                </div>
+                                                                <p className="text-sm font-medium text-slate-400">Todo al día, no hay notificaciones.</p>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                {/* General Notifications */}
+                                                                {unreadNotifications.map((notif) => (
+                                                                    <div 
+                                                                        key={`notif-${notif.id}`}
+                                                                        onClick={async () => {
+                                                                            try {
+                                                                                await api.post(`notificaciones/${notif.id}/marcar_leida/`);
+                                                                                setNotifications(notifications.map(n => n.id === notif.id ? {...n, leida: true} : n));
+                                                                                if (notif.link) navigate(notif.link);
+                                                                                setIsNotificationsOpen(false);
+                                                                            } catch (e) {}
+                                                                        }}
+                                                                        className="block p-3 rounded-2xl hover:bg-indigo-50/50 transition-all border border-transparent hover:border-indigo-100 group cursor-pointer"
+                                                                    >
+                                                                        <div className="flex gap-3">
+                                                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm ${notif.tipo === 'TICKET' ? 'bg-indigo-600' : 'bg-blue-500'}`}>
+                                                                                {notif.tipo === 'TICKET' ? <HelpCircle className="w-5 h-5" /> : <Info className="w-5 h-5" />}
+                                                                            </div>
+                                                                            <div className="min-w-0 flex-1">
+                                                                                <div className="flex justify-between items-start">
+                                                                                    <p className="text-xs font-black text-slate-800 uppercase tracking-tighter truncate">{notif.titulo}</p>
+                                                                                    <span className="text-[9px] font-bold text-slate-400">{new Date(notif.fecha_creacion).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                                                                </div>
+                                                                                <p className="text-[11px] font-medium text-slate-500 line-clamp-2 mt-0.5">{notif.mensaje}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+
+                                                                {/* Reservations */}
+                                                                {pendingReservas.map((res) => (
+                                                                    <Link
+                                                                        key={`res-${res.id}`}
+                                                                        to="/reservas"
+                                                                        onClick={() => setIsNotificationsOpen(false)}
+                                                                        className="block p-3 rounded-2xl hover:bg-rose-50/50 transition-all border border-transparent hover:border-rose-100 group"
+                                                                    >
+                                                                        <div className="flex gap-3">
+                                                                            <div className="w-10 h-10 rounded-xl bg-rose-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+                                                                                <Truck className="w-5 h-5" />
+                                                                            </div>
+                                                                            <div className="min-w-0 flex-1">
+                                                                                <div className="flex justify-between items-start">
+                                                                                    <p className="text-xs font-black text-slate-800 uppercase tracking-tighter truncate">Reserva: {res.titulo || 'Sin título'}</p>
+                                                                                    <span className="text-[9px] font-bold text-slate-400">{new Date(res.fecha_inicio).toLocaleDateString()}</span>
+                                                                                </div>
+                                                                                <p className="text-[11px] font-bold text-slate-500 truncate mt-0.5">Por: {res.nombre_funcionario}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </Link>
+                                                                ))}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
                 </header>

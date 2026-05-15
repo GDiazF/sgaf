@@ -51,6 +51,16 @@ import WelfareWall from './pages/bienestar/WelfareWall';
 
 import ProceduresDashboard from './pages/procedimientos/ProceduresDashboard';
 
+// Tickets
+import TicketsDashboard from './pages/tickets/TicketsDashboard';
+import TicketForm from './pages/tickets/TicketForm';
+import TicketDetail from './pages/tickets/TicketDetail';
+import CategoryManagement from './pages/tickets/CategoryManagement';
+
+// Comunicaciones
+import EjecutivosMain from './pages/comunicaciones/EjecutivosMain';
+import EstablecimientoGestion from './pages/comunicaciones/EstablecimientoGestion';
+
 
 import Login from './pages/Login';
 import ForgotPassword from './pages/auth/ForgotPassword';
@@ -233,6 +243,19 @@ function App() {
                   <Route path="bienestar" element={<WelfareBoard />} />
                 </Route>
                 <Route path="procedimientos" element={<ProceduresDashboard />} />
+                
+                {/* Tickets / Mesa de Ayuda */}
+                <Route path="tickets" element={<TicketsDashboard />} />
+                <Route path="tickets/new" element={<TicketForm />} />
+                <Route path="tickets/categories" element={<CategoryManagement />} />
+                <Route path="tickets/:id" element={<TicketDetail />} />
+
+                {/* Comunicaciones */}
+                <Route element={<ProtectedRoute permission="establecimientos.view_establecimiento" />}>
+                  <Route path="comunicaciones/ejecutivos" element={<EjecutivosMain />} />
+                  <Route path="comunicaciones/ejecutivos/gestion/:id" element={<EstablecimientoGestion />} />
+                </Route>
+
                 {/* Administración */}
                 <Route element={<ProtectedRoute permission="auth.view_group" />}>
                   <Route path="admin/users" element={<UserManagement />} />
