@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
-import { DollarSign, Search, Plus, Edit2, Trash2, X, Save, Building2, Calendar, FileText, FileCheck, CheckSquare, Square, Power, Download, Pencil, Archive, ArchiveRestore } from 'lucide-react';
+import { DollarSign, Search, Plus, Edit2, Trash2, X, Save, Building2, Calendar, FileText, FileCheck, CheckSquare, Square, Power, Download, Pencil, Archive, ArchiveRestore, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import DateInput from '../../components/common/DateInput';
 import Pagination from '../../components/common/Pagination';
@@ -23,8 +23,11 @@ const PaymentsDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [showBulkForm, setShowBulkForm] = useState(false);
+    const [showBulkFilesModal, setShowBulkFilesModal] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [bulkErrors, setBulkErrors] = useState([]);
+    const [bulkFilesResults, setBulkFilesResults] = useState(null);
+    const [processingIds, setProcessingIds] = useState([]);
 
     // Pagination & Search
     const [currentPage, setCurrentPage] = useState(1);
@@ -398,6 +401,57 @@ const PaymentsDashboard = () => {
         }
     };
 
+    const handleFileUpload = async (payment, file) => {
+        if (!file) return;
+        if (file.type !== 'application/pdf') {
+            alert("Por favor, suba un archivo PDF.");
+            return;
+        }
+
+        setProcessingIds(prev => [...prev, payment.id]);
+        const formData = new FormData();
+        formData.append('comprobante', file);
+
+        try {
+            await api.patch(`registros-pagos/${payment.id}/`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            await fetchData(currentPage, searchQuery, statusFilter, ordering);
+        } catch (error) {
+            console.error(error);
+            alert("Error al subir el comprobante.");
+        } finally {
+            setProcessingIds(prev => prev.filter(id => id !== payment.id));
+        }
+    };
+
+    const handleBulkFilesUpload = async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        setUploading(true);
+        setBulkFilesResults(null);
+        
+        const formData = new FormData();
+        files.forEach(file => {
+            formData.append('files', file);
+        });
+
+        try {
+            const res = await api.post('registros-pagos/bulk_upload_files/', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setBulkFilesResults(res.data);
+            fetchData(currentPage, searchQuery, statusFilter, ordering);
+        } catch (error) {
+            console.error(error);
+            alert("Error en la carga masiva de archivos.");
+        } finally {
+            setUploading(false);
+            e.target.value = null;
+        }
+    };
+
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(amount);
     };
@@ -425,12 +479,22 @@ const PaymentsDashboard = () => {
                     <div className="flex gap-2">
                         {can('servicios.add_registropago') && (
                             <button
+                                onClick={() => setShowBulkFilesModal(true)}
+                                className="group relative inline-flex items-center justify-center p-2.5 lg:px-4 lg:py-2 bg-orange-50 text-orange-700 text-sm font-semibold rounded-[14px] lg:rounded-xl overflow-hidden transition-all hover:bg-orange-100 active:scale-95 shadow-sm shrink-0 border border-orange-100"
+                                title="Subir PDFs Masivos"
+                            >
+                                <Upload className="w-5 h-5 lg:w-4 lg:h-4 lg:mr-2" />
+                                <span className="hidden lg:inline whitespace-nowrap">Subir Boletas</span>
+                            </button>
+                        )}
+                        {can('servicios.add_registropago') && (
+                            <button
                                 onClick={handleBulk}
                                 className="group relative inline-flex items-center justify-center p-2.5 lg:px-4 lg:py-2 bg-emerald-50 text-emerald-700 text-sm font-semibold rounded-[14px] lg:rounded-xl overflow-hidden transition-all hover:bg-emerald-100 active:scale-95 shadow-sm shrink-0 border border-emerald-100"
-                                title="Carga Masiva"
+                                title="Carga Masiva Excel"
                             >
                                 <FileText className="w-5 h-5 lg:w-4 lg:h-4 lg:mr-2" />
-                                <span className="hidden lg:inline">Carga Masiva</span>
+                                <span className="hidden lg:inline whitespace-nowrap">Carga Masiva</span>
                             </button>
                         )}
                         {can('servicios.add_registropago') && (
@@ -645,7 +709,11 @@ const PaymentsDashboard = () => {
                             <div className="space-y-2 mb-4">
                                 <div className="flex justify-between items-center text-[11px]">
                                     <span className="text-slate-500 font-medium uppercase tracking-tighter">Servicio:</span>
-                                    <span className="font-bold text-slate-700 truncate max-w-[150px]">{item.servicio_detalle}</span>
+                                    <span className="font-bold text-slate-700">{item.servicio_detalle}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-[11px]">
+                                    <span className="text-slate-500 font-medium uppercase tracking-tighter">Nro Cliente:</span>
+                                    <span className="font-mono text-blue-600 font-bold">{item.servicio_numero_cliente}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-[11px]">
                                     <span className="text-slate-500 font-medium uppercase tracking-tighter">F. Pago:</span>
@@ -654,6 +722,43 @@ const PaymentsDashboard = () => {
                                 <div className="flex justify-between items-center text-[11px]">
                                     <span className="text-slate-500 font-medium uppercase tracking-tighter">Monto:</span>
                                     <span className="font-black text-slate-900 text-xs">{formatCurrency(item.monto_total)}</span>
+                                </div>
+                                <div className="flex justify-between items-center pt-2 border-t border-slate-50">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Boleta PDF:</span>
+                                    {item.comprobante ? (
+                                        <div className="flex items-center gap-1">
+                                            <a 
+                                                href={item.comprobante.startsWith('http') ? item.comprobante : `${import.meta.env.VITE_API_URL}${item.comprobante}`} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase tracking-tight border border-emerald-100"
+                                            >
+                                                <FileCheck className="w-3 h-3" /> Ver
+                                            </a>
+                                            {can('servicios.change_registropago') && (
+                                                <button 
+                                                    onClick={async () => {
+                                                        if(window.confirm("¿Eliminar comprobante?")) {
+                                                            try {
+                                                                await api.patch(`registros-pagos/${item.id}/`, { comprobante: null });
+                                                                fetchData(currentPage, searchQuery, statusFilter, ordering);
+                                                            } catch(e) { alert("Error"); }
+                                                        }
+                                                    }}
+                                                    className="p-1 text-red-400 hover:bg-red-50 rounded"
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        can('servicios.change_registropago') ? (
+                                            <label className="flex items-center gap-1.5 px-2 py-1 bg-orange-50 text-orange-600 rounded-lg text-[9px] font-black uppercase tracking-tight border border-orange-100 cursor-pointer">
+                                                <input type="file" accept=".pdf" className="hidden" onChange={(e) => handleFileUpload(item, e.target.files[0])} />
+                                                <Upload className="w-3 h-3" /> Subir
+                                            </label>
+                                        ) : null
+                                    )}
                                 </div>
                             </div>
 
@@ -727,10 +832,11 @@ const PaymentsDashboard = () => {
                                 </th>
                                 <SortableHeader label="Documento" sortKey="nro_documento" currentOrdering={ordering} onSort={handleSort} className="px-4 py-3 text-xs font-semibold text-slate-500 tracking-wider uppercase" />
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 tracking-wider uppercase">Servicio</th>
+                                <SortableHeader label="Nro Cliente" sortKey="servicio__numero_cliente" currentOrdering={ordering} onSort={handleSort} className="px-4 py-3 text-xs font-semibold text-slate-500 tracking-wider uppercase text-center" />
+                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 tracking-wider uppercase text-center">Folio RC</th>
                                 <SortableHeader label="Establecimiento" sortKey="establecimiento__nombre" currentOrdering={ordering} onSort={handleSort} className="px-4 py-3 text-xs font-semibold text-slate-500 tracking-wider uppercase" />
                                 <SortableHeader label="Emisión" sortKey="fecha_emision" currentOrdering={ordering} onSort={handleSort} className="px-4 py-3 text-xs font-semibold text-slate-500 tracking-wider uppercase" />
                                 <SortableHeader label="Vencimiento" sortKey="fecha_vencimiento" currentOrdering={ordering} onSort={handleSort} className="px-4 py-3 text-xs font-semibold text-slate-500 tracking-wider uppercase" />
-                                <SortableHeader label="F. Pago" sortKey="fecha_pago" currentOrdering={ordering} onSort={handleSort} className="px-4 py-3 text-xs font-semibold text-slate-500 tracking-wider uppercase" />
                                 <SortableHeader label="Monto" sortKey="monto_total" currentOrdering={ordering} onSort={handleSort} className="px-4 py-3 text-xs font-semibold text-slate-500 tracking-wider uppercase text-right" />
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 tracking-wider uppercase text-right">Acciones</th>
                             </tr>
@@ -746,30 +852,77 @@ const PaymentsDashboard = () => {
                                         ) : <CheckSquare className="w-4 h-4 text-slate-200" />}
                                     </td>
                                     <td className="px-4 py-1">
-                                        <div className="flex flex-col">
-                                            <span className="text-[11px] font-semibold font-mono text-slate-400 leading-none">{item.nro_documento}</span>
-                                            {item.recepcion_conforme_folio && (
-                                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border mt-0.5 w-fit uppercase tracking-tighter ${item.recepcion_conforme_estado === 'HISTORICA' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                                                    {item.recepcion_conforme_estado === 'HISTORICA' ? 'H-RC' : 'RC'}: {item.recepcion_conforme_folio}
-                                                </span>
-                                            )}
-                                        </div>
+                                        <span className="text-[12px] font-bold text-slate-700 font-mono tracking-tight">{item.nro_documento}</span>
                                     </td>
-                                    <td className="px-4 py-1 font-semibold text-[12px] text-blue-600 truncate max-w-[140px]" title={item.servicio_detalle}>
+                                    <td className="px-4 py-1 font-semibold text-[12px] text-blue-600 truncate max-w-[100px]" title={item.servicio_proveedor_nombre}>
                                         {item.servicio_detalle}
+                                    </td>
+                                    <td className="px-4 py-1 text-center font-mono text-[11px] text-slate-700">
+                                        {item.servicio_numero_cliente}
+                                    </td>
+                                    <td className="px-4 py-1 text-center">
+                                        {item.recepcion_conforme_folio ? (
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium border uppercase tracking-tighter shadow-sm ${item.recepcion_conforme_estado === 'HISTORICA' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                                                {item.recepcion_conforme_estado === 'HISTORICA' ? 'H-RC' : 'RC'}: {item.recepcion_conforme_folio}
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] font-medium text-slate-300 uppercase italic">Pendiente</span>
+                                        )}
                                     </td>
                                     <td className="px-4 py-1">
                                         <span className="text-xs font-semibold text-slate-700 uppercase leading-tight truncate max-w-[120px]" title={item.establecimiento_nombre}>{item.establecimiento_nombre}</span>
                                     </td>
                                     <td className="px-4 py-1 text-xs font-normal text-slate-500">{formatDate(item.fecha_emision)}</td>
                                     <td className="px-4 py-1 text-xs font-normal text-slate-500">{formatDate(item.fecha_vencimiento)}</td>
-                                    <td className="px-4 py-1 text-xs font-semibold text-slate-700 uppercase">{formatDate(item.fecha_pago)}</td>
                                     <td className="px-4 py-1 text-right">
                                         <span className="text-[12px] font-bold text-slate-900 leading-none">{formatCurrency(item.monto_total)}</span>
                                     </td>
                                     <td className="px-4 py-1 text-right">
                                         <div className="flex justify-end gap-1 px-1">
-                                            <button onClick={() => handleDownloadRC(item, 'ESTANDAR')} disabled={!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA'} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all disabled:opacity-10" title="RC Estándar">
+                                            {item.comprobante ? (
+                                                <div className="flex items-center gap-1">
+                                                    <a 
+                                                        href={item.comprobante.startsWith('http') ? item.comprobante : `${import.meta.env.VITE_API_URL}${item.comprobante}`} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer"
+                                                        className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer"
+                                                        title="Ver Comprobante"
+                                                    >
+                                                        <FileCheck className="w-4 h-4" />
+                                                    </a>
+                                                    {can('servicios.change_registropago') && (
+                                                        <button 
+                                                            onClick={async () => {
+                                                                if(window.confirm("¿Desea eliminar este comprobante para subir uno nuevo?")) {
+                                                                    try {
+                                                                        await api.patch(`registros-pagos/${item.id}/`, { comprobante: null });
+                                                                        fetchData(currentPage, searchQuery, statusFilter, ordering);
+                                                                    } catch(e) { alert("Error al eliminar"); }
+                                                                }
+                                                            }}
+                                                            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                            title="Eliminar y Cambiar"
+                                                        >
+                                                            <X className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                can('servicios.change_registropago') ? (
+                                                    <label className={`p-2 transition-all rounded-xl cursor-pointer inline-flex items-center justify-center ${processingIds.includes(item.id) ? 'text-slate-300' : 'text-orange-400 hover:text-orange-600 hover:bg-orange-50'}`} title="Subir Comprobante">
+                                                        <input
+                                                            type="file"
+                                                            accept=".pdf"
+                                                            className="hidden"
+                                                            onChange={(e) => handleFileUpload(item, e.target.files[0])}
+                                                            disabled={processingIds.includes(item.id)}
+                                                        />
+                                                        <Upload className={`w-4 h-4 ${processingIds.includes(item.id) ? 'animate-pulse' : ''}`} />
+                                                    </label>
+                                                ) : null
+                                            )}
+
+                                            <button onClick={() => handleDownloadRC(item, 'ESTANDAR')} disabled={!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA'} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all disabled:opacity-10" title="RC Monto JUNJI">
                                                 <FileText className="w-4 h-4" />
                                             </button>
                                             <button onClick={() => handleDownloadRC(item, 'PAGO')} disabled={!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA'} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all disabled:opacity-10" title="RC Pago">
@@ -798,6 +951,105 @@ const PaymentsDashboard = () => {
                     <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} totalCount={totalCount} />
                 </div>
             </div>
+
+            {/* Bulk Files Modal */}
+            <AnimatePresence>
+                {showBulkFilesModal && (
+                    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+                            onClick={() => !uploading && setShowBulkFilesModal(false)}
+                        />
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden relative z-10 flex flex-col border border-white/20"
+                        >
+                            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                <div className="space-y-1">
+                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight leading-none">Carga Masiva de Boletas (PDF)</h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sube múltiples archivos PDF a la vez</p>
+                                </div>
+                                <button onClick={() => setShowBulkFilesModal(false)} disabled={uploading} className="p-2 bg-white text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all shadow-sm">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <div className="p-8 overflow-y-auto max-h-[60vh] custom-scrollbar">
+                                <div className="bg-orange-50 border border-orange-100 rounded-2xl p-5 mb-6">
+                                    <h4 className="text-xs font-black text-orange-800 uppercase mb-2 tracking-tight">Instrucciones de Nombre:</h4>
+                                    <p className="text-[11px] font-bold text-orange-700 leading-relaxed uppercase">
+                                        Para que el sistema asigne automáticamente cada archivo, el nombre debe seguir este patrón:<br/>
+                                        <span className="text-orange-900 bg-white/50 px-2 rounded font-mono">{"{Nro_Factura}_{Nro_Cliente}.pdf"}</span><br/>
+                                        Ejemplo: <span className="font-mono">846573_723621.pdf</span>
+                                    </p>
+                                </div>
+
+                                {!bulkFilesResults ? (
+                                    <div className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-slate-200 rounded-[2rem] bg-slate-50/30">
+                                        <Upload className={`w-12 h-12 text-slate-300 mb-4 ${uploading ? 'animate-bounce' : ''}`} />
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 text-center">
+                                            {uploading ? 'Procesando archivos...' : 'Seleccione o arrastre los archivos PDF'}
+                                        </p>
+                                        <label className={`px-8 py-3.5 bg-blue-600 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-500/20 transition-all cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                                            Seleccionar Archivos
+                                            <input
+                                                type="file"
+                                                multiple
+                                                accept=".pdf"
+                                                className="hidden"
+                                                onChange={handleBulkFilesUpload}
+                                                disabled={uploading}
+                                            />
+                                        </label>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="flex gap-4">
+                                            <div className="flex-1 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                                                <span className="text-[10px] font-black text-emerald-600 uppercase block mb-1">Exitosos</span>
+                                                <span className="text-2xl font-black text-emerald-700">{bulkFilesResults.success.length}</span>
+                                            </div>
+                                            <div className="flex-1 p-4 bg-red-50 rounded-2xl border border-red-100">
+                                                <span className="text-[10px] font-black text-red-600 uppercase block mb-1">Errores</span>
+                                                <span className="text-2xl font-black text-red-700">{bulkFilesResults.errors.length}</span>
+                                            </div>
+                                        </div>
+
+                                        {bulkFilesResults.errors.length > 0 && (
+                                            <div className="bg-red-50 rounded-2xl p-4 border border-red-100 max-h-[200px] overflow-auto custom-scrollbar">
+                                                <p className="text-[10px] font-black text-red-700 uppercase mb-2">Detalle de Errores:</p>
+                                                {bulkFilesResults.errors.map((err, i) => (
+                                                    <p key={i} className="text-[10px] font-bold text-red-600/80 mb-1 flex items-center gap-2">
+                                                        <X className="w-3 h-3" /> {err}
+                                                    </p>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        <button 
+                                            onClick={() => setBulkFilesResults(null)}
+                                            className="w-full py-3 border-2 border-slate-100 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-slate-50 transition-all"
+                                        >
+                                            Subir más archivos
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="p-8 border-t border-slate-100 flex justify-end bg-slate-50/50">
+                                <button onClick={() => setShowBulkFilesModal(false)} className="px-10 py-3.5 bg-slate-900 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-black shadow-xl transition-all">
+                                    Cerrar
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* Floating Bulk Action Bar */}
             <AnimatePresence>

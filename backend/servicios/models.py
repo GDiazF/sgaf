@@ -61,6 +61,7 @@ class Servicio(models.Model):
 class RecepcionConforme(models.Model):
     ESTADO_CHOICES = [
         ('EMITIDA', 'Emitida'),
+        ('COMPLETADA', 'Completada (Firmada)'),
         ('ANULADA', 'Anulada'),
     ]
     TIPO_CHOICES = [
@@ -73,6 +74,14 @@ class RecepcionConforme(models.Model):
     observaciones = models.TextField(blank=True, null=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='EMITIDA')
     tipo_rc = models.CharField(max_length=20, choices=TIPO_CHOICES, default='ESTANDAR')
+    
+    archivo_escaneado = models.FileField(
+        upload_to='rcs/escaneadas/%Y/', 
+        null=True, 
+        blank=True, 
+        verbose_name="Recepción Firmada (Escaneada)"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -114,6 +123,10 @@ class RecepcionConforme(models.Model):
             
             self.folio = f"{prefix}-{new_seq:04d}"
         
+        # Auto-complete status if file is uploaded
+        if self.archivo_escaneado and self.estado == 'EMITIDA':
+            self.estado = 'COMPLETADA'
+            
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -135,6 +148,12 @@ class RegistroPago(models.Model):
     monto_total = models.IntegerField()
     recepcion_conforme = models.ForeignKey(RecepcionConforme, on_delete=models.SET_NULL, null=True, blank=True, related_name='registros')
     fecha_registro = models.DateTimeField(auto_now_add=True)
+    comprobante = models.FileField(
+        upload_to='pagos/comprobantes/%Y/%m/', 
+        null=True, 
+        blank=True, 
+        verbose_name="Comprobante / Boleta Escaneada"
+    )
 
     def __str__(self):
         return f"Pago {self.nro_documento} - {self.servicio}"

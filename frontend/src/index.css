@@ -184,3 +184,16 @@ input::-webkit-credentials-auto-fill-button {
 .animate-pulse-subtle {
   animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+@keyframes highlight-subtle {
+  0%, 100% { border-color: transparent; box-shadow: 0 0 0px rgba(79, 70, 229, 0); }
+  50% { border-color: rgba(79, 70, 229, 0.4); box-shadow: 0 0 15px rgba(79, 70, 229, 0.15); }
+}
+
+.animate-highlight {
+  animation: highlight-subtle 1s ease-in-out infinite !important;
+  z-index: 50 !important;
+  position: relative;
+  border: 2px solid #4f46e5 !important;
+  background-color: rgba(79, 70, 229, 0.03) !important;
+}

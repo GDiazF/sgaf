@@ -4,6 +4,7 @@ import {
     Clock, Truck, Monitor, Package, User, AlertCircle, Lock,
     RefreshCw, Building2, Settings, Power, Trash2, Users, MapPin
 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import api from '../../api';
 import { useAuth } from '../../context/AuthContext';
 
@@ -181,6 +182,8 @@ const ReservasDashboard = () => {
     // Antelación masiva
     const [bulkDays, setBulkDays] = useState(0);
     const [selectedBulk, setSelectedBulk] = useState([]);
+    const [highlightedId, setHighlightedId] = useState(null);
+    const location = useLocation();
 
     const handleBulkUpdate = async () => {
         setAdminSaving(true);
@@ -254,6 +257,44 @@ const ReservasDashboard = () => {
             scrollRef.current.scrollTop = px;
         }
     }, [loading]);
+
+    const processedSearch = useRef('');
+
+    // Handle Deep Linking from Notifications
+    useEffect(() => {
+        if (location.search === processedSearch.current && processedSearch.current !== '') return;
+
+        const params = new URLSearchParams(location.search);
+        const dateParam = params.get('date');
+        const highlightParam = params.get('highlight');
+
+        // Solo procesar la fecha si ha cambiado
+        if (dateParam) {
+            const newDate = new Date(dateParam + 'T12:00:00'); 
+            if (!isNaN(newDate.getTime()) && toDateStr(newDate) !== toDateStr(currentDate)) {
+                setCurrentDate(newDate);
+            }
+        }
+
+        if (highlightParam) {
+            if (!loading && reservas.length > 0) {
+                const id = parseInt(highlightParam);
+                const reserva = reservas.find(r => Number(r.id) === Number(id));
+                
+                if (reserva) {
+                    setHighlightedId(id);
+                    setTimeout(() => setHighlightedId(null), 4000);
+                    processedSearch.current = location.search; // Marcar como procesado solo si se encontró
+                } else if (!loading) {
+                    // Si ya cargó y no existe, marcar para no reintentar con este ID erróneo
+                    processedSearch.current = location.search;
+                }
+            }
+        } else if (!loading) {
+            // No hay highlight que buscar, marcar como procesado
+            processedSearch.current = location.search;
+        }
+    }, [location.search, loading, reservas, currentDate]);
 
     // Auto-ajustar horas disponibles cuando cambia el recurso o fecha en el modal
     useEffect(() => {
@@ -825,7 +866,7 @@ const ReservasDashboard = () => {
                                                             return (
                                                                 <div key={ev.id}
                                                                     onClick={(e) => { e.stopPropagation(); setDetailReserva(ev); }}
-                                                                    className="p-2.5 rounded-xl border flex flex-col gap-1 transition-all hover:translate-x-1 group/item shadow-sm mb-1.5 last:mb-0"
+                                                                    className={`p-2.5 rounded-xl border flex flex-col gap-1 transition-all hover:translate-x-1 group/item shadow-sm mb-1.5 last:mb-0 ${Number(ev.id) === Number(highlightedId) ? 'animate-highlight' : ''}`}
                                                                     style={{
                                                                         background: isApproved ? hexToRgba(color, 0.15) : 'white',
                                                                         borderColor: hexToRgba(color, 0.2),
@@ -1064,7 +1105,7 @@ const ReservasDashboard = () => {
                                                         const subLeft = colLeft + colIndex * subW;
 
                                                         return (
-                                                            <div key={ev.id} className="absolute z-20 cursor-pointer group transition-all hover:z-40"
+                                                            <div key={ev.id} className={`absolute z-20 cursor-pointer group transition-all hover:z-40 ${Number(ev.id) === Number(highlightedId) ? 'animate-highlight' : ''}`}
                                                                 style={{
                                                                     top: `${top}px`, height: `${height}px`,
                                                                     left: `${subLeft}%`, width: `calc(${subW}% - 3px)`,

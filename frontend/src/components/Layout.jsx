@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShieldCheck, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Chrome, Box, Globe, UserCircle2, Settings, History, Info, Bell, Trash2, Check, X, TrendingUp, Heart, Mail } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +10,14 @@ import AboutModal from './common/AboutModal';
 import { APP_VERSION } from '../version';
 
 const Layout = () => {
+    const navigate = useNavigate();
+    const toDateStr = d => {
+        if (!(d instanceof Date)) d = new Date(d);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
     const location = useLocation();
     const { user, logout, checkUserStatus } = useAuth();
     const { can, hasRole } = usePermission();
@@ -439,13 +447,13 @@ const Layout = () => {
                                                             <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
                                                                 {can('servicios.view_servicio') && <Link to="/services" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Panel Operativo</Link>}
                                                                 {can('servicios.view_registropago') && (
-                                                                    <>
-                                                                        <Link to="/services/payments" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/payments') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Pagos</Link>
-                                                                        <Link to="/services/reporte-consumos" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/reporte-consumos') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Reporte Consumos</Link>
-                                                                    </>
+                                                                    <Link to="/services/payments" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/payments') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Pagos</Link>
                                                                 )}
                                                                 {can('servicios.view_recepcionconforme') && <Link to="/services/rc" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/rc') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Recepciones</Link>}
                                                                 {can('servicios.view_cdp') && <Link to="/services/cdp" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/cdp') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>CDPs</Link>}
+                                                                {can('servicios.view_registropago') && (
+                                                                    <Link to="/services/reporte-consumos" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/reporte-consumos') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Reporte Consumos</Link>
+                                                                )}
                                                             </div>
                                                         )}
                                                     </div>
@@ -1013,11 +1021,13 @@ const Layout = () => {
                                                 </div>
                                             ) : (
                                                 pendingReservas.map((res) => (
-                                                    <Link
+                                                    <div
                                                         key={res.id}
-                                                        to="/reservas"
-                                                        onClick={() => setIsNotificationsOpen(false)}
-                                                        className="block p-3 rounded-2xl hover:bg-indigo-50/50 transition-all border border-transparent hover:border-indigo-100 group"
+                                                        onClick={() => {
+                                                            setIsNotificationsOpen(false);
+                                                            navigate(`/reservas?date=${toDateStr(res.fecha_inicio)}&highlight=${res.id}&t=${Date.now()}`);
+                                                        }}
+                                                        className="block p-3 rounded-2xl hover:bg-indigo-50/50 transition-all border border-transparent hover:border-indigo-100 group cursor-pointer"
                                                     >
                                                         <div className="flex gap-3">
                                                             <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-sm">
@@ -1031,7 +1041,7 @@ const Layout = () => {
                                                                 <p className="text-[11px] font-bold text-slate-500 truncate mt-0.5">Por: {res.nombre_funcionario}</p>
                                                             </div>
                                                         </div>
-                                                    </Link>
+                                                    </div>
                                                 ))
                                             )}
 

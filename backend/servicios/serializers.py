@@ -37,7 +37,9 @@ class RegistroPagoSerializer(serializers.ModelSerializer):
     servicio_detalle = serializers.SerializerMethodField()
     establecimiento_nombre = serializers.ReadOnlyField(source='establecimiento.nombre', default='')
     servicio_proveedor_nombre = serializers.ReadOnlyField(source='servicio.proveedor.nombre', default='')
+    servicio_proveedor_acronimo = serializers.ReadOnlyField(source='servicio.proveedor.acronimo', default='')
     servicio_numero_cliente = serializers.ReadOnlyField(source='servicio.numero_cliente', default='')
+    servicio_numero_servicio = serializers.ReadOnlyField(source='servicio.numero_servicio', default='')
     recepcion_conforme_folio = serializers.ReadOnlyField(source='recepcion_conforme.folio', default=None)
 
     class Meta:
@@ -45,7 +47,7 @@ class RegistroPagoSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_servicio_detalle(self, obj):
-        return f"{obj.servicio.proveedor.nombre} - Cliente: {obj.servicio.numero_cliente}"
+        return obj.servicio.proveedor.acronimo or obj.servicio.proveedor.nombre
 
 class HistorialRecepcionConformeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -120,6 +122,15 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
                 recepcion_conforme=instance,
                 accion='MODIFICACION',
                 detalle="Se actualizaron las observaciones.",
+                usuario=user
+            )
+
+        # Track File Upload
+        if 'archivo_escaneado' in validated_data and validated_data['archivo_escaneado']:
+            HistorialRecepcionConforme.objects.create(
+                recepcion_conforme=instance,
+                accion='COMPLETADO',
+                detalle="Se subió el documento firmado y escaneado. Estado actualizado a COMPLETADA.",
                 usuario=user
             )
 
