@@ -105,6 +105,8 @@ const Departamentos = () => {
     };
 
     const handleToggleActivo = async (item) => {
+        const accion = item.activo ? 'desactivar' : 'activar';
+        if (!confirm(`¿Estás seguro de que deseas ${accion} este departamento?`)) return;
         try {
             await api.patch(`departamentos/${item.id}/`, { activo: !item.activo });
             fetchData(currentPage);
@@ -396,18 +398,7 @@ const Departamentos = () => {
                                                 required
                                             />
                                         </div>
-                                        <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200/60">
-                                            <div className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={formData.activo}
-                                                    onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
-                                                    className="sr-only peer"
-                                                />
-                                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                                            </div>
-                                            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Estado Activo</span>
-                                        </div>
+
                                     </div>
 
                                     <div className="flex gap-3 pt-4">

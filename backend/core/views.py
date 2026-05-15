@@ -12,7 +12,7 @@ from .serializers import (
     UserManagementSerializer, GroupSerializer, PermissionSerializer, 
     LinkInteresSerializer, EmailConfigurationSerializer
 )
-from .models import LinkInteres, Profile, TrustedDevice, EmailOTP, MFASession, EmailConfiguration
+from .models import LinkInteres, Profile, TrustedDevice, EmailOTP, MFASession, EmailConfiguration, SecurityConfig
 from .emails import enviar_correo_reset_password
 from .utils.mfa_logic import send_otp_email, verify_email_otp, verify_totp_code
 from django_otp.plugins.otp_totp.models import TOTPDevice
@@ -42,7 +42,11 @@ def get_full_user_data(user):
             'nombre_funcionario': funcionario.nombre_funcionario,
             'cargo': funcionario.cargo,
             'unidad': funcionario.unidad.nombre if funcionario.unidad else None,
+            'unidad_id': funcionario.unidad_id,
             'departamento': funcionario.departamento.nombre if funcionario.departamento else None,
+            'departamento_id': funcionario.departamento_id,
+            'subdireccion': funcionario.subdireccion.nombre if funcionario.subdireccion else None,
+            'subdireccion_id': funcionario.subdireccion_id,
         }
     except Exception:
         pass
@@ -499,7 +503,6 @@ class MFASendEmailOTPView(APIView):
         return Response({'message': 'Código enviado al correo.'})
 
 from rest_framework.permissions import IsAdminUser
-from .models import SecurityConfig
 
 class SecurityConfigView(APIView):
     def get(self, request):
