@@ -172,9 +172,10 @@ Para mantener consistencia semántica, **solo** se deben usar estos íconos para
 
 Cualquier ventana emergente, modal o cajón lateral (drawer) debe sentirse premium. Se deben construir usando `framer-motion` (`AnimatePresence`) para asegurar entradas suaves.
 
-**A. Fondo Oscuro (Backdrop)**:
-- Siempre debe ser un div fijo que cubra toda la pantalla.
-- Clases: `fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[999]`
+**A. Fondo Oscuro (Backdrop) y Portals**:
+- **REGLA CRÍTICA**: El backdrop JAMÁS debe quedar atrapado cortando la pantalla. Para asegurar que cubra el viewport entero, se recomienda fuertemente usar `createPortal` (React) hacia el `document.body`.
+- Si no se usa Portal, el contenedor principal del modal debe renderizarse en la raíz de la vista y aplicar estas clases estrictas.
+- Clases Obligatorias: `fixed top-0 left-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9999]`
 
 **B. Modal Pop-up (Central)**:
 - Contenedor Principal: `bg-white rounded-2xl shadow-2xl overflow-hidden max-w-3xl w-full mx-4`
