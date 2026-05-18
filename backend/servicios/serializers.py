@@ -46,6 +46,20 @@ class RegistroPagoSerializer(serializers.ModelSerializer):
         model = RegistroPago
         fields = '__all__'
 
+    def validate(self, data):
+        nro_documento = data.get('nro_documento', self.instance.nro_documento if self.instance else None)
+        servicio = data.get('servicio', self.instance.servicio if self.instance else None)
+        
+        if nro_documento and servicio:
+            qs = RegistroPago.objects.filter(nro_documento=nro_documento, servicio=servicio)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+                
+            if qs.exists():
+                raise serializers.ValidationError({"nro_documento": f"La factura '{nro_documento}' ya fue ingresada previamente para el servicio seleccionado."})
+                
+        return super().validate(data)
+
     def get_servicio_detalle(self, obj):
         return obj.servicio.proveedor.acronimo or obj.servicio.proveedor.nombre
 

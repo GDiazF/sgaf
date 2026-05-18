@@ -19,7 +19,6 @@ const Layout = () => {
         return `${year}-${month}-${day}`;
     };
     const location = useLocation();
-    const navigate = useNavigate();
     const { user, logout, checkUserStatus } = useAuth();
     const { can, hasRole } = usePermission();
     const [sidebarOpen, setSidebarOpen] = useState(true); // Desktop: Collapsed/Expanded
@@ -1157,7 +1156,7 @@ const Layout = () => {
                                                                 {pendingReservas.map((res) => (
                                                                     <Link
                                                                         key={`res-${res.id}`}
-                                                                        to="/reservas"
+                                                                        to={`/reservas?date=${toDateStr(res.fecha_inicio)}&highlight=${res.id}`}
                                                                         onClick={() => setIsNotificationsOpen(false)}
                                                                         className="block p-3 rounded-2xl hover:bg-rose-50/50 transition-all border border-transparent hover:border-rose-100 group"
                                                                     >

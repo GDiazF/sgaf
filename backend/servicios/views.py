@@ -322,6 +322,16 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
             est = srv.establecimiento
             prov = srv.proveedor
 
+            # 2. Check for Duplicate Invoice for the same Service
+            if RegistroPago.objects.filter(servicio=srv, nro_documento=nro_doc).exists():
+                errors.append(f"Fila {index + 2}: La factura '{nro_doc}' ya fue ingresada para el servicio '{nro_cli}'.")
+                continue
+                
+            # 3. Check for duplicates within the Excel file itself
+            if any(p.servicio == srv and p.nro_documento == nro_doc for p in pagos_to_create):
+                errors.append(f"Fila {index + 2}: La factura '{nro_doc}' para el servicio '{nro_cli}' está repetida dentro del mismo archivo Excel.")
+                continue
+
             # 4. Parse Dates
             f_emision = parse_date(row['Fecha Emision (DD/MM/YYYY)'], index, 'Fecha Emision')
             f_vencimiento = parse_date(row['Fecha Vencimiento (DD/MM/YYYY)'], index, 'Fecha Vencimiento')
@@ -474,6 +484,8 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
         
         if rc and tipo != 'ESTANDAR':
             elements.append(Paragraph(f"FOLIO: {rc.folio}", styles['FolioStyle']))
+        else:
+            elements.append(Spacer(1, 15))
         
         available_width = doc.width
 
@@ -789,20 +801,31 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
         elements.append(Paragraph("RECEPCIÓN CONFORME", styles['MainTitle']))
 
         # Intro Paragraph
-        first_pago = rc.registros.first()
-        est_name = first_pago.establecimiento.nombre if first_pago else "Establecimiento no definido"
+        establecimientos_count = rc.registros.values('establecimiento').distinct().count()
         prov_name = rc.proveedor.nombre
         fecha = rc.fecha_emision
-        intro_text = (
-            f"En Iquique, a {fecha.day} de {MESES.get(fecha.month)} de {fecha.year} "
-            f"en el establecimiento {est_name}, se procede a dar recepción conforme a las boletas "
-            f"de {prov_name}, se adjunta listado."
-        )
+        
+        if establecimientos_count > 1:
+            intro_text = (
+                f"En Iquique, a {fecha.day} de {MESES.get(fecha.month)} de {fecha.year} "
+                f"se procede a dar recepción conforme a las boletas "
+                f"de {prov_name}, se adjunta listado."
+            )
+        else:
+            first_pago = rc.registros.first()
+            est_name = first_pago.establecimiento.nombre if first_pago else "Establecimiento no definido"
+            intro_text = (
+                f"En Iquique, a {fecha.day} de {MESES.get(fecha.month)} de {fecha.year} "
+                f"en el establecimiento {est_name}, se procede a dar recepción conforme a las boletas "
+                f"de {prov_name}, se adjunta listado."
+            )
         elements.append(Paragraph(intro_text, styles['NormalText']))
         
         # Folio Right Aligned above table
         if current_tipo != 'ESTANDAR':
             elements.append(Paragraph(f"FOLIO: {rc.folio}", styles['FolioStyle']))
+        else:
+            elements.append(Spacer(1, 15))
 
         rc = self.get_object()
         current_tipo = request.query_params.get('tipo', 'ESTANDAR').upper()
@@ -1298,18 +1321,7 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
             spaceBefore=0, spaceAfter=0
         )
 
-        left_signature = [
-            [Spacer(1, 40)], 
-            [Paragraph("_________________________________", sig_p_style)],
-            [Paragraph("RECIBE CONFORME", sig_p_style)]
-        ]
-        t_left = Table(left_signature, colWidths=[3*inch])
-        t_left.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'BOTTOM'),
-        ]))
-
-        # Signature Box for "FIRMANTE" (Now on the Left)
+        # Signature Box for "FIRMANTE" (Centered)
         firmante = factura.firmante
         firmante_details = []
         if firmante:
@@ -1340,14 +1352,14 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
                 [Paragraph("FIRMANTE DEL DOCUMENTO", sig_p_style)]
             ]
 
-        t_right = Table(firmante_details, colWidths=[3*inch])
+        t_right = Table(firmante_details, colWidths=[4*inch])
         t_right.setStyle(TableStyle([
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('VALIGN', (0,0), (-1,-1), 'BOTTOM'),
         ]))
 
         available_width = doc.width
-        main_sig_table = Table([[t_right, t_left]], colWidths=[available_width/2, available_width/2])
+        main_sig_table = Table([[t_right]], colWidths=[available_width])
         main_sig_table.setStyle(TableStyle([
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('VALIGN', (0,0), (-1,-1), 'TOP'),

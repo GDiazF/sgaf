@@ -36,10 +36,10 @@ const EjecutivoDashboard = () => {
     }
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {asignaciones.map(a => (
                 <div key={a.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow group">
-                    <div className="p-6">
+                    <div className="p-4">
                         <div className="flex items-start justify-between mb-4">
                             <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
                                 <Building2 className="w-6 h-6" />

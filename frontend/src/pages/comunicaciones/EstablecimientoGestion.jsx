@@ -206,34 +206,73 @@ const EstablecimientoGestion = () => {
     const selectStyles = {
         control: (base, state) => ({
             ...base,
+            minHeight: '42px',
+            height: '42px',
             borderColor: state.isFocused ? '#6366f1' : '#e2e8f0',
-            boxShadow: state.isFocused ? '0 0 0 2px #c7d2fe' : 'none',
-            borderRadius: '0.75rem',
-            padding: '2px',
+            boxShadow: 'none',
+            borderRadius: '0.85rem',
             backgroundColor: '#f8fafc',
+            fontSize: '13px',
+            fontWeight: '500',
             transition: 'all 0.2s',
             '&:hover': { borderColor: '#6366f1' }
         }),
+        valueContainer: (base) => ({
+            ...base,
+            padding: '0 12px'
+        }),
+        input: (base) => ({
+            ...base,
+            margin: '0',
+            padding: '0',
+            background: 'transparent !important',
+            border: 'none !important',
+            boxShadow: 'none !important',
+            outline: 'none !important'
+        }),
+        placeholder: (base) => ({
+            ...base,
+            color: '#94a3b8'
+        }),
+        singleValue: (base) => ({
+            ...base,
+            color: '#334155'
+        }),
         menu: (base) => ({
             ...base,
-            borderRadius: '0.75rem',
+            borderRadius: '1rem',
             overflow: 'hidden',
-            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+            border: '1px border-slate-100',
             zIndex: 50
+        }),
+        menuList: (base) => ({
+            ...base,
+            padding: '0',
+            maxHeight: '350px'
+        }),
+        option: (base, state) => ({
+            ...base,
+            fontSize: '13px',
+            padding: '10px 12px',
+            backgroundColor: state.isSelected ? '#6366f1' : state.isFocused ? '#f1f5f9' : 'white',
+            color: state.isSelected ? 'white' : '#334155',
+            cursor: 'pointer',
+            '&:active': { backgroundColor: '#818cf8' }
         })
     };
 
     return (
         <>
-            <div className="p-4 md:p-8 space-y-6 mx-auto h-full overflow-auto">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="flex items-center gap-4">
-                    <Link to="/comunicaciones/ejecutivos" className="p-2 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
-                        <ArrowLeft className="w-5 h-5 text-slate-600" />
+            <div className="p-2 md:p-4 space-y-3 mx-auto h-full overflow-auto">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+                <div className="flex items-center gap-3">
+                    <Link to="/comunicaciones/ejecutivos" className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+                        <ArrowLeft className="w-4 h-4 text-slate-600" />
                     </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-800">{establecimiento?.nombre}</h1>
-                        <p className="text-sm text-slate-500">Gestión de Acompañamiento y Seguimiento</p>
+                    <div className="space-y-0.5">
+                        <h1 className="text-lg font-black text-slate-800 uppercase tracking-tight leading-none">{establecimiento?.nombre}</h1>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Gestión de Acompañamiento y Seguimiento</p>
                     </div>
                 </div>
                 <button 
@@ -242,99 +281,72 @@ const EstablecimientoGestion = () => {
                         setForm({ requerimiento: '', descripcion: '', subdirecciones_requeridas: [], departamentos_requeridos: [], unidades_requeridas: [], estado: 'PENDIENTE', respuesta: '' });
                         setIsFormOpen(!isFormOpen);
                     }}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg shadow-indigo-100"
                 >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-4 h-4" />
                     Nueva Atención
                 </button>
             </div>
 
             {/* Tabla de Gestiones */}
-            <div className="bg-[#56a3e8] rounded-3xl shadow-2xl border border-slate-200 overflow-hidden min-h-[600px]">
+            <div className="bg-slate-50 rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[600px]">
                 <div className="overflow-x-auto h-full bg-white">
                     <table className="w-full text-left border-collapse border-spacing-0">
-                        <thead className="sticky top-0 z-10 border-none">
-                            <tr className="bg-[#56a3e8] text-white border-none">
-                                <th className="px-4 py-5 text-center border-r border-[#3b93e2] w-12 first:rounded-tl-none border-t-0">#</th>
-                                <th className="px-4 py-5 border-r border-[#3b93e2] w-32 border-t-0">Fecha</th>
-                                <th className="px-4 py-5 border-r border-[#3b93e2] border-t-0">Requerimiento</th>
-                                <th className="px-4 py-5 border-r border-[#3b93e2] border-t-0">Unidad</th>
-                                <th className="px-4 py-5 border-r border-[#3b93e2] w-[30%] border-t-0">Respuesta / Avances</th>
-                                <th className="px-4 py-5 text-center last:rounded-tr-none border-t-0">Estado / Acciones</th>
+                        <thead className="sticky top-0 z-10">
+                            <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-200">
+                                <th className="px-4 py-3 text-center border-r border-slate-100 w-12">#</th>
+                                <th className="px-4 py-3 border-r border-slate-100 w-32">Fecha</th>
+                                <th className="px-4 py-3 border-r border-slate-100">Requerimiento</th>
+                                <th className="px-4 py-3 border-r border-slate-100">Unidad</th>
+                                <th className="px-4 py-3 border-r border-slate-100 w-[30%]">Respuesta / Avances</th>
+                                <th className="px-4 py-3 text-center">Estado / Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200">
+                        <tbody className="divide-y divide-slate-100">
                             {gestiones.map((g, idx) => (
                                 <React.Fragment key={g.id}>
-                                    <tr className="hover:bg-slate-50 transition-colors group cursor-pointer" onClick={() => setExpandedGestion(expandedGestion === g.id ? null : g.id)}>
-                                        <td className="px-4 py-4 text-center border-r border-slate-200 font-bold text-slate-500">{gestiones.length - idx}</td>
-                                        <td className="px-4 py-4 border-r border-slate-200">
-                                            <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                                                <Calendar className="w-4 h-4 text-slate-400" />
-                                                {new Date(g.fecha).toLocaleDateString()}
+                                    <tr className="hover:bg-slate-50/50 transition-colors group cursor-pointer" onClick={() => setExpandedGestion(expandedGestion === g.id ? null : g.id)}>
+                                        <td className="px-4 py-2 border-r border-slate-50 text-center font-bold text-slate-400 text-[10px]">{gestiones.length - idx}</td>
+                                        <td className="px-4 py-2 border-r border-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-tighter whitespace-nowrap">
+                                            {new Date(g.fecha).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-4 py-2 border-r border-slate-50">
+                                            <span className="text-[12px] font-black text-slate-700 uppercase leading-tight line-clamp-1">{g.requerimiento}</span>
+                                        </td>
+                                        <td className="px-4 py-2 border-r border-slate-50">
+                                            <div className="flex flex-wrap gap-1">
+                                                {g.unidades_detalles?.map(u => (
+                                                    <span key={u.id} className="text-[9px] font-black bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-lg border border-indigo-100 uppercase tracking-tighter">
+                                                        {u.nombre}
+                                                    </span>
+                                                ))}
+                                                {(!g.unidades_detalles?.length) && <span className="text-[9px] text-slate-300 italic uppercase font-bold">Gral</span>}
                                             </div>
                                         </td>
-                                        <td className="px-4 py-4 border-r border-slate-200">
-                                            <p className="text-sm font-semibold text-slate-800">{g.requerimiento}</p>
-                                        </td>
-                                        <td className="px-4 py-4 border-r border-slate-200 text-sm text-slate-600">
-                                            <div className="flex flex-col gap-1">
-                                                {g.subdirecciones_detalles?.length > 0 && (
-                                                    <span className="text-xs font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
-                                                        {g.subdirecciones_detalles.map(s => s.nombre).join(', ')}
-                                                    </span>
-                                                )}
-                                                {g.departamentos_detalles?.length > 0 && (
-                                                    <span className="text-xs font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100">
-                                                        {g.departamentos_detalles.map(d => d.nombre).join(', ')}
-                                                    </span>
-                                                )}
-                                                {g.unidades_detalles?.length > 0 && (
-                                                    <span className="text-xs font-semibold bg-cyan-50 text-cyan-700 px-2 py-0.5 rounded border border-cyan-100">
-                                                        {g.unidades_detalles.map(u => u.nombre).join(', ')}
-                                                    </span>
-                                                )}
-                                                {(!g.subdirecciones_detalles?.length && !g.departamentos_detalles?.length && !g.unidades_detalles?.length) && (
-                                                    <span className="text-slate-400 italic text-xs">-</span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4 border-r border-slate-200 text-sm text-slate-600">
-                                            <div className="mb-2">
-                                                {g.respuesta ? (
-                                                    <div className="whitespace-pre-wrap">{g.respuesta}</div>
-                                                ) : (
-                                                    g.subtareas?.length > 0 ? (
-                                                        <span className="text-indigo-500 font-medium italic flex items-center gap-1">
-                                                            <Clock className="w-3.5 h-3.5" /> En seguimiento ({g.subtareas.length} pasos)
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-slate-400 italic">Pendiente de atención</span>
-                                                    )
-                                                )}
-                                            </div>
+                                        <td className="px-4 py-2 border-r border-slate-50">
+                                            <p className="text-[11px] font-medium text-slate-600 line-clamp-1 uppercase leading-none">{g.respuesta || 'Sin respuesta'}</p>
                                             {g.subtareas?.length > 0 && (
-                                                <div className="mt-2 space-y-1">
-                                                    {g.subtareas.map(sub => (
-                                                        <div key={sub.id} className="flex items-start gap-1.5 text-xs text-slate-500">
-                                                            <CheckCircle2 className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${sub.completada ? 'text-emerald-500' : 'text-slate-300'}`} />
-                                                            <span>{sub.titulo}</span>
+                                                <div className="mt-1 space-y-0.5">
+                                                    {g.subtareas.slice(0, 2).map(sub => (
+                                                        <div key={sub.id} className="flex items-start gap-1 text-[9px] text-slate-400 font-bold uppercase leading-none">
+                                                            <CheckCircle2 className={`w-3 h-3 flex-shrink-0 ${sub.completada ? 'text-emerald-500' : 'text-slate-300'}`} />
+                                                            <span className="truncate">{sub.titulo}</span>
                                                         </div>
                                                     ))}
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="px-4 py-4 text-center">
+                                        <td className="px-4 py-2 text-center">
                                             <div className="flex items-center justify-center gap-2">
                                                 <select 
                                                     value={g.estado}
                                                     onChange={(e) => { e.stopPropagation(); handleStatusChange(g.id, e.target.value); }}
                                                     onClick={(e) => e.stopPropagation()}
-                                                    className={`text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border-none outline-none cursor-pointer appearance-none text-center ${
-                                                        g.estado === 'PENDIENTE' ? 'bg-rose-100 text-rose-600' :
-                                                        g.estado === 'EN_PROCESO' ? 'bg-amber-100 text-amber-600' :
-                                                        g.estado === 'RESPONDIDO' ? 'bg-blue-100 text-blue-600' :
-                                                        'bg-emerald-100 text-emerald-600'
+                                                    className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border-none outline-none cursor-pointer appearance-none text-center ${
+                                                        g.estado === 'PENDIENTE' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                                                        g.estado === 'EN_PROCESO' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                                                        g.estado === 'RESPONDIDO' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                                                        'bg-emerald-50 text-emerald-600 border border-emerald-100'
                                                     }`}
                                                 >
                                                     <option value="PENDIENTE">Pendiente</option>
@@ -349,61 +361,64 @@ const EstablecimientoGestion = () => {
                                                         className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                                                         title="Editar"
                                                     >
-                                                        <Edit3 className="w-4 h-4" />
+                                                        <Edit3 className="w-3.5 h-3.5" />
                                                     </button>
                                                     <button 
                                                         onClick={(e) => { e.stopPropagation(); handleDelete(g.id); }}
                                                         className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                                                         title="Eliminar"
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
+                                                        <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
                                                 </div>
                                             </div>
                                         </td>
                                     </tr>
                                     {expandedGestion === g.id && (
-                                        <tr className="bg-slate-50 border-b-2 border-indigo-100">
-                                            <td colSpan="6" className="p-6">
+                                        <tr className="bg-slate-50 border-b border-indigo-100/50 shadow-inner">
+                                            <td colSpan="6" className="p-4 md:p-6">
                                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                                     <div className="lg:col-span-1">
-                                                        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Descripción Completa</h4>
-                                                        <p className="text-sm text-slate-700 whitespace-pre-wrap">{g.descripcion || 'Sin descripción detallada.'}</p>
+                                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Descripción Completa</h4>
+                                                        <div className="bg-white p-4 rounded-xl border border-slate-100 text-xs text-slate-700 whitespace-pre-wrap leading-relaxed uppercase shadow-sm">
+                                                            {g.descripcion || 'Sin descripción detallada.'}
+                                                        </div>
                                                     </div>
                                                     <div className="lg:col-span-1">
-                                                        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Avances / Pasos</h4>
+                                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Avances / Pasos</h4>
                                                         <div className="space-y-3">
-                                                            <div className="space-y-2 max-h-40 overflow-auto pr-2">
+                                                            <div className="space-y-2 max-h-40 overflow-auto pr-2 custom-scrollbar">
                                                                 {g.subtareas?.map(sub => (
-                                                                    <div key={sub.id} onClick={(e) => { e.stopPropagation(); toggleSubtarea(sub); }} className="flex items-start gap-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-100 p-1 rounded transition-colors">
+                                                                    <div key={sub.id} onClick={(e) => { e.stopPropagation(); toggleSubtarea(sub); }} className="flex items-start gap-2 text-[11px] font-bold text-slate-600 cursor-pointer hover:bg-white p-2 rounded-lg transition-all border border-transparent hover:border-slate-100 uppercase">
                                                                         <CheckCircle2 className={`w-4 h-4 mt-0.5 flex-shrink-0 ${sub.completada ? 'text-emerald-500' : 'text-slate-300'}`} />
-                                                                        <span className={sub.completada ? 'line-through text-slate-400' : ''}>{sub.titulo}</span>
+                                                                        <span className={sub.completada ? 'line-through text-slate-300 font-medium' : ''}>{sub.titulo}</span>
                                                                     </div>
                                                                 ))}
-                                                                {(!g.subtareas || g.subtareas.length === 0) && <p className="text-xs text-slate-400 italic">No hay pasos registrados.</p>}
+                                                                {(!g.subtareas || g.subtareas.length === 0) && <p className="text-[10px] text-slate-400 italic font-bold uppercase p-4 text-center">No hay pasos registrados</p>}
                                                             </div>
                                                             <form onSubmit={(e) => { e.preventDefault(); handleAddPaso(g.id); }} className="flex gap-2">
                                                                 <input 
                                                                     type="text" 
-                                                                    placeholder="Nuevo paso o avance..." 
+                                                                    placeholder="NUEVO PASO..." 
                                                                     value={newPasos[g.id] || ''} 
-                                                                    onChange={(e) => setNewPasos({...newPasos, [g.id]: e.target.value})}
-                                                                    className="flex-1 text-sm bg-white border border-slate-200 px-3 py-1.5 rounded-lg outline-none focus:border-indigo-500"
+                                                                    onChange={(e) => setNewPasos({...newPasos, [g.id]: e.target.value.toUpperCase()})}
+                                                                    className="flex-1 text-[10px] font-bold bg-white border border-slate-200 px-3 py-2 rounded-xl outline-none focus:border-indigo-500 uppercase"
                                                                 />
-                                                                <button type="submit" className="bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-indigo-200 transition-colors">Añadir</button>
+                                                                <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">Añadir</button>
                                                             </form>
                                                         </div>
                                                     </div>
                                                     <div className="lg:col-span-1">
-                                                        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Historial de Cambios</h4>
-                                                        <div className="space-y-2 max-h-40 overflow-auto">
+                                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Historial de Cambios</h4>
+                                                        <div className="space-y-2 max-h-48 overflow-auto custom-scrollbar pr-2">
                                                             {g.historial?.map(h => (
-                                                                <div key={h.id} className="text-xs text-slate-600 flex items-start gap-2">
-                                                                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 flex-shrink-0"></div>
-                                                                    <div>
-                                                                        <span className="font-semibold">{h.usuario_nombre}:</span> {h.accion} - <span className="text-slate-400">{new Date(h.fecha).toLocaleString()}</span>
-                                                                        <p className="text-slate-500 mt-0.5">{h.detalles}</p>
+                                                                <div key={h.id} className="text-[10px] text-slate-500 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                                                                    <div className="flex justify-between items-center mb-1">
+                                                                        <span className="font-black text-indigo-600 uppercase tracking-tighter">{h.usuario_nombre}</span>
+                                                                        <span className="text-[9px] font-bold text-slate-400">{new Date(h.fecha).toLocaleString()}</span>
                                                                     </div>
+                                                                    <p className="font-bold text-slate-700 uppercase tracking-tight">{h.accion}</p>
+                                                                    <p className="text-slate-400 mt-1 italic leading-tight">{h.detalles}</p>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -477,16 +492,16 @@ const EstablecimientoGestion = () => {
                                         <div className="space-y-4">
                                             <div>
                                                 <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1.5 pl-1">1. Subdirección</label>
-                                                <Select options={subOptions} value={currentSelection.subdireccion} onChange={(selected) => setCurrentSelection({ subdireccion: selected, departamento: null, unidad: null })} placeholder="Seleccionar..." styles={selectStyles} isClearable />
+                                                <Select options={subOptions} value={currentSelection.subdireccion} onChange={(selected) => setCurrentSelection({ subdireccion: selected, departamento: null, unidad: null })} placeholder="Seleccionar..." styles={selectStyles} isClearable menuPortalTarget={document.body} menuPosition="fixed" />
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1.5 pl-1">2. Departamento</label>
-                                                    <Select isDisabled={!currentSelection.subdireccion} options={depOptions} value={currentSelection.departamento} onChange={(selected) => setCurrentSelection({ ...currentSelection, departamento: selected, unidad: null })} placeholder="Seleccionar..." styles={selectStyles} isClearable />
+                                                    <Select isDisabled={!currentSelection.subdireccion} options={depOptions} value={currentSelection.departamento} onChange={(selected) => setCurrentSelection({ ...currentSelection, departamento: selected, unidad: null })} placeholder="Seleccionar..." styles={selectStyles} isClearable menuPortalTarget={document.body} menuPosition="fixed" />
                                                 </div>
                                                 <div>
                                                     <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1.5 pl-1">3. Unidad</label>
-                                                    <Select isDisabled={!currentSelection.departamento} options={uniOptions} value={currentSelection.unidad} onChange={(selected) => setCurrentSelection({ ...currentSelection, unidad: selected })} placeholder="Seleccionar..." styles={selectStyles} isClearable />
+                                                    <Select isDisabled={!currentSelection.departamento} options={uniOptions} value={currentSelection.unidad} onChange={(selected) => setCurrentSelection({ ...currentSelection, unidad: selected })} placeholder="Seleccionar..." styles={selectStyles} isClearable menuPortalTarget={document.body} menuPosition="fixed" />
                                                 </div>
                                             </div>
                                             

@@ -262,13 +262,18 @@ const ReservasDashboard = () => {
 
     // Handle Deep Linking from Notifications
     useEffect(() => {
-        if (location.search === processedSearch.current && processedSearch.current !== '') return;
-
         const params = new URLSearchParams(location.search);
         const dateParam = params.get('date');
         const highlightParam = params.get('highlight');
 
-        // Solo procesar la fecha si ha cambiado
+        if (!dateParam && !highlightParam) {
+            processedSearch.current = '';
+            return;
+        }
+
+        if (location.search === processedSearch.current && processedSearch.current !== '') return;
+
+        // 1. Navegar a la fecha
         if (dateParam) {
             const newDate = new Date(dateParam + 'T12:00:00'); 
             if (!isNaN(newDate.getTime()) && toDateStr(newDate) !== toDateStr(currentDate)) {
@@ -276,23 +281,27 @@ const ReservasDashboard = () => {
             }
         }
 
-        if (highlightParam) {
-            if (!loading && reservas.length > 0) {
-                const id = parseInt(highlightParam);
-                const reserva = reservas.find(r => Number(r.id) === Number(id));
-                
-                if (reserva) {
-                    setHighlightedId(id);
-                    setTimeout(() => setHighlightedId(null), 4000);
-                    processedSearch.current = location.search; // Marcar como procesado solo si se encontró
-                } else if (!loading) {
-                    // Si ya cargó y no existe, marcar para no reintentar con este ID erróneo
-                    processedSearch.current = location.search;
-                }
+        // 2. Resaltar y hacer scroll
+        if (highlightParam && !loading && reservas.length > 0) {
+            const id = parseInt(highlightParam);
+            const reserva = reservas.find(r => Number(r.id) === Number(id));
+            
+            if (reserva) {
+                setHighlightedId(id);
+                processedSearch.current = location.search;
+
+                // Esperar a que se renderice
+                setTimeout(() => {
+                    const el = document.getElementById(`reserva-${id}`);
+                    if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                    }
+                    // Quitar el resaltado después de un tiempo
+                    setTimeout(() => setHighlightedId(null), 5000);
+                }, 500);
+            } else if (!loading) {
+                processedSearch.current = location.search;
             }
-        } else if (!loading) {
-            // No hay highlight que buscar, marcar como procesado
-            processedSearch.current = location.search;
         }
     }, [location.search, loading, reservas, currentDate]);
 
@@ -865,6 +874,7 @@ const ReservasDashboard = () => {
 
                                                             return (
                                                                 <div key={ev.id}
+                                                                    id={`reserva-${ev.id}`}
                                                                     onClick={(e) => { e.stopPropagation(); setDetailReserva(ev); }}
                                                                     className={`p-2.5 rounded-xl border flex flex-col gap-1 transition-all hover:translate-x-1 group/item shadow-sm mb-1.5 last:mb-0 ${Number(ev.id) === Number(highlightedId) ? 'animate-highlight' : ''}`}
                                                                     style={{
@@ -1105,7 +1115,7 @@ const ReservasDashboard = () => {
                                                         const subLeft = colLeft + colIndex * subW;
 
                                                         return (
-                                                            <div key={ev.id} className={`absolute z-20 cursor-pointer group transition-all hover:z-40 ${Number(ev.id) === Number(highlightedId) ? 'animate-highlight' : ''}`}
+                                                            <div key={ev.id} id={`reserva-${ev.id}`} className={`absolute z-20 cursor-pointer group transition-all hover:z-40 ${Number(ev.id) === Number(highlightedId) ? 'animate-highlight' : ''}`}
                                                                 style={{
                                                                     top: `${top}px`, height: `${height}px`,
                                                                     left: `${subLeft}%`, width: `calc(${subW}% - 3px)`,

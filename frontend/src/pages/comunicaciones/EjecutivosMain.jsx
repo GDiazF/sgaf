@@ -15,11 +15,11 @@ const EjecutivosMain = () => {
     const [activeTab, setActiveTab] = useState(isAdmin ? 'kpi' : 'mis_establecimientos');
 
     return (
-        <div className="p-4 md:p-8 space-y-6 mx-auto h-full overflow-auto">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800">Módulo de Comunicaciones</h1>
-                    <p className="text-sm text-slate-500">Gestión y Seguimiento de Establecimientos</p>
+        <div className="p-2 md:p-4 space-y-3 mx-auto h-full overflow-auto">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+                <div className="space-y-0.5">
+                    <h1 className="text-lg font-black text-slate-800 uppercase tracking-tight">Módulo de Comunicaciones</h1>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Gestión y Seguimiento de Establecimientos</p>
                 </div>
             </div>
 

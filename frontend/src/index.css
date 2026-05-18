@@ -28,6 +28,24 @@
     @apply bg-white border-blue-500 ring-[6px] ring-blue-500/10 outline-none shadow-md;
   }
 
+  /* Reset atómico para inputs de react-select (Elimina la burbuja) */
+  div[class*="react-select"] input,
+  div[class*="react-select"] input:focus {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    ring: 0 !important;
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+    --tw-ring-color: transparent !important;
+  }
+
   select {
     @apply bg-no-repeat bg-[position:right_1rem_center] bg-[size:1rem] pr-10 appearance-none;
     background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20fill%3D%27none%27%20viewBox%3D%270%200%2024%2024%27%20stroke%3D%27%233b82f6%27%20stroke-width%3D%272.5%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27m6%209%206%206%206-6%27%2F%3E%3C%2Fsvg%3E");
@@ -185,15 +203,16 @@ input::-webkit-credentials-auto-fill-button {
   animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-@keyframes highlight-subtle {
-  0%, 100% { border-color: transparent; box-shadow: 0 0 0px rgba(79, 70, 229, 0); }
-  50% { border-color: rgba(79, 70, 229, 0.4); box-shadow: 0 0 15px rgba(79, 70, 229, 0.15); }
+@keyframes highlight-subtle-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4); background-color: rgba(79, 70, 229, 0.05); }
+  50% { box-shadow: 0 0 15px 4px rgba(79, 70, 229, 0.3); background-color: rgba(79, 70, 229, 0.15); }
+  100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); background-color: rgba(79, 70, 229, 0.05); }
 }
 
 .animate-highlight {
-  animation: highlight-subtle 1s ease-in-out infinite !important;
+  animation: highlight-subtle-pulse 1.2s ease-in-out infinite !important;
   z-index: 50 !important;
   position: relative;
   border: 2px solid #4f46e5 !important;
-  background-color: rgba(79, 70, 229, 0.03) !important;
 }
+
