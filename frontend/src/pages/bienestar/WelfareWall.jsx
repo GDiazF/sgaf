@@ -3,22 +3,16 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Heart,
+    Globe,
     X,
     Download,
-    ExternalLink,
-    Calendar,
-    ChevronRight,
+    Eye,
     Search,
-    Filter,
-    ArrowRight,
+    FolderSearch,
     Star,
     Image as ImageIcon,
     FileText,
     Loader2,
-    Tag,
-    Trash2,
-    Plus,
-    Save,
     Book,
     Coffee,
     Shield,
@@ -28,7 +22,11 @@ import {
     Plane
 } from 'lucide-react';
 import api from '../../api';
-import { usePermission } from '../../hooks/usePermission';
+import {
+    TITLE_ICON_BOX, LOADER_SPIN, INPUT_FILTER,
+    FILTER_CHIP_ACTIVE, FILTER_CHIP,
+    DRAWER_SHELL, DRAWER_BACKDROP, DRAWER_PANEL,
+} from './bienestarUi';
 
 // --- Icon Map ---
 const ICON_OPTIONS = [
@@ -110,9 +108,9 @@ const WelfareWall = ({ limit, showFilters = true, sortBy = 'newest', layout = 'v
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-3">
-                <Loader2 className="w-8 h-8 animate-spin" />
-                <p className="text-[10px] font-bold uppercase tracking-widest">Cargando beneficios...</p>
+            <div className="flex flex-col items-center justify-center h-64 gap-3">
+                <Loader2 className={LOADER_SPIN} />
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest select-none">Cargando Datos...</span>
             </div>
         );
     }
@@ -120,43 +118,60 @@ const WelfareWall = ({ limit, showFilters = true, sortBy = 'newest', layout = 'v
     return (
         <div className="w-full flex flex-col h-full overflow-hidden">
             {showFilters && (
-                <div className="px-1 pt-0 pb-4 border-b border-slate-50 flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
-                                <Star className="w-5 h-5 fill-indigo-600/10" />
+                <div className="shrink-0 flex flex-col gap-4 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={TITLE_ICON_BOX}>
+                                <Globe className="w-4 h-4" />
                             </div>
-                            <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight uppercase leading-none">Beneficios y Convenios</h2>
+                            <div className="min-w-0">
+                                <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase select-none">
+                                    Beneficios y Convenios
+                                </h2>
+                                <p className="text-[10px] md:text-xs font-medium text-slate-500 mt-1.5 select-none">
+                                    Muro de beneficios publicados
+                                </p>
+                            </div>
                         </div>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                    </div>
+                    <div className="flex flex-col md:flex-row items-center gap-3 w-full bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <div className="relative w-full md:w-72 shrink-0">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                             <input
                                 type="text"
                                 placeholder="Buscar beneficios..."
-                                className="pl-10 pr-4 py-2 bg-slate-50 border-none rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all w-64"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
+                                className={`${INPUT_FILTER} pr-4`}
                             />
                         </div>
-                    </div>
-                    <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
-                        <button onClick={() => setSelectedCategory('ALL')} className={`px-3 py-1.5 rounded-xl text-[9px] font-semibold uppercase tracking-widest transition-all ${selectedCategory === 'ALL' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>Todos</button>
-                        {categorias.map(cat => (
-                            <button
-                                key={cat.id}
-                                onClick={() => setSelectedCategory(cat.id)}
-                                className={`px-3 py-1.5 rounded-xl text-[9px] font-semibold uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2 ${parseInt(selectedCategory) === cat.id ? 'shadow-lg text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
-                                style={{ backgroundColor: parseInt(selectedCategory) === cat.id ? cat.color : '' }}
-                            >
-                                <LucidIcon name={cat.icono} className={`w-3 h-3 ${parseInt(selectedCategory) === cat.id ? 'text-white' : ''}`} />
-                                {cat.nombre}
-                            </button>
-                        ))}
+                        <div className="flex items-center gap-2 overflow-x-auto w-full custom-scrollbar pb-0.5">
+                            <button type="button" onClick={() => setSelectedCategory('ALL')} className={`px-3 h-9 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0 ${selectedCategory === 'ALL' ? FILTER_CHIP_ACTIVE : FILTER_CHIP}`}>Todos</button>
+                            {categorias.map(cat => (
+                                <button
+                                    key={cat.id}
+                                    type="button"
+                                    onClick={() => setSelectedCategory(cat.id)}
+                                    className={`px-3 h-9 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2 shrink-0 ${parseInt(selectedCategory) === cat.id ? `${FILTER_CHIP_ACTIVE} border-transparent` : FILTER_CHIP}`}
+                                    style={{ backgroundColor: parseInt(selectedCategory) === cat.id ? cat.color : undefined }}
+                                >
+                                    <LucidIcon name={cat.icono} className={`w-3 h-3 ${parseInt(selectedCategory) === cat.id ? 'text-white' : ''}`} style={parseInt(selectedCategory) !== cat.id ? { color: cat.color } : undefined} />
+                                    {cat.nombre}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}
 
-            <div className={`grid gap-5 text-left ${showFilters ? 'px-1 pt-2 pb-6' : 'px-6 md:px-8 py-2'} flex-1 overflow-y-auto custom-scrollbar ${layout === 'horizontal'
+            <div className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar ${showFilters ? 'px-1 pt-2 pb-6' : 'px-6 md:px-8 py-2'}`}>
+                {filteredBeneficios.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-12 text-center h-full flex-1 min-h-[200px]">
+                        <FolderSearch className="w-10 h-10 text-slate-200 mb-3" />
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No se encontraron registros</span>
+                    </div>
+                ) : (
+                <div className={`grid gap-5 text-left ${layout === 'horizontal'
                 ? 'grid-cols-1 xl:grid-cols-2'
                 : limit === 5
                     ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
@@ -166,7 +181,7 @@ const WelfareWall = ({ limit, showFilters = true, sortBy = 'newest', layout = 'v
                     {filteredBeneficios.map((b) => {
                         const imageFile = b.archivos?.find(f => f.tipo === 'image');
                         const cat = categorias.find(c => c.id === b.categoria);
-                        const catColor = b.categoria_color || cat?.color || '#6366f1';
+                        const catColor = b.categoria_color || cat?.color || '#2563eb';
                         const catName = cat?.nombre || 'General';
 
                         // 1. Diseño Estilo Banco (Texto Arriba, Imagen Abajo 60%)
@@ -185,7 +200,7 @@ const WelfareWall = ({ limit, showFilters = true, sortBy = 'newest', layout = 'v
                                         <LucidIcon name={cat?.icono} className="w-3 h-3" style={{ color: catColor }} />
                                         <span className="text-[7px] font-semibold text-slate-500 uppercase tracking-widest">{catName}</span>
                                     </div>
-                                    <h4 className="text-[12px] font-bold text-slate-700 mb-0.5 leading-tight group-hover:text-indigo-600 transition-colors line-clamp-2">
+                                    <h4 className="text-[12px] font-bold text-slate-700 mb-0.5 leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">
                                         {b.titulo}
                                     </h4>
                                     <p className="text-[9px] text-slate-400 font-medium line-clamp-1 truncate opacity-70">
@@ -224,30 +239,33 @@ const WelfareWall = ({ limit, showFilters = true, sortBy = 'newest', layout = 'v
                                         </div>
                                     )}
 
-                                    {/* Botón flotante estilo premium */}
-                                    <div className="absolute bottom-4 right-4 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all p-2 bg-indigo-600 text-white rounded-xl shadow-xl">
-                                        <ChevronRight className="w-4 h-4" />
+                                    <div className="absolute bottom-4 right-4 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all p-1.5 bg-blue-600 text-white rounded-lg shadow-xl">
+                                        <Eye className="w-3.5 h-3.5" />
                                     </div>
                                 </div>
                             </motion.div>
                         );
                     })}
                 </AnimatePresence>
+                </div>
+                )}
             </div>
 
-            {/* Modal de Detalle (Se mantiene Igual de refinado) */}
+            {/* Drawer de detalle */}
             <ModalPortal>
                 <AnimatePresence>
                     {selectedBenefit && (
-                        <div className="fixed inset-0 z-[9999] flex items-center justify-end">
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setSelectedBenefit(null); setActivePdfPreview(null); }} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-                            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="relative bg-white w-full max-w-4xl h-full shadow-2xl flex flex-col overflow-hidden text-left">
-                                <div className="p-6 flex items-center justify-between border-b border-slate-50">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-3 rounded-2xl bg-indigo-50 text-indigo-500"><Heart className="w-6 h-6" /></div>
-                                        <h2 className="text-lg font-semibold text-slate-800 leading-none">Detalle del Beneficio</h2>
+                        <div className={DRAWER_SHELL}>
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setSelectedBenefit(null); setActivePdfPreview(null); }} className={DRAWER_BACKDROP} />
+                            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} onClick={(e) => e.stopPropagation()} className={DRAWER_PANEL}>
+                                <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex items-center justify-between gap-4 shrink-0">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className={TITLE_ICON_BOX}>
+                                            <Globe className="w-4 h-4" />
+                                        </div>
+                                        <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Detalle del Beneficio</h2>
                                     </div>
-                                    <button onClick={() => { setSelectedBenefit(null); setActivePdfPreview(null); }} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X className="w-6 h-6 text-slate-400" /></button>
+                                    <button type="button" onClick={() => { setSelectedBenefit(null); setActivePdfPreview(null); }} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors shrink-0"><X className="w-5 h-5" /></button>
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-12 custom-scrollbar">
                                     <span className="px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest text-white shadow-lg mb-6 inline-block" style={{ backgroundColor: selectedBenefit.categoria_color }}>{categorias.find(c => c.id === selectedBenefit.categoria)?.nombre}</span>

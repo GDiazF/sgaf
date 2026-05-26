@@ -316,7 +316,7 @@ const Layout = () => {
 
                     <Link
                         to="/tickets"
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/tickets') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${location.pathname.startsWith('/tickets') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
                     >
                         <HelpCircle className="w-5 h-5 flex-shrink-0" />
                         <motion.span
@@ -603,29 +603,13 @@ const Layout = () => {
                                                     </Link>
                                                 )}
                                                 {(can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo')) && (
-                                                    <div>
-                                                        <button onClick={() => setActiveSubMenu(activeSubMenu === 'loans' ? null : 'loans')} className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'loans' || (isActive('/loans') || isActive('/loans/new') || isActive('/history') || isActive('/keys')) ? 'text-blue-400' : ''}`}>
-                                                            <div className="flex items-center gap-3">
-                                                                <Box className="w-4 h-4 flex-shrink-0" />
-                                                                <span className="font-medium whitespace-nowrap">Préstamos</span>
-                                                            </div>
-                                                            {activeSubMenu === 'loans' ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                                                        </button>
-                                                        {activeSubMenu === 'loans' && (
-                                                            <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
-                                                                {can('prestamo_llaves.view_activo') && (
-                                                                    <Link to="/keys" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/keys') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Inventario Activos</Link>
-                                                                )}
-                                                                {can('prestamo_llaves.view_prestamo') && (
-                                                                    <>
-                                                                        <Link to="/loans" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/loans') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Panel Activos</Link>
-                                                                        <Link to="/loans/new" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/loans/new') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Nuevo Préstamo</Link>
-                                                                        <Link to="/history" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/history') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Historial</Link>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    <Link
+                                                        to={can('prestamo_llaves.view_prestamo') ? "/loans" : "/keys"}
+                                                        className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/loans') || isActive('/loans/new') || isActive('/history') || isActive('/keys') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                                    >
+                                                        <Box className="w-4 h-4 flex-shrink-0" />
+                                                        <span className="font-medium whitespace-nowrap">Préstamos</span>
+                                                    </Link>
                                                 )}
                                             </div>
                                         )}
@@ -818,7 +802,7 @@ const Layout = () => {
                                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'bienestar' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
                             >
                                 <div className="flex items-center gap-3">
-                                    <Heart className="w-5 h-5 flex-shrink-0 text-rose-400" />
+                                    <Heart className="w-5 h-5 flex-shrink-0 fill-current" />
                                     <motion.span
                                         initial={false}
                                         animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
@@ -1082,7 +1066,7 @@ const Layout = () => {
                                     <>
                                         <button
                                             onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                                            className={`p-2.5 rounded-xl transition-all duration-300 relative group ${isNotificationsOpen ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                            className={`p-2.5 rounded-xl transition-all duration-300 relative group ${isNotificationsOpen ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                                         >
                                             <Bell className={`w-5 h-5 ${totalCount > 0 && !isNotificationsOpen ? 'animate-[bounce_2s_infinite]' : ''}`} />
                                             {totalCount > 0 && (
@@ -1103,11 +1087,11 @@ const Layout = () => {
                                                 >
                                                     <div className="p-5 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
                                                         <div className="flex items-center gap-2">
-                                                            <Bell className="w-4 h-4 text-indigo-600" />
+                                                            <Bell className="w-4 h-4 text-blue-600" />
                                                             <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Notificaciones</h3>
                                                         </div>
                                                         {totalCount > 0 && (
-                                                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                                            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
                                                                 {totalCount} Pendientes
                                                             </span>
                                                         )}
@@ -1135,10 +1119,10 @@ const Layout = () => {
                                                                                 setIsNotificationsOpen(false);
                                                                             } catch (e) {}
                                                                         }}
-                                                                        className="block p-3 rounded-2xl hover:bg-indigo-50/50 transition-all border border-transparent hover:border-indigo-100 group cursor-pointer"
+                                                                        className="block p-3 rounded-2xl hover:bg-blue-50/50 transition-all border border-transparent hover:border-blue-100 group cursor-pointer"
                                                                     >
                                                                         <div className="flex gap-3">
-                                                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm ${notif.tipo === 'TICKET' ? 'bg-indigo-600' : 'bg-blue-500'}`}>
+                                                                            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm bg-blue-600">
                                                                                 {notif.tipo === 'TICKET' ? <HelpCircle className="w-5 h-5" /> : <Info className="w-5 h-5" />}
                                                                             </div>
                                                                             <div className="min-w-0 flex-1">
@@ -1158,10 +1142,10 @@ const Layout = () => {
                                                                         key={`res-${res.id}`}
                                                                         to={`/reservas?date=${toDateStr(res.fecha_inicio)}&highlight=${res.id}`}
                                                                         onClick={() => setIsNotificationsOpen(false)}
-                                                                        className="block p-3 rounded-2xl hover:bg-rose-50/50 transition-all border border-transparent hover:border-rose-100 group"
+                                                                        className="block p-3 rounded-2xl hover:bg-blue-50/50 transition-all border border-transparent hover:border-blue-100 group"
                                                                     >
                                                                         <div className="flex gap-3">
-                                                                            <div className="w-10 h-10 rounded-xl bg-rose-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+                                                                            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shrink-0 shadow-sm">
                                                                                 <Truck className="w-5 h-5" />
                                                                             </div>
                                                                             <div className="min-w-0 flex-1">

@@ -7,14 +7,16 @@ Este documento es la fuente ÚNICA de la verdad para el diseño de interfaces en
 
 ## 1. Tipografías, Títulos y Textos
 
-El sistema SGAF se caracteriza por un look de "Consola Administrativa" muy premium. Abusa de las mayúsculas (uppercase), letras pequeñas pero con mucho peso (font-black, font-bold) y tracking (espaciado de letras).
+El sistema SGAF se caracteriza por un look de "Consola Administrativa" muy premium, utilizando mayúsculas (uppercase), letras de peso medio (`font-medium` en datos de tablas y tarjetas) y espaciado de letras ajustado (tracking-tight) para evitar densidades de texto excesivas. **PROHIBIDO** `font-black` / `font-bold` en el contenido de filas de tablas (ver §4).
 
-- **Títulos Principales de Página (H1)**:
-  - Clases: `text-lg font-black text-slate-800 uppercase tracking-tight leading-none`
+- **Títulos Principales de Página (H1/H2)**:
+  - Clases: `text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase`
+  - ⚠️ **REGLA CRÍTICA**: **PROHIBIDO** incluir iconos decorativos de página (como `<Car />`, `<Folder />`, etc.) en el título principal. Debe ser texto puro para garantizar homogeneidad y pureza visual.
 - **Subtítulos o Descripciones de Página**:
-  - Clases: `text-[10px] font-bold text-slate-400 uppercase tracking-widest`
+  - Clases: `text-[10px] md:text-xs font-medium text-slate-500 mt-1.5 flex items-center gap-1.5`
+  - ⚠️ **REGLA CRÍTICA**: **PROHIBIDO** aplicar sangrías o márgenes izquierdos manuales (ej: `ml-7`) en el subtítulo. Debe estar perfectamente alineado al ras izquierdo (`ml-0`) con el título.
 - **Títulos de Secciones / Modales (H3/H4)**:
-  - Clases: `text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3`
+  - Clases: `text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3`
 - **Texto Normal (Descripciones en tarjetas o modales)**:
   - Clases: `text-xs font-medium text-slate-700 uppercase leading-relaxed`
 
@@ -22,13 +24,26 @@ El sistema SGAF se caracteriza por un look de "Consola Administrativa" muy premi
 
 ## 2. Botones (Tamaños y Colores Estrictos)
 
-**PROHIBIDO:** Botones grandes (`px-8`, `py-4`, `text-lg`), botones con bordes cuadrados. Todo botón es redondeado (`rounded-xl` o `rounded-lg`).
+**PROHIBIDO:** Botones grandes (`px-8`, `py-4`, `text-lg`), botones con bordes cuadrados, y **`text-xs` (12px) en botones** — rompe la simetría con inputs y tablas del sistema.
+
+Todo botón es redondeado (`rounded-xl` o `rounded-lg`).
+
+### Tamaño de letra y altura (regla unificada)
+
+| Elemento | Valor obligatorio |
+|----------|-------------------|
+| Texto del botón | `text-[10px]` |
+| Peso del texto | `font-black` (primario/secundario) o `font-bold` solo si el MD de un módulo legacy lo exige temporalmente |
+| Altura estándar | `h-10` (40px, igual que inputs `no-global`) |
+| Ícono dentro del botón | `w-4 h-4` |
 
 - **Botón Primario (Crear, Guardar, Acción Principal)**:
-  - Estructura: Flex, Ícono a la izquierda.
-  - Clases: `bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 flex items-center gap-2`
+  - Estructura: Flex, ícono a la izquierda del texto (si lleva ícono).
+  - Clases: `bg-indigo-600 hover:bg-indigo-700 text-white h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 flex items-center gap-2 shrink-0 active:scale-95`
 - **Botón Secundario (Cancelar, Volver)**:
-  - Clases: `bg-slate-100 hover:bg-slate-200 text-slate-600 px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all`
+  - Clases: `bg-slate-100 hover:bg-slate-200 text-slate-600 h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shrink-0`
+- **Botón Primario compacto (tablas / tarjetas estrechas)**:
+  - Misma tipografía `text-[10px] font-black`; altura mínima `h-9 px-4` solo si el espacio horizontal es muy reducido.
 - **Botones de Acción en Tablas (Íconos Pequeños)**:
   - **Solo Ícono, sin texto:** `<Icon className="w-3.5 h-3.5" />`
   - Editar (Azul): `p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors`
@@ -39,9 +54,15 @@ El sistema SGAF se caracteriza por un look de "Consola Administrativa" muy premi
 
 ## 3. Entradas de Datos (Inputs y Selects)
 
-### Inputs Estándar (Texto, Fecha, Número)
+### 🛡️ SOLUCIÓN ARQUITECTÓNICA: La Clase `.no-global` (Evadir index.css)
+Debido a reglas heredadas en `index.css` que interceptan etiquetas globales (`input[type="text"]`, `select`, etc.) e inflan su tamaño a 46px/38px, **es obligatorio** utilizar la clase de escape **`no-global`** en todas las vistas modernas que requieran simetría estricta de 40px (`h-10`).
+
+- **Regla de Oro**: Al añadir la clase `no-global` a cualquier `<input>`, `<select>` o `<textarea>`, el motor de CSS de SGAF anulará el secuestro global de estilos. Esto permite que Tailwind controle el 100% de la visualización física del elemento de forma pixel-perfect.
+
+### Inputs Estándar y Numéricos (Regla Unificada)
 - **Label**: `block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1`
-- **Input Field**: `w-full text-[10px] font-bold bg-white border border-slate-200 px-3 py-2 rounded-xl outline-none focus:border-indigo-500 uppercase transition-all shadow-sm placeholder:text-slate-300`
+- **Input Field**: `<input type="text" name="campo" className="no-global w-full h-10 text-[10px] font-bold bg-white border border-slate-200 px-3 rounded-xl outline-none focus:border-indigo-500 uppercase transition-all shadow-sm placeholder:text-slate-300" />`
+*(Fíjate que se incluye la clase `no-global` de forma segura, permitiendo usar `type="text"` o `type="number"`, se fuerza `h-10` absoluto y se eliminan paddings que alteren la geometría).*
 
 ### React-Select (Selectores Avanzados)
 Si usas `react-select`, DEBES aplicar este objeto `styles` obligatoriamente:
@@ -77,23 +98,30 @@ const selectStyles = {
 ```
 
 ### Select Nativo (`<select>`)
-- Clases: `text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-xl border border-slate-200 outline-none cursor-pointer appearance-none bg-white text-slate-700 focus:border-indigo-500 shadow-sm`
+- Clases: `no-global w-full text-[10px] font-black uppercase tracking-widest px-3 h-10 rounded-xl border border-slate-200 outline-none cursor-pointer appearance-none bg-white text-slate-700 focus:border-indigo-500 shadow-sm bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M7%209l3%203%203-3%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1rem_1rem] bg-[right_0.5rem_center] bg-no-repeat`
+*(⚠️ **Regla Crítica**: Es indispensable incluir `no-global`, `h-10` y la propiedad de fondo con la flecha SVG personalizada para anular la flecha de dropdown genérica del navegador y los secuestros de padding y altura del CSS global).*
 
 ---
 
-## 4. Estructura de Tablas (Layout Zero-Scroll)
+## 4. Estructura de Vistas y Tablas (Layout Zero-Scroll)
 
-El viewport completo NO debe hacer scroll. Solo el cuerpo de la tabla se desplaza.
+El viewport completo NO debe hacer scroll general. Solo las tablas o listas internas se desplazan. Para lograr esto sin duplicar espaciados con la barra de navegación superior (`Layout.jsx` ya posee `p-4 md:px-4 md:pt-4 md:pb-8`), se establece la siguiente estructura de envoltorio estándar para toda vista:
+
+- **Contenedor Raíz de Página**:
+  - Clases: `flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden`
+  - ⚠️ **REGLA CRÍTICA**: **PROHIBIDO** añadir paddings o márgenes adicionales (`p-2`, `p-4`, `md:p-4`) al contenedor raíz de la vista para evitar doble padding con el Layout.
 
 ```jsx
-<div className="flex flex-col w-full h-full lg:h-[calc(100vh-140px)] p-2 md:p-4 space-y-3 mx-auto overflow-hidden">
-    {/* Contenedor Superior (Fijo) */}
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 shrink-0">
-        <div className="space-y-0.5">
-            <h1 className="text-lg font-black text-slate-800 uppercase tracking-tight leading-none">TÍTULO</h1>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Subtítulo descriptivo</p>
+<div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden">
+    {/* Contenedor Superior (Cabecera) */}
+    <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-end gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
+        <div>
+            <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase">TÍTULO DE PÁGINA</h2>
+            <div className="flex items-center gap-2 mt-1.5">
+                <p className="text-[10px] md:text-xs font-medium text-slate-500">Subtítulo descriptivo de página</p>
+            </div>
         </div>
-        <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 flex items-center gap-2">
+        <button className="bg-indigo-600 hover:bg-indigo-700 text-white h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 flex items-center gap-2 active:scale-95">
             NUEVO
         </button>
     </div>
@@ -112,13 +140,12 @@ El viewport completo NO debe hacer scroll. Solo el cuerpo de la tabla se desplaz
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                     <tr className="hover:bg-slate-50/50 transition-colors group">
-                        {/* Celdas Normales */}
+                        {/* Todas las celdas de datos — mismo peso tipográfico */}
                         <td className="px-4 py-2 border-r border-slate-50 text-[11px] font-medium text-slate-500 uppercase tracking-tighter whitespace-nowrap">
                             VALOR
                         </td>
-                        {/* Celda Principal Destacada */}
-                        <td className="px-4 py-2 border-r border-slate-50">
-                            <span className="text-[12px] font-black text-slate-700 uppercase leading-tight line-clamp-1">TEXTO DESTACADO</span>
+                        <td className="px-4 py-2 border-r border-slate-50 text-[11px] font-medium text-slate-700 uppercase tracking-tighter line-clamp-1">
+                            TEXTO PRINCIPAL
                         </td>
                         {/* Celda de Acciones */}
                         <td className="px-4 py-2 text-center">
@@ -138,6 +165,42 @@ El viewport completo NO debe hacer scroll. Solo el cuerpo de la tabla se desplaz
     </div>
 </div>
 ```
+
+### ⚠️ Tipografía en filas de tabla (`<tbody>`) — REGLA CRÍTICA
+
+**PROHIBIDO** usar `font-black` o `font-bold` en el texto de los registros (celdas `<td>`). Los datos de cada fila deben verse uniformes y legibles, no “gritados”.
+
+- **Todas las celdas de datos**: `text-[11px] font-medium text-slate-500 uppercase tracking-tighter` (o `text-slate-700` si es la columna principal).
+- **Excepción permitida con negrita**: solo `<thead>`, badges de estado (§5), botones (§2) y textos de UI (títulos de página, labels, footer de paginación).
+- **PROHIBIDO** la antigua “celda destacada” con `font-black` en filas: rompe la simetría visual del sistema.
+
+### 4.1 Listas con pocos registros (1 a ~5 ítems) — Usar tarjetas, no tabla
+
+Si el usuario verá **muy pocos elementos** (ej: 1–2 establecimientos asignados, accesos directos, resúmenes personales), **NO** uses tabla. Usa **tarjetas de listado** dentro del contenedor con scroll interno:
+
+```jsx
+<div className="bg-slate-50 rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex-1 min-h-0 flex flex-col">
+    <div className="overflow-auto flex-1 min-h-0 p-4 flex flex-col gap-3 custom-scrollbar">
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-indigo-200/60 transition-all">
+            <div className="flex items-center gap-4 min-w-0 flex-1">
+                <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
+                    <Building2 className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                    <p className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter line-clamp-2">NOMBRE DEL ÍTEM</p>
+                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mt-1">DETALLE SECUNDARIO</p>
+                </div>
+            </div>
+            <button className="bg-indigo-600 hover:bg-indigo-700 text-white h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 flex items-center gap-2 shrink-0 active:scale-95">
+                ACCIÓN PRINCIPAL
+            </button>
+        </div>
+    </div>
+</div>
+```
+
+- **Cuándo usar tabla**: listados administrativos con muchos registros, filtros, paginación o columnas comparables.
+- **Cuándo usar tarjetas**: paneles personales, asignaciones reducidas, accesos rápidos (≤ ~5 ítems).
 
 ---
 
@@ -173,9 +236,11 @@ Para mantener consistencia semántica, **solo** se deben usar estos íconos para
 Cualquier ventana emergente, modal o cajón lateral (drawer) debe sentirse premium. Se deben construir usando `framer-motion` (`AnimatePresence`) para asegurar entradas suaves.
 
 **A. Fondo Oscuro (Backdrop) y Portals**:
-- **REGLA CRÍTICA**: El backdrop JAMÁS debe quedar atrapado cortando la pantalla. Para asegurar que cubra el viewport entero, se recomienda fuertemente usar `createPortal` (React) hacia el `document.body`.
-- Si no se usa Portal, el contenedor principal del modal debe renderizarse en la raíz de la vista y aplicar estas clases estrictas.
-- Clases Obligatorias: `fixed top-0 left-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9999]`
+- **REGLA CRÍTICA**: El backdrop y el drawer/modal **DEBEN** renderizarse con `createPortal(..., document.body)` para no quedar atrapados por `overflow-hidden` del layout ni tapar el panel lateral.
+- **REGLA CRÍTICA DE CAPAS**: El backdrop siempre va **debajo** del panel. Nunca asignes al drawer un `z-index` menor que al backdrop.
+  - Backdrop: `z-[9998]`
+  - Drawer / Modal: `z-[10000]` (o superior)
+- Clases del backdrop: `fixed top-0 left-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9998]`
 
 **B. Modal Pop-up (Central)**:
 - Contenedor Principal: `bg-white rounded-2xl shadow-2xl overflow-hidden max-w-3xl w-full mx-4`
@@ -183,8 +248,10 @@ Cualquier ventana emergente, modal o cajón lateral (drawer) debe sentirse premi
 - Botón Cerrar (X): Usa la X de lucide-react. Clases: `p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors`
 
 **C. Drawer (Cajón Lateral)**:
-- Ideal para formularios largos sin sacar al usuario de la vista.
-- Clases Contenedor: `fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl border-l border-slate-100 z-[1000] flex flex-col`
+- Ideal para formularios largos sin sacar al usuario de la vista (ej: Nueva Atención).
+- Entra desde la derecha con `framer-motion` (`x: '100%'` → `x: 0`).
+- Clases Contenedor: `fixed inset-y-0 right-0 w-full max-w-2xl bg-white shadow-2xl border-l border-slate-100 z-[10000] flex flex-col`
+- El backdrop (`z-[9998]`) oscurece la página; el drawer (`z-[10000]`) queda siempre visible encima.
 
 ---
 

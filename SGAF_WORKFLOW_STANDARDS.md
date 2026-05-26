@@ -89,6 +89,25 @@ Los módulos críticos (Contratos, Recepciones, Pagos, Gestiones) deben contar c
 - Si bien la paginación por defecto protege la memoria del servidor, **NO debe entorpecer los filtros del frontend**. 
 - Si el frontend necesita renderizar toda la data para filtrar localmente en una tabla o armar opciones de un `<select>`, el endpoint o el ViewSet debe estar programado para soportar un parámetro que permita omitir la paginación o devolver la data completa bajo demanda.
 
+### 6.1. Búsquedas Server-Side con Debounce
+- Todo buscador de tabla que dispare consultas al backend mediante `searchQuery` **DEBE** usar el hook compartido `frontend/src/hooks/useDebouncedValue.js`.
+- El delay estándar es `300ms`. No se deben crear debounces manuales con `setTimeout` dentro de cada vista si el hook compartido ya cubre el caso.
+- El input debe mantenerse controlado con `searchQuery` para que la escritura sea inmediata, pero el `GET` debe depender de `debouncedSearchQuery`.
+- Al cambiar el texto de búsqueda, se debe ejecutar `setCurrentPage(1)` inmediatamente. La consulta al backend debe ocurrir solo cuando cambie `debouncedSearchQuery`.
+- Paginación, ordenamiento y filtros select pueden consultar de inmediato, sin debounce.
+- Acciones como guardar, eliminar, cambiar estado o subir archivos pueden seguir llamando `fetchData(...)` directamente para refrescar la tabla al instante.
+- No se debe aplicar este patrón a filtros puramente locales, como búsquedas internas de `SearchableSelect`, `MultiSearchableSelect` o listas ya cargadas en memoria.
+
+### Patrón obligatorio:
+```jsx
+const [searchQuery, setSearchQuery] = useState('');
+const debouncedSearchQuery = useDebouncedValue(searchQuery);
+
+useEffect(() => {
+    fetchData(1, debouncedSearchQuery, ordering, pageSize);
+}, [debouncedSearchQuery, ordering, pageSize]);
+```
+
 ## 7. Cargas Masivas Seguras (Archivos Excel)
 - Al procesar importaciones masivas (ej: subida de pagos o facturas), el código debe **validar el 100% de las filas ANTES** de guardar el primer registro en la Base de Datos.
 - Si un archivo tiene 100 filas y la fila 99 tiene un error de tipeo, se debe rechazar el archivo completo y devolver el detalle exacto del error al frontend. Esto evita bases de datos "a medio cargar".

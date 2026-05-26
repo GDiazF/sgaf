@@ -1,19 +1,28 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Truck, Plus, Search, Filter, Calendar, 
     ArrowRight, Building2, FileText, Loader2, 
-    AlertCircle, X, Save, CheckCircle2,
+    AlertCircle, X, Save, CheckCircle2, FolderSearch,
     Trash2, Shield, Settings, Info, Box, ExternalLink, Edit2, Pencil, ArrowLeft, RefreshCw
 } from 'lucide-react';
 import { usePermission } from '../../hooks/usePermission';
 import api from '../../api';
+import {
+    BTN_PRIMARY, BTN_SECONDARY, LOADER_SPIN,
+    MODAL_SHELL, MODAL_BACKDROP_LAYER, MODAL_PANEL, MODAL_PANEL_LG,
+    SERVICE_ROW_ICON, SERVICE_ROW_TITLE, SERVICE_INPUT, SERVICE_FORM_CONTROL, HOLIDAY_SYNC_BOX,
+    TITLE_ICON_BOX,
+} from './contractsUi';
 
 // Map icon names to Lucide components
 const IconMap = {
     Truck, Trash2, Shield, Settings, Info, Box, Calendar, FileText, Building2, Edit2, Pencil
 };
+
+const ModalPortal = ({ children }) => createPortal(children, document.body);
 
 const ServiciosDashboard = () => {
     const { can } = usePermission();
@@ -42,6 +51,8 @@ const ServiciosDashboard = () => {
     const [isFeriadosModalOpen, setIsFeriadosModalOpen] = useState(false);
     const [feriados, setFeriados] = useState([]);
     const [syncing, setSyncing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+    const [noticeMessage, setNoticeMessage] = useState('');
 
     const fetchData = async () => {
         try {
@@ -72,6 +83,8 @@ const ServiciosDashboard = () => {
     const handleCreateService = async (e) => {
         e.preventDefault();
         setSubmitting(true);
+        setErrorMessage('');
+        setNoticeMessage('');
         try {
             await api.post('contratos/servicios/', formData);
             setIsModalOpen(false);
@@ -79,7 +92,7 @@ const ServiciosDashboard = () => {
             fetchData();
         } catch (error) {
             console.error("Error creating service:", error);
-            alert("Error al crear el servicio operativo.");
+            setErrorMessage('Error al crear el servicio operativo.');
         } finally {
             setSubmitting(false);
         }
@@ -88,12 +101,14 @@ const ServiciosDashboard = () => {
     const handleUpdateService = async (e) => {
         e.preventDefault();
         setUpdating(true);
+        setErrorMessage('');
+        setNoticeMessage('');
         try {
             await api.put(`contratos/servicios/${editingService.id}/`, editingService);
             setIsEditModalOpen(false);
             fetchData();
         } catch (error) {
-            alert("Error al actualizar el servicio.");
+            setErrorMessage('Error al actualizar el servicio.');
         } finally {
             setUpdating(false);
         }
@@ -103,9 +118,11 @@ const ServiciosDashboard = () => {
         if (!window.confirm("¿Está seguro de eliminar este servicio operativo? Se eliminarán todas las rutas asociadas.")) return;
         try {
             await api.delete(`contratos/servicios/${id}/`);
+            setErrorMessage('');
+            setNoticeMessage('');
             fetchData();
         } catch (error) {
-            alert("Error al eliminar el servicio.");
+            setErrorMessage('Error al eliminar el servicio.');
         }
     };
 
@@ -131,6 +148,8 @@ const ServiciosDashboard = () => {
 
     const handleSyncFeriados = async () => {
         setSyncing(true);
+        setErrorMessage('');
+        setNoticeMessage('');
         try {
             const anios = [2024, 2025, 2026];
             let totalCreados = 0;
@@ -181,11 +200,11 @@ const ServiciosDashboard = () => {
                 }
             }
 
-            alert(`Sincronización completa: ${totalCreados} feriados nuevos añadidos.`);
+            setNoticeMessage(`Sincronización completa: ${totalCreados} feriados nuevos añadidos.`);
             fetchFeriados();
         } catch (error) {
             console.error("Sync Error:", error);
-            alert("Error al sincronizar: " + (error.message || "Problema de conexión"));
+            setErrorMessage(`Error al sincronizar: ${error.message || 'Problema de conexión'}`);
         } finally {
             setSyncing(false);
         }
@@ -195,9 +214,10 @@ const ServiciosDashboard = () => {
         if (!window.confirm("¿Eliminar este feriado?")) return;
         try {
             await api.delete(`contratos/feriados/${id}/`);
+            setErrorMessage('');
             fetchFeriados();
         } catch (error) {
-            alert("Error al eliminar feriado.");
+            setErrorMessage('Error al eliminar feriado.');
         }
     };
 
@@ -219,31 +239,35 @@ const ServiciosDashboard = () => {
     return (
         <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden animate-in fade-in duration-500">
             {/* Header Limpio */}
-            <div className="shrink-0 flex flex-row justify-between items-start lg:items-end gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
-                <div>
-                    <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight flex items-center gap-2 leading-none uppercase">
-                        <Truck className="w-6 h-6 text-indigo-500" />
-                        Gestión de Rutas
-                    </h2>
-                    <p className="text-[10px] md:text-xs font-medium text-slate-500 mt-1.5 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
-                        Panel operativo de rutas de transporte ({servicios.length})
-                    </p>
+            <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-end gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
+                <div className="flex items-center gap-3">
+                    <div className={TITLE_ICON_BOX}>
+                        <Truck className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase">
+                            Gestión de Rutas
+                        </h2>
+                        <p className="text-[10px] md:text-xs font-medium text-slate-500 mt-1.5 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                            Panel operativo de rutas de transporte ({servicios.length})
+                        </p>
+                    </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                     {can('contratos.change_rutatransporte') && (
                         <button 
                             onClick={() => setIsFeriadosModalOpen(true)}
-                            className="inline-flex items-center justify-center p-2.5 lg:px-4 lg:py-2 bg-white border border-slate-200 text-slate-600 text-sm font-semibold rounded-[14px] lg:rounded-xl transition-all hover:bg-slate-50 active:scale-95 shadow-sm"
+                            className={`${BTN_SECONDARY} p-2.5 lg:px-4 lg:py-2`}
                         >
-                            <Calendar className="w-5 h-5 lg:w-3.5 lg:h-3.5 lg:mr-2 text-indigo-500" />
+                            <Calendar className="w-5 h-5 lg:w-3.5 lg:h-3.5 lg:mr-2 text-blue-500" />
                             <span className="hidden lg:inline uppercase tracking-widest text-[9px]">Feriados</span>
                         </button>
                     )}
                     {can('contratos.add_rutatransporte') && (
                         <button 
                             onClick={() => setIsModalOpen(true)}
-                            className="inline-flex items-center justify-center p-2.5 lg:px-5 lg:py-2 bg-indigo-600 text-white text-sm font-semibold rounded-[14px] lg:rounded-xl overflow-hidden transition-all hover:bg-indigo-700 active:scale-95 shadow-lg shadow-indigo-500/20"
+                            className={`${BTN_PRIMARY} p-2.5 lg:px-5 lg:py-2`}
                         >
                             <Plus className="w-5 h-5 lg:w-4 lg:h-4 lg:mr-2" />
                             <span className="hidden lg:inline uppercase tracking-widest text-[10px]">Nueva Ruta</span>
@@ -251,6 +275,17 @@ const ServiciosDashboard = () => {
                     )}
                 </div>
             </div>
+
+            {(errorMessage || noticeMessage) && (
+                <div className={`shrink-0 text-[10px] font-bold uppercase p-3 rounded-xl border flex gap-2 items-center ${
+                    errorMessage
+                        ? 'bg-rose-50 text-rose-600 border-rose-100'
+                        : 'bg-blue-50 text-blue-600 border-blue-100'
+                }`}>
+                    {errorMessage ? <AlertCircle className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
+                    <span>{errorMessage || noticeMessage}</span>
+                </div>
+            )}
 
             {/* Contenedor Principal (Tabla) */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-0">
@@ -261,7 +296,7 @@ const ServiciosDashboard = () => {
                         <input
                             type="text"
                             placeholder="Buscar por nombre, contrato o tipo..."
-                            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                            className={SERVICE_INPUT}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -272,23 +307,22 @@ const ServiciosDashboard = () => {
                 <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center h-64">
-                            <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mb-2" />
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cargando gestiones...</p>
+                            <Loader2 className={`${LOADER_SPIN} mb-2`} />
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cargando Datos...</p>
                         </div>
                     ) : filteredServicios.length === 0 ? (
-                        <div className="h-64 flex flex-col items-center justify-center text-center opacity-60">
-                            <Truck className="w-12 h-12 text-slate-300 mb-3" />
-                            <h3 className="text-base font-bold text-slate-600 uppercase tracking-tight">Sin gestiones operativas</h3>
-                            <p className="text-slate-400 text-xs mt-1 max-w-xs">No se encontraron gestiones que coincidan con la búsqueda.</p>
+                        <div className="flex flex-col items-center justify-center p-12 text-center h-full flex-1">
+                            <FolderSearch className="w-10 h-10 text-slate-200 mb-3" />
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No se encontraron registros</span>
                         </div>
                     ) : (
                         <table className="w-full border-collapse">
                             <thead className="bg-slate-50/80 sticky top-0 z-10 backdrop-blur-md">
                                 <tr className="border-b border-slate-200">
-                                    <th className="text-left py-2.5 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Servicio / Operación</th>
-                                    <th className="text-left py-2.5 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Tipo</th>
-                                    <th className="text-left py-2.5 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Contrato Vinculado</th>
-                                    <th className="text-center py-2.5 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-widest w-24">Acciones</th>
+                                    <th className="text-left py-2.5 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Servicio / Operación</th>
+                                    <th className="text-left py-2.5 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo</th>
+                                    <th className="text-left py-2.5 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Contrato Vinculado</th>
+                                    <th className="text-center py-2.5 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -302,11 +336,11 @@ const ServiciosDashboard = () => {
                                     >
                                         <td className="py-2 px-6">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-all">
+                                                <div className={SERVICE_ROW_ICON}>
                                                     {getIcon(servicio.tipo_servicio_icono)}
                                                 </div>
                                                 <div>
-                                                    <p className="text-[11px] font-bold text-slate-700 leading-tight group-hover:text-indigo-600 transition-colors">
+                                                    <p className={SERVICE_ROW_TITLE}>
                                                         {servicio.nombre}
                                                     </p>
                                                 </div>
@@ -320,7 +354,7 @@ const ServiciosDashboard = () => {
                                         <td className="py-2 px-6">
                                             <div className="flex items-center gap-1.5">
                                                 <FileText className="w-3 h-3 text-slate-300" />
-                                                <span className="text-[10px] font-bold text-slate-500 truncate max-w-[180px]">{servicio.contrato_nombre || 'No vinculado'}</span>
+                                                <span className="text-[10px] font-medium text-slate-500 uppercase tracking-tighter truncate max-w-[180px]">{servicio.contrato_nombre || 'No vinculado'}</span>
                                             </div>
                                         </td>
                                         <td className="py-2 px-6 text-center">
@@ -328,7 +362,7 @@ const ServiciosDashboard = () => {
                                                 {can('contratos.change_rutatransporte') && (
                                                     <button 
                                                         onClick={(e) => openEditModal(e, servicio)}
-                                                        className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all"
+                                                        className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-blue-600 hover:border-blue-100 transition-all"
                                                         title="Editar"
                                                     >
                                                         <Edit2 className="w-3 h-3" />
@@ -337,7 +371,7 @@ const ServiciosDashboard = () => {
                                                 {can('contratos.delete_rutatransporte') && (
                                                     <button 
                                                         onClick={(e) => { e.stopPropagation(); handleDeleteService(servicio.id); }}
-                                                        className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-red-600 hover:border-red-100 transition-all"
+                                                        className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-rose-600 hover:border-rose-100 hover:bg-rose-50 transition-colors"
                                                         title="Eliminar"
                                                     >
                                                         <Trash2 className="w-3 h-3" />
@@ -354,68 +388,69 @@ const ServiciosDashboard = () => {
             </div>
 
             {/* Create Modal */}
+            <ModalPortal>
             <AnimatePresence>
                 {isModalOpen && (
-                    <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-white w-full max-w-md rounded-[32px] shadow-2xl p-8">
-                            <div className="flex items-center justify-between mb-8">
-                                <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Nueva Ruta de Transporte</h2>
-                                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-colors"><X className="w-5 h-5" /></button>
+                    <div className={MODAL_SHELL}>
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className={MODAL_BACKDROP_LAYER} />
+                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} onClick={(e) => e.stopPropagation()} className={MODAL_PANEL}>
+                            <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex items-center justify-between gap-4 shrink-0">
+                                <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Nueva Ruta de Transporte</h2>
+                                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
                             </div>
-                            <form onSubmit={handleCreateService} className="space-y-5">
-                                <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Nombre</label><input required type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} /></div>
-                                <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Contrato</label><select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" value={formData.contrato} onChange={e => setFormData({...formData, contrato: e.target.value})}><option value="">Seleccionar...</option>{contracts.map(c => (<option key={c.id} value={c.id}>[{c.codigo_mercado_publico}] {c.descripcion.substring(0, 30)}...</option>))}</select></div>
-                                <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Tipo</label><select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" value={formData.tipo_servicio} onChange={e => setFormData({...formData, tipo_servicio: e.target.value})}><option value="">Seleccionar...</option>{tiposServicios.map(t => (<option key={t.id} value={t.id}>{t.nombre}</option>))}</select></div>
-                                <div className="pt-4 flex gap-4"><button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-3xl font-black text-[10px] uppercase tracking-widest">Cancelar</button><button disabled={submitting} type="submit" className="flex-[2] py-4 bg-indigo-600 text-white rounded-3xl font-black text-[10px] uppercase tracking-widest shadow-xl">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Guardar'}</button></div>
+                            <form onSubmit={handleCreateService} className="space-y-5 p-4 md:p-6">
+                                <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nombre</label><input required type="text" className={SERVICE_FORM_CONTROL} value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} /></div>
+                                <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Contrato</label><select required className={SERVICE_FORM_CONTROL} value={formData.contrato} onChange={e => setFormData({...formData, contrato: e.target.value})}><option value="">Seleccionar...</option>{contracts.map(c => (<option key={c.id} value={c.id}>[{c.codigo_mercado_publico}] {c.descripcion.substring(0, 30)}...</option>))}</select></div>
+                                <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Tipo</label><select required className={SERVICE_FORM_CONTROL} value={formData.tipo_servicio} onChange={e => setFormData({...formData, tipo_servicio: e.target.value})}><option value="">Seleccionar...</option>{tiposServicios.map(t => (<option key={t.id} value={t.id}>{t.nombre}</option>))}</select></div>
+                                <div className="pt-4 flex gap-4"><button type="button" onClick={() => setIsModalOpen(false)} className={`flex-1 ${BTN_SECONDARY}`}>Cancelar</button><button disabled={submitting} type="submit" className={`flex-[2] ${BTN_PRIMARY}`}>{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Guardar'}</button></div>
                             </form>
                         </motion.div>
                     </div>
                 )}
 
                 {isEditModalOpen && editingService && (
-                    <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsEditModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-white w-full max-w-md rounded-[32px] shadow-2xl p-8">
-                            <div className="flex items-center justify-between mb-8">
-                                <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Editar Gestión</h2>
-                                <button onClick={() => setIsEditModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-colors"><X className="w-5 h-5" /></button>
+                    <div className={MODAL_SHELL}>
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsEditModalOpen(false)} className={MODAL_BACKDROP_LAYER} />
+                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} onClick={(e) => e.stopPropagation()} className={MODAL_PANEL}>
+                            <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex items-center justify-between gap-4 shrink-0">
+                                <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Editar Gestión</h2>
+                                <button onClick={() => setIsEditModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
                             </div>
-                            <form onSubmit={handleUpdateService} className="space-y-5">
-                                <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Nombre</label><input required type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" value={editingService.nombre} onChange={e => setEditingService({...editingService, nombre: e.target.value})} /></div>
-                                <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Contrato</label><select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" value={editingService.contrato} onChange={e => setEditingService({...editingService, contrato: e.target.value})}><option value="">Seleccionar...</option>{contracts.map(c => (<option key={c.id} value={c.id}>[{c.codigo_mercado_publico}] {c.descripcion.substring(0, 30)}...</option>))}</select></div>
-                                <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Tipo</label><select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" value={editingService.tipo_servicio} onChange={e => setEditingService({...editingService, tipo_servicio: e.target.value})}><option value="">Seleccionar...</option>{tiposServicios.map(t => (<option key={t.id} value={t.id}>{t.nombre}</option>))}</select></div>
-                                <div className="pt-4 flex gap-4"><button type="button" onClick={() => setIsEditModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-3xl font-black text-[10px] uppercase tracking-widest">Cancelar</button><button disabled={updating} type="submit" className="flex-[2] py-4 bg-indigo-600 text-white rounded-3xl font-black text-[10px] uppercase tracking-widest shadow-xl">{updating ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Guardar Cambios'}</button></div>
+                            <form onSubmit={handleUpdateService} className="space-y-5 p-4 md:p-6">
+                                <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nombre</label><input required type="text" className={SERVICE_FORM_CONTROL} value={editingService.nombre} onChange={e => setEditingService({...editingService, nombre: e.target.value})} /></div>
+                                <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Contrato</label><select required className={SERVICE_FORM_CONTROL} value={editingService.contrato} onChange={e => setEditingService({...editingService, contrato: e.target.value})}><option value="">Seleccionar...</option>{contracts.map(c => (<option key={c.id} value={c.id}>[{c.codigo_mercado_publico}] {c.descripcion.substring(0, 30)}...</option>))}</select></div>
+                                <div className="space-y-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Tipo</label><select required className={SERVICE_FORM_CONTROL} value={editingService.tipo_servicio} onChange={e => setEditingService({...editingService, tipo_servicio: e.target.value})}><option value="">Seleccionar...</option>{tiposServicios.map(t => (<option key={t.id} value={t.id}>{t.nombre}</option>))}</select></div>
+                                <div className="pt-4 flex gap-4"><button type="button" onClick={() => setIsEditModalOpen(false)} className={`flex-1 ${BTN_SECONDARY}`}>Cancelar</button><button disabled={updating} type="submit" className={`flex-[2] ${BTN_PRIMARY}`}>{updating ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Guardar Cambios'}</button></div>
                             </form>
                         </motion.div>
                     </div>
                 )}
 
                 {isFeriadosModalOpen && (
-                    <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsFeriadosModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-white w-full max-w-lg rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
-                            <div className="p-8 border-b border-slate-100">
-                                <div className="flex items-center justify-between mb-2">
-                                    <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Calendario de Feriados</h2>
-                                    <button onClick={() => setIsFeriadosModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-colors"><X className="w-5 h-5" /></button>
+                    <div className={MODAL_SHELL}>
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsFeriadosModalOpen(false)} className={MODAL_BACKDROP_LAYER} />
+                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} onClick={(e) => e.stopPropagation()} className={MODAL_PANEL_LG}>
+                            <div className="p-4 md:p-6 border-b border-slate-100 bg-slate-50">
+                                <div className="flex items-center justify-between gap-4 mb-2">
+                                    <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Calendario de Feriados</h2>
+                                    <button onClick={() => setIsFeriadosModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
                                 </div>
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Configuración nacional para exclusión de días</p>
                             </div>
                             
-                            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                                <div className="mb-6 flex justify-between items-center bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
+                            <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
+                                <div className={HOLIDAY_SYNC_BOX}>
                                     <div className="flex items-center gap-3">
-                                        <RefreshCw className={`w-5 h-5 text-indigo-600 ${syncing ? 'animate-spin' : ''}`} />
+                                        <RefreshCw className={`w-5 h-5 text-blue-600 ${syncing ? 'animate-spin' : ''}`} />
                                         <div>
-                                            <p className="text-[10px] font-black text-indigo-900 uppercase">Sincronización Automática</p>
-                                            <p className="text-[9px] text-indigo-600 font-bold">Obtener feriados {new Date().getFullYear()} desde apis.digital.gob.cl</p>
+                                            <p className="text-[10px] font-black text-blue-900 uppercase">Sincronización Automática</p>
+                                            <p className="text-[9px] text-blue-600 font-bold">Obtener feriados {new Date().getFullYear()} desde apis.digital.gob.cl</p>
                                         </div>
                                     </div>
                                     <button 
                                         onClick={handleSyncFeriados}
                                         disabled={syncing}
-                                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50"
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all disabled:opacity-50"
                                     >
                                         {syncing ? 'Sincronizando...' : 'Sincronizar Ahora'}
                                     </button>
@@ -433,7 +468,7 @@ const ServiciosDashboard = () => {
                                             </div>
                                             <button 
                                                 onClick={() => handleDeleteFeriado(f.id)}
-                                                className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />
                                             </button>
@@ -451,6 +486,7 @@ const ServiciosDashboard = () => {
                     </div>
                 )}
             </AnimatePresence>
+            </ModalPortal>
         </div>
     );
 };

@@ -80,22 +80,22 @@ const MultiSearchableSelect = ({
             {/* Selection Button */}
             <div
                 onClick={() => setIsOpen(!isOpen)}
-                className={`form-input flex items-center justify-between cursor-pointer !py-0 ${isOpen ? 'ring-4 ring-blue-500/5 !border-blue-400' : ''}`}
+                className={`no-global w-full h-10 min-h-10 px-3 bg-white border border-slate-200 rounded-xl outline-none text-[10px] font-bold text-slate-700 shadow-sm flex items-center justify-between cursor-pointer transition-all ${isOpen ? 'ring-4 ring-blue-500/5 border-blue-500' : 'hover:border-slate-300'}`}
             >
                 <div className="flex flex-wrap gap-1 items-center flex-1 min-w-0 pr-2">
                     {selectedCount > 0 ? (
                         <div className="flex items-center gap-1.5 overflow-hidden">
-                            <span className="bg-blue-600 text-white text-[11px] font-black px-2 py-0.5 rounded-full shrink-0">
+                            <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shrink-0">
                                 {selectedCount}
                             </span>
-                            <span className="text-slate-700 text-[13px] font-bold truncate">
+                            <span className="text-slate-700 text-[10px] font-bold uppercase truncate">
                                 {selectedCount === 1
                                     ? options.find(o => o.value === value[0])?.label
                                     : `${selectedCount} seleccionados`}
                             </span>
                         </div>
                     ) : (
-                        <span className="text-slate-400 text-[13px] font-bold">
+                        <span className="text-slate-400 text-[10px] font-bold uppercase">
                             {placeholder}
                         </span>
                     )}
@@ -105,7 +105,7 @@ const MultiSearchableSelect = ({
                         <button
                             type="button"
                             onClick={handleRemoveAll}
-                            className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
+                            className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-rose-600 transition-colors"
                         >
                             <X className="w-3.5 h-3.5" />
                         </button>
@@ -131,7 +131,7 @@ const MultiSearchableSelect = ({
                                 <input
                                     ref={inputRef}
                                     type="text"
-                                    className="form-dropdown-search"
+                                    className="no-global w-full pl-10 pr-4 h-10 bg-white border border-slate-200 rounded-xl outline-none text-[10px] font-bold text-slate-700 focus:border-blue-500 transition-all placeholder:text-slate-300"
                                     placeholder="Buscar opciones..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}

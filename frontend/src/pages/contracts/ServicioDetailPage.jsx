@@ -14,6 +14,21 @@ import * as XLSX from 'xlsx';
 import { format, eachDayOfInterval, parseISO, isWeekend } from 'date-fns';
 import { es } from 'date-fns/locale';
 import api from '../../api';
+import {
+    BTN_PRIMARY,
+    BTN_SECONDARY,
+    INPUT_FILTER,
+    SELECT_FILTER,
+    SERVICE_FORM_CONTROL,
+    TITLE_ICON_BOX,
+} from './contractsUi';
+
+const ROUTE_LABEL_CLASS = 'block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1';
+const ROUTE_TEXTAREA_CLASS = 'no-global w-full min-h-[80px] text-[10px] font-bold bg-white border border-slate-200 px-3 py-2 rounded-xl outline-none focus:border-blue-500 uppercase transition-all shadow-sm resize-none placeholder:text-slate-300';
+const ROUTE_CHECKBOX_CLASS = 'w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer';
+const ROUTE_SMALL_ACTION = 'p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors';
+const ROUTE_DELETE_ACTION = 'p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors';
+const BTN_SECONDARY_COMPACT = 'bg-slate-100 hover:bg-slate-200 text-slate-600 h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shrink-0';
 
 // --- Sub-component: DiaCelda (Moved from PeriodoDetallePage) ---
 const DiaCelda = ({ fecha, isTrabajado, isFeriado, isFinDeSemana, onClick, disabled }) => {
@@ -30,8 +45,8 @@ const DiaCelda = ({ fecha, isTrabajado, isFeriado, isFinDeSemana, onClick, disab
     } 
     // PRIORIDAD 2: Estado de asistencia en días válidos
     else if (!isTrabajado) {
-        bgColor = "bg-red-50 border-red-200";
-        textColor = "text-red-700 font-medium";
+        bgColor = "bg-rose-50 border-rose-200";
+        textColor = "text-rose-700 font-medium";
     } else {
         bgColor = "bg-emerald-50 border-emerald-200";
         textColor = "text-emerald-700 font-medium";
@@ -153,7 +168,7 @@ const PeriodoCalendarioModal = ({ periodoId, onClose }) => {
 
     if (loading) return (
         <div className="flex h-64 items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
         </div>
     );
 
@@ -161,8 +176,7 @@ const PeriodoCalendarioModal = ({ periodoId, onClose }) => {
         <div className="flex flex-col h-full max-h-[85vh]">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 backdrop-blur-md sticky top-0 z-10">
                 <div>
-                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-                        <Calendar className="w-5 h-5 text-indigo-500" />
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                         Control de Asistencia - {calendario?.nombre_estandarizado || 'Periodo'}
                     </h3>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
@@ -183,7 +197,7 @@ const PeriodoCalendarioModal = ({ periodoId, onClose }) => {
                             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Calendario Mensual</h4>
                             <div className="flex items-center gap-4 text-[9px] font-bold text-slate-400">
                                 <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-100 border border-emerald-300" /> Realizado</div>
-                                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-100 border border-red-300" /> Ausencia</div>
+                                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-rose-100 border border-rose-300" /> Ausencia</div>
                                 <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-100 border border-amber-300" /> Feriado</div>
                             </div>
                         </div>
@@ -216,20 +230,20 @@ const PeriodoCalendarioModal = ({ periodoId, onClose }) => {
 
                     {/* Summary Sidebar */}
                     <div className="space-y-4">
-                        <div className="bg-slate-50/50 border border-slate-100 p-6 rounded-[28px] shadow-sm">
+                        <div className="bg-slate-50/50 border border-slate-100 p-6 rounded-2xl shadow-sm">
                             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Resumen de Pago</h4>
                             <div className="space-y-4 mb-8">
-                                <div className="flex justify-between items-center text-xs font-bold">
+                                <div className="flex justify-between items-center text-[10px] font-medium uppercase tracking-tighter">
                                     <span className="text-slate-400">Días Hábiles:</span>
                                     <span className="text-slate-800">{totalData?.dias_base}</span>
                                 </div>
-                                <div className="flex justify-between items-center text-xs font-bold text-red-500">
+                                <div className="flex justify-between items-center text-[10px] font-medium text-rose-600 uppercase tracking-tighter">
                                     <span className="text-slate-400">Inasistencias:</span>
                                     <span>-{totalData?.ausencias}</span>
                                 </div>
-                                <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-sm font-black">
+                                <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
                                     <span className="text-slate-600">Días a Pagar:</span>
-                                    <span className="text-indigo-600">{totalData?.dias_cobrar}</span>
+                                    <span className="text-blue-600">{totalData?.dias_cobrar}</span>
                                 </div>
                             </div>
                             <div className="bg-white p-4 rounded-2xl border border-slate-100 text-center shadow-sm">
@@ -244,14 +258,14 @@ const PeriodoCalendarioModal = ({ periodoId, onClose }) => {
                             <button 
                                 onClick={handleCerrarPeriodo}
                                 disabled={isClosing || !calendario}
-                                className="w-full py-4 bg-slate-900 hover:bg-black text-white rounded-[24px] font-black text-[10px] uppercase tracking-widest shadow-xl shadow-slate-200 flex items-center justify-center gap-2 transition-all active:scale-95"
+                                className={BTN_PRIMARY}
                             >
                                 {isClosing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4 text-emerald-400" />}
                                 Guardar y Congelar Periodo
                             </button>
                         )}
                         {calendario?.estado === 'CERRADO' && (
-                            <div className="w-full py-4 bg-slate-100 text-slate-400 rounded-[24px] font-black text-[10px] uppercase tracking-widest text-center border border-slate-200">
+                            <div className="w-full h-10 bg-slate-100 text-slate-400 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center border border-slate-200">
                                 Periodo Finalizado
                             </div>
                         )}
@@ -610,47 +624,53 @@ const ServicioDetailPage = () => {
 
     if (loading && !servicio) return (
         <div className="flex h-[calc(100vh-170px)] items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
         </div>
     );
 
     return (
         <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden animate-in fade-in duration-500 px-1">
             {/* Standard Header */}
-            <div className="shrink-0 flex flex-row justify-between items-end gap-3 border-b border-slate-200/60 pb-3">
+            <div className="shrink-0 flex flex-col xl:flex-row justify-between items-start xl:items-end gap-3 border-b border-slate-200/60 pb-3">
                 <div>
-                    <Link to="/contracts/servicios" className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 hover:text-indigo-600 transition-colors group">
+                    <Link to="/contracts/servicios" className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 hover:text-blue-600 transition-colors group">
                         <ArrowLeft className="w-3 h-3 transition-transform group-hover:-translate-x-0.5" />
                         Volver a Gestión de Contratos
                     </Link>
-                    <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight flex items-center gap-2.5 leading-none uppercase">
-                        <Truck className="w-6 h-6 text-indigo-500" />
-                        {servicio?.nombre}
-                    </h2>
-                    <p className="text-[10px] font-medium text-slate-500 mt-2 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
-                        Control operativo y gestión de periodos ({rutas.length} rutas)
-                    </p>
+                    <div className="flex items-center gap-3">
+                        <div className={TITLE_ICON_BOX}>
+                            <Truck className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase">
+                                {servicio?.nombre}
+                            </h2>
+                            <p className="text-[10px] font-medium text-slate-500 mt-1.5 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                Control operativo y gestión de periodos ({rutas.length} rutas)
+                            </p>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
                     <button 
                         onClick={() => { setPanelView('contract'); setIsPanelOpen(true); }} 
-                        className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all shadow-sm group"
+                        className={BTN_SECONDARY}
                     >
-                        <Info className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Información de Contrato</span>
+                        <Info className="w-4 h-4" />
+                        Información de Contrato
                     </button>
                     <button 
                         onClick={() => setIsConsolidadoModalOpen(true)} 
-                        className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95 group"
+                        className={BTN_SECONDARY}
                     >
                         <Calculator className="w-4 h-4" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Consolidado de Pagos</span>
+                        Consolidado de Pagos
                     </button>
                     {can('contratos.add_rutatransporte') && (
                         <button 
                             onClick={() => setIsRutaModalOpen(true)}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-xl hover:bg-black transition-all shadow-lg shadow-slate-200 active:scale-95"
+                            className={BTN_PRIMARY}
                         >
                             <Plus className="w-4 h-4" />
                             Nueva Ruta
@@ -669,7 +689,7 @@ const ServicioDetailPage = () => {
                             <input
                                 type="text"
                                 placeholder="Buscar ruta..."
-                                className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-indigo-100 transition-all uppercase placeholder:text-slate-300"
+                                className={INPUT_FILTER}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
@@ -681,7 +701,7 @@ const ServicioDetailPage = () => {
                                     setSelectedProvider(e.target.value);
                                     setSelectedRutasTable([]);
                                 }}
-                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-indigo-100 transition-all uppercase cursor-pointer truncate"
+                                className={SELECT_FILTER}
                             >
                                 <option value="all">Proveedor: TODOS</option>
                                 {contrato?.proveedores_asociados.map(p => (
@@ -699,10 +719,10 @@ const ServicioDetailPage = () => {
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: 20 }}
                                     onClick={(e) => { e.stopPropagation(); setIsBulkModalOpen(true); }}
-                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95 group"
+                                    className="bg-blue-600 hover:bg-blue-700 text-white h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20 flex items-center gap-2 shrink-0 active:scale-95"
                                 >
-                                    <Calendar className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Abrir Periodos ({selectedRutasTable.length})</span>
+                                    <Calendar className="w-4 h-4" />
+                                    Abrir Periodos ({selectedRutasTable.length})
                                 </motion.button>
                             )}
                         </AnimatePresence>
@@ -710,29 +730,29 @@ const ServicioDetailPage = () => {
                         {can('contratos.change_ausenciaruta') && (
                             <button 
                                 onClick={() => setIsBulkAsistenciaModalOpen(true)} 
-                                className="flex items-center justify-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 border border-amber-100 rounded-xl hover:bg-amber-500 hover:text-white transition-all group shadow-sm active:scale-95"
+                                className={BTN_SECONDARY_COMPACT}
                             >
                                 <LayoutGrid className="w-4 h-4" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">Gestión de Asistencia</span>
+                                Gestión de Asistencia
                             </button>
                         )}
 
                         {can('contratos.change_rutatransporte') && (
                             <button 
                                 onClick={() => setIsBulkRouteModalOpen(true)} 
-                                className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-600 hover:text-white transition-all group shadow-sm active:scale-95"
+                                className={BTN_SECONDARY_COMPACT}
                             >
                                 <Settings className="w-4 h-4" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">Config. Masiva</span>
+                                Config. Masiva
                             </button>
                         )}
                         
                         <button 
                             onClick={() => setIsActaModalOpen(true)}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl hover:bg-indigo-600 hover:text-white transition-all group shadow-sm active:scale-95"
+                            className={BTN_SECONDARY_COMPACT}
                         >
                             <FileText className="w-4 h-4" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Acta de Conformidad</span>
+                            Acta de Conformidad
                         </button>
                     </div>
                 </div>
@@ -744,7 +764,7 @@ const ServicioDetailPage = () => {
                                 <th className="py-2 px-4 text-center w-10">
                                      <input 
                                          type="checkbox" 
-                                         className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                          checked={sortedRutas.length > 0 && selectedRutasTable.length === sortedRutas.length}
                                          onChange={(e) => {
                                              if (e.target.checked) setSelectedRutasTable(sortedRutas.map(r => r.id));
@@ -752,9 +772,9 @@ const ServicioDetailPage = () => {
                                          }}
                                      />
                                  </th>
-                                 <th className="py-2 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-widest w-12 text-center">Ficha</th>
+                                 <th className="py-3 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest w-12 text-center">Ficha</th>
                                  <th 
-                                     className="text-left py-2 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-widest cursor-pointer hover:text-indigo-600 transition-colors"
+                                     className="text-left py-3 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-blue-600 transition-colors"
                                      onClick={() => requestSort('nombre')}
                                  >
                                      <div className="flex items-center gap-1">
@@ -763,7 +783,7 @@ const ServicioDetailPage = () => {
                                      </div>
                                  </th>
                                  <th 
-                                     className="text-left py-2 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-widest cursor-pointer hover:text-indigo-600 transition-colors"
+                                     className="text-left py-3 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-blue-600 transition-colors"
                                      onClick={() => requestSort('itinerario')}
                                  >
                                      <div className="flex items-center gap-1">
@@ -772,7 +792,7 @@ const ServicioDetailPage = () => {
                                      </div>
                                  </th>
                                  <th 
-                                     className="text-left py-2 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-widest cursor-pointer hover:text-indigo-600 transition-colors"
+                                     className="text-left py-3 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-blue-600 transition-colors"
                                      onClick={() => requestSort('proveedor_nombre')}
                                  >
                                      <div className="flex items-center gap-1">
@@ -781,7 +801,7 @@ const ServicioDetailPage = () => {
                                      </div>
                                  </th>
                                  <th 
-                                     className="text-right py-2 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-widest w-32 cursor-pointer hover:text-indigo-600 transition-colors"
+                                     className="text-right py-3 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest w-32 cursor-pointer hover:text-blue-600 transition-colors"
                                      onClick={() => requestSort('valor_diario')}
                                  >
                                      <div className="flex items-center justify-end gap-1">
@@ -789,7 +809,7 @@ const ServicioDetailPage = () => {
                                          {sortConfig.key === 'valor_diario' && (sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}
                                      </div>
                                  </th>
-                                 <th className="text-center py-2 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-widest w-24">Acciones</th>
+                                 <th className="text-center py-3 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">Acciones</th>
                              </tr>
                          </thead>
                          <tbody className="divide-y divide-slate-50 font-sans">
@@ -797,12 +817,12 @@ const ServicioDetailPage = () => {
                                 <tr 
                                     key={ruta.id} 
                                     onClick={() => openRoutePanel(ruta, 'management')}
-                                    className={`hover:bg-indigo-50/40 transition-colors group cursor-pointer ${selectedRutasTable.includes(ruta.id) ? 'bg-indigo-50/60' : (selectedRoute?.id === ruta.id ? 'bg-indigo-50/60' : '')}`}
+                                    className={`hover:bg-blue-50/40 transition-colors group cursor-pointer ${selectedRutasTable.includes(ruta.id) ? 'bg-blue-50/60' : (selectedRoute?.id === ruta.id ? 'bg-blue-50/60' : '')}`}
                                 >
                                     <td className="py-2 px-4 text-center" onClick={(e) => e.stopPropagation()}>
                                         <input 
                                             type="checkbox" 
-                                            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                             checked={selectedRutasTable.includes(ruta.id)}
                                             onChange={(e) => {
                                                 if (e.target.checked) setSelectedRutasTable([...selectedRutasTable, ruta.id]);
@@ -813,32 +833,32 @@ const ServicioDetailPage = () => {
                                     <td className="py-1.5 px-6 text-center" onClick={(e) => { e.stopPropagation(); openRoutePanel(ruta, 'info'); }}>
                                         <button 
                                             onClick={() => openRoutePanel(ruta, 'info')}
-                                            className="p-1 text-slate-300 hover:text-indigo-600 hover:bg-white rounded-lg transition-all border border-transparent hover:border-indigo-100"
+                                            className={ROUTE_SMALL_ACTION}
                                             title="Ver Ficha Técnica"
                                         >
                                             <Info className="w-3.5 h-3.5" />
                                         </button>
                                     </td>
-                                    <td className="py-1.5 px-6"><div className="flex items-center gap-2.5"><div className={`w-7 h-7 rounded-lg flex items-center justify-center border transition-all ${selectedRoute?.id === ruta.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-100 group-hover:bg-white group-hover:text-indigo-600 group-hover:border-indigo-100'}`}><MapPin className="w-3 h-3" /></div><span className="text-[10px] font-bold text-slate-700 uppercase tracking-tight">{ruta.nombre}</span></div></td>
+                                    <td className="py-2 px-6"><div className="flex items-center gap-2.5"><div className={`w-7 h-7 rounded-lg flex items-center justify-center border transition-all ${selectedRoute?.id === ruta.id ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-100 group-hover:bg-white group-hover:text-blue-600 group-hover:border-blue-100'}`}><MapPin className="w-3 h-3" /></div><span className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter">{ruta.nombre}</span></div></td>
                                     <td className="py-1.5 px-6">
                                         <div className="max-w-[250px]">
-                                            <p className="text-[9px] font-bold text-slate-500 uppercase truncate italic">
+                                            <p className="text-[11px] font-medium text-slate-500 uppercase tracking-tighter truncate">
                                                 {ruta.itinerario || 'SIN DETALLE TÉCNICO'}
                                             </p>
                                         </div>
                                     </td>
-                                    <td className="py-1.5 px-6"><span className="text-[9px] font-bold text-slate-500 uppercase">{ruta.proveedor_nombre}</span></td>
-                                    <td className="py-1.5 px-6 text-right font-mono text-[10px] font-black text-slate-800">${new Intl.NumberFormat('es-CL').format(ruta.valor_diario)}</td>
+                                    <td className="py-2 px-6"><span className="text-[11px] font-medium text-slate-500 uppercase tracking-tighter">{ruta.proveedor_nombre}</span></td>
+                                    <td className="py-2 px-6 text-right font-mono text-[11px] font-medium text-slate-700">${new Intl.NumberFormat('es-CL').format(ruta.valor_diario)}</td>
                                     <td className="py-1.5 px-6 text-right" onClick={e => e.stopPropagation()}>
                                         <div className="flex justify-center gap-1">
                                             {can('contratos.change_rutatransporte') && (
-                                                <button onClick={() => openEditRutaModal(ruta)} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-white border border-transparent hover:border-indigo-100 rounded-lg shadow-sm transition-all">
-                                                    <Pencil className="w-3 h-3" />
+                                                <button onClick={() => openEditRutaModal(ruta)} className={ROUTE_SMALL_ACTION}>
+                                                    <Pencil className="w-3.5 h-3.5" />
                                                 </button>
                                             )}
                                             {can('contratos.delete_rutatransporte') && (
-                                                <button onClick={() => handleDeleteRuta(ruta.id)} className="p-1 text-slate-400 hover:text-red-600 hover:bg-white border border-transparent hover:border-red-100 rounded-lg shadow-sm transition-all">
-                                                    <Trash2 className="w-3 h-3" />
+                                                <button onClick={() => handleDeleteRuta(ruta.id)} className={ROUTE_DELETE_ACTION}>
+                                                    <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
                                             )}
                                         </div>
@@ -857,7 +877,7 @@ const ServicioDetailPage = () => {
                             <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 300 }} className="absolute top-0 right-0 bottom-0 w-full max-w-md bg-white shadow-2xl flex flex-col z-30 border-l border-slate-200">
                                 <div className="p-5 border-b border-slate-100 bg-slate-50/80 backdrop-blur-md flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-10 h-10 ${panelView === 'contract' ? 'bg-amber-500' : 'bg-indigo-600'} rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200`}>
+                                        <div className={`w-10 h-10 ${panelView === 'contract' ? 'bg-amber-500' : 'bg-blue-600'} rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200`}>
                                             {panelView === 'info' ? <Info className="w-5 h-5" /> : panelView === 'contract' ? <Shield className="w-5 h-5" /> : <Settings className="w-5 h-5" />}
                                         </div>
                                         <div><h3 className="text-sm font-black text-slate-800 uppercase tracking-tight truncate max-w-[200px]">{panelView === 'contract' ? 'Detalles del Contrato' : selectedRoute?.nombre}</h3><p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">{panelView === 'info' ? 'Ficha Técnica' : panelView === 'contract' ? 'Información Legal' : 'Gestión de Operaciones'}</p></div>
@@ -868,7 +888,7 @@ const ServicioDetailPage = () => {
                                     {panelView === 'contract' ? (
                                         <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
                                             {/* Financial Overview Card */}
-                                            <div className="bg-slate-900 rounded-[32px] p-6 text-white shadow-xl relative overflow-hidden group">
+                                            <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden group">
                                                 <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
                                                     <Calculator className="w-24 h-24" />
                                                 </div>
@@ -902,7 +922,7 @@ const ServicioDetailPage = () => {
                                                         </div>
                                                         <div>
                                                             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Gasto Mensual Prom.</p>
-                                                            <p className="text-sm font-black text-indigo-300">${new Intl.NumberFormat('es-CL').format(Math.round(contrato?.monto_total / (contrato?.plazo_meses || 1)))}</p>
+                                                            <p className="text-sm font-black text-blue-300">${new Intl.NumberFormat('es-CL').format(Math.round(contrato?.monto_total / (contrato?.plazo_meses || 1)))}</p>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -927,7 +947,7 @@ const ServicioDetailPage = () => {
                                                     <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-slate-100" />
                                                     <div className="space-y-6 relative">
                                                         <div className="flex gap-4 items-start">
-                                                            <div className="w-8 h-8 rounded-full bg-white border-2 border-indigo-500 flex items-center justify-center shrink-0 z-10 shadow-sm"><Calendar className="w-3.5 h-3.5 text-indigo-500" /></div>
+                                                            <div className="w-8 h-8 rounded-full bg-white border-2 border-blue-500 flex items-center justify-center shrink-0 z-10 shadow-sm"><Calendar className="w-3.5 h-3.5 text-blue-500" /></div>
                                                             <div>
                                                                 <p className="text-[10px] font-black text-slate-700 uppercase leading-none">Fecha de Inicio</p>
                                                                 <p className="text-[11px] font-bold text-slate-500 mt-1.5">{contrato?.fecha_inicio ? new Date(contrato.fecha_inicio).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase() : 'N/A'}</p>
@@ -973,7 +993,7 @@ const ServicioDetailPage = () => {
                                             {/* Description */}
                                             <div className="space-y-3">
                                                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Descripción del Servicio</h4>
-                                                <div className="p-5 bg-indigo-50/30 rounded-3xl border border-indigo-100/50">
+                                                <div className="p-5 bg-blue-50/30 rounded-2xl border border-blue-100/50">
                                                     <p className="text-[11px] font-medium text-slate-600 leading-relaxed italic">"{contrato?.descripcion}"</p>
                                                 </div>
                                             </div>
@@ -983,15 +1003,15 @@ const ServicioDetailPage = () => {
                                                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Proveedores Adjudicados ({contrato?.proveedores_asociados.length})</h4>
                                                 <div className="space-y-3">
                                                     {contrato?.proveedores_asociados.map(pa => (
-                                                        <div key={pa.id} className="p-4 bg-white rounded-3xl border border-slate-100 shadow-sm group hover:border-indigo-200 transition-all">
+                                                        <div key={pa.id} className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm group hover:border-blue-200 transition-all">
                                                             <div className="flex items-center justify-between mb-3">
                                                                 <div className="flex items-center gap-3">
-                                                                    <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center group-hover:bg-indigo-50 transition-colors">
-                                                                        <Building2 className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
+                                                                    <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center group-hover:bg-blue-50 transition-colors">
+                                                                        <Building2 className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
                                                                     </div>
                                                                     <span className="text-[11px] font-black text-slate-700 uppercase truncate max-w-[180px]">{pa.proveedor_nombre}</span>
                                                                 </div>
-                                                                <span className="text-[11px] font-black text-indigo-600">${new Intl.NumberFormat('es-CL').format(pa.monto_adjudicado)}</span>
+                                                                <span className="text-[11px] font-black text-blue-600">${new Intl.NumberFormat('es-CL').format(pa.monto_adjudicado)}</span>
                                                             </div>
                                                             <div className="flex items-center justify-between text-[9px] font-bold text-slate-400 uppercase tracking-widest px-1">
                                                                 <span>Restante: ${new Intl.NumberFormat('es-CL').format(pa.monto_restante)}</span>
@@ -1008,14 +1028,14 @@ const ServicioDetailPage = () => {
                                             <div className="p-6 space-y-6 shrink-0 border-b border-slate-100/60 bg-slate-50/30">
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <div className="bg-white p-4 rounded-2xl border border-slate-100 text-center shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase mb-1.5">Corte de Pago</p><p className="text-xs font-black text-slate-700">{selectedRoute?.dia_inicio_periodo} - {selectedRoute?.dia_fin_periodo}</p></div>
-                                                    <div className="bg-white p-4 rounded-2xl border border-slate-100 text-center shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase mb-1.5">Valor Diario</p><p className="text-xs font-black text-indigo-600">${new Intl.NumberFormat('es-CL').format(selectedRoute?.valor_diario || 0)}</p></div>
+                                                    <div className="bg-white p-4 rounded-2xl border border-slate-100 text-center shadow-sm"><p className="text-[9px] font-black text-slate-400 uppercase mb-1.5">Valor Diario</p><p className="text-xs font-black text-blue-600">${new Intl.NumberFormat('es-CL').format(selectedRoute?.valor_diario || 0)}</p></div>
                                                 </div>
 
                                                 {panelView === 'management' && (
                                                     <div className="flex items-center justify-between px-1">
                                                         <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><History className="w-3.5 h-3.5" /> Historial de Periodos</h4>
                                                         {can('contratos.add_periodocobro') && (
-                                                            <button onClick={() => setIsPeriodoModalOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100"><Plus className="w-3 h-3" /> Generar</button>
+                                                            <button onClick={() => setIsPeriodoModalOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md shadow-blue-100"><Plus className="w-3 h-3" /> Generar</button>
                                                         )}
                                                     </div>
                                                 )}
@@ -1029,16 +1049,16 @@ const ServicioDetailPage = () => {
                                                 {panelView === 'management' && (
                                                     <div className="space-y-2.5">
                                                         {selectedRoute?.periodos.map(periodo => (
-                                                            <button key={periodo.id} onClick={() => setActivePeriodId(periodo.id)} className="w-full flex items-center justify-between p-3 bg-white border border-slate-100 rounded-2xl hover:border-indigo-300 hover:shadow-lg transition-all group/p text-left">
+                                                            <button key={periodo.id} onClick={() => setActivePeriodId(periodo.id)} className="w-full flex items-center justify-between p-3 bg-white border border-slate-100 rounded-2xl hover:border-blue-300 hover:shadow-lg transition-all group/p text-left">
                                                                 <div className="flex items-center gap-3">
-                                                                    <div className={`w-2 h-2 rounded-full ${periodo.estado === 'CERRADO' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-indigo-500 animate-pulse shadow-[0_0_8px_rgba(99,102,241,0.4)]'}`} />
+                                                                    <div className={`w-2 h-2 rounded-full ${periodo.estado === 'CERRADO' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(99,102,241,0.4)]'}`} />
                                                                     <div><p className="text-[10px] font-black text-slate-700 uppercase tracking-tight leading-none">{periodo.nombre_estandarizado}</p><p className="text-[8px] text-slate-400 mt-1.5 font-bold uppercase tracking-widest">Estado: {periodo.estado}</p></div>
                                                                 </div>
-                                                                <ArrowRight className="w-3.5 h-3.5 text-slate-200 group-hover/p:text-indigo-600 group-hover/p:translate-x-1 transition-all" />
+                                                                <ArrowRight className="w-3.5 h-3.5 text-slate-200 group-hover/p:text-blue-600 group-hover/p:translate-x-1 transition-all" />
                                                             </button>
                                                         ))}
                                                         {selectedRoute?.periodos.length === 0 && (
-                                                            <div className="py-12 text-center border-2 border-dashed border-slate-100 rounded-[32px]"><Clock className="w-8 h-8 text-slate-200 mx-auto mb-3" /><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No hay periodos generados</p></div>
+                                                            <div className="py-12 text-center border-2 border-dashed border-slate-100 rounded-2xl"><Clock className="w-8 h-8 text-slate-200 mx-auto mb-3" /><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No hay periodos generados</p></div>
                                                         )}
                                                     </div>
                                                 )}
@@ -1055,16 +1075,16 @@ const ServicioDetailPage = () => {
                                                             </div>
                                                             <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
                                                                 <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Días Feriados</p>
-                                                                <p className={`text-[10px] font-black uppercase ${selectedRoute?.excluir_feriados ? 'text-indigo-600' : 'text-slate-400'}`}>
+                                                                <p className={`text-[10px] font-black uppercase ${selectedRoute?.excluir_feriados ? 'text-blue-600' : 'text-slate-400'}`}>
                                                                     {selectedRoute?.excluir_feriados ? 'Excluidos' : 'Incluidos'}
                                                                 </p>
                                                             </div>
                                                         </div>
 
                                                         {/* Itinerario / Trayecto */}
-                                                        <div className="p-5 bg-indigo-50/30 border border-indigo-100/50 rounded-[32px]">
+                                                        <div className="p-5 bg-blue-50/30 border border-blue-100/50 rounded-2xl">
                                                             <div className="flex items-center gap-2 mb-3">
-                                                                <div className="p-1.5 bg-white rounded-lg text-indigo-600 shadow-sm"><Truck className="w-3.5 h-3.5" /></div>
+                                                                <div className="p-1.5 bg-white rounded-lg text-blue-600 shadow-sm"><Truck className="w-3.5 h-3.5" /></div>
                                                                 <h5 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Detalle del Itinerario</h5>
                                                             </div>
                                                             <p className="text-[11px] font-medium text-slate-600 leading-relaxed italic px-1">
@@ -1078,7 +1098,7 @@ const ServicioDetailPage = () => {
                                                             <div className="flex flex-wrap gap-2">
                                                                 {selectedRoute?.establecimientos_detalle?.map(est => (
                                                                     <div key={est.id} className="px-4 py-2.5 bg-white text-[10px] font-bold text-slate-600 rounded-xl border border-slate-100 uppercase tracking-tight shadow-sm flex items-center gap-2">
-                                                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                                                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
                                                                         {est.nombre}
                                                                     </div>
                                                                 ))}
@@ -1101,7 +1121,7 @@ const ServicioDetailPage = () => {
                 {activePeriodId && (
                     <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setActivePeriodId(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-                        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative bg-white w-full max-w-5xl rounded-[40px] shadow-2xl overflow-hidden min-h-[500px]">
+                        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden min-h-[500px]">
                             <PeriodoCalendarioModal periodoId={activePeriodId} onClose={() => { setActivePeriodId(null); fetchData(); }} />
                         </motion.div>
                     </div>
@@ -1144,20 +1164,23 @@ const ServicioDetailPage = () => {
                 )}
 
                 {isRutaModalOpen && (
-                    <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsRutaModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-white w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden p-8 flex flex-col">
-                            <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight mb-8">Nueva Ruta Operativa</h2>
-                            <form onSubmit={handleCreateRuta} className="space-y-6">
+                    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 overflow-hidden">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsRutaModalOpen(false)} className="fixed top-0 left-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9998]" />
+                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative z-[10000] bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+                            <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex items-center justify-between shrink-0">
+                                <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Nueva Ruta Operativa</h2>
+                                <button onClick={() => setIsRutaModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
+                            </div>
+                            <form onSubmit={handleCreateRuta} className="space-y-5 p-4 md:p-6 overflow-y-auto custom-scrollbar">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Nombre</label><input required type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" value={rutaFormData.nombre} onChange={e => setRutaFormData({...rutaFormData, nombre: e.target.value})} /></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Proveedor</label><select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" value={rutaFormData.proveedor} onChange={e => setRutaFormData({...rutaFormData, proveedor: e.target.value, establecimientos: []})}><option value="">Seleccionar proveedor...</option>{contrato?.proveedores_asociados.map(pa => (<option key={pa.proveedor} value={pa.proveedor}>{pa.proveedor_nombre}</option>))}</select></div>
+                                    <div className="space-y-1"><label className={ROUTE_LABEL_CLASS}>Nombre</label><input required type="text" className={SERVICE_FORM_CONTROL} value={rutaFormData.nombre} onChange={e => setRutaFormData({...rutaFormData, nombre: e.target.value})} /></div>
+                                    <div className="space-y-1"><label className={ROUTE_LABEL_CLASS}>Proveedor</label><select required className={SELECT_FILTER} value={rutaFormData.proveedor} onChange={e => setRutaFormData({...rutaFormData, proveedor: e.target.value, establecimientos: []})}><option value="">Seleccionar proveedor...</option>{contrato?.proveedores_asociados.map(pa => (<option key={pa.proveedor} value={pa.proveedor}>{pa.proveedor_nombre}</option>))}</select></div>
                                 </div>
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between ml-1">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Establecimientos ({rutaFormData.establecimientos.length} seleccionados)</label>
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Establecimientos ({rutaFormData.establecimientos.length} seleccionados)</label>
                                         <div className="flex gap-3">
-                                            <button type="button" onClick={() => setRutaFormData({...rutaFormData, establecimientos: availableEsts.map(e => e.id)})} className="text-[9px] font-black text-indigo-600 uppercase hover:underline">Todos</button>
+                                            <button type="button" onClick={() => setRutaFormData({...rutaFormData, establecimientos: availableEsts.map(e => e.id)})} className="text-[9px] font-black text-blue-600 uppercase hover:underline">Todos</button>
                                             <button type="button" onClick={() => setRutaFormData({...rutaFormData, establecimientos: []})} className="text-[9px] font-black text-slate-400 uppercase hover:underline">Limpiar</button>
                                         </div>
                                     </div>
@@ -1166,68 +1189,71 @@ const ServicioDetailPage = () => {
                                         <input 
                                             type="text" 
                                             placeholder="Buscar establecimiento..." 
-                                            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold"
+                                            className={INPUT_FILTER}
                                             value={searchTermEst}
                                             onChange={e => setSearchTermEst(e.target.value)}
                                         />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2 bg-slate-50 p-4 rounded-3xl border border-slate-200 max-h-48 overflow-y-auto custom-scrollbar">
+                                    <div className="grid grid-cols-2 gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-200 max-h-48 overflow-y-auto custom-scrollbar">
                                         {availableEsts.filter(est => est.nombre.toLowerCase().includes(searchTermEst.toLowerCase())).map(est => (
-                                            <label key={est.id} className="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-100 cursor-pointer text-[10px] font-bold text-slate-600 transition-all hover:border-indigo-100 hover:bg-indigo-50/20">
-                                                <input type="checkbox" className="w-3.5 h-3.5 rounded text-indigo-600" checked={rutaFormData.establecimientos.includes(est.id)} onChange={e => { const newEsts = e.target.checked ? [...rutaFormData.establecimientos, est.id] : rutaFormData.establecimientos.filter(id => id !== est.id); setRutaFormData({...rutaFormData, establecimientos: newEsts}); }} /> 
+                                            <label key={est.id} className="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-100 cursor-pointer text-[10px] font-bold text-slate-600 transition-all hover:border-blue-100 hover:bg-blue-50/20">
+                                                <input type="checkbox" className={ROUTE_CHECKBOX_CLASS} checked={rutaFormData.establecimientos.includes(est.id)} onChange={e => { const newEsts = e.target.checked ? [...rutaFormData.establecimientos, est.id] : rutaFormData.establecimientos.filter(id => id !== est.id); setRutaFormData({...rutaFormData, establecimientos: newEsts}); }} /> 
                                                 <span className="truncate">{est.nombre}</span>
                                             </label>
                                         ))}
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Itinerario / Trayecto (Detalle para el Acta)</label>
+                                    <label className={ROUTE_LABEL_CLASS}>Itinerario / Trayecto (Detalle para el Acta)</label>
                                     <textarea 
                                         placeholder="Ej: Iquique - Los Verdes - Chipana. Describa los puntos clave de la ruta."
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-[11px] font-bold min-h-[80px] resize-none"
+                                        className={ROUTE_TEXTAREA_CLASS}
                                         value={rutaFormData.itinerario}
                                         onChange={e => setRutaFormData({...rutaFormData, itinerario: e.target.value})}
                                     />
                                 </div>
                                 <div className="grid grid-cols-3 gap-4">
-                                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Valor Diario</label><input required type="number" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black" value={rutaFormData.valor_diario} onChange={e => setRutaFormData({...rutaFormData, valor_diario: e.target.value})} /></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Día Inicio</label><input required type="number" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" value={rutaFormData.dia_inicio_periodo} onChange={e => setRutaFormData({...rutaFormData, dia_inicio_periodo: e.target.value})} /></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Día Fin</label><input required type="number" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" value={rutaFormData.dia_fin_periodo} onChange={e => setRutaFormData({...rutaFormData, dia_fin_periodo: e.target.value})} /></div>
+                                    <div className="space-y-1"><label className={ROUTE_LABEL_CLASS}>Valor Diario</label><input required type="number" className={SERVICE_FORM_CONTROL} value={rutaFormData.valor_diario} onChange={e => setRutaFormData({...rutaFormData, valor_diario: e.target.value})} /></div>
+                                    <div className="space-y-1"><label className={ROUTE_LABEL_CLASS}>Día Inicio</label><input required type="number" className={SERVICE_FORM_CONTROL} value={rutaFormData.dia_inicio_periodo} onChange={e => setRutaFormData({...rutaFormData, dia_inicio_periodo: e.target.value})} /></div>
+                                    <div className="space-y-1"><label className={ROUTE_LABEL_CLASS}>Día Fin</label><input required type="number" className={SERVICE_FORM_CONTROL} value={rutaFormData.dia_fin_periodo} onChange={e => setRutaFormData({...rutaFormData, dia_fin_periodo: e.target.value})} /></div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer group transition-all hover:bg-white hover:border-indigo-100">
-                                        <input type="checkbox" className="w-4 h-4 rounded text-indigo-600" checked={!rutaFormData.incluir_fines_semana} onChange={e => setRutaFormData({...rutaFormData, incluir_fines_semana: !e.target.checked})} />
-                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight group-hover:text-indigo-600">Excluir Fines de Semana</span>
+                                    <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer group transition-all hover:bg-white hover:border-blue-100">
+                                        <input type="checkbox" className={ROUTE_CHECKBOX_CLASS} checked={!rutaFormData.incluir_fines_semana} onChange={e => setRutaFormData({...rutaFormData, incluir_fines_semana: !e.target.checked})} />
+                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight group-hover:text-blue-600">Excluir Fines de Semana</span>
                                     </label>
-                                    <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer group transition-all hover:bg-white hover:border-indigo-100">
-                                        <input type="checkbox" className="w-4 h-4 rounded text-indigo-600" checked={rutaFormData.excluir_feriados} onChange={e => setRutaFormData({...rutaFormData, excluir_feriados: e.target.checked})} />
-                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight group-hover:text-indigo-600">Excluir Feriados</span>
+                                    <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer group transition-all hover:bg-white hover:border-blue-100">
+                                        <input type="checkbox" className={ROUTE_CHECKBOX_CLASS} checked={rutaFormData.excluir_feriados} onChange={e => setRutaFormData({...rutaFormData, excluir_feriados: e.target.checked})} />
+                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight group-hover:text-blue-600">Excluir Feriados</span>
                                     </label>
                                 </div>
-                                <div className="flex gap-4"><button type="button" onClick={() => setIsRutaModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-3xl font-black text-[10px] uppercase tracking-widest">Cancelar</button><button disabled={creatingRuta} type="submit" className="flex-[2] py-4 bg-indigo-600 text-white rounded-3xl font-black text-[10px] uppercase tracking-widest shadow-xl">{creatingRuta ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Guardar Ruta'}</button></div>
+                                <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsRutaModalOpen(false)} className={BTN_SECONDARY}>Cancelar</button><button disabled={creatingRuta} type="submit" className={BTN_PRIMARY}>{creatingRuta ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Guardar Ruta'}</button></div>
                             </form>
                         </motion.div>
                     </div>
                 )}
 
                 {isEditModalOpen && editRutaData && (
-                    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsEditModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-white w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden p-8 flex flex-col">
-                            <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight mb-8">Editar Ruta Operativa</h2>
-                            <form onSubmit={handleUpdateRuta} className="space-y-6">
+                    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 overflow-hidden">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsEditModalOpen(false)} className="fixed top-0 left-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9998]" />
+                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative z-[10000] bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+                            <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex items-center justify-between shrink-0">
+                                <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Editar Ruta Operativa</h2>
+                                <button onClick={() => setIsEditModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
+                            </div>
+                            <form onSubmit={handleUpdateRuta} className="space-y-5 p-4 md:p-6 overflow-y-auto custom-scrollbar">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Nombre</label><input required type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" value={editRutaData.nombre} onChange={e => setEditRutaData({...editRutaData, nombre: e.target.value})} /></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Proveedor</label><select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" value={editRutaData.proveedor} onChange={e => setEditRutaData({...editRutaData, proveedor: e.target.value, establecimientos: []})}><option value="">Seleccionar proveedor...</option>{contrato?.proveedores_asociados.map(pa => (<option key={pa.proveedor} value={pa.proveedor}>{pa.proveedor_nombre}</option>))}</select></div>
+                                    <div className="space-y-1"><label className={ROUTE_LABEL_CLASS}>Nombre</label><input required type="text" className={SERVICE_FORM_CONTROL} value={editRutaData.nombre} onChange={e => setEditRutaData({...editRutaData, nombre: e.target.value})} /></div>
+                                    <div className="space-y-1"><label className={ROUTE_LABEL_CLASS}>Proveedor</label><select required className={SELECT_FILTER} value={editRutaData.proveedor} onChange={e => setEditRutaData({...editRutaData, proveedor: e.target.value, establecimientos: []})}><option value="">Seleccionar proveedor...</option>{contrato?.proveedores_asociados.map(pa => (<option key={pa.proveedor} value={pa.proveedor}>{pa.proveedor_nombre}</option>))}</select></div>
                                 </div>
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between ml-1">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Establecimientos ({editRutaData.establecimientos.length} seleccionados)</label>
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Establecimientos ({editRutaData.establecimientos.length} seleccionados)</label>
                                         <div className="flex gap-3">
                                             <button type="button" onClick={() => {
                                                 const pa = contrato?.proveedores_asociados.find(p => p.proveedor === parseInt(editRutaData.proveedor));
                                                 if (pa) setEditRutaData({...editRutaData, establecimientos: pa.establecimientos_detalle.map(e => e.id)});
-                                            }} className="text-[9px] font-black text-indigo-600 uppercase hover:underline">Todos</button>
+                                            }} className="text-[9px] font-black text-blue-600 uppercase hover:underline">Todos</button>
                                             <button type="button" onClick={() => setEditRutaData({...editRutaData, establecimientos: []})} className="text-[9px] font-black text-slate-400 uppercase hover:underline">Limpiar</button>
                                         </div>
                                     </div>
@@ -1236,17 +1262,17 @@ const ServicioDetailPage = () => {
                                         <input 
                                             type="text" 
                                             placeholder="Buscar establecimiento..." 
-                                            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold"
+                                            className={INPUT_FILTER}
                                             value={searchTermEditEst}
                                             onChange={e => setSearchTermEditEst(e.target.value)}
                                         />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2 bg-slate-50 p-4 rounded-3xl border border-slate-200 max-h-48 overflow-y-auto custom-scrollbar">
+                                    <div className="grid grid-cols-2 gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-200 max-h-48 overflow-y-auto custom-scrollbar">
                                         {(contrato?.proveedores_asociados.find(pa => pa.proveedor === parseInt(editRutaData.proveedor))?.establecimientos_detalle || [])
                                           .filter(est => est.nombre.toLowerCase().includes(searchTermEditEst.toLowerCase()))
                                           .map(est => (
-                                            <label key={est.id} className="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-100 cursor-pointer text-[10px] font-bold text-slate-600 transition-all hover:border-indigo-100 hover:bg-indigo-50/20">
-                                                <input type="checkbox" className="w-3.5 h-3.5 rounded text-indigo-600" checked={editRutaData.establecimientos.includes(est.id)} onChange={e => {
+                                            <label key={est.id} className="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-100 cursor-pointer text-[10px] font-bold text-slate-600 transition-all hover:border-blue-100 hover:bg-blue-50/20">
+                                                <input type="checkbox" className={ROUTE_CHECKBOX_CLASS} checked={editRutaData.establecimientos.includes(est.id)} onChange={e => {
                                                     const newEsts = e.target.checked ? [...editRutaData.establecimientos, est.id] : editRutaData.establecimientos.filter(id => id !== est.id);
                                                     setEditRutaData({...editRutaData, establecimientos: newEsts});
                                                 }} /> 
@@ -1256,34 +1282,34 @@ const ServicioDetailPage = () => {
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Itinerario / Trayecto (Detalle para el Acta)</label>
+                                    <label className={ROUTE_LABEL_CLASS}>Itinerario / Trayecto (Detalle para el Acta)</label>
                                     <textarea 
                                         placeholder="Ej: Iquique - Los Verdes - Chipana. Describa los puntos clave de la ruta."
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-[11px] font-bold min-h-[80px] resize-none"
+                                        className={ROUTE_TEXTAREA_CLASS}
                                         value={editRutaData.itinerario}
                                         onChange={e => setEditRutaData({...editRutaData, itinerario: e.target.value})}
                                     />
                                 </div>
                                 <div className="grid grid-cols-3 gap-4">
-                                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Valor Diario</label><input required type="number" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black" value={editRutaData.valor_diario} onChange={e => setEditRutaData({...editRutaData, valor_diario: e.target.value})} /></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Día Inicio</label><input required type="number" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" value={editRutaData.dia_inicio_periodo} onChange={e => setEditRutaData({...editRutaData, dia_inicio_periodo: e.target.value})} /></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Día Fin</label><input required type="number" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" value={editRutaData.dia_fin_periodo} onChange={e => setEditRutaData({...editRutaData, dia_fin_periodo: e.target.value})} /></div>
+                                    <div className="space-y-1"><label className={ROUTE_LABEL_CLASS}>Valor Diario</label><input required type="number" className={SERVICE_FORM_CONTROL} value={editRutaData.valor_diario} onChange={e => setEditRutaData({...editRutaData, valor_diario: e.target.value})} /></div>
+                                    <div className="space-y-1"><label className={ROUTE_LABEL_CLASS}>Día Inicio</label><input required type="number" className={SERVICE_FORM_CONTROL} value={editRutaData.dia_inicio_periodo} onChange={e => setEditRutaData({...editRutaData, dia_inicio_periodo: e.target.value})} /></div>
+                                    <div className="space-y-1"><label className={ROUTE_LABEL_CLASS}>Día Fin</label><input required type="number" className={SERVICE_FORM_CONTROL} value={editRutaData.dia_fin_periodo} onChange={e => setEditRutaData({...editRutaData, dia_fin_periodo: e.target.value})} /></div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer group transition-all hover:bg-white hover:border-indigo-100">
-                                        <input type="checkbox" className="w-4 h-4 rounded text-indigo-600" checked={!editRutaData.incluir_fines_semana} onChange={e => setEditRutaData({...editRutaData, incluir_fines_semana: !e.target.checked})} />
-                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight group-hover:text-indigo-600">Excluir Fines de Semana</span>
+                                    <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer group transition-all hover:bg-white hover:border-blue-100">
+                                        <input type="checkbox" className={ROUTE_CHECKBOX_CLASS} checked={!editRutaData.incluir_fines_semana} onChange={e => setEditRutaData({...editRutaData, incluir_fines_semana: !e.target.checked})} />
+                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight group-hover:text-blue-600">Excluir Fines de Semana</span>
                                     </label>
-                                    <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer group transition-all hover:bg-white hover:border-indigo-100">
-                                        <input type="checkbox" className="w-4 h-4 rounded text-indigo-600" checked={editRutaData.excluir_feriados} onChange={e => setEditRutaData({...editRutaData, excluir_feriados: e.target.checked})} />
-                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight group-hover:text-indigo-600">Excluir Feriados</span>
+                                    <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer group transition-all hover:bg-white hover:border-blue-100">
+                                        <input type="checkbox" className={ROUTE_CHECKBOX_CLASS} checked={editRutaData.excluir_feriados} onChange={e => setEditRutaData({...editRutaData, excluir_feriados: e.target.checked})} />
+                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight group-hover:text-blue-600">Excluir Feriados</span>
                                     </label>
                                 </div>
                                 <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex gap-3 items-start">
                                     <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                                     <p className="text-[9px] font-bold text-amber-700 leading-relaxed uppercase tracking-tight">Atención: Los cambios solo afectarán a los periodos que aún se encuentren ABIERTOS. Los periodos CERRADOS mantendrán sus fechas y montos originales.</p>
                                 </div>
-                                <div className="flex gap-4"><button type="button" onClick={() => setIsEditModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-3xl font-black text-[10px] uppercase tracking-widest">Cancelar</button><button disabled={updatingRuta} type="submit" className="flex-[2] py-4 bg-indigo-600 text-white rounded-3xl font-black text-[10px] uppercase tracking-widest shadow-xl">{updatingRuta ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Actualizar Ruta'}</button></div>
+                                <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsEditModalOpen(false)} className={BTN_SECONDARY}>Cancelar</button><button disabled={updatingRuta} type="submit" className={BTN_PRIMARY}>{updatingRuta ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Actualizar Ruta'}</button></div>
                             </form>
                         </motion.div>
                     </div>
@@ -1294,31 +1320,31 @@ const ServicioDetailPage = () => {
                 {isPeriodoModalOpen && (
                     <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsPeriodoModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-white w-full max-w-sm rounded-[32px] shadow-2xl overflow-hidden p-8">
+                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden p-8">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Generar Periodo</h2>
+                                <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Generar Periodo</h2>
                                 <button onClick={() => setIsPeriodoModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-colors"><X className="w-5 h-5" /></button>
                             </div>
                             
                             <form onSubmit={handleGeneratePeriod} className="space-y-6 text-left">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-1.5">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Mes del Periodo</label>
-                                        <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold" value={periodoData.mes} onChange={e => setPeriodoData({...periodoData, mes: parseInt(e.target.value)})}>
+                                        <label className={ROUTE_LABEL_CLASS}>Mes del Periodo</label>
+                                        <select className={SELECT_FILTER} value={periodoData.mes} onChange={e => setPeriodoData({...periodoData, mes: parseInt(e.target.value)})}>
                                             {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => (
                                                 <option key={m} value={i+1}>{m}</option>
                                             ))}
                                         </select>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Año</label>
-                                        <input type="number" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold" value={periodoData.anio} onChange={e => setPeriodoData({...periodoData, anio: parseInt(e.target.value)})} />
+                                        <label className={ROUTE_LABEL_CLASS}>Año</label>
+                                        <input type="number" className={SERVICE_FORM_CONTROL} value={periodoData.anio} onChange={e => setPeriodoData({...periodoData, anio: parseInt(e.target.value)})} />
                                     </div>
                                 </div>
 
                                 {/* Preview de Rango */}
-                                <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl">
-                                    <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-2xl">
+                                    <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                                         <Calendar className="w-3 h-3" /> Rango de Fechas Estimado
                                     </p>
                                     <div className="flex items-center justify-between">
@@ -1326,7 +1352,7 @@ const ServicioDetailPage = () => {
                                             <p className="text-[10px] font-black text-slate-700">{selectedRoute.dia_inicio_periodo}/{periodoData.mes === 1 ? 12 : periodoData.mes - 1}/{periodoData.mes === 1 ? periodoData.anio - 1 : periodoData.anio}</p>
                                             <p className="text-[8px] font-bold text-slate-400 uppercase">Inicio</p>
                                         </div>
-                                        <ArrowRight className="w-3 h-3 text-indigo-300" />
+                                        <ArrowRight className="w-3 h-3 text-blue-300" />
                                         <div className="text-center">
                                             <p className="text-[10px] font-black text-slate-700">{selectedRoute.dia_fin_periodo}/{periodoData.mes}/{periodoData.anio}</p>
                                             <p className="text-[8px] font-bold text-slate-400 uppercase">Término</p>
@@ -1334,7 +1360,7 @@ const ServicioDetailPage = () => {
                                     </div>
                                 </div>
 
-                                <button disabled={creatingPeriodo} type="submit" className="w-full py-4 bg-indigo-600 text-white rounded-[22px] font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-95">
+                                <button disabled={creatingPeriodo} type="submit" className={`w-full justify-center ${BTN_PRIMARY}`}>
                                     {creatingPeriodo ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'GENERAR PERIODO'}
                                 </button>
                             </form>
@@ -1345,23 +1371,23 @@ const ServicioDetailPage = () => {
 
             <AnimatePresence>
                 {isActaModalOpen && (
-                    <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closeActaModal} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-white w-full max-w-5xl rounded-[40px] shadow-2xl overflow-hidden p-8 flex flex-col max-h-[95vh]">
-                            <div className="flex items-center justify-between mb-8">
+                    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 overflow-hidden">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closeActaModal} className="fixed top-0 left-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9998]" />
+                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative z-[10000] bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200">
+                            <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex items-center justify-between shrink-0">
                                 <div>
-                                    <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Generar Acta de Conformidad Operativa</h2>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Configuración masiva de reporte oficial</p>
+                                    <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Generar Acta de Conformidad Operativa</h2>
+                                    <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter mt-1.5">Configuración masiva de reporte oficial</p>
                                 </div>
-                                <button onClick={closeActaModal} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-all"><X className="w-5 h-5" /></button>
+                                <button onClick={closeActaModal} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto space-y-10 pr-2 custom-scrollbar">
+                            <div className="flex-1 overflow-y-auto space-y-8 p-4 md:p-6 custom-scrollbar">
                                 {/* Presets / Grupos de Rutas */}
-                                <div className="bg-slate-50/50 border border-slate-100 p-5 rounded-[32px] space-y-4">
+                                <div className="bg-slate-50/50 border border-slate-100 p-5 rounded-2xl space-y-4">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl"><Target className="w-4 h-4" /></div>
+                                            <div className="p-2 bg-blue-100 text-blue-600 rounded-xl"><Target className="w-4 h-4" /></div>
                                             <div>
                                                 <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Grupos de Rutas Guardados</h4>
                                                 <p className="text-[9px] text-slate-400 font-bold uppercase">Carga rápida de selecciones frecuentes</p>
@@ -1370,7 +1396,7 @@ const ServicioDetailPage = () => {
                                         {actaSelection.rutas.length > 0 && !showSavePresetInput && (
                                             <button 
                                                 onClick={() => setShowSavePresetInput(true)}
-                                                className="px-4 py-2 bg-white text-indigo-600 border border-indigo-100 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                                                className="px-4 py-2 bg-white text-blue-600 border border-blue-100 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all shadow-sm"
                                             >
                                                 Guardar Selección Actual
                                             </button>
@@ -1378,7 +1404,7 @@ const ServicioDetailPage = () => {
                                     </div>
 
                                     {showSavePresetInput && (
-                                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 p-3 bg-white rounded-2xl border border-indigo-100 shadow-sm">
+                                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 p-3 bg-white rounded-2xl border border-blue-100 shadow-sm">
                                             <input 
                                                 autoFocus
                                                 placeholder="Nombre del grupo (ej: Zona Norte)"
@@ -1387,7 +1413,7 @@ const ServicioDetailPage = () => {
                                                 onChange={e => setNewPresetName(e.target.value)}
                                                 onKeyDown={e => e.key === 'Enter' && handleSavePreset()}
                                             />
-                                            <button onClick={handleSavePreset} disabled={isSavingPreset} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all">
+                                            <button onClick={handleSavePreset} disabled={isSavingPreset} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all">
                                                 {isSavingPreset ? 'Guardando...' : 'Confirmar'}
                                             </button>
                                             <button onClick={() => setShowSavePresetInput(false)} className="px-4 py-2 bg-slate-100 text-slate-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all">Cancelar</button>
@@ -1399,14 +1425,14 @@ const ServicioDetailPage = () => {
                                             <div key={grupo.id} className="group relative">
                                                 <button 
                                                     onClick={() => handleApplyPreset(grupo)}
-                                                    className="px-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-tight hover:border-indigo-400 hover:text-indigo-600 transition-all shadow-sm flex items-center gap-2"
+                                                    className="px-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-tight hover:border-blue-400 hover:text-blue-600 transition-all shadow-sm flex items-center gap-2"
                                                 >
                                                     {grupo.nombre}
                                                     <span className="text-[8px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-md font-bold">{grupo.rutas.length} Rutas</span>
                                                 </button>
                                                 <button 
                                                     onClick={(e) => handleDeletePreset(e, grupo.id)}
-                                                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
                                                 >
                                                     <X className="w-3 h-3" />
                                                 </button>
@@ -1425,7 +1451,7 @@ const ServicioDetailPage = () => {
                                         <div className="flex gap-2">
                                             <button 
                                                 onClick={() => setActaSelection({...actaSelection, rutas: rutas.map(r => r.id)})}
-                                                className="text-[9px] font-black text-indigo-600 uppercase hover:underline"
+                                                className="text-[9px] font-black text-blue-600 uppercase hover:underline"
                                             >
                                                 Seleccionar Todas
                                             </button>
@@ -1444,12 +1470,12 @@ const ServicioDetailPage = () => {
                                             return (
                                                 <label 
                                                     key={r.id} 
-                                                    className={`flex items-center gap-2.5 p-1.5 rounded-lg cursor-pointer transition-all group ${isSelected ? 'bg-indigo-50/50' : 'hover:bg-slate-50'}`}
+                                                    className={`flex items-center gap-2.5 p-1.5 rounded-lg cursor-pointer transition-all group ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}
                                                 >
                                                     <div className="relative flex items-center justify-center">
                                                         <input 
                                                             type="checkbox" 
-                                                            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer transition-all"
+                                                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer transition-all"
                                                             checked={isSelected}
                                                             onChange={() => {
                                                                 setActaSelection({
@@ -1460,7 +1486,7 @@ const ServicioDetailPage = () => {
                                                         />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <div className={`text-[10px] uppercase truncate transition-all ${isSelected ? 'font-black text-indigo-700' : 'font-bold text-slate-600 group-hover:text-slate-900'}`}>
+                                                        <div className={`text-[10px] uppercase truncate transition-all ${isSelected ? 'font-black text-blue-700' : 'font-bold text-slate-600 group-hover:text-slate-900'}`}>
                                                             {r.nombre}
                                                         </div>
                                                     </div>
@@ -1536,7 +1562,7 @@ const ServicioDetailPage = () => {
                                                         className={`px-3 py-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 ${
                                                             isSelected 
                                                                 ? 'bg-emerald-600 border-emerald-600 text-white shadow-md' 
-                                                                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                                                                : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'
                                                         }`}
                                                     >
                                                         <div className="flex items-center gap-2 overflow-hidden text-left">
@@ -1551,7 +1577,7 @@ const ServicioDetailPage = () => {
                                             });
                                         })()}
                                         {actaSelection.rutas.length === 0 && (
-                                            <div className="w-full p-8 border-2 border-dashed border-slate-100 rounded-[32px] text-center">
+                                            <div className="w-full p-8 border-2 border-dashed border-slate-100 rounded-2xl text-center">
                                                 <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Primero selecciona las rutas operativas</p>
                                             </div>
                                         )}
@@ -1604,23 +1630,23 @@ const ServicioDetailPage = () => {
                                 </div>
                             </div>
 
-                            <div className="mt-8 pt-8 border-t border-slate-100 flex gap-4">
+                            <div className="p-4 md:p-6 border-t border-slate-100 flex gap-4 shrink-0 bg-white">
                                 <div className="flex-1">
                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Resumen de Selección</p>
                                     <div className="flex gap-4">
-                                        <div className="text-[10px] font-bold text-slate-600 uppercase"><span className="text-indigo-600">{actaSelection.rutas.length}</span> Rutas</div>
+                                        <div className="text-[10px] font-bold text-slate-600 uppercase"><span className="text-blue-600">{actaSelection.rutas.length}</span> Rutas</div>
                                         <div className="text-[10px] font-bold text-slate-600 uppercase"><span className="text-emerald-600">{actaSelection.periodos.length}</span> Meses</div>
                                         <div className="text-[10px] font-bold text-slate-600 uppercase"><span className="text-amber-600">{actaSelection.establecimientos.length}</span> Firmas</div>
                                     </div>
                                 </div>
                                 <div className="flex gap-3">
-                                    <button onClick={closeActaModal} className="px-8 py-4 bg-slate-100 text-slate-500 rounded-3xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">Cancelar</button>
+                                    <button onClick={closeActaModal} className={BTN_SECONDARY}>Cancelar</button>
                                     <button 
                                         disabled={generatingActa || actaSelection.rutas.length === 0 || actaSelection.periodos.length === 0}
                                         onClick={handleGenerateActa}
-                                        className="px-12 py-4 bg-indigo-600 text-white rounded-3xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-100 hover:shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transition-all active:scale-95"
+                                        className={BTN_PRIMARY}
                                     >
-                                        {generatingActa ? <Loader2 className="w-5 h-5 animate-spin" /> : <><FileText className="w-5 h-5" /> Generar Acta de Conformidad</>}
+                                        {generatingActa ? <Loader2 className="w-4 h-4 animate-spin" /> : <><FileText className="w-4 h-4" /> Generar Acta de Conformidad</>}
                                     </button>
                                 </div>
                             </div>
@@ -1630,28 +1656,23 @@ const ServicioDetailPage = () => {
 
                 {/* Bulk Period Modal */}
                 {isBulkModalOpen && (
-                    <div className="fixed inset-0 z-[1300] flex items-center justify-center p-4">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsBulkModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-white w-full max-w-md rounded-[32px] shadow-2xl overflow-hidden p-8">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center">
-                                        <Calendar className="w-5 h-5 text-emerald-600" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Apertura Masiva</h3>
-                                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{selectedRutasTable.length} Rutas Seleccionadas</p>
-                                    </div>
+                    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 overflow-hidden">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsBulkModalOpen(false)} className="fixed top-0 left-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9998]" />
+                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative z-[10000] bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
+                            <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex items-center justify-between shrink-0">
+                                <div>
+                                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Apertura Masiva</h3>
+                                    <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter mt-1.5">{selectedRutasTable.length} Rutas Seleccionadas</p>
                                 </div>
-                                <button onClick={() => setIsBulkModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-all"><X className="w-5 h-5" /></button>
+                                <button onClick={() => setIsBulkModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
                             </div>
 
-                            <form onSubmit={handleBulkCreatePeriod} className="space-y-6">
+                            <form onSubmit={handleBulkCreatePeriod} className="space-y-6 p-4 md:p-6">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Mes del Periodo</label>
+                                        <label className={ROUTE_LABEL_CLASS}>Mes del Periodo</label>
                                         <select 
-                                            className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-100 transition-all"
+                                            className={SELECT_FILTER}
                                             value={bulkPeriodoData.mes}
                                             onChange={e => setBulkPeriodoData({...bulkPeriodoData, mes: e.target.value})}
                                         >
@@ -1661,10 +1682,10 @@ const ServicioDetailPage = () => {
                                         </select>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Año</label>
+                                        <label className={ROUTE_LABEL_CLASS}>Año</label>
                                         <input 
                                             type="number" 
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-100 transition-all"
+                                            className={SERVICE_FORM_CONTROL}
                                             value={bulkPeriodoData.anio}
                                             onChange={e => setBulkPeriodoData({...bulkPeriodoData, anio: e.target.value})}
                                         />
@@ -1677,12 +1698,12 @@ const ServicioDetailPage = () => {
                                     </p>
                                 </div>
 
-                                <div className="flex gap-3">
-                                    <button type="button" onClick={() => setIsBulkModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-200 transition-all">Cancelar</button>
+                                <div className="flex justify-end gap-2">
+                                    <button type="button" onClick={() => setIsBulkModalOpen(false)} className={BTN_SECONDARY}>Cancelar</button>
                                     <button 
                                         type="submit" 
                                         disabled={creatingBulk}
-                                        className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-xl shadow-emerald-100 hover:shadow-emerald-200 transition-all flex items-center justify-center gap-2"
+                                        className={BTN_PRIMARY}
                                     >
                                         {creatingBulk ? <Loader2 className="w-4 h-4 animate-spin" /> : "Generar Periodos Masivos"}
                                     </button>
@@ -1828,52 +1849,47 @@ const ConsolidadoModal = ({ isOpen, onClose, rutas }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 overflow-hidden">
             <motion.div 
                 initial={{ opacity: 0 }} 
                 animate={{ opacity: 1 }} 
                 exit={{ opacity: 0 }} 
                 onClick={onClose}
-                className="absolute inset-0 bg-slate-900/60 backdrop-blur-md cursor-pointer" 
+                className="fixed top-0 left-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9998] cursor-pointer" 
             />
 
             <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 30 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 30 }}
-                className="relative bg-white rounded-[40px] shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col z-10"
+                className="relative z-[10000] bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col border border-slate-200"
             >
                 {/* Header */}
-                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-emerald-100 text-emerald-600 rounded-2xl shadow-sm">
-                            <Calculator className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight">Consolidado de Pagos</h2>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Resumen financiero por proveedor</p>
-                        </div>
+                <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex justify-between items-center shrink-0">
+                    <div>
+                        <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Consolidado de Pagos</h2>
+                        <p className="text-[10px] font-medium text-slate-500 uppercase tracking-tighter mt-1.5">Resumen financiero por proveedor</p>
                     </div>
                     <button 
                         type="button"
                         onClick={(e) => { e.stopPropagation(); onClose(); }} 
-                        className="p-2 hover:bg-gray-100 rounded-xl transition-colors border border-transparent hover:border-gray-200"
+                        className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors"
                     >
-                        <X className="w-5 h-5 text-gray-400" />
+                        <X className="w-5 h-5" />
                     </button>
                 </div>
 
-                <div className="p-8 overflow-y-auto space-y-8 custom-scrollbar">
+                <div className="p-4 md:p-6 overflow-y-auto space-y-6 custom-scrollbar">
                     {/* Filtro de Periodo */}
-                    <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-3">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2">
-                            <Calendar className="w-3 h-3" /> Seleccionar periodos
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-3">
+                        <label className={ROUTE_LABEL_CLASS}>
+                            Seleccionar periodos
                         </label>
                         <div className="relative w-full md:w-80">
                             <select
                                 value={selectedPeriodName}
                                 onChange={(e) => setSelectedPeriodName(e.target.value)}
-                                className="w-full h-[52px] px-5 bg-white border border-slate-200 rounded-2xl text-[13px] font-black text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all cursor-pointer shadow-sm appearance-none pr-12 leading-none"
+                                className={SELECT_FILTER}
                             >
                                 <option value="">-- ELIGE UN PERIODO --</option>
                                 {availablePeriodNames.map(name => (
@@ -1888,7 +1904,7 @@ const ConsolidadoModal = ({ isOpen, onClose, rutas }) => {
 
                     {selectedPeriodName ? (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <div className="overflow-hidden border border-slate-100 rounded-[24px] shadow-sm bg-white">
+                            <div className="overflow-hidden border border-slate-100 rounded-xl shadow-sm bg-white">
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
                                         <tr>
@@ -1900,10 +1916,10 @@ const ConsolidadoModal = ({ isOpen, onClose, rutas }) => {
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
                                         {consolidatedData.map((d, idx) => (
-                                            <tr key={idx} className="hover:bg-emerald-50/20 transition-colors group">
-                                                <td className="px-6 py-4 font-bold text-slate-700 text-sm uppercase tracking-tight">{d.nombre}</td>
-                                                <td className="px-6 py-4 text-center text-slate-500 font-bold text-xs">{d.rutasCount}</td>
-                                                <td className="px-6 py-4 text-center text-slate-600 font-black text-xs">{d.diasTotal}</td>
+                                            <tr key={idx} className="hover:bg-slate-50/70 transition-colors group">
+                                                <td className="px-6 py-4 font-medium text-slate-700 text-[11px] uppercase tracking-tighter">{d.nombre}</td>
+                                                <td className="px-6 py-4 text-center text-slate-500 font-medium text-[11px]">{d.rutasCount}</td>
+                                                <td className="px-6 py-4 text-center text-slate-600 font-medium text-[11px]">{d.diasTotal}</td>
                                                 <td className="px-6 py-4 text-right">
                                                     <span className="text-emerald-700 font-black text-sm font-mono">
                                                         ${new Intl.NumberFormat('es-CL').format(d.montoTotal)}
@@ -1934,15 +1950,15 @@ const ConsolidadoModal = ({ isOpen, onClose, rutas }) => {
                             <div className="flex justify-end">
                                 <button
                                     onClick={handleExportExcel}
-                                    className="flex items-center gap-3 px-8 py-4 bg-emerald-600 text-white rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 font-black text-[10px] uppercase tracking-widest active:scale-95 group"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/20 flex items-center gap-2 shrink-0 active:scale-95"
                                 >
-                                    <FileSpreadsheet className="w-5 h-5 group-hover:rotate-6 transition-transform" />
+                                    <FileSpreadsheet className="w-4 h-4" />
                                     Descargar Resumen Detallado
                                 </button>
                             </div>
                         </div>
                     ) : (
-                        <div className="py-24 flex flex-col items-center justify-center text-slate-300 gap-6 border-2 border-dashed border-slate-100 rounded-[32px]">
+                        <div className="py-24 flex flex-col items-center justify-center text-slate-300 gap-6 border-2 border-dashed border-slate-100 rounded-2xl">
                             <div className="p-6 bg-slate-50 rounded-full">
                                 <Calculator className="w-16 h-16 opacity-20" />
                             </div>
@@ -2063,28 +2079,23 @@ const BulkAsistenciaModal = ({ isOpen, onClose, rutas, onUpdate }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md cursor-pointer" />
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 overflow-hidden">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed top-0 left-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9998] cursor-pointer" />
             
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 30 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 30 }} className="relative bg-white rounded-[24px] shadow-2xl w-[98vw] max-w-[1800px] max-h-[92vh] overflow-hidden flex flex-col z-10">
-                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100">
-                            <LayoutGrid className="w-4 h-4" />
-                        </div>
-                        <div>
-                            <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Planilla de Asistencia</h2>
-                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Haz clic en un día para marcar toda la columna</p>
-                        </div>
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 30 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 30 }} className="relative z-[10000] bg-white rounded-2xl shadow-2xl w-[98vw] max-w-[1800px] max-h-[92vh] overflow-hidden flex flex-col border border-slate-200">
+                <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex justify-between items-center shrink-0">
+                    <div>
+                        <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Planilla de Asistencia</h2>
+                        <p className="text-[10px] font-medium text-slate-500 uppercase tracking-tighter mt-1.5">Haz clic en un día para marcar toda la columna</p>
                     </div>
                     
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
-                             <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Periodo:</label>
+                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Periodo:</label>
                              <select
                                 value={selectedPeriodName}
                                 onChange={(e) => setSelectedPeriodName(e.target.value)}
-                                className="h-8 px-3 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all cursor-pointer shadow-sm"
+                                className={SELECT_FILTER}
                             >
                                 <option value="">-- ELIGE UN PERIODO --</option>
                                 {availablePeriodNames.map(name => (
@@ -2092,7 +2103,7 @@ const BulkAsistenciaModal = ({ isOpen, onClose, rutas, onUpdate }) => {
                                 ))}
                             </select>
                         </div>
-                        <button onClick={onClose} className="p-1.5 hover:bg-white rounded-lg text-slate-400 transition-colors border border-transparent hover:border-slate-100"><X className="w-4 h-4" /></button>
+                        <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
                     </div>
                 </div>
 
@@ -2120,15 +2131,15 @@ const BulkAsistenciaModal = ({ isOpen, onClose, rutas, onUpdate }) => {
                                             return (
                                                 <th 
                                                     key={fecha.toString()} 
-                                                    className={`p-1 border-b border-r border-slate-100 min-w-[28px] bg-white cursor-pointer hover:bg-indigo-50 transition-colors group/th ${isSem ? 'bg-slate-50/80' : ''}`}
+                                                    className={`p-1 border-b border-r border-slate-100 min-w-[28px] bg-white cursor-pointer hover:bg-blue-50 transition-colors group/th ${isSem ? 'bg-slate-50/80' : ''}`}
                                                     onClick={() => can('contratos.change_ausenciaruta') && handleToggleColumn(fecha)}
                                                 >
                                                     <div className="flex flex-col items-center relative">
-                                                        {isTogglingCol && <div className="absolute inset-0 bg-white/80 z-10 flex items-center justify-center"><Loader2 className="w-3 h-3 animate-spin text-indigo-500" /></div>}
-                                                        <span className={`text-[6px] font-black uppercase tracking-tighter ${isSem ? 'text-slate-300' : 'text-indigo-400 group-hover/th:text-indigo-600'}`}>
+                                                        {isTogglingCol && <div className="absolute inset-0 bg-white/80 z-10 flex items-center justify-center"><Loader2 className="w-3 h-3 animate-spin text-blue-500" /></div>}
+                                                        <span className={`text-[6px] font-black uppercase tracking-tighter ${isSem ? 'text-slate-300' : 'text-blue-400 group-hover/th:text-blue-600'}`}>
                                                             {format(fecha, 'EEE', { locale: es }).substring(0, 2)}
                                                         </span>
-                                                        <span className={`text-[9px] font-black ${isFer ? 'text-amber-500' : 'text-slate-800 group-hover/th:text-indigo-600'}`}>
+                                                        <span className={`text-[9px] font-black ${isFer ? 'text-amber-500' : 'text-slate-800 group-hover/th:text-blue-600'}`}>
                                                             {format(fecha, 'd')}
                                                         </span>
                                                     </div>
@@ -2144,7 +2155,7 @@ const BulkAsistenciaModal = ({ isOpen, onClose, rutas, onUpdate }) => {
                                             <tr key={ruta.id} className="group hover:bg-slate-50 transition-colors">
                                                 <td className="sticky left-0 z-20 bg-white group-hover:bg-slate-50 px-3 py-1.5 border-b border-r border-slate-100 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.1)]">
                                                     <p className="text-[11px] font-black text-slate-700 uppercase leading-none truncate max-w-[160px]">{ruta.nombre}</p>
-                                                    <p className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest truncate mt-1">{ruta.proveedor_nombre}</p>
+                                                    <p className="text-[9px] font-bold text-blue-600 uppercase tracking-widest truncate mt-1">{ruta.proveedor_nombre}</p>
                                                     {ruta.itinerario && (
                                                         <p className="text-[9px] font-black text-amber-600 mt-1 truncate max-w-[160px]" title={ruta.itinerario}>
                                                             {ruta.itinerario}
@@ -2180,7 +2191,7 @@ const BulkAsistenciaModal = ({ isOpen, onClose, rutas, onUpdate }) => {
                                                                     onClick={() => handleToggleCell(p?.id, fStr)}
                                                                     disabled={isToggling || !p || !can('contratos.change_ausenciaruta')}
                                                                     className={`w-full h-8 transition-all duration-200 flex items-center justify-center relative border
-                                                                        ${isAus ? 'bg-red-50 border-red-100 text-red-600' : 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-100'}
+                                                                        ${isAus ? 'bg-rose-50 border-rose-100 text-rose-600' : 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-100'}
                                                                     `}
                                                                     title={isAus ? 'Marcar como TRABAJADO' : 'Marcar como AUSENTE'}
                                                                 >
@@ -2212,7 +2223,7 @@ const BulkAsistenciaModal = ({ isOpen, onClose, rutas, onUpdate }) => {
                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Realizado</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded bg-red-50 border border-red-100" />
+                            <div className="w-3 h-3 rounded bg-rose-50 border border-rose-100" />
                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Inasistencia</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -2224,7 +2235,7 @@ const BulkAsistenciaModal = ({ isOpen, onClose, rutas, onUpdate }) => {
                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Bloqueo Feriado</span>
                         </div>
                     </div>
-                    <div className="text-[8px] font-black text-indigo-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                    <div className="text-[8px] font-black text-blue-500 uppercase tracking-[0.2em] flex items-center gap-2">
                         <Info className="w-3 h-3" />
                         Haz clic en una celda para alternar
                     </div>
@@ -2280,38 +2291,38 @@ const BulkRouteSettingsModal = ({ isOpen, onClose, rutas, onUpdate }) => {
     };
 
     return (
-        <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 overflow-hidden">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed top-0 left-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9998]" />
             <motion.div 
                 initial={{ scale: 0.95, opacity: 0 }} 
                 animate={{ scale: 1, opacity: 1 }} 
                 exit={{ scale: 0.95, opacity: 0 }} 
-                className="relative bg-white w-full max-w-2xl h-[80vh] rounded-[32px] shadow-2xl overflow-hidden p-8 flex flex-col"
+                className="relative z-[10000] bg-white w-full max-w-2xl h-[80vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200"
             >
-                <div className="flex justify-between items-center mb-8 shrink-0">
+                <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex justify-between items-center shrink-0">
                     <div>
-                        <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Configuración Masiva de Rutas</h2>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Afecta a múltiples rutas operativas de forma simultánea</p>
+                        <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Configuración Masiva de Rutas</h2>
+                        <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter mt-1.5">Afecta a múltiples rutas operativas de forma simultánea</p>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-colors"><X className="w-5 h-5" /></button>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 flex-1 min-h-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 flex-1 min-h-0 p-4 md:p-6">
                     {/* Left: Route Selection */}
                     <div className="flex flex-col space-y-4 min-h-0">
                         <div className="flex items-center justify-between px-1 shrink-0">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">1. Rutas a modificar ({selectedIds.length})</label>
                             <div className="flex gap-2">
-                                <button onClick={() => setSelectedIds(rutas.map(r => r.id))} className="text-[9px] font-black text-indigo-600 uppercase hover:underline transition-all">Todas</button>
+                                <button onClick={() => setSelectedIds(rutas.map(r => r.id))} className="text-[9px] font-black text-blue-600 uppercase hover:underline transition-all">Todas</button>
                                 <button onClick={() => setSelectedIds([])} className="text-[9px] font-black text-slate-400 uppercase hover:underline transition-all">Ninguna</button>
                             </div>
                         </div>
-                        <div className="flex-1 bg-slate-50 p-4 rounded-[24px] border border-slate-100 space-y-2 overflow-y-auto custom-scrollbar shadow-inner">
+                        <div className="flex-1 bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2 overflow-y-auto custom-scrollbar shadow-inner">
                             {rutas.map(r => (
-                                <label key={r.id} className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-slate-100 cursor-pointer transition-all hover:bg-indigo-50/50 hover:border-indigo-200 shadow-sm group">
+                                <label key={r.id} className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-slate-100 cursor-pointer transition-all hover:bg-blue-50/50 hover:border-blue-200 shadow-sm group">
                                     <input 
                                         type="checkbox" 
-                                        className="w-4 h-4 rounded text-indigo-600 border-slate-300 transition-all group-hover:scale-110" 
+                                        className="w-4 h-4 rounded text-blue-600 border-slate-300 transition-all group-hover:scale-110" 
                                         checked={selectedIds.includes(r.id)} 
                                         onChange={e => {
                                             const newIds = e.target.checked ? [...selectedIds, r.id] : selectedIds.filter(id => id !== r.id);
@@ -2330,7 +2341,7 @@ const BulkRouteSettingsModal = ({ isOpen, onClose, rutas, onUpdate }) => {
                         
                         <div className="space-y-4">
                             {/* Excluir Fines de Semana */}
-                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-[22px] border border-slate-100 shadow-sm">
+                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 shadow-sm">
                                 <div className="flex flex-col">
                                     <span className="text-[10px] font-black text-slate-700 uppercase tracking-tight">Excluir Fines de Semana</span>
                                     <span className="text-[8px] font-bold text-slate-400 uppercase">Sábados y Domingos</span>
@@ -2342,7 +2353,7 @@ const BulkRouteSettingsModal = ({ isOpen, onClose, rutas, onUpdate }) => {
                                     >SÍ</button>
                                     <button 
                                         onClick={() => setFields({...fields, incluir_fines_semana: false})}
-                                        className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${fields.incluir_fines_semana === false ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
+                                        className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${fields.incluir_fines_semana === false ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
                                     >NO</button>
                                     <button 
                                         onClick={() => setFields({...fields, incluir_fines_semana: null})}
@@ -2352,7 +2363,7 @@ const BulkRouteSettingsModal = ({ isOpen, onClose, rutas, onUpdate }) => {
                             </div>
 
                             {/* Excluir Feriados */}
-                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-[22px] border border-slate-100 shadow-sm">
+                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 shadow-sm">
                                 <div className="flex flex-col">
                                     <span className="text-[10px] font-black text-slate-700 uppercase tracking-tight">Excluir Feriados</span>
                                     <span className="text-[8px] font-bold text-slate-400 uppercase">Días Nacionales</span>
@@ -2360,7 +2371,7 @@ const BulkRouteSettingsModal = ({ isOpen, onClose, rutas, onUpdate }) => {
                                 <div className="flex gap-1 bg-white p-1.5 rounded-xl border border-slate-200 shadow-inner">
                                     <button 
                                         onClick={() => setFields({...fields, excluir_feriados: true})}
-                                        className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${fields.excluir_feriados === true ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
+                                        className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${fields.excluir_feriados === true ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
                                     >SÍ</button>
                                     <button 
                                         onClick={() => setFields({...fields, excluir_feriados: false})}
@@ -2375,29 +2386,29 @@ const BulkRouteSettingsModal = ({ isOpen, onClose, rutas, onUpdate }) => {
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1">
-                                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Día Inicio</label>
-                                    <input type="number" placeholder="No cambiar" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold" value={fields.dia_inicio_periodo} onChange={e => setFields({...fields, dia_inicio_periodo: e.target.value})} />
+                                    <label className={ROUTE_LABEL_CLASS}>Día Inicio</label>
+                                    <input type="number" placeholder="No cambiar" className={SERVICE_FORM_CONTROL} value={fields.dia_inicio_periodo} onChange={e => setFields({...fields, dia_inicio_periodo: e.target.value})} />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Día Fin</label>
-                                    <input type="number" placeholder="No cambiar" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold" value={fields.dia_fin_periodo} onChange={e => setFields({...fields, dia_fin_periodo: e.target.value})} />
+                                    <label className={ROUTE_LABEL_CLASS}>Día Fin</label>
+                                    <input type="number" placeholder="No cambiar" className={SERVICE_FORM_CONTROL} value={fields.dia_fin_periodo} onChange={e => setFields({...fields, dia_fin_periodo: e.target.value})} />
                                 </div>
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Valor Diario ($)</label>
-                                <input type="number" placeholder="No cambiar el valor..." className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold" value={fields.valor_diario} onChange={e => setFields({...fields, valor_diario: e.target.value})} />
+                                <label className={ROUTE_LABEL_CLASS}>Valor Diario ($)</label>
+                                <input type="number" placeholder="No cambiar el valor..." className={SERVICE_FORM_CONTROL} value={fields.valor_diario} onChange={e => setFields({...fields, valor_diario: e.target.value})} />
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="mt-8 flex gap-4">
-                    <button onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-[24px] font-black text-[10px] uppercase tracking-widest shadow-sm">Cancelar</button>
+                <div className="p-4 md:p-6 border-t border-slate-100 flex justify-end gap-2 shrink-0 bg-white">
+                    <button onClick={onClose} className={BTN_SECONDARY}>Cancelar</button>
                     <button 
                         onClick={handleApply}
                         disabled={updating || !can('contratos.change_rutatransporte')}
-                        className="flex-[2] py-4 bg-indigo-600 text-white rounded-[24px] font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-100 flex items-center justify-center gap-2"
+                        className={BTN_PRIMARY}
                     >
                         {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                         Aplicar a {selectedIds.length} Rutas

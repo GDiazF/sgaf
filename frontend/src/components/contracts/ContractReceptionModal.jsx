@@ -1,11 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import BaseModal from '../common/BaseModal';
-import { ShoppingBag, Calendar, FileText, DollarSign, List, Building2, Info, Hash, Users, CreditCard, PenLine } from 'lucide-react';
+import { Info } from 'lucide-react';
 import DateInput from '../common/DateInput';
 import MultiSearchableSelect from '../common/MultiSearchableSelect';
 import FormInput from '../common/FormInput';
 import FormSelect from '../common/FormSelect';
 import MonthInput from '../common/MonthInput';
+
+const RC_INPUT_CLASS =
+    'no-global !w-full !h-10 !min-h-10 !text-[10px] !font-bold !bg-white !border !border-slate-200 !px-3 !py-0 !rounded-xl !outline-none focus:!border-blue-500 uppercase !transition-all !shadow-sm placeholder:!text-slate-300';
+
+const RC_SELECT_CLASS =
+    "no-global !w-full !h-10 !min-h-10 !text-[10px] !font-black uppercase tracking-widest !px-3 !py-0 !rounded-xl !border !border-slate-200 !outline-none cursor-pointer appearance-none !bg-white !text-slate-700 focus:!border-blue-500 !shadow-sm bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M7%209l3%203%203-3%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1rem_1rem] bg-[right_0.5rem_center] bg-no-repeat";
+
+const RC_LABEL_CLASS =
+    '!block !text-[10px] !font-black !text-slate-500 !uppercase !tracking-widest !mb-1.5 !ml-1';
+
+const BULK_BUTTON_CLASS =
+    'h-9 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-100 border border-transparent transition-colors';
+
+const SectionHeader = ({ number, title }) => (
+    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2">
+        {number}. {title}
+    </h4>
+);
 
 const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, editingRC = null }) => {
     const { establishments, deliveryTypes, establishmentTypes } = lookups;
@@ -160,61 +178,58 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
             onSave={handleFormSave}
             title={editingRC ? "Editar Recepción de Contrato" : "Registrar Recepción de Contrato"}
             subtitle={`Proceso: ${contract?.codigo_mercado_publico}`}
-            icon={ShoppingBag}
             maxWidth="max-w-3xl"
             saveLabel={editingRC ? "Actualizar Recepción" : "Guardar Recepción"}
         >
             <div className="space-y-10 px-1 py-2">
                 {/* Section 1: Identificación del Documento */}
                 <div className="space-y-5">
-                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">
-                        1. Detalles de Facturación
-                    </h4>
+                    <SectionHeader number="1" title="Detalles de Facturación" />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                         <FormInput
                             label="Folio RC"
-                            icon={<FileText />}
                             name="folio"
                             placeholder="Opcional (Manual)..."
                             value={formData.folio}
                             onChange={handleChange}
-                            inputClassName="font-mono"
+                            labelClassName={RC_LABEL_CLASS}
+                            inputClassName={`${RC_INPUT_CLASS} font-mono`}
                         />
                         <FormInput
                             label="Nº CDP"
-                            icon={<Hash />}
                             name="cdp"
                             required
                             placeholder="Certificado..."
                             value={formData.cdp}
                             onChange={handleChange}
+                            labelClassName={RC_LABEL_CLASS}
+                            inputClassName={RC_INPUT_CLASS}
                         />
                         <FormInput
                             label="Nº Factura"
-                            icon={<FileText />}
                             name="nro_factura"
                             placeholder="Folio..."
                             value={formData.nro_factura}
                             onChange={handleChange}
+                            labelClassName={RC_LABEL_CLASS}
+                            inputClassName={RC_INPUT_CLASS}
                         />
                         <FormInput
                             label="Nº Orden de Compra"
-                            icon={<Hash />}
                             name="nro_oc"
                             placeholder={contract?.tipo_oc === 'MULTIPLE' ? "Individual para esta RC..." : "Autocompletado..."}
                             value={formData.nro_oc}
                             onChange={handleChange}
                             readOnly={contract?.tipo_oc === 'UNICA' && !!contract?.nro_oc}
-                            inputClassName={contract?.tipo_oc === 'UNICA' && contract?.nro_oc ? "bg-slate-100/50" : ""}
+                            labelClassName={RC_LABEL_CLASS}
+                            inputClassName={`${RC_INPUT_CLASS} ${contract?.tipo_oc === 'UNICA' && contract?.nro_oc ? "!bg-slate-100/50" : ""}`}
                         />
                     </div>
                 </div>
 
                 {/* Section 2: Actores Involucrados */}
                 <div className="space-y-5">
-                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">
-                        2. Proveedor y Destino
-                    </h4>
+                    <SectionHeader number="2" title="Proveedor y Destino" />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <FormSelect
                             label="Proveedor (Vinculado)"
@@ -224,20 +239,26 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                             required
                             placeholder="Seleccione el proveedor..."
                             options={(contract?.proveedores_asociados || []).map(p => ({ value: p.proveedor, label: p.proveedor_nombre }))}
+                            labelClassName={RC_LABEL_CLASS}
+                            inputClassName={RC_SELECT_CLASS}
                         />
                         <div className="space-y-4">
-                            <MultiSearchableSelect
-                                label="Establecimientos de Destino"
-                                options={filteredEstablishments.map(e => ({ value: e.id, label: e.nombre }))}
-                                value={formData.establecimientos || []}
-                                onChange={(val) => handleSelectChange('establecimientos', val)}
-                                placeholder="Seleccione uno o muchos..."
-                            />
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    Establecimientos de Destino
+                                </label>
+                                <MultiSearchableSelect
+                                    options={filteredEstablishments.map(e => ({ value: e.id, label: e.nombre }))}
+                                    value={formData.establecimientos || []}
+                                    onChange={(val) => handleSelectChange('establecimientos', val)}
+                                    placeholder="Seleccione uno o muchos..."
+                                />
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 <button
                                     type="button"
                                     onClick={() => handleBulkSelect('ALL')}
-                                    className="px-3 py-1.5 rounded text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                                    className={BULK_BUTTON_CLASS}
                                 >
                                     Todos
                                 </button>
@@ -252,7 +273,7 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                                     key={area.key}
                                     type="button"
                                     onClick={() => handleBulkSelect(area.key)}
-                                    className="px-3 py-1.5 rounded text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                                    className={BULK_BUTTON_CLASS}
                                 >
                                     {area.label}
                                 </button>
@@ -261,7 +282,7 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                             <button
                                 type="button"
                                 onClick={() => handleBulkSelect('CLEAR')}
-                                className="px-3 py-1.5 rounded text-xs font-medium text-red-600 hover:bg-red-50 transition-colors ml-auto"
+                                className="h-9 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest text-rose-600 hover:bg-rose-50 transition-colors ml-auto"
                             >
                                 Limpiar
                             </button>
@@ -279,10 +300,10 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                                         className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                                     />
                                     <div className="flex flex-col">
-                                        <span className="text-xs font-bold text-slate-800">
+                                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">
                                             Generar recepciones individuales por establecimiento ({formData.establecimientos.length} RCs separadas)
                                         </span>
-                                        <span className="text-xs text-slate-500 mt-1">
+                                        <span className="text-[10px] font-medium text-slate-500 mt-1 uppercase tracking-tighter">
                                             Si se especifica un folio manual (ej. RCI-01), este se incrementará automáticamente (ej. RCI-02, RCI-03) por cada registro generado.
                                         </span>
                                     </div>
@@ -294,12 +315,10 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
 
                 {/* Section 3: Tiempos y Entrega */}
                 <div className="space-y-5">
-                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">
-                        3. Cronología y Entrega
-                    </h4>
+                    <SectionHeader number="3" title="Cronología y Entrega" />
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="space-y-2">
-                            <label className="form-label block text-xs font-bold text-slate-700">
+                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
                                 Fecha Recepción
                             </label>
                             <DateInput
@@ -308,12 +327,16 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                                 required
                             />
                         </div>
-                        <MonthInput
-                            label="Periodo de Cobro"
-                            name="periodo"
-                            value={formData.periodo || ''}
-                            onChange={(val) => handleSelectChange('periodo', val)}
-                        />
+                        <div className="space-y-2">
+                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
+                                Periodo de Cobro
+                            </label>
+                            <MonthInput
+                                name="periodo"
+                                value={formData.periodo || ''}
+                                onChange={(val) => handleSelectChange('periodo', val)}
+                            />
+                        </div>
                         <FormSelect
                             label="Tipo de Entrega"
                             name="tipo_entrega"
@@ -322,15 +345,15 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                             required
                             placeholder="Seleccione..."
                             options={deliveryTypes.map(t => ({ value: t.id, label: t.nombre }))}
+                            labelClassName={RC_LABEL_CLASS}
+                            inputClassName={RC_SELECT_CLASS}
                         />
                     </div>
                 </div>
 
                 {/* Section 4: Detalle y Costos */}
                 <div className="space-y-5">
-                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">
-                        4. Contenido y Finanzas
-                    </h4>
+                    <SectionHeader number="4" title="Contenido y Finanzas" />
                     <div className="space-y-4">
                         <div className="space-y-3">
                             <FormInput
@@ -340,6 +363,8 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                                 onChange={handleChange}
                                 required
                                 placeholder="Ej: Servicios de transporte..."
+                                labelClassName={RC_LABEL_CLASS}
+                                inputClassName={RC_INPUT_CLASS}
                             />
 
                             {/* Preview of the final combined description */}
@@ -367,6 +392,8 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                                     onChange={handleChange}
                                     required
                                     placeholder="0"
+                                    labelClassName={RC_LABEL_CLASS}
+                                    inputClassName={RC_INPUT_CLASS}
                                 />
                                 <FormInput
                                     type="number"
@@ -376,6 +403,8 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                                     onChange={handleChange}
                                     required
                                     placeholder="0"
+                                    labelClassName={RC_LABEL_CLASS}
+                                    inputClassName={RC_INPUT_CLASS}
                                 />
                             </div>
                             <div className="flex justify-start">
@@ -388,7 +417,8 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                                         onChange={handleChange}
                                         required
                                         placeholder="0"
-                                        inputClassName="font-bold"
+                                        labelClassName={RC_LABEL_CLASS}
+                                        inputClassName={RC_INPUT_CLASS}
                                     />
                                 </div>
                             </div>
@@ -398,9 +428,7 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
 
                 {/* Section 5: Aprobación */}
                 <div className="space-y-5">
-                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">
-                        5. Firmante de la RC
-                    </h4>
+                    <SectionHeader number="5" title="Firmante de la RC" />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <FormSelect
                             label="Grupo de Firmantes"
@@ -417,6 +445,8 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                             }}
                             placeholder="Seleccione grupo..."
                             options={lookups.groups?.map(g => ({ value: g.id, label: g.nombre }))}
+                            labelClassName={RC_LABEL_CLASS}
+                            inputClassName={RC_SELECT_CLASS}
                         />
                         <FormSelect
                             label="Funcionario Firmante"
@@ -429,6 +459,8 @@ const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, ed
                                 value: m.id,
                                 label: `${m.nombre} ${m.id === lookups.groups?.find(g => g.id.toString() === formData.grupo_firmante.toString())?.jefe ? '(Jefe)' : ''}`
                             })) || []}
+                            labelClassName={RC_LABEL_CLASS}
+                            inputClassName={RC_SELECT_CLASS}
                         />
                     </div>
                 </div>

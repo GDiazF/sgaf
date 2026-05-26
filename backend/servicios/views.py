@@ -211,6 +211,8 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
                 'Fecha Vencimiento': p.fecha_vencimiento,
                 'Monto Total': p.monto_total,
                 'Monto Interes': p.monto_interes,
+                'Consumo': p.consumo if p.consumo is not None else '-',
+                'Unidad de Medida': p.servicio.unidad_medida if p.servicio.unidad_medida else '-',
                 'Tiene RC': 'SÍ' if p.recepcion_conforme else 'NO',
                 'Folio RC': p.recepcion_conforme.folio if p.recepcion_conforme else '-'
             })
@@ -234,14 +236,14 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
         cols = [
             'Nro Cliente', 'Nro Documento', 'Monto Total', 'Monto Interes', 
             'Fecha Emision (DD/MM/YYYY)', 'Fecha Vencimiento (DD/MM/YYYY)', 
-            'Fecha Pago (DD/MM/YYYY)'
+            'Fecha Pago (DD/MM/YYYY)', 'Consumo'
         ]
         df = pd.DataFrame(columns=cols)
         
         # Add a sample row
         df.loc[0] = [
             '10002000', 'FAC-123', 50000, 0, 
-            '01/01/2026', '15/01/2026', '20/01/2026'
+            '01/01/2026', '15/01/2026', '20/01/2026', 15.5
         ]
 
         buffer = io.BytesIO()
@@ -348,6 +350,17 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
                 errors.append(f"Fila {index + 2}: Los montos deben ser valores numéricos enteros.")
                 continue
 
+            # 6. Parse Consumo (Optional)
+            consumo_val = None
+            if 'Consumo' in row and not pd.isna(row['Consumo']):
+                try:
+                    # Clean and parse string representation to handle commas or other formatting
+                    consumo_str = str(row['Consumo']).strip().replace(',', '.')
+                    consumo_val = float(consumo_str)
+                except ValueError:
+                    errors.append(f"Fila {index + 2}: El valor de consumo '{row['Consumo']}' debe ser numérico.")
+                    continue
+
             pagos_to_create.append(RegistroPago(
                 servicio=srv,
                 establecimiento=est,
@@ -356,7 +369,8 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
                 fecha_pago=f_pago,
                 nro_documento=nro_doc,
                 monto_interes=m_interes,
-                monto_total=m_total
+                monto_total=m_total,
+                consumo=consumo_val
             ))
 
         if errors:

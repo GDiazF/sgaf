@@ -121,7 +121,7 @@ const TicketDetail = () => {
 
     if (loading) return (
         <div className="h-[60vh] flex flex-col items-center justify-center text-slate-400">
-            <Loader2 className="w-8 h-8 animate-spin mb-4 text-indigo-600" />
+            <Loader2 className="w-8 h-8 animate-spin mb-4 text-blue-600" />
             <p className="font-medium">Cargando ticket...</p>
         </div>
     );
@@ -130,7 +130,7 @@ const TicketDetail = () => {
         <div className="h-[60vh] flex flex-col items-center justify-center text-slate-400">
             <AlertCircle className="w-12 h-12 mb-4" />
             <p className="font-medium">Ticket no encontrado</p>
-            <button onClick={() => navigate('/tickets')} className="mt-4 text-indigo-600 font-medium hover:underline">Volver a Mesa de Ayuda</button>
+            <button onClick={() => navigate('/tickets')} className="mt-4 text-blue-600 font-medium hover:underline">Volver a Mesa de Ayuda</button>
         </div>
     );
 
@@ -143,13 +143,13 @@ const TicketDetail = () => {
                 <div className="flex items-center gap-4">
                     <button 
                         onClick={() => navigate('/tickets')}
-                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                     >
                         <ArrowLeft className="w-5 h-5" />
                     </button>
                     <div>
                         <div className="flex flex-wrap items-center gap-3 mb-1">
-                            <span className="text-sm font-bold text-indigo-600">{ticket.correlativo}</span>
+                            <span className="text-sm font-bold text-blue-600">{ticket.correlativo}</span>
                             <StatusBadge status={ticket.estado} />
                             <PriorityBadge priority={ticket.prioridad} />
                         </div>
@@ -200,7 +200,7 @@ const TicketDetail = () => {
                             
                             return (
                                 <div key={msg.id} className={`flex gap-4 ${isMe ? 'flex-row-reverse' : ''}`}>
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isMe ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isMe ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
                                         {msg.autor_obj?.username?.charAt(0).toUpperCase()}
                                     </div>
                                     <div className={`flex flex-col max-w-[80%] ${isMe ? 'items-end' : 'items-start'}`}>
@@ -208,7 +208,7 @@ const TicketDetail = () => {
                                             <span className="text-xs font-bold text-slate-700">{msg.autor_obj?.username}</span>
                                             <span className="text-[10px] text-slate-400 font-medium">{new Date(msg.fecha).toLocaleString()}</span>
                                         </div>
-                                        <div className={`px-4 py-3 rounded-2xl text-sm font-medium ${isMe ? 'bg-indigo-600 text-white rounded-tr-sm shadow-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm shadow-sm'}`}>
+                                        <div className={`px-4 py-3 rounded-2xl text-sm font-medium ${isMe ? 'bg-blue-600 text-white rounded-tr-sm shadow-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm shadow-sm'}`}>
                                             <p className="whitespace-pre-wrap leading-relaxed">{msg.mensaje}</p>
                                         </div>
                                     </div>
@@ -224,7 +224,7 @@ const TicketDetail = () => {
                             <textarea 
                                 rows={3}
                                 placeholder="Escribe tu respuesta aquí..."
-                                className="w-full p-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl text-sm transition-all resize-none outline-none font-medium"
+                                className="w-full p-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl text-sm transition-all resize-none outline-none font-medium"
                                 value={newMessage}
                                 onChange={(e) => setNewMessage(e.target.value)}
                                 onKeyDown={(e) => {
@@ -239,7 +239,7 @@ const TicketDetail = () => {
                                 <button 
                                     disabled={!newMessage.trim() || isSending}
                                     type="submit" 
-                                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium text-sm shadow-sm hover:bg-indigo-700 disabled:bg-indigo-300 transition-colors flex items-center gap-2"
+                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm shadow-sm hover:bg-blue-700 disabled:bg-blue-300 transition-colors flex items-center gap-2"
                                 >
                                     {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                                     Enviar
@@ -263,7 +263,7 @@ const TicketDetail = () => {
                                 {!ticket.asignado_a && (
                                     <button 
                                         onClick={autoAssign}
-                                        className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium transition-colors border border-indigo-200 flex items-center justify-center gap-2"
+                                        className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-medium transition-colors border border-blue-200 flex items-center justify-center gap-2"
                                     >
                                         <User className="w-4 h-4" />
                                         Asignarme este Ticket

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Save, X, Tag, Info, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Edit3, Save, X, Info, ArrowLeft, Loader2, FolderSearch, Tags } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import api from '../../api';
+import { BTN_BLUE, BTN_BLUE_FULL, INPUT_FORM, TEXTAREA_FORM, BTN_ICON_EDIT, LOADER_SPIN, INFO_BANNER, INFO_BANNER_ICON, TITLE_ICON_BOX } from './ticketsUi';
 
 const CategoryManagement = () => {
     const [categories, setCategories] = useState([]);
@@ -18,7 +19,7 @@ const CategoryManagement = () => {
             const res = await api.get('tickets/categorias/');
             setCategories(res.data.results || res.data);
         } catch (error) {
-            console.error("Error fetching categories:", error);
+            console.error('Error fetching categories:', error);
         } finally {
             if (isInitial) setLoading(false);
         }
@@ -35,12 +36,12 @@ const CategoryManagement = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm("¿Estás seguro de eliminar esta categoría? Se recomienda desactivarla en su lugar si tiene tickets asociados.")) return;
+        if (!window.confirm('¿Estás seguro de eliminar esta categoría? Se recomienda desactivarla en su lugar si tiene tickets asociados.')) return;
         try {
             await api.delete(`tickets/categorias/${id}/`);
             fetchCategories(false);
         } catch (error) {
-            alert("Error al eliminar. Probablemente existan tickets vinculados a esta categoría.");
+            alert('Error al eliminar. Probablemente existan tickets vinculados a esta categoría.');
         }
     };
 
@@ -58,173 +59,184 @@ const CategoryManagement = () => {
             setFormData({ nombre: '', descripcion: '', activo: true });
             fetchCategories(false);
         } catch (error) {
-            console.error("Error saving category:", error);
-            alert("Error al guardar la categoría.");
+            console.error('Error saving category:', error);
+            alert('Error al guardar la categoría.');
         } finally {
             setIsSaving(false);
         }
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <Link 
+        <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden">
+            <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-end gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
+                <div className="flex items-start gap-3 min-w-0">
+                    <Link
                         to="/tickets"
-                        className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 hover:shadow-lg rounded-2xl transition-all"
+                        className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors shrink-0 h-10 w-10 flex items-center justify-center"
+                        title="Volver"
                     >
-                        <ArrowLeft className="w-5 h-5" />
+                        <ArrowLeft className="w-4 h-4" />
                     </Link>
-                    <div>
-                        <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                            <Tag className="w-6 h-6 text-indigo-600" />
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={TITLE_ICON_BOX}>
+                            <Tags className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase select-none">
                             Categorías de Tickets
                         </h2>
-                        <p className="text-sm text-slate-500 font-medium">Gestiona las categorías disponibles para clasificar solicitudes</p>
+                        <p className="text-[10px] md:text-xs font-medium text-slate-500 mt-1.5">
+                            Clasificación de solicitudes en mesa de ayuda
+                        </p>
+                        </div>
                     </div>
                 </div>
-                <button 
+                <button
+                    type="button"
                     onClick={() => { setShowForm(true); setEditingId(null); setFormData({ nombre: '', descripcion: '', activo: true }); }}
-                    className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-lg shadow-indigo-200 transition-all active:scale-95"
+                    className={BTN_BLUE}
                 >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-4 h-4" />
                     Nueva Categoría
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Form Side */}
+            <div className="flex flex-1 min-h-0 gap-4 overflow-hidden">
                 <AnimatePresence>
                     {showForm && (
-                        <motion.div 
+                        <motion.div
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -20 }}
-                            className="lg:col-span-4 bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-100 p-8 h-fit sticky top-6"
+                            className="w-full max-w-sm shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col overflow-y-auto custom-scrollbar"
                         >
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">
+                            <div className="flex items-center justify-between mb-4 shrink-0">
+                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                                     {editingId ? 'Editar Categoría' : 'Nueva Categoría'}
                                 </h3>
-                                <button onClick={() => setShowForm(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                                    <X className="w-5 h-5 text-slate-400" />
+                                <button type="button" onClick={() => setShowForm(false)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors">
+                                    <X className="w-4 h-4" />
                                 </button>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Nombre</label>
-                                    <input 
+                            <form onSubmit={handleSubmit} className="space-y-4 flex flex-col flex-1">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Nombre</label>
+                                    <input
                                         required
                                         type="text"
-                                        className="w-full px-5 py-3 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-xl text-sm transition-all outline-none font-bold"
+                                        className={INPUT_FORM}
                                         value={formData.nombre}
-                                        onChange={(e) => setFormData({...formData, nombre: e.target.value})}
+                                        onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Descripción</label>
-                                    <textarea 
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Descripción</label>
+                                    <textarea
                                         rows={4}
-                                        className="w-full px-5 py-3 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-xl text-sm transition-all outline-none font-medium"
+                                        className={TEXTAREA_FORM}
                                         value={formData.descripcion}
-                                        onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
-                                    ></textarea>
+                                        onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                                    />
                                 </div>
-                                <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl">
-                                    <input 
+                                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                    <input
                                         type="checkbox"
                                         id="activo"
-                                        className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                                         checked={formData.activo}
-                                        onChange={(e) => setFormData({...formData, activo: e.target.checked})}
+                                        onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
                                     />
-                                    <label htmlFor="activo" className="text-xs font-bold text-slate-600 cursor-pointer">Categoría Activa</label>
+                                    <label htmlFor="activo" className="text-[10px] font-medium text-slate-600 uppercase tracking-tighter cursor-pointer">
+                                        Categoría activa
+                                    </label>
                                 </div>
 
-                                <button 
+                                <button
                                     disabled={isSaving}
                                     type="submit"
-                                    className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 disabled:bg-indigo-300"
+                                    className={`mt-auto ${BTN_BLUE_FULL}`}
                                 >
-                                    <Save className="w-5 h-5" />
-                                    {isSaving ? 'Guardando...' : 'Guardar Categoría'}
+                                    <Save className="w-4 h-4" />
+                                    {isSaving ? 'Guardando...' : 'Guardar'}
                                 </button>
                             </form>
                         </motion.div>
                     )}
                 </AnimatePresence>
 
-                {/* List Side */}
-                <div className={`${showForm ? 'lg:col-span-8' : 'lg:col-span-12'} space-y-4`}>
-                    {loading ? (
-                        <div className="p-20 text-center bg-white rounded-[2rem] border border-slate-100 shadow-sm">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto"></div>
-                            <p className="mt-4 text-sm font-bold text-slate-400 uppercase tracking-widest">Cargando...</p>
-                        </div>
-                    ) : (
-                        <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-                            <table className="w-full text-left">
-                                <thead>
-                                    <tr className="bg-slate-50/50">
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Categoría</th>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Descripción</th>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Estado</th>
-                                        <th className="px-6 py-4"></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {categories.map(cat => (
-                                        <tr key={cat.id} className="hover:bg-slate-50/50 transition-colors group">
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-                                                        <Tag className="w-4 h-4" />
-                                                    </div>
-                                                    <span className="text-sm font-black text-slate-700">{cat.nombre}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <p className="text-xs text-slate-500 line-clamp-1 max-w-xs">{cat.descripcion || '-'}</p>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${cat.activo ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
-                                                    {cat.activo ? 'Activo' : 'Inactivo'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <button onClick={() => handleEdit(cat)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-md rounded-xl transition-all">
-                                                        <Edit2 className="w-4 h-4" />
-                                                    </button>
-                                                    <button onClick={() => handleDelete(cat.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-white hover:shadow-md rounded-xl transition-all">
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                            {categories.length === 0 && (
-                                <div className="p-20 text-center">
-                                    <Tag className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-                                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No hay categorías configuradas</p>
+                <div className="flex flex-col flex-1 min-h-0 gap-3 overflow-hidden">
+                    <div className="bg-slate-50 rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-0">
+                        <div className="overflow-auto flex-1 bg-white custom-scrollbar">
+                            {loading ? (
+                                <div className="flex flex-col items-center justify-center p-12 h-full flex-1 gap-3 min-h-[200px]">
+                                    <Loader2 className={LOADER_SPIN} />
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cargando Datos...</span>
                                 </div>
+                            ) : categories.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center p-12 text-center h-full flex-1 min-h-[200px]">
+                                    <FolderSearch className="w-10 h-10 text-slate-200 mb-3" />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No se encontraron registros</span>
+                                </div>
+                            ) : (
+                                <table className="w-full text-left border-collapse border-spacing-0">
+                                    <thead className="sticky top-0 z-10">
+                                        <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-200 select-none shadow-sm">
+                                            <th className="px-4 py-3 align-middle border-r border-slate-100">Categoría</th>
+                                            <th className="px-4 py-3 align-middle border-r border-slate-100">Descripción</th>
+                                            <th className="px-4 py-3 align-middle border-r border-slate-100 text-center w-28">Estado</th>
+                                            <th className="px-4 py-3 align-middle text-center w-24">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {categories.map((cat) => (
+                                            <tr key={cat.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                <td className="px-4 py-3 align-middle border-r border-slate-50">
+                                                    <span className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter line-clamp-2 block">
+                                                        {cat.nombre}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 align-middle border-r border-slate-50 max-w-md">
+                                                    <span className="text-[11px] font-medium text-slate-500 uppercase tracking-tighter line-clamp-2 block">
+                                                        {cat.descripcion || '—'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 align-middle border-r border-slate-50 text-center">
+                                                    <span className={`inline-block px-2 py-0.5 text-[9px] font-black uppercase tracking-tighter rounded-lg border ${cat.activo ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                                                        {cat.activo ? 'Activo' : 'Inactivo'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 align-middle text-center">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <button type="button" onClick={() => handleEdit(cat)} className={BTN_ICON_EDIT} title="Editar">
+                                                            <Edit3 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button type="button" onClick={() => handleDelete(cat.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Eliminar">
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             )}
                         </div>
-                    )}
+                        {!loading && categories.length > 0 && (
+                            <div className="p-3 bg-slate-50 border-t border-slate-200 shrink-0">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                                    Mostrando {categories.length} categoría{categories.length !== 1 ? 's' : ''}
+                                </span>
+                            </div>
+                        )}
+                    </div>
 
-                    <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 flex items-start gap-4">
-                        <div className="p-2 bg-white rounded-xl shadow-sm">
-                            <Info className="w-5 h-5 text-indigo-500" />
-                        </div>
+                    <div className={INFO_BANNER}>
+                        <Info className={INFO_BANNER_ICON} />
                         <div>
-                            <h4 className="text-[11px] font-black text-slate-700 uppercase tracking-widest mb-1">Nota del Sistema</h4>
-                            <p className="text-xs text-slate-500 leading-relaxed font-medium">
-                                Estas categorías serán visibles para todos los usuarios al crear un nuevo ticket. 
-                                Te recomendamos usar nombres claros como "Soporte Software", "Infraestructura" o "RRHH" 
-                                para facilitar la clasificación de las solicitudes.
+                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Nota del sistema</h4>
+                            <p className="text-[10px] font-medium text-slate-500 uppercase leading-relaxed tracking-tighter">
+                                Estas categorías serán visibles al crear un ticket. Use nombres claros como Soporte Software o Infraestructura.
                             </p>
                         </div>
                     </div>

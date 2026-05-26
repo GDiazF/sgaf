@@ -33,6 +33,7 @@ class PlantillaCorreo(models.Model):
         ('RESERVA_APROBACION', 'Reserva Aprobada/Rechazada'),
         ('RESERVA_AVISO_ADMIN', 'Aviso a Admin de Nueva Reserva'),
         ('RESERVA_RECORDATORIO', 'Recordatorio de Reserva (Automático)'),
+        ('ALERTA_VENCIMIENTO_VEHICULO', 'Alerta de Vencimiento de Documento Vehicular'),
         ('TEST', 'Correo de Prueba'),
     ]
 

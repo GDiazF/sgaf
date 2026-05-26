@@ -1,32 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { ArrowLeft, Send, Paperclip, AlertCircle, HelpCircle, X, Building, Landmark } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { useNavigate, Link } from 'react-router-dom';
+import { ArrowLeft, Plus, Paperclip, X, Loader2, FilePlus } from 'lucide-react';
 import api from '../../api';
+import { BTN_BLUE, INPUT_FORM, SELECT_FORM, TEXTAREA_FORM, FILE_CHIP, TITLE_ICON_BOX } from './ticketsUi';
+
+const PRIORITIES = ['BAJA', 'MEDIA', 'ALTA'];
+
+const PRIORITY_ACTIVE = {
+    BAJA: 'bg-slate-100 border-slate-300 text-slate-700',
+    MEDIA: 'bg-blue-50 border-blue-200 text-blue-600',
+    ALTA: 'bg-amber-50 border-amber-200 text-amber-600',
+};
 
 const TicketForm = () => {
     const navigate = useNavigate();
-    const { user } = useAuth();
     const [loading, setLoading] = useState(false);
-    
-    // Data lists
     const [categories, setCategories] = useState([]);
-    
-    
+    const [formError, setFormError] = useState('');
+
     const [formData, setFormData] = useState({
         titulo: '',
         descripcion: '',
-        area_destino: null, 
+        area_destino: null,
         categoria: '',
-        prioridad: 'BAJA'
+        prioridad: 'BAJA',
     });
     const [files, setFiles] = useState([]);
-
-    // Sync with User Profile (Unused now as departments are removed)
-    useEffect(() => {
-        // No auto-assignment to department
-    }, [user]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -34,7 +33,7 @@ const TicketForm = () => {
                 const catsRes = await api.get('tickets/categorias/');
                 setCategories(catsRes.data.results || catsRes.data);
             } catch (error) {
-                console.error("Error fetching form data:", error);
+                console.error('Error fetching form data:', error);
             }
         };
         fetchData();
@@ -42,13 +41,19 @@ const TicketForm = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setFormError('');
         setLoading(true);
         try {
             const res = await api.post('tickets/tickets/', formData);
             navigate(`/tickets/${res.data.id}`);
         } catch (error) {
-            console.error("Error creating ticket:", error);
-            alert("Error al crear el ticket. Revisa los campos.");
+            console.error('Error creating ticket:', error);
+            const msg = error.response?.data
+                ? (typeof error.response.data === 'string'
+                    ? error.response.data
+                    : Object.values(error.response.data).flat().join(' '))
+                : 'Error al crear el ticket. Revisa los campos.';
+            setFormError(msg);
         } finally {
             setLoading(false);
         }
@@ -56,154 +61,164 @@ const TicketForm = () => {
 
     const handleFileChange = (e) => {
         const newFiles = Array.from(e.target.files);
-        setFiles([...files, ...newFiles]);
+        setFiles((prev) => [...prev, ...newFiles]);
     };
 
     const removeFile = (index) => {
-        setFiles(files.filter((_, i) => i !== index));
+        setFiles((prev) => prev.filter((_, i) => i !== index));
     };
 
-
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
-            <button 
-                onClick={() => navigate(-1)}
-                className="flex items-center gap-2 text-slate-400 hover:text-slate-600 transition-colors font-bold text-sm group"
-            >
-                <div className="p-2 rounded-xl bg-white border border-slate-100 group-hover:border-slate-200 shadow-sm">
-                    <ArrowLeft className="w-4 h-4" />
-                </div>
-                Volver a la Mesa de Ayuda
-            </button>
-
-            <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-                <div className="p-8 md:p-12 border-b border-slate-50 bg-slate-50/30">
-                    <div className="flex items-center gap-4 mb-2">
-                        <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-200">
-                            <HelpCircle className="w-6 h-6" />
+        <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden">
+            <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-end gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
+                <div className="flex items-start gap-3 min-w-0">
+                    <Link
+                        to="/tickets"
+                        className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors shrink-0 h-10 w-10 flex items-center justify-center"
+                        title="Volver"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                    </Link>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={TITLE_ICON_BOX}>
+                            <FilePlus className="w-4 h-4" />
                         </div>
-                        <h2 className="text-3xl font-black text-slate-800 tracking-tight">Nueva Solicitud</h2>
+                        <div className="min-w-0">
+                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase select-none">
+                            Nueva Solicitud
+                        </h2>
+                        <p className="text-[10px] md:text-xs font-medium text-slate-500 mt-1.5">
+                            Describe el problema con el mayor detalle posible
+                        </p>
+                        </div>
                     </div>
-                    <p className="text-slate-500 font-medium">Describe tu problema lo más detallado posible para ayudarte mejor.</p>
                 </div>
+            </div>
 
-                <form onSubmit={handleSubmit} className="p-8 md:p-12 space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* Title */}
-                        <div className="md:col-span-2 space-y-2">
-                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Asunto / Título</label>
-                            <input 
-                                required
-                                type="text"
-                                placeholder="Ej: No puedo acceder al sistema de remuneraciones"
-                                className="w-full px-6 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 rounded-2xl text-sm transition-all outline-none font-bold"
-                                value={formData.titulo}
-                                onChange={(e) => setFormData({...formData, titulo: e.target.value})}
-                            />
-                        </div>
-
-
-                        {/* Category */}
-                        <div className="space-y-2">
-                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Categoría</label>
-                            <select 
-                                required
-                                className="w-full px-6 py-3 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 rounded-2xl text-sm transition-all outline-none font-bold cursor-pointer"
-                                value={formData.categoria}
-                                onChange={(e) => setFormData({...formData, categoria: e.target.value})}
-                            >
-                                <option value="">Selecciona categoría...</option>
-                                {categories.map(cat => (
-                                    <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Priority */}
-                        <div className="space-y-2">
-                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Prioridad (Inicial)</label>
-                            <div className="flex gap-2">
-                                {['BAJA', 'MEDIA', 'ALTA'].map(p => (
-                                    <button
-                                        key={p}
-                                        type="button"
-                                        onClick={() => setFormData({...formData, prioridad: p})}
-                                        className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${formData.prioridad === p ? 'bg-slate-900 border-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100'}`}
-                                    >
-                                        {p}
-                                    </button>
-                                ))}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-0 overflow-hidden">
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                    <div className="overflow-y-auto flex-1 p-4 md:p-6 custom-scrollbar">
+                        {formError && (
+                            <div className="mb-4 bg-rose-50 text-rose-600 text-[10px] font-bold uppercase p-3 rounded-xl border border-rose-100">
+                                {formError}
                             </div>
-                        </div>
+                        )}
 
-                        {/* Attachments UI */}
-                        <div className="md:col-span-2 space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Adjuntos (Opcional)</label>
-                                <div className="flex items-center gap-3">
-                                    <label className="flex items-center gap-2 px-6 py-3 bg-slate-50 hover:bg-slate-100 text-slate-500 rounded-2xl cursor-pointer transition-all border-2 border-dashed border-slate-200 group flex-1">
-                                        <Paperclip className="w-4 h-4 group-hover:text-indigo-600" />
-                                        <span className="text-[11px] font-black uppercase tracking-widest">Subir Archivos</span>
-                                        <input type="file" multiple className="hidden" onChange={handleFileChange} />
-                                    </label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+                            <div className="md:col-span-2">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    Asunto / Título
+                                </label>
+                                <input
+                                    required
+                                    type="text"
+                                    placeholder="Ej: No puedo acceder al sistema de remuneraciones"
+                                    className={INPUT_FORM}
+                                    value={formData.titulo}
+                                    onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    Categoría
+                                </label>
+                                <select
+                                    required
+                                    className={SELECT_FORM}
+                                    value={formData.categoria}
+                                    onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
+                                >
+                                    <option value="">Selecciona categoría...</option>
+                                    {categories.map((cat) => (
+                                        <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    Prioridad inicial
+                                </label>
+                                <div className="flex gap-2">
+                                    {PRIORITIES.map((p) => (
+                                        <button
+                                            key={p}
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, prioridad: p })}
+                                            className={`flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                                                formData.prioridad === p
+                                                    ? PRIORITY_ACTIVE[p]
+                                                    : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
+                                            }`}
+                                        >
+                                            {p}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
-                            
-                            {/* File list */}
-                            <div className="flex flex-wrap gap-2">
-                                {files.map((file, i) => (
-                                    <motion.div 
-                                        initial={{ opacity: 0, scale: 0.8 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        key={i} 
-                                        className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-bold border border-indigo-100"
-                                    >
-                                        <span className="truncate max-w-[100px]">{file.name}</span>
-                                        <button type="button" onClick={() => removeFile(i)} className="p-0.5 hover:bg-indigo-200 rounded-full transition-colors">
-                                            <X className="w-3 h-3" />
-                                        </button>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </div>
 
-                        {/* Description */}
-                        <div className="md:col-span-2 space-y-2">
-                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Descripción del Problema</label>
-                            <textarea 
-                                required
-                                rows={6}
-                                placeholder="Escribe aquí los detalles..."
-                                className="w-full px-6 py-4 bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 rounded-[2rem] text-sm transition-all outline-none font-medium"
-                                value={formData.descripcion}
-                                onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
-                            ></textarea>
+                            <div className="md:col-span-2">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    Descripción del problema
+                                </label>
+                                <textarea
+                                    required
+                                    rows={6}
+                                    placeholder="Escribe aquí los detalles..."
+                                    className={TEXTAREA_FORM}
+                                    value={formData.descripcion}
+                                    onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    Adjuntos (opcional)
+                                </label>
+                                <label className="flex items-center justify-center gap-2 h-10 px-4 bg-slate-50 hover:bg-slate-100 text-slate-500 rounded-xl cursor-pointer transition-all border border-dashed border-slate-200 w-full md:w-auto">
+                                    <Paperclip className="w-4 h-4 shrink-0" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Subir archivos</span>
+                                    <input type="file" multiple className="hidden" onChange={handleFileChange} />
+                                </label>
+                                {files.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mt-3">
+                                        {files.map((file, i) => (
+                                            <div
+                                                key={`${file.name}-${i}`}
+                                                className={FILE_CHIP}
+                                            >
+                                                <span className="truncate max-w-[140px]">{file.name}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeFile(i)}
+                                                    className="p-0.5 hover:bg-blue-100 rounded transition-colors"
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-6">
-                        <div className="flex items-center gap-3 text-slate-400">
-                            <div className="p-2 bg-slate-50 rounded-xl">
-                                <AlertCircle className="w-5 h-5" />
-                            </div>
-                            <p className="text-[11px] font-medium max-w-xs leading-tight">
-                                Al enviar este ticket, se notificará al equipo de soporte correspondiente y recibirás actualizaciones por correo.
-                            </p>
-                        </div>
-
-                        <button 
+                    <div className="shrink-0 p-4 md:px-6 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                        <p className="text-[10px] font-medium text-slate-500 uppercase tracking-tighter max-w-md leading-relaxed">
+                            Al enviar, se notificará al equipo de soporte y recibirás actualizaciones por correo.
+                        </p>
+                        <button
                             disabled={loading}
                             type="submit"
-                            className="w-full md:w-auto flex items-center justify-center gap-3 px-10 py-5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-[2rem] font-black shadow-2xl shadow-indigo-200 transition-all active:scale-95 group"
+                            className={`${BTN_BLUE} sm:ml-auto`}
                         >
                             {loading ? (
-                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
-                                <>
-                                    <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                                    Enviar Solicitud
-                                </>
+                                <Plus className="w-4 h-4" />
                             )}
+                            {loading ? 'Enviando...' : 'Enviar solicitud'}
                         </button>
                     </div>
                 </form>

@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from .models import LicitacionMP
+from core.mp_date_validation import validate_mp_date_range
 
 # --- HELPERS DE APOYO ---
 
@@ -314,6 +315,11 @@ class VisorLicitacionesView(GenericAPIView):
             force = request.query_params.get('force', 'false').lower() == 'true'
             fecha_inicio = request.query_params.get('fecha_inicio')
             fecha_fin = request.query_params.get('fecha_fin')
+
+            if fecha_inicio and fecha_fin:
+                range_check = validate_mp_date_range(fecha_inicio, fecha_fin)
+                if not range_check['valid']:
+                    return Response({'error': range_check['error']}, status=status.HTTP_400_BAD_REQUEST)
 
             # --- CONSULTA LOCAL ---
             if not force and codigo_organismo == "1820906":

@@ -46,6 +46,7 @@ class Servicio(models.Model):
     numero_servicio = models.CharField(max_length=100, blank=True, null=True) # Optional
     numero_cliente = models.CharField(max_length=100, unique=True) # Required and unique globally
     tipo_documento = models.ForeignKey(TipoDocumento, on_delete=models.SET_NULL, null=True)
+    unidad_medida = models.CharField(max_length=50, blank=True, null=True, verbose_name="Unidad de Medida de Consumo")
     
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
@@ -146,6 +147,7 @@ class RegistroPago(models.Model):
     nro_documento = models.CharField(max_length=100)
     monto_interes = models.IntegerField(default=0)
     monto_total = models.IntegerField()
+    consumo = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Consumo del periodo")
     recepcion_conforme = models.ForeignKey(RecepcionConforme, on_delete=models.SET_NULL, null=True, blank=True, related_name='registros')
     fecha_registro = models.DateTimeField(auto_now_add=True)
     comprobante = models.FileField(

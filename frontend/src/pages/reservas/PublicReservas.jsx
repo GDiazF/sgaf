@@ -113,6 +113,18 @@ const PublicReservas = () => {
 
     const [slotBloqueadoMsg, setSlotBloqueadoMsg] = useState('');
     const scrollRef = useRef(null);
+    const weekScrollRef = useRef(null);
+
+    const [isMobile, setIsMobile] = useState(() =>
+        typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+    );
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 767px)');
+        const onChange = e => setIsMobile(e.matches);
+        setIsMobile(mq.matches);
+        mq.addEventListener('change', onChange);
+        return () => mq.removeEventListener('change', onChange);
+    }, []);
 
     // Gestión de reserva existente
     const [manageOpen, setManageOpen] = useState(false);
@@ -167,18 +179,6 @@ const PublicReservas = () => {
         return () => clearInterval(interval);
     }, [filtroRecurso, currentDate, viewMode]);
 
-    // Responsividad: Forzar modo día en móviles
-    useEffect(() => {
-        const checkMobile = () => {
-            if (window.innerWidth < 768 && viewMode === 'week') {
-                setViewMode('day');
-            }
-        };
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, [viewMode]);
-
     // Auto-ajuste de horas (igual que el Dashboard principal)
     useEffect(() => {
         if (!modalOpen || !formData.recurso || !formData.fecha) return;
@@ -217,6 +217,22 @@ const PublicReservas = () => {
             return addDays(mon, i);
         })
         : [currentDate];
+
+    // Móvil: al abrir la semana, desplazar a la columna de hoy
+    useEffect(() => {
+        if (!isMobile || viewMode !== 'week' || loading) return;
+        const container = weekScrollRef.current;
+        if (!container) return;
+        const weekDates = visibleDays.map(d => toDateStr(d));
+        const target = weekDates.includes(todayStr) ? todayStr : toDateStr(currentDate);
+        const scroll = () => {
+            const col = container.querySelector(`#week-day-col-${target}`);
+            if (!col) return;
+            container.scrollTo({ left: Math.max(0, col.offsetLeft - 80), behavior: 'smooth' });
+        };
+        const t = window.setTimeout(scroll, 120);
+        return () => clearTimeout(t);
+    }, [isMobile, viewMode, loading, currentDate, todayStr, filtroRecurso, recursos.length]);
 
     // Optimización: Agrupar reservas por recurso y día una sola vez
     const reservasBuckets = useMemo(() => {
@@ -444,7 +460,7 @@ const PublicReservas = () => {
                     </div>
 
                     <div className="flex items-center bg-slate-100 rounded-lg p-0.5 flex-shrink-0">
-                        {['day', 'week'].map(v => (
+                        {['week', 'day'].map(v => (
                             <button key={v} onClick={() => setViewMode(v)} className={`px-4 py-1.5 text-[11px] font-bold rounded-md transition ${viewMode === v ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
                                 {v === 'day' ? 'Día' : 'Semana'}
                             </button>
@@ -567,15 +583,20 @@ const PublicReservas = () => {
                 <div className="flex-1 overflow-hidden flex flex-col min-h-0">
                     {viewMode === 'week' ? (
                         /* MODO MATRIZ (RECURSOS EN FILAS, DÍAS EN COLUMNAS) */
-                        <div className="flex-1 overflow-auto bg-slate-50/30">
+                        <div ref={weekScrollRef} className="flex-1 overflow-auto scroll-smooth bg-slate-50/30">
                             <div className="min-w-max">
                                 {/* Cabecera de Días */}
                                 <div className="flex sticky top-0 z-30 bg-white border-b border-slate-200">
-                                    <div className="w-56 flex-shrink-0 p-4 font-black text-slate-400 text-[10px] uppercase tracking-widest bg-slate-50 border-r border-slate-200">
-                                        RECURSO / DÍA
+                                    <div className="w-20 md:w-56 flex-shrink-0 p-2 md:p-4 font-black text-slate-400 text-[8px] md:text-[10px] uppercase tracking-widest bg-slate-50 border-r border-slate-200 leading-tight">
+                                        <span className="md:hidden">Rec.</span>
+                                        <span className="hidden md:inline">RECURSO / DÍA</span>
                                     </div>
                                     {visibleDays.map(day => (
-                                        <div key={toDateStr(day)} className={`flex-1 min-w-[160px] p-3 text-center border-r border-slate-100 ${toDateStr(day) === todayStr ? 'bg-indigo-50/50' : ''}`}>
+                                        <div
+                                            key={toDateStr(day)}
+                                            id={`week-day-col-${toDateStr(day)}`}
+                                            className={`flex-1 min-w-[calc(100vw-5rem)] md:min-w-[160px] p-2 md:p-3 text-center border-r border-slate-100 ${toDateStr(day) === todayStr ? 'bg-indigo-50/50' : ''}`}
+                                        >
                                             <div className="text-[10px] font-black text-indigo-500 uppercase">{fmtDay(day).split(' ')[0]}</div>
                                             <div className={`text-xl font-black ${toDateStr(day) === todayStr ? 'text-indigo-600' : 'text-slate-700'}`}>{day.getDate()}</div>
                                         </div>
@@ -590,13 +611,13 @@ const PublicReservas = () => {
                                     return (
                                         <div key={rec.id} className="flex border-b border-slate-100 group bg-white hover:bg-slate-50/50 transition-colors">
                                             {/* Info de Recurso (Sticky Left) */}
-                                            <div className="w-56 sticky left-0 z-20 flex-shrink-0 p-4 bg-white border-r border-slate-200 flex items-start gap-3 shadow-[4px_0_8px_rgba(0,0,0,0.02)]">
-                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm border border-slate-100" style={{ background: hexToRgba(color, 0.08), color }}>
-                                                    <Icon className="w-5 h-5" />
+                                            <div className="w-20 md:w-56 sticky left-0 z-20 flex-shrink-0 p-2 md:p-4 bg-white border-r border-slate-200 flex flex-col md:flex-row items-center md:items-start gap-1 md:gap-3 shadow-[4px_0_8px_rgba(0,0,0,0.02)]">
+                                                <div className="w-7 h-7 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm border border-slate-100" style={{ background: hexToRgba(color, 0.08), color }}>
+                                                    <Icon className="w-3.5 h-3.5 md:w-5 md:h-5" />
                                                 </div>
-                                                <div className="min-w-0">
-                                                    <h4 className="font-black text-slate-800 text-[11px] leading-tight mb-1">{rec.nombre}</h4>
-                                                    <span className="text-[9px] font-black uppercase tracking-tighter text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded">
+                                                <div className="min-w-0 w-full text-center md:text-left">
+                                                    <h4 className="font-black text-slate-800 text-[9px] md:text-[11px] leading-tight mb-0 md:mb-1 line-clamp-2 md:truncate" title={rec.nombre}>{rec.nombre}</h4>
+                                                    <span className="hidden md:inline text-[9px] font-black uppercase tracking-tighter text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded">
                                                         {TYPE_LABELS[rec.tipo]}
                                                     </span>
                                                 </div>
@@ -616,7 +637,7 @@ const PublicReservas = () => {
                                                 return (
                                                     <div key={dayStr}
                                                         onClick={() => !isDayBlocked && handleSlotClick(day, '', rec.id)}
-                                                        className={`flex-1 min-w-[160px] p-2 border-r border-slate-50 min-h-[120px] transition-colors relative hover:bg-indigo-50/20 ${!isDayBlocked ? 'cursor-pointer' : 'bg-slate-100/50'} ${dayStr === todayStr ? 'bg-indigo-50/10' : ''}`}>
+                                                        className={`flex-1 min-w-[calc(100vw-5rem)] md:min-w-[160px] p-2 border-r border-slate-50 min-h-[120px] transition-colors relative hover:bg-indigo-50/20 ${!isDayBlocked ? 'cursor-pointer' : 'bg-slate-100/50'} ${dayStr === todayStr ? 'bg-indigo-50/10' : ''}`}>
                                                         
                                                         {isDayBlocked && (
                                                             <div className="absolute inset-0 z-0 opacity-40" style={{ background: 'repeating-linear-gradient(45deg, #f1f5f9 0, #f1f5f9 10px, transparent 10px, transparent 20px)' }} />

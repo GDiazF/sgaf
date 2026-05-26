@@ -1,247 +1,259 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, MessageSquare, Clock, AlertCircle, CheckCircle2, ChevronRight, User, Tag, Calendar, Activity } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, Search, Filter, Clock, CheckCircle2, Tag, Activity, Eye, Loader2, FolderSearch, HelpCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../../api';
-import { useAuth } from '../../context/AuthContext';
+import { BTN_BLUE, BTN_SECONDARY, INPUT_FILTER, SELECT_FILTER, LOADER_SPIN, FOLIO_TEXT, TITLE_ICON_BOX } from './ticketsUi';
 
-const StatusBadge = ({ status }) => {
-    const config = {
-        'ABIERTO': { color: 'bg-blue-100 text-blue-700 border-blue-200', label: 'Abierto' },
-        'EN_PROGRESO': { color: 'bg-amber-100 text-amber-700 border-amber-200', label: 'En Progreso' },
-        'EN_ESPERA': { color: 'bg-slate-100 text-slate-700 border-slate-200', label: 'En Espera' },
-        'RESUELTO': { color: 'bg-emerald-100 text-emerald-700 border-emerald-200', label: 'Resuelto' },
-        'CERRADO': { color: 'bg-slate-400 text-white border-slate-500', label: 'Cerrado' },
-    };
-    const { color, label } = config[status] || { color: 'bg-slate-100 text-slate-700', label: status };
-    return (
-        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${color}`}>
-            {label}
-        </span>
-    );
+const STATUS_STYLES = {
+    ABIERTO: 'bg-blue-50 text-blue-600 border-blue-100',
+    EN_PROGRESO: 'bg-amber-50 text-amber-600 border-amber-100',
+    EN_ESPERA: 'bg-slate-50 text-slate-600 border-slate-200',
+    RESUELTO: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+    CERRADO: 'bg-slate-100 text-slate-500 border-slate-200',
 };
 
-const PriorityBadge = ({ priority }) => {
-    const config = {
-        'BAJA': { color: 'text-slate-400', label: 'Baja' },
-        'MEDIA': { color: 'text-blue-500', label: 'Media' },
-        'ALTA': { color: 'text-orange-500', label: 'Alta' },
-        'CRITICA': { color: 'text-red-600', label: 'Crítica' },
-    };
-    const { color, label } = config[priority] || { color: 'text-slate-400', label: priority };
-    return (
-        <span className={`flex items-center gap-1 text-[11px] font-bold ${color}`}>
-            <AlertCircle className="w-3 h-3" />
-            {label}
-        </span>
-    );
+const STATUS_LABELS = {
+    ABIERTO: 'Abierto',
+    EN_PROGRESO: 'En Progreso',
+    EN_ESPERA: 'En Espera',
+    RESUELTO: 'Resuelto',
+    CERRADO: 'Cerrado',
 };
+
+const PRIORITY_STYLES = {
+    BAJA: 'bg-slate-50 text-slate-500 border-slate-200',
+    MEDIA: 'bg-blue-50 text-blue-600 border-blue-100',
+    ALTA: 'bg-amber-50 text-amber-600 border-amber-100',
+    CRITICA: 'bg-rose-50 text-rose-600 border-rose-100',
+};
+
+const StatusBadge = ({ status }) => (
+    <span className={`inline-block px-2 py-0.5 text-[9px] font-black uppercase tracking-tighter rounded-lg border ${STATUS_STYLES[status] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+        {STATUS_LABELS[status] || status?.replace('_', ' ')}
+    </span>
+);
+
+const PriorityBadge = ({ priority }) => (
+    <span className={`inline-block px-2 py-0.5 text-[9px] font-black uppercase tracking-tighter rounded-lg border ${PRIORITY_STYLES[priority] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+        {priority || '—'}
+    </span>
+);
 
 const TicketsDashboard = () => {
-    const { user } = useAuth();
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL');
 
-    const fetchTickets = async (isInitial = false) => {
-        if (isInitial) setLoading(true);
+    const fetchTickets = async (showLoader = false) => {
+        if (showLoader) setLoading(true);
         try {
             const params = {};
             if (statusFilter !== 'ALL') params.estado = statusFilter;
             if (searchTerm) params.search = searchTerm;
-            
+
             const [ticketsRes, statsRes] = await Promise.all([
                 api.get('tickets/tickets/', { params }),
-                api.get('tickets/tickets/estadisticas/')
+                api.get('tickets/tickets/estadisticas/'),
             ]);
-            
+
             setTickets(ticketsRes.data.results || ticketsRes.data || []);
             setStats(statsRes.data);
         } catch (error) {
-            console.error("Error fetching tickets:", error);
+            console.error('Error fetching tickets:', error);
         } finally {
-            if (isInitial) setLoading(false);
+            setLoading(false);
         }
     };
 
     useEffect(() => {
-        // Al cambiar filtros, si ya tenemos tickets, no mostramos el loader gigante
-        fetchTickets(tickets.length === 0);
+        fetchTickets(true);
     }, [statusFilter]);
 
     const handleSearch = (e) => {
         if (e.key === 'Enter') fetchTickets(false);
     };
 
+    const kpiCards = [
+        { label: 'Abiertos', value: stats?.abiertos || 0, icon: Clock, iconBg: 'bg-blue-50', iconColor: 'text-blue-600', valueColor: 'text-blue-600' },
+        { label: 'En Progreso', value: stats?.en_progreso || 0, icon: Activity, iconBg: 'bg-amber-50', iconColor: 'text-amber-600', valueColor: 'text-amber-600' },
+        { label: 'Resueltos', value: stats?.resueltos || 0, icon: CheckCircle2, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', valueColor: 'text-emerald-600' },
+        { label: 'Total', value: stats?.total || 0, icon: Tag, iconBg: 'bg-blue-50', iconColor: 'text-blue-600', valueColor: 'text-slate-800' },
+    ];
+
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Mesa de Ayuda</h2>
-                    <p className="text-sm text-slate-500 font-medium">Gestiona tus solicitudes de soporte técnico y administrativo</p>
+        <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden">
+            <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={TITLE_ICON_BOX}>
+                        <HelpCircle className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase select-none">
+                            Mesa de Ayuda
+                        </h2>
+                        <p className="text-[10px] md:text-xs font-medium text-slate-500 mt-1.5">
+                            Gestiona solicitudes de soporte técnico y administrativo
+                        </p>
+                    </div>
                 </div>
-                <div className="flex flex-wrap gap-3">
-                    <Link 
-                        to="/tickets/categories" 
-                        className="flex items-center justify-center gap-2 px-6 py-3 bg-white border border-slate-200 hover:border-indigo-200 text-slate-600 hover:text-indigo-600 rounded-2xl font-bold shadow-sm transition-all active:scale-95"
-                    >
-                        <Tag className="w-5 h-5" />
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <Link to="/tickets/categories" className={BTN_SECONDARY}>
                         Categorías
                     </Link>
-                    <Link 
-                        to="/tickets/new" 
-                        className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-lg shadow-indigo-200 transition-all active:scale-95"
-                    >
-                        <Plus className="w-5 h-5" />
+                    <Link to="/tickets/new" className={BTN_BLUE}>
+                        <Plus className="w-4 h-4 shrink-0" />
                         Crear Ticket
                     </Link>
                 </div>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                    { label: 'Abiertos', value: stats?.abiertos || 0, color: 'text-blue-600', bg: 'bg-blue-50', icon: Clock },
-                    { label: 'En Progreso', value: stats?.en_progreso || 0, color: 'text-amber-600', bg: 'bg-amber-50', icon: Activity },
-                    { label: 'Resueltos', value: stats?.resueltos || 0, color: 'text-emerald-600', bg: 'bg-emerald-50', icon: CheckCircle2 },
-                    { label: 'Total', value: stats?.total || 0, color: 'text-slate-600', bg: 'bg-slate-100', icon: Tag },
-                ].map((stat, i) => (
-                    <motion.div 
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.1 }}
-                        key={stat.label} 
-                        className={`p-4 rounded-3xl ${stat.bg} border border-white shadow-sm flex items-center gap-4`}
+            <div className="shrink-0 grid grid-cols-2 md:grid-cols-4 gap-3">
+                {kpiCards.map((stat) => (
+                    <div
+                        key={stat.label}
+                        className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 transition-all hover:shadow-md"
                     >
-                        <div className={`p-3 rounded-2xl bg-white shadow-sm ${stat.color}`}>
+                        <div className={`w-12 h-12 rounded-xl ${stat.iconBg} ${stat.iconColor} flex items-center justify-center shrink-0`}>
                             <stat.icon className="w-5 h-5" />
                         </div>
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{stat.label}</p>
-                            <p className={`text-xl font-black ${stat.color}`}>{stat.value}</p>
+                        <div className="min-w-0">
+                            <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest line-clamp-1">{stat.label}</h3>
+                            <p className={`text-lg font-black leading-none mt-1 ${stat.valueColor}`}>{stat.value}</p>
                         </div>
-                    </motion.div>
+                    </div>
                 ))}
             </div>
 
-            {/* Filters & List */}
-            <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-                <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4 items-center justify-between">
-                    <div className="relative w-full md:w-96">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input 
-                            type="text"
-                            placeholder="Buscar por folio o título..."
-                            className="w-full pl-11 pr-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 rounded-2xl text-sm transition-all outline-none font-medium"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            onKeyDown={handleSearch}
-                        />
-                    </div>
-                    
-                    <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
-                        {['ALL', 'ABIERTO', 'EN_PROGRESO', 'RESUELTO', 'CERRADO'].map((status) => (
-                            <button
-                                key={status}
-                                onClick={() => setStatusFilter(status)}
-                                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${statusFilter === status ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                            >
-                                {status === 'ALL' ? 'Todos' : status.replace('_', ' ')}
-                            </button>
-                        ))}
-                    </div>
+            <div className="shrink-0 flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                    <input
+                        type="text"
+                        placeholder="Buscar por folio o título..."
+                        className={INPUT_FILTER}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyDown={handleSearch}
+                    />
                 </div>
+                <div className="relative w-full md:w-52 shrink-0">
+                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className={SELECT_FILTER}
+                    >
+                        <option value="ALL">Todos los estados</option>
+                        <option value="ABIERTO">Abierto</option>
+                        <option value="EN_PROGRESO">En Progreso</option>
+                        <option value="EN_ESPERA">En Espera</option>
+                        <option value="RESUELTO">Resuelto</option>
+                        <option value="CERRADO">Cerrado</option>
+                    </select>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => fetchTickets(false)}
+                    disabled={loading}
+                    className={BTN_BLUE}
+                >
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Search className="w-4 h-4 shrink-0" />}
+                    Buscar
+                </button>
+            </div>
 
-                <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-450px)] custom-scrollbar">
-                    <table className="w-full text-left border-collapse">
-                        <thead className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-slate-100 shadow-sm">
-                            <tr className="bg-slate-50/50">
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Ticket</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Asunto</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Categoría</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Estado / Prioridad</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Creado</th>
-                                <th className="px-6 py-4"></th>
-                            </tr>
-                        </thead>
-                        <AnimatePresence mode="wait">
-                            <motion.tbody 
-                                key={statusFilter + searchTerm}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                transition={{ duration: 0.2 }}
-                                className="divide-y divide-slate-50"
-                            >
+            <div className="bg-slate-50 rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-0">
+                <div className="overflow-auto flex-1 bg-white custom-scrollbar">
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center p-12 h-full flex-1 gap-3 min-h-[200px]">
+                            <Loader2 className={LOADER_SPIN} />
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest select-none">
+                                Cargando Datos...
+                            </span>
+                        </div>
+                    ) : tickets.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center p-12 text-center h-full flex-1 min-h-[200px]">
+                            <FolderSearch className="w-10 h-10 text-slate-200 mb-3" />
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest select-none">
+                                No se encontraron registros
+                            </span>
+                        </div>
+                    ) : (
+                        <table className="w-full text-left border-collapse border-spacing-0 min-w-[1100px]">
+                            <thead className="sticky top-0 z-10">
+                                <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-200 select-none shadow-sm">
+                                    <th className="px-4 py-3 align-middle border-r border-slate-100 w-28">Folio</th>
+                                    <th className="px-4 py-3 align-middle border-r border-slate-100 w-36">Solicitante</th>
+                                    <th className="px-4 py-3 align-middle border-r border-slate-100">Asunto</th>
+                                    <th className="px-4 py-3 align-middle border-r border-slate-100 max-w-[200px]">Descripción</th>
+                                    <th className="px-4 py-3 align-middle border-r border-slate-100 w-32">Categoría</th>
+                                    <th className="px-4 py-3 align-middle border-r border-slate-100 text-center w-28">Estado</th>
+                                    <th className="px-4 py-3 align-middle border-r border-slate-100 text-center w-24">Prioridad</th>
+                                    <th className="px-4 py-3 align-middle border-r border-slate-100 w-28">Creado</th>
+                                    <th className="px-4 py-3 align-middle text-center w-16">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
                                 {tickets.map((ticket) => (
-                                    <tr 
-                                        key={ticket.id} 
-                                        className="group hover:bg-slate-50/80 transition-colors"
-                                    >
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-xs font-black text-indigo-600">{ticket.correlativo}</span>
-                                                <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                                                    <User className="w-3 h-3" />
-                                                    {ticket.creado_por_obj?.username}
-                                                </span>
-                                            </div>
+                                    <tr key={ticket.id} className="hover:bg-slate-50/50 transition-colors group">
+                                        <td className="px-4 py-3 align-middle border-r border-slate-50 whitespace-nowrap">
+                                            <span className={FOLIO_TEXT}>
+                                                {ticket.correlativo}
+                                            </span>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="max-w-xs">
-                                                <p className="text-sm font-bold text-slate-700 truncate">{ticket.titulo}</p>
-                                                <p className="text-[11px] text-slate-400 truncate">{ticket.descripcion}</p>
-                                            </div>
+                                        <td className="px-4 py-3 align-middle border-r border-slate-50">
+                                            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-tighter line-clamp-2 block">
+                                                {ticket.creado_por_obj?.username || '—'}
+                                            </span>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-[11px] font-bold text-slate-600">{ticket.categoria_obj?.nombre}</span>
-                                            </div>
+                                        <td className="px-4 py-3 align-middle border-r border-slate-50 max-w-[200px]">
+                                            <span className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter line-clamp-2 block">
+                                                {ticket.titulo}
+                                            </span>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col gap-2">
-                                                <StatusBadge status={ticket.estado} />
-                                                <PriorityBadge priority={ticket.prioridad} />
-                                            </div>
+                                        <td className="px-4 py-3 align-middle border-r border-slate-50 max-w-[220px]">
+                                            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-tighter line-clamp-2 block">
+                                                {ticket.descripcion || '—'}
+                                            </span>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2 text-slate-500">
-                                                <Calendar className="w-4 h-4" />
-                                                <span className="text-[11px] font-medium">{new Date(ticket.fecha_creacion).toLocaleDateString()}</span>
-                                            </div>
+                                        <td className="px-4 py-3 align-middle border-r border-slate-50">
+                                            <span className="text-[11px] font-medium text-slate-600 uppercase tracking-tighter line-clamp-2 block">
+                                                {ticket.categoria_obj?.nombre || '—'}
+                                            </span>
                                         </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <Link 
+                                        <td className="px-4 py-3 align-middle border-r border-slate-50 text-center">
+                                            <StatusBadge status={ticket.estado} />
+                                        </td>
+                                        <td className="px-4 py-3 align-middle border-r border-slate-50 text-center">
+                                            <PriorityBadge priority={ticket.prioridad} />
+                                        </td>
+                                        <td className="px-4 py-3 align-middle border-r border-slate-50 whitespace-nowrap">
+                                            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-tighter">
+                                                {new Date(ticket.fecha_creacion).toLocaleDateString('es-CL')}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 align-middle text-center">
+                                            <Link
                                                 to={`/tickets/${ticket.id}`}
-                                                className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 hover:shadow-lg transition-all"
+                                                className="inline-flex p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                                title="Ver detalle"
                                             >
-                                                <ChevronRight className="w-5 h-5" />
+                                                <Eye className="w-3.5 h-3.5" />
                                             </Link>
                                         </td>
                                     </tr>
                                 ))}
-                            </motion.tbody>
-                        </AnimatePresence>
-                    </table>
+                            </tbody>
+                        </table>
+                    )}
                 </div>
-
-                {tickets.length === 0 && !loading && (
-                    <div className="p-20 text-center">
-                        <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto mb-4 border-2 border-white shadow-inner">
-                            <MessageSquare className="w-8 h-8 text-slate-300" />
-                        </div>
-                        <h3 className="text-lg font-bold text-slate-700">No se encontraron tickets</h3>
-                        <p className="text-sm text-slate-400">Intenta cambiar los filtros o crea uno nuevo.</p>
-                    </div>
-                )}
-                
-                {loading && (
-                    <div className="p-20 text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-                        <p className="text-sm text-slate-400 mt-4 font-bold">Cargando mesa de ayuda...</p>
+                {!loading && (
+                    <div className="p-3 bg-slate-50 border-t border-slate-200 shrink-0">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest select-none">
+                            Mostrando {tickets.length} ticket{tickets.length !== 1 ? 's' : ''}
+                        </span>
                     </div>
                 )}
             </div>
