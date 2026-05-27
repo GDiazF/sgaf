@@ -155,7 +155,8 @@ const Layout = () => {
             '/reservas': 'Reservas',
             '/personal-ti': 'Personal TI',
             '/procedimientos': 'Procedimientos',
-            '/admin/audit-log': 'Auditoría de Sistema'
+            '/admin/audit-log': 'Auditoría de Sistema',
+            '/admin/personalizacion/login/backgrounds': 'Personalización'
         };
 
         const baseTitle = 'SGAF - SLEP Iquique';
@@ -1026,6 +1027,16 @@ const Layout = () => {
                                                             <History className="w-4 h-4" />
                                                         </div>
                                                         Auditoría de Sistema
+                                                    </Link>
+                                                    <Link
+                                                        to="/admin/personalizacion/login/backgrounds"
+                                                        onClick={() => setIsProfileOpen(false)}
+                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                    >
+                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                            <Settings className="w-4 h-4" />
+                                                        </div>
+                                                        Personalización
                                                     </Link>
                                                     <Link
                                                         to="/admin/email-settings"

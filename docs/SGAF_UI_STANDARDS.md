@@ -37,9 +37,11 @@ Todo botón es redondeado (`rounded-xl` o `rounded-lg`).
 | Altura estándar | `h-10` (40px, igual que inputs `no-global`) |
 | Ícono dentro del botón | `w-4 h-4` |
 
+- **Color oficial del sistema para botones primarios**: `bg-blue-600` con `hover:bg-blue-700`.
+
 - **Botón Primario (Crear, Guardar, Acción Principal)**:
   - Estructura: Flex, ícono a la izquierda del texto (si lleva ícono).
-  - Clases: `bg-indigo-600 hover:bg-indigo-700 text-white h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 flex items-center gap-2 shrink-0 active:scale-95`
+  - Clases: `bg-blue-600 hover:bg-blue-700 text-white h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-100 flex items-center gap-2 shrink-0 active:scale-95`
 - **Botón Secundario (Cancelar, Volver)**:
   - Clases: `bg-slate-100 hover:bg-slate-200 text-slate-600 h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shrink-0`
 - **Botón Primario compacto (tablas / tarjetas estrechas)**:
@@ -121,7 +123,7 @@ El viewport completo NO debe hacer scroll general. Solo las tablas o listas inte
                 <p className="text-[10px] md:text-xs font-medium text-slate-500">Subtítulo descriptivo de página</p>
             </div>
         </div>
-        <button className="bg-indigo-600 hover:bg-indigo-700 text-white h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 flex items-center gap-2 active:scale-95">
+        <button className="bg-blue-600 hover:bg-blue-700 text-white h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-100 flex items-center gap-2 active:scale-95">
             NUEVO
         </button>
     </div>
@@ -191,7 +193,7 @@ Si el usuario verá **muy pocos elementos** (ej: 1–2 establecimientos asignado
                     <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mt-1">DETALLE SECUNDARIO</p>
                 </div>
             </div>
-            <button className="bg-indigo-600 hover:bg-indigo-700 text-white h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 flex items-center gap-2 shrink-0 active:scale-95">
+            <button className="bg-blue-600 hover:bg-blue-700 text-white h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-100 flex items-center gap-2 shrink-0 active:scale-95">
                 ACCIÓN PRINCIPAL
             </button>
         </div>
@@ -400,6 +402,9 @@ Para vistas que muestran resúmenes (Ej: Total de facturas, Presupuesto, etc.), 
 **ESTRICTAMENTE PROHIBIDO** usar colores personalizados por módulo (ej: morado para mesa de ayuda, verde para otro) en el menú de navegación principal.
 El elemento seleccionado (activo) en el Sidebar siempre debe usar el azul/índigo estándar del sistema para mantener coherencia visual.
 
+- **Color oficial de fondo del Sidebar (contenedor principal)**: `bg-slate-900`.
+- **Regla de consistencia visual**: cualquier panel institucional oscuro (como login) debe reutilizar `bg-slate-900` como base, evitando gradientes morados.
+
 - **Item Activo**: Fondo suave índigo/azul con texto fuerte. 
   - Ejemplo: `bg-indigo-50 text-indigo-600 font-bold` (o `bg-blue-50 text-blue-600`).
 - **Item Inactivo**: Fondo transparente con texto gris.
@@ -447,3 +452,4 @@ Los formularios con múltiples inputs nunca deben usar anchos fijos manuales ni 
 ---
 **FIN DEL DOCUMENTO.**
 *Nota para IA: Analiza minuciosamente estas reglas antes de modificar componentes visuales.*
+

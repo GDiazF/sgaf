@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }) => {
 
         // Sincronizar logout entre pestañas
         const handleStorageChange = (e) => {
-            if (e.key === 'access_token' && !getSessionCookie('access_token')) {
+            if (e.key === 'access_token' && typeof e.newValue === 'string' && e.newValue.startsWith('logout-')) {
                 setUser(null);
             }
         };

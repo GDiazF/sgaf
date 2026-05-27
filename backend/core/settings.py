@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'conciliacion',
     'tickets',
     'ejecutivos',
+    'personalizacion_sistema',
 ]
 
 MIDDLEWARE = [
