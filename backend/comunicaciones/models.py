@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 class CuentaSMTP(models.Model):
@@ -52,3 +53,37 @@ class PlantillaCorreo(models.Model):
 
     def __str__(self):
         return f"{self.get_proposito_display()} - {self.nombre}"
+
+
+class DestinatariosCorreoOperativo(models.Model):
+    proposito = models.CharField(
+        max_length=50,
+        choices=PlantillaCorreo.PROPOSITO_CHOICES,
+        unique=True,
+        verbose_name="Propósito"
+    )
+    grupos = models.ManyToManyField(
+        'funcionarios.Grupo',
+        blank=True,
+        verbose_name="Grupos destinatarios"
+    )
+    usuarios = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        verbose_name="Usuarios destinatarios"
+    )
+    emails_adicionales = models.TextField(
+        blank=True,
+        default='',
+        verbose_name="Emails adicionales",
+        help_text="Correos externos o institucionales separados por coma, punto y coma o salto de línea."
+    )
+    activo = models.BooleanField(default=True, verbose_name="Activo")
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Destinatarios de Correo Operativo"
+        verbose_name_plural = "Destinatarios de Correos Operativos"
+
+    def __str__(self):
+        return self.get_proposito_display()

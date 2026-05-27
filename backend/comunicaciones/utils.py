@@ -1,9 +1,58 @@
 from django.template import Template, Context
 from django.core.mail import get_connection, EmailMessage
-from .models import CuentaSMTP, PlantillaCorreo
+from .models import CuentaSMTP, DestinatariosCorreoOperativo, PlantillaCorreo
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+
+def obtener_destinatarios_correo_operativo(proposito):
+    """
+    Resuelve destinatarios configurados para correos operativos.
+    Incluye usuarios vinculados a grupos de funcionarios, usuarios específicos y emails adicionales.
+    """
+    config = (
+        DestinatariosCorreoOperativo.objects
+        .prefetch_related('grupos', 'usuarios')
+        .filter(proposito=proposito, activo=True)
+        .first()
+    )
+    if not config:
+        logger.warning(f"No hay destinatarios activos configurados para el propósito: {proposito}")
+        return []
+
+    destinatarios = []
+
+    for grupo in config.grupos.all():
+        usuarios_grupo = (
+            grupo.funcionarios
+            .filter(estado=True, user__is_active=True)
+            .exclude(user__email__isnull=True)
+            .exclude(user__email='')
+        )
+        destinatarios.extend(usuarios_grupo.values_list('user__email', flat=True))
+
+    usuarios_directos = (
+        config.usuarios
+        .filter(is_active=True)
+        .exclude(email__isnull=True)
+        .exclude(email='')
+    )
+    destinatarios.extend(usuarios_directos.values_list('email', flat=True))
+
+    emails_adicionales = [
+        email.strip()
+        for email in re.split(r'[,;\n]+', config.emails_adicionales or '')
+        if email.strip()
+    ]
+    destinatarios.extend(emails_adicionales)
+
+    deduplicados = {}
+    for email in destinatarios:
+        deduplicados[email.lower()] = email
+
+    return list(deduplicados.values())
 
 def enviar_correo_maestro(proposito, destinatarios, contexto, archivo_adjunto=None):
     """

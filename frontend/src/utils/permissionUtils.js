@@ -8,8 +8,6 @@ export const groupPermissions = (permissions) => {
         let module = 'Otros';
         // Normalize to remove accents for easier matching
         const name = perm.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const codename = (perm.codename || '').toLowerCase();
-
         // Módulos del Navbar (Modelo Dummy eliminado)
 
         const appLabel = (perm.content_type_app_label || '').toLowerCase();
@@ -124,6 +122,7 @@ export const getFriendlyPermName = (perm) => {
         'emailconfiguration': 'Configuración Global de Correo',
         'plantillacorreo': 'Plantillas de Correo',
         'cuentasmtp': 'Cuentas SMTP (Servidores)',
+        'destinatarioscorreooperativo': 'Destinatarios de Correos Operativos',
         'rutatransporte': 'Rutas de Transporte',
         'serviciocontrato': 'Gestión Operativa de Rutas',
         'periodocobro': 'Periodos de Cobro / Asistencia',

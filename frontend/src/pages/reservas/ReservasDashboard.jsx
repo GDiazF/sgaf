@@ -4,7 +4,7 @@ import {
     Clock, Truck, Monitor, Package, User, AlertCircle, Lock,
     RefreshCw, Building2, Settings, Power, Trash2, Users, MapPin
 } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../api';
 import { useAuth } from '../../context/AuthContext';
 
@@ -184,6 +184,7 @@ const ReservasDashboard = () => {
     const [selectedBulk, setSelectedBulk] = useState([]);
     const [highlightedId, setHighlightedId] = useState(null);
     const location = useLocation();
+    const navigate = useNavigate();
 
     const handleBulkUpdate = async () => {
         setAdminSaving(true);
@@ -262,6 +263,23 @@ const ReservasDashboard = () => {
 
     const processedSearch = useRef('');
 
+    const clearDeepLinkParams = useCallback(() => {
+        const params = new URLSearchParams(location.search);
+        const hadDeepLink = params.has('date') || params.has('highlight');
+        if (!hadDeepLink) return;
+
+        params.delete('date');
+        params.delete('highlight');
+        const nextSearch = params.toString();
+        navigate(
+            {
+                pathname: location.pathname,
+                search: nextSearch ? `?${nextSearch}` : ''
+            },
+            { replace: true }
+        );
+    }, [location.pathname, location.search, navigate]);
+
     // Handle Deep Linking from Notifications
     useEffect(() => {
         const params = new URLSearchParams(location.search);
@@ -301,11 +319,13 @@ const ReservasDashboard = () => {
                     // Quitar el resaltado después de un tiempo
                     setTimeout(() => setHighlightedId(null), 5000);
                 }, 500);
+                clearDeepLinkParams();
             } else if (!loading) {
                 processedSearch.current = location.search;
+                clearDeepLinkParams();
             }
         }
-    }, [location.search, loading, reservas, currentDate]);
+    }, [location.search, loading, reservas, currentDate, clearDeepLinkParams]);
 
     // Auto-ajustar horas disponibles cuando cambia el recurso o fecha en el modal
     useEffect(() => {

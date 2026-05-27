@@ -1,7 +1,7 @@
 from django.conf import settings
 import threading
 from django.utils import timezone
-from comunicaciones.utils import enviar_correo_maestro
+from comunicaciones.utils import enviar_correo_maestro, obtener_destinatarios_correo_operativo
 
 def _get_reservation_context(solicitud):
     """Prepara el contexto común para todas las notificaciones de reserva."""
@@ -31,12 +31,18 @@ def enviar_correo_nueva_solicitud(solicitud):
     
     # 1. Notificar al Admin (Lista dinámica)
     try:
-        config = EmailConfiguration.get_config()
-        admin_emails = config.get_reservas_emails_list()
-    except:
+        admin_emails = obtener_destinatarios_correo_operativo('RESERVA_AVISO_ADMIN')
+    except Exception:
         admin_emails = []
 
-    # Si no hay en BD, usar settings como fallback
+    # Si no hay destinatarios operativos, mantener compatibilidad con la config antigua.
+    if not admin_emails:
+        try:
+            config = EmailConfiguration.get_config()
+            admin_emails = config.get_reservas_emails_list()
+        except Exception:
+            admin_emails = []
+
     if not admin_emails:
         fallback = getattr(settings, 'RESERVAS_ADMIN_EMAIL', None)
         if fallback:
