@@ -73,6 +73,7 @@ import RolesManagement from './pages/admin/RolesManagement';
 import AuditLog from './pages/admin/AuditLog';
 import EmailSettings from './pages/admin/EmailSettings';
 import ConciliacionDashboard from './pages/admin/ConciliacionDashboard';
+import LoginBackgroundsAdmin from './pages/admin/LoginBackgroundsAdmin';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -263,6 +264,7 @@ function App() {
                   <Route path="admin/audit-log" element={<AuditLog />} />
                   <Route path="admin/email-settings" element={<EmailSettings />} />
                   <Route path="admin/conciliacion" element={<ConciliacionDashboard />} />
+                  <Route path="admin/personalizacion/login/backgrounds" element={<LoginBackgroundsAdmin />} />
                 </Route>
               </Route>
             </Route>

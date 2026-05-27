@@ -1,11 +1,35 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Lock, User, AlertCircle, Eye, EyeOff, ShieldCheck, CheckCircle2, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Lock, User, AlertCircle, Eye, EyeOff, ShieldCheck, RefreshCw, ArrowLeft, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api';
+import axios from 'axios';
 import { QRCodeCanvas } from 'qrcode.react';
 import { APP_VERSION } from '../version';
+import './LoginResponsive.css';
+
+const fieldLabelClass = 'block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1';
+const fieldClass = 'no-global w-full h-10 text-[11px] font-bold bg-white border border-slate-200 rounded-xl outline-none focus:border-indigo-500 transition-all shadow-sm placeholder:text-slate-300';
+const iconFieldClass = `${fieldClass} pl-10 pr-3`;
+const primaryButtonClass = 'bg-blue-600 hover:bg-blue-700 text-white h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed';
+const secondaryButtonClass = 'bg-slate-100 hover:bg-slate-200 text-slate-600 h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 active:scale-95';
+const MotionDiv = motion.div;
+const MotionForm = motion.form;
+
+const resolvePublicImageUrl = (path) => {
+    if (!path) return null;
+    if (/^https?:\/\//i.test(path)) return path;
+
+    const configuredApi = import.meta.env.DEV ? import.meta.env.VITE_API_URL : '/api/';
+    try {
+        const apiUrl = new URL(configuredApi, window.location.origin);
+        const backendOrigin = `${apiUrl.protocol}//${apiUrl.host}`;
+        return new URL(path, backendOrigin).toString();
+    } catch {
+        return new URL(path, window.location.origin).toString();
+    }
+};
 
 const Login = () => {
     const [username, setUsername] = useState('');
@@ -18,14 +42,86 @@ const Login = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [resendingEmail, setResendingEmail] = useState(false);
+    const [loginBackgrounds, setLoginBackgrounds] = useState([]);
+    const [backgroundIndex, setBackgroundIndex] = useState(0);
+    const [rotationSeconds, setRotationSeconds] = useState(8);
 
-    const { login, verifyMFA, completeLogin, logout } = useAuth();
+    const { login, verifyMFA, completeLogin } = useAuth();
     const navigate = useNavigate();
 
-    // Limpiar cualquier sesión previa al entrar al login para evitar conflictos de cookies
-    React.useEffect(() => {
-        logout();
+    useEffect(() => {
+        let mounted = true;
+        const fetchBackgrounds = async () => {
+            try {
+                try {
+                    const configRes = await axios.get('/api/personalizacion/login/backgrounds/public-config/');
+                    const seconds = Number(configRes.data?.rotation_seconds || 8);
+                    if (seconds >= 2 && seconds <= 120) {
+                        setRotationSeconds(seconds);
+                    }
+                } catch {
+                    setRotationSeconds(8);
+                }
+
+                const res = await axios.get('/api/personalizacion/login/backgrounds/active/');
+                const raw = Array.isArray(res.data) ? res.data : [];
+                const normalized = raw
+                    .map((item) => ({
+                        id: item.id,
+                        imageUrl: resolvePublicImageUrl(item.imagen),
+                        establecimientoNombre: item.establecimiento_nombre || '',
+                        establecimientoLogo: resolvePublicImageUrl(item.establecimiento_logo),
+                        establecimientoDirector: item.establecimiento_director || '',
+                        establecimientoDireccion: item.establecimiento_direccion || '',
+                    }))
+                    .filter((item) => Boolean(item.imageUrl));
+
+                if (!normalized.length || !mounted) return;
+
+                const preloaded = await Promise.all(
+                    normalized.map(
+                        (item) =>
+                            new Promise((resolve) => {
+                                const img = new Image();
+                                img.onload = () => resolve(item);
+                                img.onerror = () => resolve(null);
+                                img.src = item.imageUrl;
+                            })
+                    )
+                );
+                if (mounted) {
+                    const successful = preloaded.filter(Boolean);
+                    setLoginBackgrounds(successful.length ? successful : normalized);
+                    setBackgroundIndex(0);
+                }
+            } catch {
+                if (mounted) setLoginBackgrounds([]);
+            }
+        };
+        fetchBackgrounds();
+        return () => {
+            mounted = false;
+        };
     }, []);
+
+    useEffect(() => {
+        if (loginBackgrounds.length < 2) return undefined;
+        const timer = setInterval(() => {
+            setBackgroundIndex((prev) => (prev + 1) % loginBackgrounds.length);
+        }, Math.max(2, Number(rotationSeconds || 8)) * 1000);
+        return () => clearInterval(timer);
+    }, [loginBackgrounds, rotationSeconds]);
+
+    const activeBackground = useMemo(() => {
+        if (!loginBackgrounds.length) return null;
+        return loginBackgrounds[backgroundIndex] || null;
+    }, [loginBackgrounds, backgroundIndex]);
+    const handleEnterSubmit = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.currentTarget.form?.requestSubmit();
+        }
+    };
 
     const handleLoginSubmit = async (e) => {
         e.preventDefault();
@@ -39,14 +135,16 @@ const Login = () => {
                     method: result.mfa_method,
                     emailMask: result.email_mask,
                     token: result.mfa_token,
-                    availableMethods: result.available_methods || ['EMAIL']
+                    availableMethods: result.available_methods || ['EMAIL'],
+                    setupRequired: false
                 });
+                setMfaCode('');
             } else {
                 navigate('/');
             }
         } catch (err) {
             console.error('Error during login:', err);
-            setError(err.response?.data?.error || 'Credenciales inválidas. Intente nuevamente.');
+            setError(err.response?.data?.error || 'Credenciales invalidas. Intenta nuevamente.');
         } finally {
             setIsLoading(false);
         }
@@ -63,18 +161,18 @@ const Login = () => {
                 try {
                     const setupRes = await api.get(`auth/mfa/setup/?mfa_token=${mfaState.token}`);
                     setSetupMfaData(setupRes.data);
-                    setMfaState(prev => ({ ...prev, setupRequired: true }));
+                    setMfaState((prev) => ({ ...prev, setupRequired: true }));
                     setMfaCode('');
                 } catch (setupErr) {
-                    console.error("Error al obtener datos de configuración MFA", setupErr);
-                    setError("El código fue correcto, pero hubo un error al cargar el QR. Por favor reintente.");
+                    console.error('Error al obtener datos de configuracion MFA', setupErr);
+                    setError('Codigo correcto, pero hubo un error al cargar el QR. Reintenta.');
                 }
             } else {
                 navigate('/');
             }
         } catch (err) {
-            console.error("Error en verifyMFA", err);
-            setError(err.response?.data?.error || 'Código inválido o expirado.');
+            console.error('Error en verifyMFA', err);
+            setError(err.response?.data?.error || 'Codigo invalido o expirado.');
         } finally {
             setIsLoading(false);
         }
@@ -92,17 +190,16 @@ const Login = () => {
                 remember_device: rememberDevice
             });
 
-            // Si el setup fue exitoso, el backend nos devuelve los tokens finales
             if (res.data.access) {
                 completeLogin(res.data);
                 navigate('/');
             } else {
-                setError("Configuración exitosa, por favor ingresa nuevamente.");
-                setMfaState({ ...mfaState, required: false, setupRequired: false });
+                setError('Configuracion exitosa, por favor ingresa nuevamente.');
+                setMfaState((prev) => ({ ...prev, required: false, setupRequired: false }));
             }
         } catch (err) {
-            console.error("Error en handleSetupSubmit", err);
-            setError(err.response?.data?.error || 'Código incorrecto. Verifica el autenticador.');
+            console.error('Error en handleSetupSubmit', err);
+            setError(err.response?.data?.error || 'Codigo incorrecto. Verifica el autenticador.');
         } finally {
             setIsLoading(false);
         }
@@ -112,10 +209,10 @@ const Login = () => {
         setResendingEmail(true);
         try {
             await api.post('auth/mfa/send-otp/', { mfa_token: mfaState.token });
-            setError('Nuevo código enviado a tu correo.');
+            setError('Nuevo codigo enviado a tu correo.');
             setTimeout(() => setError(''), 3000);
-        } catch (err) {
-            setError('Error al reenviar el código.');
+        } catch {
+            setError('Error al reenviar el codigo.');
         } finally {
             setResendingEmail(false);
         }
@@ -129,328 +226,350 @@ const Login = () => {
         setMfaCode('');
     };
 
+    const showSuccessNotice = error.toLowerCase().includes('enviado');
+    const panelTitle = !mfaState.required
+        ? 'Iniciar Sesion'
+        : mfaState.setupRequired
+            ? 'Configurar Autenticador'
+            : 'Verificar Identidad';
+    const panelSubtitle = !mfaState.required
+        ? 'Ingresa tus credenciales institucionales'
+        : mfaState.setupRequired
+            ? 'Escanea el codigo QR y valida el codigo de 6 digitos'
+            : mfaState.method === 'EMAIL'
+                ? `Codigo enviado a ${mfaState.emailMask}`
+                : 'Ingresa el codigo generado en tu aplicacion';
 
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative"
-            >
-                {/* Decorative header */}
-                <div className="bg-slate-900 p-8 text-center relative overflow-hidden">
-                    <motion.div
-                        initial={{ y: 20, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        transition={{ delay: 0.2 }}
-                        className="relative z-10 flex flex-col items-center"
-                    >
-                        {/* Modified for wide logo */}
-                        <div className="mb-6 p-2 w-72 h-36 flex items-center justify-center bg-white/10 rounded-2xl backdrop-blur-md border border-white/10">
-                            <img src="/logo.png" alt="SLEP Logo" className="w-full h-full object-contain" />
-                        </div>
-                        <h1 className="text-2xl font-black text-white tracking-tight">
-                            {mfaState.required ? "Seguridad" : "Bienvenido"}
-                        </h1>
-                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-1">Sistema de Gestión SLEP Iquique</p>
-                    </motion.div>
-                </div>
+        <div className="login-shell min-h-screen bg-slate-100 relative overflow-hidden flex items-center justify-center p-3 sm:p-4 md:p-6">
+            <div className="absolute inset-0 pointer-events-none">
+                {loginBackgrounds.map((item, index) => (
+                    <div
+                        key={item.id || item.imageUrl}
+                        className="absolute inset-0 bg-center bg-cover transition-opacity duration-1000"
+                        style={{
+                            backgroundImage: `url(${item.imageUrl})`,
+                            opacity: index === backgroundIndex ? 1 : 0,
+                        }}
+                    />
+                ))}
+                <div className="absolute inset-0 bg-slate-900/35" />
+                {!activeBackground && <div className="absolute -top-20 right-[-40px] h-56 w-56 rounded-full bg-white/10 blur-2xl" />}
+                {!activeBackground && <div className="absolute bottom-[-40px] left-[-40px] h-48 w-48 rounded-full bg-slate-500/20 blur-2xl" />}
+            </div>
 
-                <div className="p-8 pt-10">
-                    <AnimatePresence mode="wait">
+            {activeBackground?.establecimientoNombre && (
+                <MotionDiv
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeOut' }}
+                    className="establishment-card rounded-2xl border border-white/35 bg-slate-900/75 backdrop-blur-md text-white p-3 sm:p-3.5 shadow-2xl"
+                >
+                    <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-white/90 flex items-center justify-center overflow-hidden shrink-0">
+                            {activeBackground.establecimientoLogo ? (
+                                <img
+                                    src={activeBackground.establecimientoLogo}
+                                    alt={activeBackground.establecimientoNombre}
+                                    className="w-full h-full object-contain"
+                                />
+                            ) : (
+                                <ShieldCheck className="w-6 h-6 text-slate-500" />
+                            )}
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-[9px] uppercase tracking-widest text-slate-300 font-black">Establecimiento</p>
+                            <p className="text-[13px] sm:text-sm leading-tight font-bold text-white break-words">{activeBackground.establecimientoNombre}</p>
+                            {activeBackground.establecimientoDirector && (
+                                <p className="text-[11px] text-slate-200 mt-1">
+                                    Director: {activeBackground.establecimientoDirector}
+                                </p>
+                            )}
+                            {activeBackground.establecimientoDireccion && (
+                                <p className="text-[11px] text-slate-300 mt-0.5 break-words">
+                                    {activeBackground.establecimientoDireccion}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </MotionDiv>
+            )}
+
+            <MotionDiv
+                initial={{ opacity: 0, y: 12, scale: 0.985 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.28, ease: 'easeOut' }}
+                className="login-card relative w-full max-w-5xl rounded-2xl md:rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden bg-white"
+            >
+                <section className="login-left relative bg-slate-900 text-white px-4 py-5 sm:px-6 sm:py-6 md:px-8 md:py-7 lg:px-9 lg:py-8 flex flex-col justify-center gap-5 sm:gap-6">
+                    <div className="relative z-10 text-center flex flex-col items-center justify-center">
+                        <div className="w-full max-w-[500px] h-32 sm:h-36 md:h-52 rounded-2xl bg-slate-950/65 border border-white/20 shadow-xl shadow-black/30 px-5 md:px-7 py-4 flex items-center justify-center backdrop-blur-sm">
+                            <img src="/logo.png" alt="SLEP Iquique" className="w-full h-full object-contain" />
+                        </div>
+
+                        <p className="mt-8 text-[10px] sm:text-[11px] font-black tracking-[0.2em] uppercase text-slate-300">Plataforma Institucional</p>
+                        <h1 className="mt-2 text-lg sm:text-xl md:text-[30px] font-bold tracking-tight leading-tight uppercase text-center">Sistema de Gestion Administrativa</h1>
+                        <p className="mt-3 text-[11px] sm:text-xs text-slate-200 max-w-md leading-relaxed">
+                            Gestiona procesos, solicitudes y servicios desde un unico punto de acceso.
+                        </p>
+
+                    </div>
+
+                </section>
+
+                <section className="login-right px-4 py-4 sm:px-5 sm:py-5 md:px-8 md:py-6 flex flex-col bg-white">
+                    <div className="mb-5 border-b border-slate-200 pb-4">
+                        <h2 className="text-base sm:text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase">{panelTitle}</h2>
+                        <p className="text-[10px] sm:text-[11px] md:text-xs font-medium text-slate-500 mt-1.5 flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5" />
+                            {panelSubtitle}
+                        </p>
+                    </div>
+
+                    <div className="w-full max-w-md mx-auto">
+                        <AnimatePresence mode="wait">
                         {!mfaState.required ? (
-                            <motion.form
+                            <MotionForm
                                 key="login-step"
-                                initial={{ opacity: 0, x: -20 }}
+                                initial={{ opacity: 0, x: -12 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 20 }}
+                                exit={{ opacity: 0, x: 12 }}
                                 onSubmit={handleLoginSubmit}
-                                className="space-y-6"
+                                className="space-y-5"
                             >
                                 {error && (
-                                    <motion.div
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        className="bg-red-50 text-red-600 p-3 rounded-xl text-sm flex items-center gap-2 border border-red-100"
-                                    >
-                                        <AlertCircle className="w-4 h-4" />
-                                        {error}
-                                    </motion.div>
+                                    <div className="bg-rose-50 text-rose-600 text-[10px] font-bold uppercase p-3 rounded-xl border border-rose-100 flex gap-2 items-center">
+                                        <AlertCircle className="w-4 h-4 shrink-0" />
+                                        <span>{error}</span>
+                                    </div>
                                 )}
 
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        id="username"
-                                        className="peer w-full !pl-12 !pr-4 py-3 bg-white border-2 border-slate-100 rounded-xl !focus:border-slate-900 !focus:ring-[6px] !focus:ring-slate-900/5 outline-none transition-all placeholder:text-transparent text-slate-900 font-bold text-sm"
-                                        placeholder=" "
-                                        value={username}
-                                        onChange={(e) => setUsername(e.target.value)}
-                                        required
-                                    />
-                                    <label
-                                        htmlFor="username"
-                                        className="absolute !left-12 -top-2 bg-white px-2 text-[8px] font-black text-slate-400 uppercase tracking-widest transition-all 
-                                        peer-placeholder-shown:text-[11px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:top-3.5 peer-placeholder-shown:bg-transparent peer-placeholder-shown:font-bold
-                                        peer-focus:-top-2 peer-focus:text-[8px] peer-focus:text-slate-900 peer-focus:bg-white pointer-events-none"
-                                    >
-                                        Usuario
-                                    </label>
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 peer-focus:text-slate-900 transition-colors pointer-events-none" />
+                                <div>
+                                    <label htmlFor="username" className={fieldLabelClass}>Usuario</label>
+                                    <div className="relative">
+                                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                        <input
+                                            id="username"
+                                            type="text"
+                                            className={iconFieldClass}
+                                            value={username}
+                                            onChange={(e) => setUsername(e.target.value)}
+                                            onKeyDown={handleEnterSubmit}
+                                            placeholder="Ingresa tu usuario"
+                                            required
+                                        />
+                                    </div>
                                 </div>
 
-                                <div className="relative">
-                                    <input
-                                        type={showPassword ? "text" : "password"}
-                                        id="password"
-                                        className="peer w-full !pl-12 !pr-12 py-3 bg-white border-2 border-slate-100 rounded-xl !focus:border-slate-900 !focus:ring-[6px] !focus:ring-slate-900/5 outline-none transition-all placeholder:text-transparent text-slate-900 font-bold text-sm"
-                                        placeholder=" "
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        required
-                                    />
-                                    <label
-                                        htmlFor="password"
-                                        className="absolute !left-12 -top-2 bg-white px-2 text-[8px] font-black text-slate-400 uppercase tracking-widest transition-all 
-                                        peer-placeholder-shown:text-[11px] peer-placeholder-shown:text-slate-400 peer-placeholder-shown:top-3.5 peer-placeholder-shown:bg-transparent peer-placeholder-shown:font-bold
-                                        peer-focus:-top-2 peer-focus:text-[8px] peer-focus:text-slate-900 peer-focus:bg-white pointer-events-none"
-                                    >
-                                        Contraseña
-                                    </label>
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 peer-focus:text-slate-900 transition-colors pointer-events-none" />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600 transition-colors outline-none"
-                                    >
-                                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                    </button>
+                                <div>
+                                    <label htmlFor="password" className={fieldLabelClass}>Contrasena</label>
+                                    <div className="relative">
+                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                        <input
+                                            id="password"
+                                            type={showPassword ? 'text' : 'password'}
+                                            className={`${iconFieldClass} pr-11`}
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            onKeyDown={handleEnterSubmit}
+                                            placeholder="Ingresa tu contrasena"
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors"
+                                        >
+                                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="text-right">
                                     <button
                                         type="button"
                                         onClick={() => navigate('/forgot-password')}
-                                        className="text-[10px] font-black text-slate-400 hover:text-slate-900 uppercase tracking-widest transition-colors"
+                                        className="text-[10px] font-black text-slate-500 hover:text-indigo-600 uppercase tracking-widest transition-colors"
                                     >
-                                        ¿Olvidaste tu contraseña?
+                                        Olvide mi contrasena
                                     </button>
                                 </div>
 
-                                <button
-                                    type="submit"
-                                    disabled={isLoading}
-                                    className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-3.5 rounded-xl shadow-xl shadow-slate-900/10 transition-all transform active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center mt-2 uppercase text-[11px] tracking-widest"
-                                >
-                                    {isLoading ? (
-                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                    ) : (
-                                        "Iniciar Sesión"
-                                    )}
+                                <button type="submit" disabled={isLoading} className={`w-full ${primaryButtonClass}`}>
+                                    {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Iniciar Sesion'}
                                 </button>
-                            </motion.form>
+                            </MotionForm>
                         ) : mfaState.setupRequired ? (
-                            <motion.form
+                            <MotionForm
                                 key="mfa-setup"
-                                initial={{ opacity: 0, x: 20 }}
+                                initial={{ opacity: 0, x: 12 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -20 }}
+                                exit={{ opacity: 0, x: -12 }}
                                 onSubmit={handleSetupSubmit}
-                                className="space-y-6"
+                                className="space-y-5"
                             >
-                                <div className="text-center space-y-2">
-                                    <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-blue-100">
-                                        <ShieldCheck className="w-8 h-8" />
-                                    </div>
-                                    <h2 className="text-lg font-black text-slate-800 uppercase">Configurar Autenticador</h2>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Escanea el código con tu App (Google Authenticator, etc)</p>
-                                </div>
-
                                 {error && (
-                                    <div className="bg-red-50 text-red-600 p-3 rounded-xl text-[11px] font-bold border border-red-100 flex items-center gap-2">
-                                        <AlertCircle className="w-4 h-4" />
-                                        {error}
+                                    <div className="bg-rose-50 text-rose-600 text-[10px] font-bold uppercase p-3 rounded-xl border border-rose-100 flex gap-2 items-center">
+                                        <AlertCircle className="w-4 h-4 shrink-0" />
+                                        <span>{error}</span>
                                     </div>
                                 )}
 
-                                <div className="flex justify-center p-4 bg-white border-2 border-slate-100 rounded-2xl shadow-inner group">
+                                <div className="flex justify-center p-4 rounded-2xl border border-slate-200 bg-slate-50">
                                     {setupMfaData?.otpauth_url ? (
-                                        <div className="relative">
-                                            <QRCodeCanvas value={setupMfaData.otpauth_url} size={180} />
-                                            <div className="absolute inset-0 border-4 border-white/50 rounded-lg pointer-events-none"></div>
-                                        </div>
+                                        <QRCodeCanvas value={setupMfaData.otpauth_url} size={180} />
                                     ) : (
-                                        <div className="w-[180px] h-[180px] bg-slate-50 animate-pulse rounded-lg flex items-center justify-center">
-                                            <RefreshCw className="w-8 h-8 text-slate-200 animate-spin" />
+                                        <div className="w-[180px] h-[180px] rounded-xl bg-white border border-slate-200 flex items-center justify-center">
+                                            <RefreshCw className="w-7 h-7 text-slate-300 animate-spin" />
                                         </div>
                                     )}
                                 </div>
 
-                                <div className="space-y-4">
-                                    <p className="text-[9px] text-slate-400 text-center font-bold uppercase tracking-widest">Luego ingresa el código de 6 dígitos generado:</p>
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            maxLength={6}
-                                            className="w-full text-center py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:bg-white focus:border-slate-900 outline-none transition-all text-2xl font-black text-slate-900 tracking-[0.5em] placeholder:text-slate-200"
-                                            placeholder="000000"
-                                            value={mfaCode}
-                                            onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
-                                            required
-                                            autoFocus
-                                        />
-                                    </div>
-
-                                    <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl cursor-pointer group hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200">
-                                        <div className="flex items-center justify-center w-5 h-5 rounded-md border-2 border-slate-200 group-hover:border-slate-900 bg-white transition-all">
-                                            <input
-                                                type="checkbox"
-                                                className="hidden"
-                                                checked={rememberDevice}
-                                                onChange={(e) => setRememberDevice(e.target.checked)}
-                                            />
-                                            {rememberDevice && <CheckCircle2 className="w-4 h-4 text-slate-900" />}
-                                        </div>
-                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter group-hover:text-slate-900">Recordar equipo por 30 días</span>
-                                    </label>
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    disabled={isLoading || mfaCode.length < 6}
-                                    className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-xl shadow-xl shadow-slate-900/10 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center uppercase text-[11px] tracking-widest"
-                                >
-                                    {isLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : "Finalizar Configuración"}
-                                </button>
-
-                                <div className="flex flex-col gap-2 pt-2 text-center">
-                                    <button
-                                        type="button"
-                                        onClick={() => setMfaState(prev => ({ ...prev, setupRequired: false }))}
-                                        className="text-[9px] font-black text-slate-400 hover:text-slate-900 uppercase tracking-widest transition-all p-2 flex items-center justify-center gap-2"
-                                    >
-                                        <ArrowLeft className="w-3 h-3" /> Volver al Correo
-                                    </button>
-                                </div>
-                            </motion.form>
-                        ) : (
-                            <motion.form
-                                key="mfa-step"
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -20 }}
-                                onSubmit={handleMfaSubmit}
-                                className="space-y-6"
-                            >
-                                <div className="text-center space-y-2 mb-2">
-                                    <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-blue-100 shadow-sm shadow-blue-500/10">
-                                        <ShieldCheck className="w-8 h-8" />
-                                    </div>
-                                    <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight">Doble Factor</h2>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
-                                        {mfaState.method === 'EMAIL'
-                                            ? `Código enviado a ${mfaState.emailMask}`
-                                            : "Ingresa el código de tu App"}
-                                    </p>
-                                </div>
-
-                                {error && (
-                                    <div className={`p-3 rounded-xl text-[11px] font-bold border flex items-center gap-2 ${error.includes('enviado') ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
-                                        <AlertCircle className="w-4 h-4" />
-                                        {error}
-                                    </div>
-                                )}
-
-                                <div className="relative">
+                                <div>
+                                    <label htmlFor="mfa-setup-code" className={fieldLabelClass}>Codigo de verificacion</label>
                                     <input
+                                        id="mfa-setup-code"
                                         type="text"
                                         maxLength={6}
-                                        className="w-full text-center py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:bg-white focus:border-slate-900 outline-none transition-all text-2xl font-black text-slate-900 tracking-[0.5em] placeholder:text-slate-200"
+                                        className="no-global w-full h-12 text-center text-xl font-black tracking-[0.45em] bg-white border border-slate-200 rounded-xl outline-none focus:border-indigo-500 transition-all placeholder:text-slate-300"
                                         placeholder="000000"
                                         value={mfaCode}
                                         onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+                                        onKeyDown={handleEnterSubmit}
+                                        required
+                                        autoFocus
+                                    />
+                                </div>
+
+                                <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                                    <input
+                                        type="checkbox"
+                                        className="no-global w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        checked={rememberDevice}
+                                        onChange={(e) => setRememberDevice(e.target.checked)}
+                                    />
+                                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Recordar equipo por 30 dias</span>
+                                </label>
+
+                                <button type="submit" disabled={isLoading || mfaCode.length < 6} className={`w-full ${primaryButtonClass}`}>
+                                    {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Finalizar Configuracion'}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setMfaState((prev) => ({ ...prev, setupRequired: false }))}
+                                    className={`w-full ${secondaryButtonClass}`}
+                                >
+                                    <ArrowLeft className="w-4 h-4" />
+                                    Volver al codigo por correo
+                                </button>
+                            </MotionForm>
+                        ) : (
+                            <MotionForm
+                                key="mfa-step"
+                                initial={{ opacity: 0, x: 12 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -12 }}
+                                onSubmit={handleMfaSubmit}
+                                className="space-y-5"
+                            >
+                                {error && (
+                                    <div className={`${showSuccessNotice ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-rose-50 text-rose-600 border-rose-100'} text-[10px] font-bold uppercase p-3 rounded-xl border flex gap-2 items-center`}>
+                                        <AlertCircle className="w-4 h-4 shrink-0" />
+                                        <span>{error}</span>
+                                    </div>
+                                )}
+
+                                <div>
+                                    <label htmlFor="mfa-code" className={fieldLabelClass}>Codigo de verificacion</label>
+                                    <input
+                                        id="mfa-code"
+                                        type="text"
+                                        maxLength={6}
+                                        className="no-global w-full h-12 text-center text-xl font-black tracking-[0.45em] bg-white border border-slate-200 rounded-xl outline-none focus:border-indigo-500 transition-all placeholder:text-slate-300"
+                                        placeholder="000000"
+                                        value={mfaCode}
+                                        onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+                                        onKeyDown={handleEnterSubmit}
                                         autoFocus
                                         required
                                     />
                                 </div>
 
-                                <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl cursor-pointer group hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200">
-                                    <div className="flex items-center justify-center w-5 h-5 rounded-md border-2 border-slate-200 group-hover:border-slate-900 bg-white transition-all">
-                                        <input
-                                            type="checkbox"
-                                            className="hidden"
-                                            checked={rememberDevice}
-                                            onChange={(e) => setRememberDevice(e.target.checked)}
-                                        />
-                                        {rememberDevice && <CheckCircle2 className="w-4 h-4 text-slate-900" />}
-                                    </div>
-                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter group-hover:text-slate-900">Recordar equipo por 30 días</span>
+                                <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                                    <input
+                                        type="checkbox"
+                                        className="no-global w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        checked={rememberDevice}
+                                        onChange={(e) => setRememberDevice(e.target.checked)}
+                                    />
+                                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Recordar equipo por 30 dias</span>
                                 </label>
 
-                                <div className="space-y-3 pt-2">
-                                    <button
-                                        type="submit"
-                                        disabled={isLoading || mfaCode.length < (mfaState.method === 'EMAIL' ? 6 : 6)}
-                                        className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-xl shadow-xl shadow-slate-900/10 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center uppercase text-[11px] tracking-widest"
-                                    >
-                                        {isLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : "Verificar e Ingresar"}
-                                    </button>
+                                <button type="submit" disabled={isLoading || mfaCode.length < 6} className={`w-full ${primaryButtonClass}`}>
+                                    {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Verificar e Ingresar'}
+                                </button>
 
-                                    {/* Method Selector if available */}
-                                    {mfaState.availableMethods.length > 1 && (
-                                        <div className="flex flex-col gap-2 pt-1">
-                                            <p className="text-[8px] font-black text-slate-300 uppercase text-center tracking-widest">Otras opciones de verificación</p>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                {mfaState.availableMethods.map(m => (
-                                                    <button
-                                                        key={m}
-                                                        type="button"
-                                                        onClick={() => switchMfaMethod(m)}
-                                                        className={`py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all border ${mfaState.method === m ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'}`}
-                                                    >
-                                                        {m === 'EMAIL' ? 'Usar Correo' : 'Usar App'}
-                                                    </button>
-                                                ))}
-                                            </div>
+                                {mfaState.availableMethods.length > 1 && (
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Metodo de verificacion</p>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {mfaState.availableMethods.map((method) => (
+                                                <button
+                                                    key={method}
+                                                    type="button"
+                                                    onClick={() => switchMfaMethod(method)}
+                                                    className={`h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${mfaState.method === method ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100' : 'bg-white text-slate-500 border-slate-200 hover:border-blue-300 hover:text-blue-600'}`}
+                                                >
+                                                    {method === 'EMAIL' ? 'Usar Correo' : 'Usar App'}
+                                                </button>
+                                            ))}
                                         </div>
-                                    )}
+                                    </div>
+                                )}
 
-                                    <div className="flex flex-col gap-2 pt-2">
-                                        {mfaState.method === 'EMAIL' && (
-                                            <button
-                                                type="button"
-                                                disabled={resendingEmail}
-                                                onClick={resendEmailCode}
-                                                className="text-[9px] font-black text-slate-400 hover:text-slate-900 uppercase tracking-widest transition-all p-2"
-                                            >
-                                                {resendingEmail ? "Enviando..." : "¿No recibiste el código? Reenviar"}
-                                            </button>
-                                        )}
-
+                                <div className="grid grid-cols-1 gap-2">
+                                    {mfaState.method === 'EMAIL' && (
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                setMfaCode('');
-                                                setMfaState({ ...mfaState, required: false });
-                                            }}
-                                            className="text-[9px] font-black text-slate-400 hover:text-slate-900 uppercase tracking-widest transition-all p-2 flex items-center justify-center gap-2"
+                                            disabled={resendingEmail}
+                                            onClick={resendEmailCode}
+                                            className="text-[10px] font-black text-slate-500 hover:text-indigo-600 uppercase tracking-widest transition-colors py-2 disabled:opacity-60"
                                         >
-                                            <ArrowLeft className="w-3 h-3" /> Volver
+                                            {resendingEmail ? 'Enviando...' : 'No recibiste el codigo? Reenviar'}
                                         </button>
-                                    </div>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setMfaCode('');
+                                            setMfaState((prev) => ({ ...prev, required: false }));
+                                        }}
+                                        className={`w-full ${secondaryButtonClass}`}
+                                    >
+                                        <ArrowLeft className="w-4 h-4" />
+                                        Volver al login
+                                    </button>
                                 </div>
-                            </motion.form>
+                            </MotionForm>
                         )}
-                    </AnimatePresence>
-                </div>
+                        </AnimatePresence>
+                    </div>
 
-                <div className="bg-slate-50 p-6 text-center border-t border-slate-100 flex flex-col gap-1">
-                    <p className="text-xs text-slate-400 font-medium">© 2026 SLEP Iquique. Todos los derechos reservados.</p>
-                    <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">Versión {APP_VERSION}</p>
-                </div>
-            </motion.div>
+                    <div className="mt-3 pt-3 border-t border-slate-200 text-center">
+                        <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium">
+                            (c) 2026 SLEP Iquique. Todos los derechos reservados.
+                        </p>
+                        <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium mt-1">
+                            Version {APP_VERSION}
+                        </p>
+                    </div>
+
+                </section>
+            </MotionDiv>
         </div>
     );
 };
 
 export default Login;
+

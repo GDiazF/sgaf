@@ -74,6 +74,7 @@ urlpatterns = [
     path('api/notificaciones/', include('notificaciones.urls')),
     path('api/tickets/', include('tickets.urls')),
     path('api/ejecutivos/', include('ejecutivos.urls')),
+    path('api/personalizacion/', include('personalizacion_sistema.urls')),
 ]
 
 from django.conf import settings
