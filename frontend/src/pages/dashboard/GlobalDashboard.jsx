@@ -82,8 +82,8 @@ const GlobalDashboard = () => {
                         </div>
                     </div>
 
-                    {/* Redes Sociales - Bajadas con translate para cerrar el hueco sin afectar el layout */}
-                    <div className="flex items-center gap-2 translate-y-12">
+                    {/* Redes Sociales - ligero desplazamiento hacia el bloque de links */}
+                    <div className="flex items-center gap-2 translate-y-8">
                         {socialLinks.map(link => {
                             const Icon = IconMap[link.icono] || Globe;
                             const brand = BrandColors[link.icono] || BrandColors.Globe;

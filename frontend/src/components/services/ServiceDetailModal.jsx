@@ -4,6 +4,17 @@ import { X, Calendar, Activity, DollarSign, Building2, FileText, Zap, TrendingUp
 import api from '../../api';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 
+/** Período de consumo = mes calendario anterior a la fecha de vencimiento (ej. vence 22-may → período abril). */
+const getServicePeriod = (payment) => {
+    const dateStr = payment.fecha_vencimiento || payment.fecha_emision || payment.fecha_pago;
+    if (!dateStr) return null;
+    const [year, month, day] = dateStr.split('-').map(Number);
+    if (!year || !month) return null;
+    const vencimiento = new Date(year, month - 1, day || 1);
+    vencimiento.setMonth(vencimiento.getMonth() - 1);
+    return { year: vencimiento.getFullYear(), month: vencimiento.getMonth() };
+};
+
 const ServiceDetailModal = ({ isOpen, onClose, service }) => {
     const [payments, setPayments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -21,10 +32,7 @@ const ServiceDetailModal = ({ isOpen, onClose, service }) => {
                     setPayments(fetchedPayments);
 
                     // Set default selected year to the most recent payment's year, or current year
-                    const availableYears = fetchedPayments.map(p => {
-                        const dateStr = p.fecha_pago || p.fecha_emision;
-                        return dateStr ? new Date(dateStr).getFullYear() : null;
-                    }).filter(Boolean);
+                    const availableYears = fetchedPayments.map(p => getServicePeriod(p)?.year ?? null).filter(Boolean);
 
                     if (availableYears.length > 0) {
                         const maxYear = Math.max(...availableYears);
@@ -46,10 +54,7 @@ const ServiceDetailModal = ({ isOpen, onClose, service }) => {
 
     // Detect available years dynamically
     const availableYears = Array.from(new Set(
-        payments.map(p => {
-            const dateStr = p.fecha_pago || p.fecha_emision;
-            return dateStr ? new Date(dateStr).getFullYear() : null;
-        }).filter(Boolean)
+        payments.map(p => getServicePeriod(p)?.year ?? null).filter(Boolean)
     )).sort((a, b) => b - a);
 
     if (availableYears.length === 0) {
@@ -57,10 +62,7 @@ const ServiceDetailModal = ({ isOpen, onClose, service }) => {
     }
 
     // Filter payments for chosen year
-    const yearlyPayments = payments.filter(p => {
-        const dateStr = p.fecha_pago || p.fecha_emision;
-        return dateStr && new Date(dateStr).getFullYear() === selectedYear;
-    });
+    const yearlyPayments = payments.filter(p => getServicePeriod(p)?.year === selectedYear);
 
     // Formatting utilities
     const formatCurrency = (amount) => {
@@ -76,12 +78,7 @@ const ServiceDetailModal = ({ isOpen, onClose, service }) => {
     // Build Recharts data for the 12 months
     const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     const chartData = MONTH_NAMES.map((name, index) => {
-        const monthlyPayments = yearlyPayments.filter(p => {
-            const dateStr = p.fecha_pago || p.fecha_emision;
-            if (!dateStr) return false;
-            const month = parseInt(dateStr.split('-')[1]) - 1;
-            return month === index;
-        });
+        const monthlyPayments = yearlyPayments.filter(p => getServicePeriod(p)?.month === index);
 
         const totalConsumo = monthlyPayments.reduce((sum, p) => sum + (parseFloat(p.consumo) || 0), 0);
         const totalMonto = monthlyPayments.reduce((sum, p) => sum + (parseInt(p.monto_total) || 0), 0);
@@ -232,7 +229,7 @@ const ServiceDetailModal = ({ isOpen, onClose, service }) => {
                         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 space-y-3 shadow-sm">
                             <div className="flex justify-between items-center">
                                 <h4 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-0">
-                                    <TrendingUp className="w-3.5 h-3.5 text-blue-500" /> Historial Mensual
+                                    <TrendingUp className="w-3.5 h-3.5 text-blue-500" /> Historial Mensual (por período de vencimiento)
                                 </h4>
                                 {service.unidad_medida ? (
                                     <span className="text-[8px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">
@@ -298,7 +295,7 @@ const ServiceDetailModal = ({ isOpen, onClose, service }) => {
                                         <thead className="sticky top-0 z-10 border-b border-slate-200 text-[9px] font-black text-slate-400 uppercase tracking-widest">
                                             <tr>
                                                 <th className="px-3 py-2 bg-slate-50">N° Documento</th>
-                                                <th className="px-3 py-2 text-center bg-slate-50">F. Pago</th>
+                                                <th className="px-3 py-2 text-center bg-slate-50">F. Venc.</th>
                                                 <th className="px-3 py-2 text-center bg-slate-50">Consumo</th>
                                                 <th className="px-3 py-2 text-right bg-slate-50">Monto</th>
                                             </tr>
@@ -307,7 +304,7 @@ const ServiceDetailModal = ({ isOpen, onClose, service }) => {
                                             {yearlyPayments.map(p => (
                                                 <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
                                                     <td className="px-3 py-2 font-mono text-slate-700 font-medium">{p.nro_documento}</td>
-                                                    <td className="px-3 py-2 text-center text-slate-500">{formatDate(p.fecha_pago)}</td>
+                                                    <td className="px-3 py-2 text-center text-slate-500">{formatDate(p.fecha_vencimiento)}</td>
                                                     <td className="px-3 py-2 text-center">
                                                         {p.consumo !== null && p.consumo !== undefined ? (
                                                             <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50/80 text-blue-600 font-bold text-[9px]">

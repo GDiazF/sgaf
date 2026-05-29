@@ -2,6 +2,7 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import transaction
+from django.core.files.base import ContentFile
 from django.http import HttpResponse
 import pandas as pd
 import io
@@ -15,6 +16,9 @@ from .serializers import (
 )
 from reportlab.lib.colors import HexColor
 from core.utils.report_utils import get_report_assets
+
+# Sufijo estándar para PDF corporativo en carga masiva: {nro_documento}_CORP.pdf
+PAGO_PDF_CORPORATE_SUFFIX = 'CORP'
 
 # --- Corporate Branding for PDFs ---
 COLOR_VERDE = HexColor('#92D050')
@@ -288,22 +292,30 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
         if missing_cols:
             return Response({'error': f'Faltan las siguientes columnas: {", ".join(missing_cols)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        def parse_date(date_val, row_idx, col_name):
-            if pd.isna(date_val):
+        def parse_date(date_val, row_idx, col_name, required=True):
+            if pd.isna(date_val) or str(date_val).strip() in ('', 'nan', 'None'):
+                if required:
+                    errors.append(
+                        f"Fila {row_idx + 2}: '{col_name}' es obligatoria y está vacía."
+                    )
                 return None
             if isinstance(date_val, (datetime.date, datetime.datetime)):
-                return date_val
-            
+                return date_val.date() if isinstance(date_val, datetime.datetime) else date_val
+
             date_str = str(date_val).strip()
-            # Try multiple formats
             for fmt in ('%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'):
                 try:
                     return datetime.datetime.strptime(date_str, fmt).date()
                 except ValueError:
                     continue
-            
-            errors.append(f"Fila {row_idx + 2}: Formato de fecha '{date_str}' inválido en '{col_name}'. Use DD/MM/YYYY o DD-MM-YYYY.")
+
+            errors.append(
+                f"Fila {row_idx + 2}: Formato de fecha '{date_str}' inválido en '{col_name}'. "
+                "Use DD/MM/YYYY o DD-MM-YYYY."
+            )
             return None
+
+        emision_autocompletada = 0
 
         for index, row in df.iterrows():
             nro_cli = str(row['Nro Cliente']).strip()
@@ -334,13 +346,23 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
                 errors.append(f"Fila {index + 2}: La factura '{nro_doc}' para el servicio '{nro_cli}' está repetida dentro del mismo archivo Excel.")
                 continue
 
-            # 4. Parse Dates
-            f_emision = parse_date(row['Fecha Emision (DD/MM/YYYY)'], index, 'Fecha Emision')
-            f_vencimiento = parse_date(row['Fecha Vencimiento (DD/MM/YYYY)'], index, 'Fecha Vencimiento')
-            f_pago = parse_date(row['Fecha Pago (DD/MM/YYYY)'], index, 'Fecha Pago')
+            # 4. Parse Dates (vencimiento y pago obligatorias; emisión opcional → se usa vencimiento)
+            f_emision = parse_date(
+                row['Fecha Emision (DD/MM/YYYY)'], index, 'Fecha Emision', required=False
+            )
+            f_vencimiento = parse_date(
+                row['Fecha Vencimiento (DD/MM/YYYY)'], index, 'Fecha Vencimiento', required=True
+            )
+            f_pago = parse_date(
+                row['Fecha Pago (DD/MM/YYYY)'], index, 'Fecha Pago', required=True
+            )
 
-            if not f_emision or not f_vencimiento or not f_pago:
-                continue # Error already added by parse_date
+            if not f_vencimiento or not f_pago:
+                continue
+
+            if not f_emision:
+                f_emision = f_vencimiento
+                emision_autocompletada += 1
 
             # 5. Validate Amounts
             try:
@@ -382,7 +404,19 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
         try:
             with transaction.atomic():
                 RegistroPago.objects.bulk_create(pagos_to_create)
-            return Response({'message': f'Se han cargado exitosamente {len(pagos_to_create)} registros.'}, status=status.HTTP_201_CREATED)
+            message = f'Se han cargado exitosamente {len(pagos_to_create)} registros.'
+            if emision_autocompletada:
+                message += (
+                    f' En {emision_autocompletada} fila(s) la fecha de emisión estaba vacía '
+                    'y se completó con la fecha de vencimiento.'
+                )
+            return Response(
+                {
+                    'message': message,
+                    'emision_autocompletada': emision_autocompletada,
+                },
+                status=status.HTTP_201_CREATED,
+            )
         except Exception as e:
             return Response({'error': f'Error al guardar en la base de datos: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -627,6 +661,32 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
         buffer.seek(0)
         return FileResponse(buffer, as_attachment=True, filename=f'RC_{pago.nro_documento}.pdf')
 
+    @staticmethod
+    def _parse_pago_pdf_filename(filename):
+        """Devuelve partes del nombre sin extensión. Último segmento normalizado (CORP, CORP.PDF → CORP)."""
+        base_name = filename.rsplit('.', 1)[0].strip()
+        parts = [p.strip() for p in base_name.split('_') if p.strip()]
+        if parts:
+            last = parts[-1].upper()
+            if last == 'CORP' or last.startswith('CORP.'):
+                parts[-1] = 'CORP'
+        return parts
+
+    def _assign_comprobante_to_pagos(self, pagos, uploaded_file, results, label):
+        pagos = list(pagos)
+        if not pagos:
+            results['errors'].append(f"{label}: No se encontraron registros de pago.")
+            return 0
+
+        content = uploaded_file.read()
+        filename = uploaded_file.name
+        for pago in pagos:
+            pago.comprobante.save(filename, ContentFile(content), save=True)
+        results['success'].append(
+            f"{label}: Comprobante asignado a {len(pagos)} registro(s) de pago."
+        )
+        return len(pagos)
+
     @action(detail=False, methods=['post'])
     def bulk_upload_files(self, request):
         files = request.FILES.getlist('files')
@@ -635,44 +695,63 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
 
         results = {
             'success': [],
-            'errors': []
+            'errors': [],
+            'corporate_assignments': 0,
         }
 
         for f in files:
             name = f.name
-            # Expected format: {nro_documento}_{nro_cliente}.pdf
             try:
-                # Handle possible multiple underscores or complex names
-                # We assume the last underscore separates the customer number if we have many
-                # But user said {nro_factura}_{nro_cliente}.pdf
-                base_name = name.rsplit('.', 1)[0]
-                parts = base_name.split('_')
-                
-                if len(parts) < 2:
-                    results['errors'].append(f"Archivo {name}: El nombre debe ser {{nro_documento}}_{{nro_cliente}}.pdf")
+                if '.' not in name:
+                    results['errors'].append(f"Archivo {name}: Debe ser un archivo PDF.")
                     continue
-                
-                # If there are more than 2 parts, we might have underscores in nro_documento
-                # nro_doc = "_".join(parts[:-1])
-                # nro_cli = parts[-1]
-                # Actually, let's stick to the user's simple {nro_factura}_{nro_cliente}.pdf first
-                nro_doc = parts[0].strip()
-                nro_cli = parts[1].strip()
 
-                # Find the payment record
-                # We filter by both to be sure
+                parts = self._parse_pago_pdf_filename(name)
+
+                if not parts:
+                    results['errors'].append(
+                        f"Archivo {name}: nombre inválido. Use NroDocumento_NroCliente.pdf "
+                        "o NroDocumento_CORP.pdf (corporativa)."
+                    )
+                    continue
+
+                if len(parts) == 1:
+                    doc = parts[0]
+                    results['errors'].append(
+                        f"Archivo {name}: falta el sufijo. Si es corporativa use {doc}_CORP.pdf; "
+                        f"si es una sola boleta use {doc}_NroCliente.pdf."
+                    )
+                    continue
+
+                # Factura corporativa (estándar único): {nro_documento}_CORP.pdf
+                if parts[-1] == 'CORP':
+                    nro_doc = '_'.join(parts[:-1])
+                    pagos = RegistroPago.objects.filter(nro_documento=nro_doc).select_related('servicio')
+                    self._assign_comprobante_to_pagos(
+                        pagos,
+                        f,
+                        results,
+                        f"Archivo {name} (corporativa · doc. {nro_doc})",
+                    )
+                    results['corporate_assignments'] += 1
+                    continue
+
+                # Boleta individual: {nro_documento}_{nro_cliente}.pdf (soporta _ en el documento)
+                nro_cli = parts[-1]
+                nro_doc = '_'.join(parts[:-1])
                 pago = RegistroPago.objects.filter(
                     nro_documento=nro_doc,
-                    servicio__numero_cliente=nro_cli
+                    servicio__numero_cliente=nro_cli,
                 ).first()
 
                 if not pago:
-                    results['errors'].append(f"Archivo {name}: No se encontró un registro de pago con Factura '{nro_doc}' y Nro Cliente '{nro_cli}'")
+                    results['errors'].append(
+                        f"Archivo {name}: No se encontró pago con documento '{nro_doc}' "
+                        f"y Nro Cliente '{nro_cli}'."
+                    )
                     continue
 
-                pago.comprobante = f
-                pago.save()
-                results['success'].append(f"Archivo {name}: Cargado exitosamente.")
+                self._assign_comprobante_to_pagos([pago], f, results, f"Archivo {name}")
 
             except Exception as e:
                 results['errors'].append(f"Archivo {name}: Error inesperado: {str(e)}")

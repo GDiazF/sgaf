@@ -653,7 +653,7 @@ const PaymentsDashboard = () => {
                 isOpen={showBulkForm}
                 onClose={() => setShowBulkForm(false)}
                 title="Carga Masiva de Pagos"
-                description="Suba un archivo Excel con los registros de pago de servicios."
+                description="Suba un archivo Excel con los registros de pago. La fecha de emisión puede ir vacía (se usará la de vencimiento). Vencimiento y pago son obligatorios."
                 onUpload={handleBulkUpload}
                 onDownloadTemplate={handleDownloadTemplate}
                 uploading={uploading}
@@ -1089,13 +1089,35 @@ const PaymentsDashboard = () => {
                             </div>
 
                             <div className="p-5 overflow-y-auto custom-scrollbar">
-                                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-5">
-                                    <h4 className="text-[10px] font-black text-blue-700 uppercase mb-2 tracking-widest">Instrucciones de Nombre:</h4>
-                                    <p className="text-[11px] font-medium text-blue-700 leading-relaxed uppercase">
-                                        Para que el sistema asigne automáticamente cada archivo, el nombre debe seguir este patrón:<br/>
-                                        <span className="text-blue-900 bg-white/70 px-2 rounded font-mono">{"{Nro_Factura}_{Nro_Cliente}.pdf"}</span><br/>
-                                        Ejemplo: <span className="font-mono">846573_723621.pdf</span>
+                                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-5 space-y-4">
+                                    <p className="text-[10px] font-black text-blue-800 uppercase tracking-widest">
+                                        Estándar de nombres (obligatorio)
                                     </p>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1">
+                                            1 · Boleta por servicio
+                                        </p>
+                                        <p className="text-[11px] font-medium text-blue-800 font-mono bg-white/80 px-2 py-1 rounded inline-block">
+                                            {'{Nro_Documento}_{Nro_Cliente}.pdf'}
+                                        </p>
+                                        <p className="text-[10px] font-medium text-blue-700 mt-1 normal-case">
+                                            Ejemplo: <span className="font-mono">846573_723621.pdf</span>
+                                        </p>
+                                    </div>
+                                    <div className="pt-3 border-t border-blue-100">
+                                        <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1">
+                                            2 · Factura corporativa (un PDF, varios servicios)
+                                        </p>
+                                        <p className="text-[11px] font-medium text-blue-800 font-mono bg-white/80 px-2 py-1 rounded inline-block">
+                                            {'{Nro_Documento}_CORP.pdf'}
+                                        </p>
+                                        <p className="text-[10px] font-medium text-blue-700 mt-1 normal-case leading-relaxed">
+                                            Mismo N° de documento en todos los pagos del Excel. El archivo se asigna a cada registro con esa boleta.
+                                            <span className="block mt-1">
+                                                Ejemplo: <span className="font-mono">98765432_CORP.pdf</span> → 30 servicios con documento 98765432.
+                                            </span>
+                                        </p>
+                                    </div>
                                 </div>
 
                                 {!bulkFilesResults ? (
