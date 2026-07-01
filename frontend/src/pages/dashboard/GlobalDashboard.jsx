@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Calendar, Users2, Map, Star, Heart, Info, Facebook, Instagram, Twitter, Linkedin, Youtube, Globe, Link2, ChevronRight
+    Calendar, Users2, Map, Star, Heart, Info, Facebook, Instagram, Twitter, Linkedin, Youtube, Globe, Link2, ChevronRight, Home
 } from 'lucide-react';
 import api from '../../api';
+import { TITLE_ICON_BOX } from '../funcionarios/shared/funcionariosUi';
 import { useAuth } from '../../context/AuthContext';
 import EstablishmentMapModal from '../../components/establishments/EstablishmentMapModal';
 import InterestLinksSection from '../../components/dashboard/InterestLinksSection';
@@ -59,24 +60,30 @@ const GlobalDashboard = () => {
         Twitter: { color: '#1DA1F2', bg: 'hover:bg-[#1DA1F2]', shadow: 'hover:shadow-[#1DA1F2]/30' },
         Linkedin: { color: '#0077B5', bg: 'hover:bg-[#0077B5]', shadow: 'hover:shadow-[#0077B5]/30' },
         Youtube: { color: '#FF0000', bg: 'hover:bg-[#FF0000]', shadow: 'hover:shadow-[#FF0000]/30' },
-        Globe: { color: '#6366f1', bg: 'hover:bg-indigo-600', shadow: 'hover:shadow-indigo-500/30' }
+        Globe: { color: '#2563eb', bg: 'hover:bg-blue-600', shadow: 'hover:shadow-blue-900/30' }
     };
 
     const firstName = (user?.first_name || 'Usuario').split(' ')[0];
 
     return (
         <div className="w-full h-full bg-[#fcfdfe] flex flex-col overflow-hidden font-sans">
-            {/* 1. Header Hero - Restaurado */}
-            <header className="px-1 pt-0 pb-2 shrink-0">
+            {/* 1. Header Hero - Espacio para "Hola" preservado */}
+            <header className="px-1 pt-4 pb-10 shrink-0">
                 <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] mb-1">Dashboard Principal</p>
-                        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight leading-tight">
-                            ¡Hola!, {firstName}
-                        </h1>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={TITLE_ICON_BOX}>
+                            <Home className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-[0.2em] mb-1">Dashboard Principal</p>
+                            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight leading-tight">
+                                ¡Hola!, {firstName}
+                            </h1>
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    {/* Redes Sociales - ligero desplazamiento hacia el bloque de links */}
+                    <div className="flex items-center gap-2 translate-y-8">
                         {socialLinks.map(link => {
                             const Icon = IconMap[link.icono] || Globe;
                             const brand = BrandColors[link.icono] || BrandColors.Globe;
@@ -97,24 +104,24 @@ const GlobalDashboard = () => {
                 </div>
             </header>
 
-            {/* 2. Área Principal - ESTRUCTURA DE COLUMNAS SEGÚN MAQUETA */}
+            {/* 2. Área Principal - SIMETRÍA RESTAURADA */}
             <main className="flex-1 min-h-0 px-1 pb-6 overflow-hidden">
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
 
                     {/* COLUMNA IZQUIERDA: Botones + Novedades (3/4 del ancho) */}
                     <div className="lg:col-span-3 flex flex-col space-y-4 min-h-0">
 
-                        {/* 2.1 Botones de Acción (Ahora dentro de la columna) */}
+                        {/* 2.1 Botones de Acción */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 shrink-0">
                             <button
                                 onClick={() => window.location.href = '/reservas'}
-                                className="h-24 bg-white border border-indigo-100 rounded-2xl text-indigo-700 flex items-center justify-between px-8 shadow-md hover:shadow-2xl hover:border-indigo-400 transition-all group overflow-hidden relative active:scale-95"
+                                className="h-24 bg-white border border-blue-100 rounded-2xl text-blue-700 flex items-center justify-between px-8 shadow-md hover:shadow-2xl hover:border-blue-400 transition-all group overflow-hidden relative active:scale-95"
                             >
                                 <div className="z-10 text-left">
-                                    <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest block mb-0.5">Calendario de Solicitudes</span>
+                                    <span className="text-[9px] font-bold text-blue-600 uppercase tracking-widest block mb-0.5">Calendario de Solicitudes</span>
                                     <h3 className="text-lg font-black uppercase tracking-tight">Gestión Reservas</h3>
                                 </div>
-                                <Calendar className="w-16 h-16 absolute -right-2 text-indigo-50 group-hover:scale-110 transition-transform" />
+                                <Calendar className="w-16 h-16 absolute -right-2 text-blue-50 group-hover:scale-110 transition-transform" />
                             </button>
 
                             <button
@@ -140,7 +147,7 @@ const GlobalDashboard = () => {
                             </button>
                         </div>
 
-                        {/* 2.2 NOVEDADES Y CONVENIOS (Se expande para llenar el espacio) */}
+                        {/* 2.2 NOVEDADES Y CONVENIOS */}
                         <section className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col min-h-0 overflow-hidden">
                             <div className="px-6 md:px-8 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 border-b border-slate-50">
                                 <div className="flex items-center gap-3">
@@ -154,7 +161,7 @@ const GlobalDashboard = () => {
                                 </div>
                                 <button
                                     onClick={() => window.location.href = '/bienestar/muro'}
-                                    className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-rose-500 transition-all shadow-md active:scale-95"
+                                    className="w-full sm:w-auto px-5 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20 active:scale-95 inline-flex items-center justify-center"
                                 >
                                     Explorar Todo
                                 </button>
@@ -166,7 +173,7 @@ const GlobalDashboard = () => {
                         </section>
                     </div>
 
-                    {/* COLUMNA DERECHA: Links de Interés (1/4 del ancho) */}
+                    {/* COLUMNA DERECHA: Links de Interés - SIMETRÍA TOTAL */}
                     <div className="lg:col-span-1 h-[600px] min-h-0">
                         <InterestLinksSection isSidebar={true} onRefresh={fetchSocialLinks} />
                     </div>

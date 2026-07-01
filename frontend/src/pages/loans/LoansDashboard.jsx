@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api';
-import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, Box as KeyIcon, ChevronRight, Clock, User, Building, Calendar, ArrowRight, CheckCircle2, XCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Search, Box as KeyIcon, ChevronRight, Clock, User, Building, Calendar, ArrowRight, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { usePermission } from '../../hooks/usePermission';
-import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '../../components/common/Pagination';
-import FilterBar from '../../components/common/FilterBar';
 import ReturnLoanModal from '../../components/loans/ReturnLoanModal';
 import TransferModal from '../../components/loans/TransferModal';
 
@@ -18,8 +16,9 @@ const Dashboard = () => {
     const [showTransferModal, setShowTransferModal] = useState(false);
     const { can } = usePermission();
 
-    // Pagination & Search
+    // Pagination, Page Size & Search
     const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const [totalPages, setTotalPages] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
     const [totalAssets, setTotalAssets] = useState(0);
@@ -33,7 +32,8 @@ const Dashboard = () => {
                 page,
                 search: searchQuery,
                 active: 'true',
-                ordering: order
+                ordering: order,
+                page_size: pageSize
             };
             const [loansRes, assetsRes] = await Promise.all([
                 api.get('prestamos/', { params }),
@@ -42,7 +42,7 @@ const Dashboard = () => {
 
             setLoans(loansRes.data.results || []);
             setTotalCount(loansRes.data.count || 0);
-            setTotalPages(Math.ceil((loansRes.data.count || 0) / 10));
+            setTotalPages(Math.ceil((loansRes.data.count || 0) / pageSize));
             setTotalAssets(assetsRes.data.count || 0);
         } catch (error) {
             console.error("Error fetching loans:", error);
@@ -54,7 +54,7 @@ const Dashboard = () => {
 
     useEffect(() => {
         fetchData(currentPage, ordering);
-    }, [currentPage, ordering, searchQuery]);
+    }, [currentPage, ordering, searchQuery, pageSize]);
 
     const handleSearch = (query) => {
         setSearchQuery(query);
@@ -91,127 +91,157 @@ const Dashboard = () => {
         }
     };
 
+    const filteredLoans = loans;
+
     return (
-        <div className="flex flex-col gap-6 pb-12 w-full">
+        <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden">
             {/* Header Area */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-end gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
                 <div>
-                    <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Gestión de Préstamos</h1>
-                    <p className="text-slate-500 font-medium text-xs mt-1.5">Monitoreo y control de activos institucionales en circulación.</p>
+                    <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase select-none">Gestión de Préstamos</h2>
+                    <div className="flex items-center gap-2 mt-1.5">
+                        <p className="text-[10px] md:text-xs font-medium text-slate-500 uppercase ml-0 select-none">Monitoreo y control de activos institucionales en circulación.</p>
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <Link
-                        to="/history"
-                        className="flex items-center gap-2 bg-white text-slate-600 px-4 py-2 rounded-xl hover:bg-slate-50 transition-all border border-slate-200 font-bold text-[11px] uppercase tracking-wider shadow-sm active:scale-95"
+                <div className="flex items-center gap-2 shrink-0">
+                    <button
+                        type="button"
+                        onClick={() => navigate('/history')}
+                        className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-650 px-5 py-2 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 shrink-0"
                     >
                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        Historial
-                    </Link>
+                        <span>Historial</span>
+                    </button>
                     {can('prestamo_llaves.add_prestamo') && (
-                        <Link
-                            to="/loans/new"
-                            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-500/10 font-black text-[11px] uppercase tracking-[0.1em] active:scale-95"
+                        <button
+                            type="button"
+                            onClick={() => navigate('/loans/new')}
+                            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 shrink-0 active:scale-95"
                         >
                             <Plus className="w-4 h-4" />
-                            Nuevo Préstamo
-                        </Link>
+                            <span>Nuevo Préstamo</span>
+                        </button>
                     )}
                 </div>
             </div>
 
             {/* Structured Stats Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0 select-none">
                 {can('prestamo_llaves.add_prestamo') && (
-                    <Link to="/loans/new" className="bg-white rounded-[1.5rem] p-6 border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-blue-600 transition-all hover:shadow-lg hover:shadow-blue-600/5">
-                        <div className="flex items-center justify-between mb-4">
-                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none">Acción Rápida</span>
-                            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-md">
+                    <button 
+                        onClick={() => navigate('/loans/new')} 
+                        className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between group hover:border-indigo-500 hover:shadow-md transition-all text-left"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100 group-hover:scale-110 transition-transform">
                                 <Plus className="w-4 h-4" />
                             </div>
+                            <div>
+                                <span className="block text-[8px] font-black text-slate-400 uppercase tracking-widest">Acción Rápida</span>
+                                <span className="block text-xs font-black text-slate-700 uppercase tracking-tight mt-0.5">Nuevo Préstamo</span>
+                            </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-lg font-black text-slate-900 leading-none">Nuevo Préstamo</span>
-                            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
-                        </div>
-                    </Link>
+                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
+                    </button>
                 )}
 
-                <div className="bg-white rounded-[1.5rem] p-6 border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-slate-300 transition-all">
-                    <div className="flex items-center justify-between mb-4">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Total Activos</span>
-                        <div className="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 flex items-center justify-center">
-                            <KeyIcon className="w-4 h-4" />
-                        </div>
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center gap-3 hover:shadow-md transition-all">
+                    <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-500 flex items-center justify-center shrink-0 border border-slate-200">
+                        <KeyIcon className="w-4 h-4" />
                     </div>
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-black text-slate-900 leading-none">{totalAssets}</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">En Inventario</span>
+                    <div>
+                        <span className="block text-[8px] font-black text-slate-400 uppercase tracking-widest">Total Activos</span>
+                        <div className="flex items-baseline gap-1.5 mt-0.5">
+                            <span className="text-lg font-black text-slate-800 leading-none">{totalAssets}</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">En Inventario</span>
+                        </div>
                     </div>
                 </div>
 
                 {can('prestamo_llaves.view_activo') && (
-                    <Link to="/keys" className="bg-white rounded-[1.5rem] p-6 border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-blue-500 transition-all hover:shadow-lg hover:shadow-blue-500/5">
-                        <div className="flex items-center justify-between mb-4">
-                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none">Gestión Inventario</span>
-                            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-md">
-                                <Plus className="w-4 h-4" />
+                    <button 
+                        onClick={() => navigate('/keys')} 
+                        className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between group hover:border-indigo-500 hover:shadow-md transition-all text-left"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100 group-hover:scale-110 transition-transform">
+                                <KeyIcon className="w-4 h-4" />
+                            </div>
+                            <div>
+                                <span className="block text-[8px] font-black text-slate-400 uppercase tracking-widest">Gestión Inventario</span>
+                                <span className="block text-xs font-black text-slate-700 uppercase tracking-tight mt-0.5">Ir al Inventario</span>
                             </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-lg font-black text-slate-900 leading-none">Ir al Inventario</span>
-                            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
-                        </div>
-                    </Link>
+                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
+                    </button>
                 )}
             </div>
 
             {/* Refined Filter Bar */}
-            <div className="bg-white rounded-2xl p-2 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center gap-2">
-                <div className="flex-1">
-                    <FilterBar
-                        onSearch={handleSearch}
-                        placeholder="Buscar préstamos activos por RUT, responsable o activo..."
-                        inputClassName="!shadow-none"
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col md:flex-row gap-3 items-center shrink-0">
+                <div className="relative flex-1 w-full shrink-0">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                    <input 
+                        type="text" 
+                        placeholder="BUSCAR PRÉSTAMOS ACTIVOS POR RUT, RESPONSABLE O ACTIVO..."
+                        className="no-global w-full h-10 text-[10px] font-bold bg-white border border-slate-200 pl-10 pr-4 rounded-xl outline-none focus:border-indigo-500 uppercase transition-all shadow-sm placeholder:text-slate-350"
+                        value={searchQuery}
+                        onChange={(e) => handleSearch(e.target.value)}
                     />
                 </div>
-                <div className="flex items-center gap-2 px-4 py-2 border-l border-slate-100 md:border-l lg:border-l">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Ordenar:</span>
-                    <select
-                        value={ordering}
-                        onChange={(e) => handleSort(e.target.value)}
-                        className="bg-transparent text-[11px] font-black text-slate-700 focus:outline-none cursor-pointer hover:text-blue-600 transition-colors"
-                    >
-                        <option value="-fecha_prestamo">Recientes</option>
-                        <option value="fecha_prestamo">Antiguos</option>
-                        <option value="activo__nombre">Nombre Activo</option>
-                        <option value="solicitante__nombre">Responsable</option>
-                    </select>
+                
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto shrink-0">
+                    <div className="relative w-full sm:w-28 shrink-0">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400 uppercase tracking-widest pointer-events-none z-10">Ver:</span>
+                        <select
+                            value={pageSize}
+                            onChange={(e) => {
+                                setPageSize(Number(e.target.value));
+                                setCurrentPage(1);
+                            }}
+                            className="no-global w-full text-[10px] font-black uppercase tracking-widest pl-11 pr-8 h-10 rounded-xl border border-slate-200 outline-none cursor-pointer appearance-none bg-white text-slate-700 focus:border-indigo-500 shadow-sm bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M7%209l3%203%203-3%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1rem_1rem] bg-[right_0.5rem_center] bg-no-repeat"
+                        >
+                            <option value={10}>10</option>
+                            <option value={20}>20</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                        </select>
+                    </div>
+
+                    <div className="relative w-full sm:w-44 shrink-0">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400 uppercase tracking-widest pointer-events-none z-10">Orden:</span>
+                        <select
+                            value={ordering}
+                            onChange={(e) => handleSort(e.target.value)}
+                            className="no-global w-full text-[10px] font-black uppercase tracking-widest pl-16 pr-8 h-10 rounded-xl border border-slate-200 outline-none cursor-pointer appearance-none bg-white text-slate-700 focus:border-indigo-500 shadow-sm bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M7%209l3%203%203-3%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1rem_1rem] bg-[right_0.5rem_center] bg-no-repeat"
+                        >
+                            <option value="-fecha_prestamo">RECIENTES</option>
+                            <option value="fecha_prestamo">ANTIGUOS</option>
+                            <option value="activo__nombre">NOMBRE ACTIVO</option>
+                            <option value="solicitante__nombre">RESPONSABLE</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
             {/* Content Area */}
-            <AnimatePresence mode="wait">
-                {loans.length === 0 && !loading ? (
-                    <motion.div
-                        key="empty"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-white p-12 rounded-[2rem] border border-slate-100 text-center flex flex-col items-center justify-center min-h-[300px]"
-                    >
-                        <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4">
-                            <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+            <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0 relative">
+                {loading ? (
+                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-[99] flex flex-col items-center justify-center gap-3">
+                        <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
+                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest animate-pulse">Cargando préstamos activos...</p>
+                    </div>
+                ) : filteredLoans.length === 0 ? (
+                    <div className="p-12 text-center flex flex-col items-center justify-center flex-grow select-none">
+                        <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100 flex items-center justify-center mb-3">
+                            <CheckCircle2 className="w-6 h-6" />
                         </div>
-                        <h3 className="text-lg font-black text-slate-900">Todo en Orden</h3>
-                        <p className="text-slate-400 font-medium text-xs max-w-[240px] mt-1">No hay activos en circulación. Todo el inventario está bajo resguardo.</p>
-                    </motion.div>
+                        <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Todo en Orden</h3>
+                        <p className="text-slate-450 font-medium text-[10px] uppercase tracking-wide max-w-[280px] mt-1.5">No hay activos en circulación. Todo el inventario está bajo resguardo.</p>
+                    </div>
                 ) : (
-                    <motion.div
-                        key="list"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="space-y-6"
-                    >
+                    <>
                         <ReturnLoanModal
                             isOpen={showReturnModal}
                             onClose={() => setShowReturnModal(false)}
@@ -226,99 +256,100 @@ const Dashboard = () => {
                             onTransferSuccess={() => fetchData(currentPage, ordering)}
                         />
 
-                        {/* Loans Table */}
-                        <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-50/50 border-b border-slate-100">
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Responsable</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Llave / Activo</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Desde</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {loans.map((loan, idx) => {
-                                            const isInternal = !!loan.solicitante_obj?.funcionario;
-                                            return (
-                                                <tr key={loan.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                    <td className="p-2.5 pl-6">
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${isInternal ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-400'}`}>
-                                                                <User className="w-3.5 h-3.5" />
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <div className="flex items-center gap-1.5 flex-wrap">
-                                                                    <p className="text-[13px] font-black text-slate-900 truncate">
-                                                                        {loan.solicitante_obj?.nombre} {loan.solicitante_obj?.apellido}
-                                                                    </p>
-                                                                    <span className={`text-[7px] font-black px-1 py-0.5 rounded-md uppercase tracking-widest border ${isInternal ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
-                                                                        {isInternal ? 'Personal' : 'Externo'}
-                                                                    </span>
-                                                                </div>
-                                                                <p className="text-[9px] text-slate-400 font-bold mt-0">{loan.solicitante_obj?.rut || 'Sin RUT'}</p>
-                                                            </div>
+                        {/* Loans Table (Zero-Scroll Internal Scroll) */}
+                        <div className="overflow-y-auto flex-grow custom-scrollbar">
+                            <table className="w-full text-left border-collapse border-spacing-0">
+                                <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
+                                    <tr className="border-b border-slate-200">
+                                        <th className="px-6 py-2 text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50">Responsable</th>
+                                        <th className="px-6 py-2 text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50">Llave / Activo</th>
+                                        <th className="px-6 py-2 text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50">Desde</th>
+                                        <th className="px-6 py-2 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right pr-8 bg-slate-50">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 bg-white">
+                                    {filteredLoans.map((loan) => {
+                                        const isInternal = !!loan.solicitante_obj?.funcionario;
+                                        return (
+                                            <tr key={loan.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                <td className="py-1.5 pl-6">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${isInternal ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                                                            <User className="w-3 h-3" />
                                                         </div>
-                                                    </td>
-                                                    <td className="p-2.5">
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
-                                                                <KeyIcon className="w-3.5 h-3.5" />
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <p className="text-[13px] font-bold text-slate-800 leading-tight">
-                                                                    {loan.activo_obj?.nombre}
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                <p className="text-xs font-semibold text-slate-700 truncate capitalize">
+                                                                    {loan.solicitante_obj?.nombre} {loan.solicitante_obj?.apellido}
                                                                 </p>
-                                                                <p className="text-[8px] text-slate-400 font-black uppercase tracking-wider mt-0 truncate">
-                                                                    {loan.activo_obj?.establecimiento_nombre}
-                                                                </p>
+                                                                <span className={`text-[7px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider border ${isInternal ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-slate-50 text-slate-500 border-slate-150'}`}>
+                                                                    {isInternal ? 'Personal' : 'Externo'}
+                                                                </span>
                                                             </div>
+                                                            <p className="text-[9px] text-slate-400 font-mono mt-0.5 uppercase">{loan.solicitante_obj?.rut || 'Sin RUT'}</p>
                                                         </div>
-                                                    </td>
-                                                    <td className="p-2.5">
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
-                                                                <Clock className="w-3.5 h-3.5" />
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <p className="text-[13px] font-bold text-slate-800 capitalize">
-                                                                    {new Date(loan.fecha_prestamo).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })}
-                                                                </p>
-                                                                <p className="text-[9px] text-slate-400 font-bold">
-                                                                    {new Date(loan.fecha_prestamo).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} hrs
-                                                                </p>
-                                                            </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-1.5">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-200 shrink-0">
+                                                            <KeyIcon className="w-3 h-3" />
                                                         </div>
-                                                    </td>
-                                                    <td className="p-2.5 text-right pr-6">
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            <button
-                                                                onClick={() => handleTransferClick(loan)}
-                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl hover:bg-indigo-100 transition-all font-black text-[9px] uppercase tracking-widest active:scale-95"
-                                                                title="Traspasar Responsabilidad"
-                                                            >
-                                                                <ArrowRight className="w-3 h-3" />
-                                                                <span className="hidden lg:inline">Traspasar</span>
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleReturnClick(loan)}
-                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all font-black text-[9px] uppercase tracking-widest shadow-sm active:scale-95"
-                                                            >
-                                                                <CheckCircle2 className="w-3 h-3" />
-                                                                <span className="hidden sm:inline">Devolver</span>
-                                                            </button>
+                                                        <div className="min-w-0">
+                                                            <p className="text-xs font-semibold text-slate-700 leading-tight uppercase">
+                                                                {loan.activo_obj?.nombre}
+                                                            </p>
+                                                            <p className="text-[9px] text-slate-400 font-medium uppercase tracking-wider mt-0.5 truncate">
+                                                                {loan.activo_obj?.establecimiento_nombre}
+                                                            </p>
                                                         </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-1.5">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-200 shrink-0">
+                                                            <Clock className="w-3 h-3" />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-xs font-semibold text-slate-700 capitalize">
+                                                                {new Date(loan.fecha_prestamo).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })}
+                                                            </p>
+                                                            <p className="text-[9px] text-slate-450 font-medium mt-0.5">
+                                                                {new Date(loan.fecha_prestamo).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} hrs
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-1.5 text-right pr-8">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleTransferClick(loan)}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl hover:bg-indigo-100 transition-all font-bold text-[9px] uppercase tracking-widest active:scale-95 shadow-sm"
+                                                            title="Traspasar Responsabilidad"
+                                                        >
+                                                            <ArrowRight className="w-3 h-3" />
+                                                            <span>Traspasar</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleReturnClick(loan)}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-xl hover:bg-emerald-600 hover:border-emerald-600 hover:shadow-emerald-100 border border-slate-900 transition-all font-bold text-[9px] uppercase tracking-widest shadow-lg shadow-slate-900/10 active:scale-95"
+                                                        >
+                                                            <CheckCircle2 className="w-3 h-3" />
+                                                            <span>Devolver</span>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
 
-                        <div className="flex justify-center mt-2">
+                        {/* Bottom Pagination Bar */}
+                        <div className="p-3 border-t border-slate-150 bg-slate-50/50 shrink-0">
                             <Pagination
                                 currentPage={currentPage}
                                 totalPages={totalPages}
@@ -326,9 +357,9 @@ const Dashboard = () => {
                                 totalCount={totalCount}
                             />
                         </div>
-                    </motion.div>
+                    </>
                 )}
-            </AnimatePresence>
+            </div>
         </div>
     );
 };

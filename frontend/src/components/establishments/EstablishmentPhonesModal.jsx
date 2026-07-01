@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Phone, Plus, Trash2, X, Check, Search, Building } from 'lucide-react';
+import { Phone, Plus, Trash2, X, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePermission } from '../../hooks/usePermission';
 import api from '../../api';
+import Portal from '../common/Portal';
+import { BTN_SECONDARY } from '../../pages/funcionarios/shared/funcionariosUi';
+import { INPUT_FORM } from '../../pages/establishments/establishmentsUi';
 
 const EstablishmentPhonesModal = ({ isOpen, onClose, establishment }) => {
     const { can } = usePermission();
@@ -67,33 +70,42 @@ const EstablishmentPhonesModal = ({ isOpen, onClose, establishment }) => {
         }
     };
 
-    if (!isOpen) return null;
-
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm shadow-2xl overflow-y-auto">
+        <Portal>
+            <AnimatePresence>
+            {isOpen && (
+            <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4">
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                onClick={onClose}
+                aria-hidden
+            />
             <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="bg-white rounded-[32px] w-full max-w-xl overflow-hidden shadow-2xl relative"
+                className="relative z-10 bg-white rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col"
+                onClick={e => e.stopPropagation()}
             >
-                {/* Header */}
-                <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
-                            <Phone className="w-6 h-6 text-white" />
+                <div className="p-4 md:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20 shrink-0">
+                            <Phone className="w-5 h-5 text-white" />
                         </div>
-                        <div>
-                            <h2 className="text-xl font-black text-slate-800 tracking-tight">Gestión de Teléfonos</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">{establishment?.nombre}</p>
+                        <div className="min-w-0">
+                            <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider">Gestión de teléfonos</h2>
+                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 truncate">{establishment?.nombre}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-white hover:shadow-md rounded-xl transition-all text-slate-400 hover:text-slate-600">
-                        <X className="w-6 h-6" />
+                    <button type="button" onClick={onClose} className="p-2 hover:bg-slate-200 rounded-xl transition-all text-slate-500 shrink-0">
+                        <X className="w-4 h-4" />
                     </button>
                 </div>
 
-                <div className="p-8">
+                <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar flex-1 min-h-0">
                     {/* Add Phone Section */}
                     {can('establecimientos.add_telefonoestablecimiento') && (
                         <div className="mb-8">
@@ -238,7 +250,7 @@ const EstablishmentPhonesModal = ({ isOpen, onClose, establishment }) => {
                             ) : (
                                 !loading && (
                                     <div className="text-center py-12 text-slate-400">
-                                        <Building className="w-12 h-12 mx-auto mb-3 opacity-10" />
+                                        <Phone className="w-10 h-10 mx-auto mb-3 text-slate-200" />
                                         <p className="text-sm font-bold opacity-30">No hay teléfonos registrados</p>
                                     </div>
                                 )
@@ -247,7 +259,10 @@ const EstablishmentPhonesModal = ({ isOpen, onClose, establishment }) => {
                     </div>
                 </div>
             </motion.div>
-        </div>
+            </div>
+            )}
+            </AnimatePresence>
+        </Portal>
     );
 };
 

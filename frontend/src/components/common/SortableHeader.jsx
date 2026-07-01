@@ -17,18 +17,18 @@ const SortableHeader = ({ label, sortKey, currentOrdering, onSort, className = "
 
     return (
         <th
-            className={`p-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group ${className}`}
+            className={`px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors group border-r border-slate-100 ${className}`}
             onClick={handleSort}
         >
             <div className="flex items-center gap-1">
                 {label}
                 <div className="text-slate-300 group-hover:text-slate-400 transition-colors">
                     {isSortedAsc ? (
-                        <ChevronUp className="w-4 h-4 text-blue-600" />
+                        <ChevronUp className="w-3 h-3 text-blue-600" />
                     ) : isSortedDesc ? (
-                        <ChevronDown className="w-4 h-4 text-blue-600" />
+                        <ChevronDown className="w-3 h-3 text-blue-600" />
                     ) : (
-                        <ChevronsUpDown className="w-4 h-4 opacity-0 group-hover:opacity-100" />
+                        <ChevronsUpDown className="w-3 h-3 opacity-0 group-hover:opacity-100" />
                     )}
                 </div>
             </div>

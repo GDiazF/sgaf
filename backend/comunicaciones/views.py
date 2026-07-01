@@ -4,8 +4,12 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
 from django.template import Template, Context
 from django.core.mail import get_connection, EmailMessage
-from .models import CuentaSMTP, PlantillaCorreo
-from .serializers import CuentaSMTPSerializer, PlantillaCorreoSerializer
+from .models import CuentaSMTP, DestinatariosCorreoOperativo, PlantillaCorreo
+from .serializers import (
+    CuentaSMTPSerializer,
+    DestinatariosCorreoOperativoSerializer,
+    PlantillaCorreoSerializer
+)
 
 from rest_framework.permissions import IsAuthenticated, DjangoModelPermissions
 
@@ -109,3 +113,9 @@ class PlantillaCorreoViewSet(viewsets.ModelViewSet):
             return Response({'message': f'Correo de prueba enviado correctamente a {destinatario}'})
         except Exception as e:
             return Response({'error': f'Error al enviar: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DestinatariosCorreoOperativoViewSet(viewsets.ModelViewSet):
+    queryset = DestinatariosCorreoOperativo.objects.prefetch_related('grupos', 'usuarios').all()
+    serializer_class = DestinatariosCorreoOperativoSerializer
+    permission_classes = [IsAuthenticated, DjangoModelPermissions]

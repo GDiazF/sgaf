@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
-import { Truck, Search, Plus, Edit2, Trash2, X, Save, Building2 } from 'lucide-react';
+import { Building2, Search, Plus, Edit2, Trash2, FolderSearch, AlertCircle } from 'lucide-react';
 import { usePermission } from '../../hooks/usePermission';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import Pagination from '../../components/common/Pagination';
-import FilterBar from '../../components/common/FilterBar';
 import SortableHeader from '../../components/common/SortableHeader';
 import ProviderModal from '../../components/services/ProviderModal';
+import useDebouncedValue from '../../hooks/useDebouncedValue';
+import {
+    BTN_PRIMARY,
+    INPUT_FILTER,
+    SELECT_FILTER,
+    TITLE_ICON_BOX,
+    BTN_ICON_EDIT,
+    BTN_ICON_DELETE,
+} from '../funcionarios/shared/funcionariosUi';
 
 const Providers = () => {
     const { can } = usePermission();
@@ -23,6 +31,8 @@ const Providers = () => {
     const [totalCount, setTotalCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [ordering, setOrdering] = useState('nombre');
+    const [errorMessage, setErrorMessage] = useState('');
+    const debouncedSearchQuery = useDebouncedValue(searchQuery);
 
     const [editingId, setEditingId] = useState(null);
 
@@ -49,10 +59,11 @@ const Providers = () => {
                 api.get('tipos-proveedores/', { params: { page_size: 1000 } })
             ]);
 
-            // Handle Pagination
-            setProviders(provRes.data.results || []);
-            setTotalCount(provRes.data.count || 0);
-            setTotalPages(Math.ceil((provRes.data.count || 0) / pageSize));
+            // Handle Pagination and Data Structure
+            const provData = provRes.data.results || (Array.isArray(provRes.data) ? provRes.data : []);
+            setProviders(provData);
+            setTotalCount(provRes.data.count || provData.length);
+            setTotalPages(provRes.data.count ? Math.ceil(provRes.data.count / pageSize) : 1);
 
             setProviderTypes(typesRes.data.results || typesRes.data);
 
@@ -65,19 +76,12 @@ const Providers = () => {
     };
 
     useEffect(() => {
-        fetchData(currentPage, searchQuery, ordering);
-    }, [currentPage, pageSize, ordering]);
-
-    // Handle initial search effect
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            fetchData(1, searchQuery, ordering);
-        }, 400);
-        return () => clearTimeout(timer);
-    }, [searchQuery]);
+        fetchData(currentPage, debouncedSearchQuery, ordering);
+    }, [currentPage, pageSize, ordering, debouncedSearchQuery]);
 
     const handleSearch = (query) => {
         setSearchQuery(query);
+        setCurrentPage(1);
     };
 
     const handlePageChange = (page) => {
@@ -117,10 +121,11 @@ const Providers = () => {
         if (!window.confirm("¿Seguro que desea eliminar este proveedor?")) return;
         try {
             await api.delete(`proveedores/${id}/`);
+            setErrorMessage('');
             fetchData(currentPage, searchQuery);
         } catch (error) {
             console.error(error);
-            alert("Error al eliminar.");
+            setErrorMessage('Error al eliminar el proveedor.');
         }
     };
 
@@ -132,10 +137,11 @@ const Providers = () => {
                 await api.post('proveedores/', dataToSubmit);
             }
             setShowForm(false);
+            setErrorMessage('');
             fetchData(currentPage, searchQuery);
         } catch (error) {
             console.error(error);
-            alert("Error al guardar.");
+            setErrorMessage('Error al guardar el proveedor.');
         }
     };
 
@@ -143,63 +149,73 @@ const Providers = () => {
     const filteredData = providers;
 
     return (
-        <div className="flex flex-col w-full lg:h-[calc(100vh-140px)] lg:overflow-hidden">
-            {/* Header */}
-            <div className="shrink-0 mb-6 lg:mb-4 px-1">
-                <div className="flex justify-between items-start mb-4">
-                    <div>
-                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight uppercase leading-none">Proveedores</h2>
-                        <p className="text-[10px] md:text-xs text-slate-500 font-normal mt-1">Gestión de empresas prestadoras de servicios.</p>
+        <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden w-full">
+            {/* Cabecera Premium Estándar */}
+            <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-end gap-3 border-b border-slate-200/60 pb-3 px-1">
+                <div className="flex items-center gap-3">
+                    <div className={TITLE_ICON_BOX}>
+                        <Building2 className="w-5 h-5" />
                     </div>
+                    <div>
+                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase">
+                            Proveedores
+                        </h2>
+                        <div className="flex items-center gap-2 mt-1.5">
+                            <p className="text-[10px] md:text-xs font-medium text-slate-500 uppercase tracking-wide">
+                                Gestión de empresas prestadoras de servicios.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-2 self-end md:self-auto shrink-0">
                     {can('servicios.add_proveedor') && (
                         <button
                             onClick={handleNew}
-                            className="lg:hidden p-2.5 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-500/20 active:scale-95 transition-transform"
+                            className={BTN_PRIMARY}
                         >
-                            <Plus className="w-5 h-5" />
+                            <Plus className="w-4 h-4" />
+                            <span>Nuevo Proveedor</span>
                         </button>
                     )}
                 </div>
+            </div>
 
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                    <div className="flex flex-row flex-1 gap-2">
-                        <div className="relative w-full lg:max-w-md flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                            <input
-                                type="text"
-                                placeholder="Buscar por nombre, RUT o tipo..."
-                                value={searchQuery}
-                                onChange={(e) => handleSearch(e.target.value)}
-                                className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all shadow-sm"
-                            />
-                        </div>
-                        <div className="flex gap-2">
-                            <select
-                                value={pageSize}
-                                onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                                className="w-[84px] pl-3 pr-7 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm cursor-pointer"
-                            >
-                                <option value={10}>10</option>
-                                <option value={20}>20</option>
-                                <option value={50}>50</option>
-                                <option value={100}>100</option>
-                            </select>
-                        </div>
-                    </div>
+            {/* Barra de Filtros Unificada y Simétrica (h-10 / 40px) */}
+            <div className="shrink-0 flex flex-col md:flex-row items-center gap-3 w-full bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="w-full md:w-80 lg:w-96 shrink-0 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder="Buscar por nombre, RUT o tipo..."
+                        value={searchQuery}
+                        onChange={(e) => handleSearch(e.target.value)}
+                        className={INPUT_FILTER}
+                    />
+                </div>
 
-                    <div className="flex items-center gap-2">
-                        {can('servicios.add_proveedor') && (
-                            <button
-                                onClick={handleNew}
-                                className="hidden lg:flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all font-semibold text-[10px] uppercase shadow-lg shadow-blue-600/20 active:scale-95"
-                            >
-                                <Plus className="w-4 h-4" />
-                                <span>Nuevo Proveedor</span>
-                            </button>
-                        )}
-                    </div>
+                {/* Selector de tamaño de página (h-10 unificado) */}
+                <div className="flex items-center gap-2 ml-auto shrink-0 self-stretch md:self-auto justify-end">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mostrar:</span>
+                    <select
+                        value={pageSize}
+                        onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                        className={`${SELECT_FILTER} w-[84px]`}
+                    >
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                    </select>
                 </div>
             </div>
+
+            {errorMessage && (
+                <div className="shrink-0 bg-rose-50 text-rose-600 text-[10px] font-bold uppercase p-3 rounded-xl border border-rose-100 flex gap-2 items-center">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    {errorMessage}
+                </div>
+            )}
 
             {/* Modal Form */}
             <ProviderModal
@@ -225,21 +241,21 @@ const Providers = () => {
                                 {item.acronimo ? item.acronimo.substring(0, 2).toUpperCase() : item.nombre.charAt(0)}
                             </div>
                             <div className="min-w-0">
-                                <h3 className="font-semibold text-slate-800 text-sm truncate uppercase leading-tight">{item.nombre}</h3>
-                                {item.acronimo && <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-widest">{item.acronimo}</p>}
+                                <h3 className="font-medium text-slate-700 text-[11px] truncate uppercase tracking-tighter leading-tight">{item.nombre}</h3>
+                                {item.acronimo && <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{item.acronimo}</p>}
                             </div>
                         </div>
 
                         <div className="space-y-2.5 mb-4">
-                            <div className="flex justify-between items-center text-xs">
+                            <div className="flex justify-between items-center text-[11px]">
                                 <span className="text-slate-500 font-medium">RUT:</span>
-                                <span className="font-mono text-slate-700 font-semibold">{item.rut || '-'}</span>
+                                <span className="font-mono text-slate-700 font-medium">{item.rut || '-'}</span>
                             </div>
-                            <div className="flex justify-between items-center text-xs">
+                            <div className="flex justify-between items-center text-[11px]">
                                 <span className="text-slate-500 font-medium">Contacto:</span>
                                 <span className="text-slate-700 truncate ml-2 text-right">{item.contacto || '-'}</span>
                             </div>
-                            <div className="flex justify-between items-center text-xs">
+                            <div className="flex justify-between items-center text-[11px]">
                                 <span className="text-slate-500 font-medium">Tipo:</span>
                                 {item.tipo_proveedor_nombre ? (
                                     <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-[9px] font-bold uppercase border border-slate-200">
@@ -253,7 +269,7 @@ const Providers = () => {
                             {can('servicios.change_proveedor') && (
                                 <button
                                     onClick={() => handleEdit(item)}
-                                    className="flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 py-2.5 rounded-xl font-semibold text-[10px] uppercase shadow-sm active:scale-95 transition-all"
+                                    className="flex items-center justify-center gap-2 bg-blue-50 text-blue-700 h-10 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm active:scale-95 transition-all"
                                 >
                                     <Edit2 className="w-3.5 h-3.5" /> Editar
                                 </button>
@@ -261,7 +277,7 @@ const Providers = () => {
                             {can('servicios.delete_proveedor') && (
                                 <button
                                     onClick={() => handleDelete(item.id)}
-                                    className="flex items-center justify-center gap-2 bg-red-50 text-red-600 py-2.5 rounded-xl font-semibold text-[10px] uppercase shadow-sm active:scale-95 transition-all"
+                                    className="flex items-center justify-center gap-2 bg-rose-50 text-rose-600 h-10 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm active:scale-95 transition-all"
                                 >
                                     <Trash2 className="w-3.5 h-3.5" /> Borrar
                                 </button>
@@ -272,51 +288,51 @@ const Providers = () => {
             </div>
 
             {/* Desktop Table List */}
-            <div className="hidden lg:flex flex-1 flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-0">
-                <div className="flex-1 overflow-auto custom-scrollbar">
+            <div className="hidden lg:flex flex-1 flex-col bg-slate-50 rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-0">
+                <div className="flex-1 overflow-auto custom-scrollbar bg-white">
                     <table className="w-full text-left whitespace-nowrap">
                         <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                             <tr>
                                 <SortableHeader label="Proveedor" sortKey="nombre" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="Tipo" sortKey="tipo_proveedor__nombre" currentOrdering={ordering} onSort={handleSort} />
                                 <SortableHeader label="RUT" sortKey="rut" currentOrdering={ordering} onSort={handleSort} />
-                                <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Contacto</th>
-                                <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-r border-slate-100">Contacto</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 font-sans">
                             {filteredData.map(item => (
                                 <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
-                                    <td className="py-2 px-4">
+                                    <td className="px-4 py-2 border-r border-slate-50 text-[11px] font-medium text-slate-700 uppercase tracking-tighter">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm border border-blue-100 group-hover:bg-white transition-colors">
+                                            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-[11px] border border-blue-100 group-hover:bg-white transition-colors">
                                                 {item.acronimo ? item.acronimo.substring(0, 2).toUpperCase() : item.nombre.charAt(0)}
                                             </div>
                                             <div>
-                                                <div className="font-semibold text-slate-800 text-[12px]">{item.nombre}</div>
+                                                <div className="font-medium text-slate-700 text-[11px] uppercase tracking-tighter">{item.nombre}</div>
                                                 {item.acronimo && <div className="text-[10px] text-blue-500 font-medium">{item.acronimo}</div>}
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="py-2 px-4">
+                                    <td className="px-4 py-2 border-r border-slate-50 text-[11px] font-medium text-slate-500 uppercase tracking-tighter">
                                         {item.tipo_proveedor_nombre ? (
                                             <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-[10px] font-bold uppercase border border-slate-200">
                                                 {item.tipo_proveedor_nombre}
                                             </span>
                                         ) : <span className="text-slate-400">-</span>}
                                     </td>
-                                    <td className="py-2 px-4 font-mono text-[11px] font-semibold text-slate-400">{item.rut || '-'}</td>
-                                    <td className="py-2 px-4 text-xs font-normal text-slate-600">{item.contacto || '-'}</td>
-                                    <td className="py-2 px-4 text-right">
+                                    <td className="px-4 py-2 border-r border-slate-50 font-mono text-[11px] font-medium text-slate-500 uppercase tracking-tighter">{item.rut || '-'}</td>
+                                    <td className="px-4 py-2 border-r border-slate-50 text-[11px] font-medium text-slate-500 uppercase tracking-tighter">{item.contacto || '-'}</td>
+                                    <td className="px-4 py-2 text-right">
                                         <div className="flex justify-end items-center gap-1.5">
                                             {can('servicios.change_proveedor') && (
-                                                <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Editar">
-                                                    <Edit2 className="w-4 h-4" />
+                                                <button onClick={() => handleEdit(item)} className={BTN_ICON_EDIT} title="Editar">
+                                                    <Edit2 className="w-3.5 h-3.5" />
                                                 </button>
                                             )}
                                             {can('servicios.delete_proveedor') && (
-                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all" title="Eliminar">
-                                                    <Trash2 className="w-4 h-4" />
+                                                <button onClick={() => handleDelete(item.id)} className={BTN_ICON_DELETE} title="Eliminar">
+                                                    <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
                                             )}
                                         </div>
@@ -327,8 +343,8 @@ const Providers = () => {
                     </table>
                     {filteredData.length === 0 && !loading && (
                         <div className="p-12 text-center text-slate-400">
-                            <Truck className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                            <p>No se encontraron proveedores.</p>
+                            <FolderSearch className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No se encontraron proveedores.</p>
                         </div>
                     )}
                 </div>

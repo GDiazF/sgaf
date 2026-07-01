@@ -20,21 +20,29 @@ const SessionTimeoutManager = () => {
 
     const lastActivityRef = useRef(Date.now());
     
-    // Reiniciar temporizador cuando el usuario inicia sesión (cambia de null a objeto)
+    // Reiniciar temporizador cuando el usuario inicia sesión
     useEffect(() => {
         if (user) {
             const now = Date.now();
             lastActivityRef.current = now;
             localStorage.setItem('lastActivity', now.toString());
+            setShowModal(false);
+            setSecondsLeft(60);
+        } else {
+            // Limpiar estado y almacenamiento al cerrar sesión
+            setShowModal(false);
+            setSecondsLeft(60);
+            localStorage.removeItem('lastActivity');
+            lastActivityRef.current = Date.now();
         }
-    }, [!!user]);
+    }, [user]);
 
     // 1. Registro de actividad (solo si está logueado y no en ruta pública)
     const updateActivity = () => {
         if (!user || showModal || isPublic) return;
         const now = Date.now();
-        // Prevenir excesivas escrituras, solo registrar cada 1 segundo
-        if (now - lastActivityRef.current > 1000) {
+        // Prevenir excesivas escrituras, solo registrar cada 5 segundos
+        if (now - lastActivityRef.current > 5000) {
             lastActivityRef.current = now;
             localStorage.setItem('lastActivity', now.toString());
         }
@@ -62,6 +70,14 @@ const SessionTimeoutManager = () => {
         if (!user || isPublic) {
             setShowModal(false);
             return;
+        }
+
+        // Si por alguna razón al iniciar el efecto el tiempo ya expiró (estado residual)
+        // forzamos el reinicio del contador para la nueva sesión
+        const initialElapsed = Date.now() - lastActivityRef.current;
+        if (initialElapsed >= SESSION_TIME) {
+            lastActivityRef.current = Date.now();
+            localStorage.setItem('lastActivity', lastActivityRef.current.toString());
         }
 
         const interval = setInterval(() => {

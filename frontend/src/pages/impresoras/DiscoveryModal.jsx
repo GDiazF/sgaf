@@ -54,30 +54,30 @@ const DiscoveryModal = ({ isOpen, onClose, onFinish }) => {
             <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-wider">IP Inicial</label>
+                        <label className="text-[10px] font-semibold text-slate-500 ml-1 uppercase tracking-wider">IP Inicial</label>
                         <input
                             type="text"
                             value={startIp}
                             onChange={(e) => setStartIp(e.target.value)}
                             disabled={scanning}
-                            className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                            className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
                         />
                     </div>
                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-wider">IP Final</label>
+                        <label className="text-[10px] font-semibold text-slate-500 ml-1 uppercase tracking-wider">IP Final</label>
                         <input
                             type="text"
                             value={endIp}
                             onChange={(e) => setEndIp(e.target.value)}
                             disabled={scanning}
-                            className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                            className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
                         />
                     </div>
                     <div className="col-span-2">
                         <button
                             onClick={handleScan}
                             disabled={scanning}
-                            className="w-full py-3 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-slate-200"
+                            className="w-full py-3 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-md shadow-slate-900/10 active:scale-[0.98]"
                         >
                             {scanning ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
                             {scanning ? 'Escaneando red...' : 'Iniciar Búsqueda'}
@@ -97,7 +97,7 @@ const DiscoveryModal = ({ isOpen, onClose, onFinish }) => {
 
                 {!scanning && found.length > 0 && (
                     <div className="space-y-4">
-                        <div className="flex justify-between items-center text-sm font-bold text-slate-800">
+                        <div className="flex justify-between items-center text-sm font-semibold text-slate-800">
                             <h3>Dispositivos Encontrados</h3>
                             <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full">{found.length} Dispositivos</span>
                         </div>
@@ -115,7 +115,7 @@ const DiscoveryModal = ({ isOpen, onClose, onFinish }) => {
                                             <CheckCircle2 className="w-5 h-5" />
                                         </div>
                                         <div>
-                                            <p className="font-bold text-slate-800">{dev.name}</p>
+                                            <p className="font-semibold text-slate-800">{dev.name}</p>
                                             <p className="text-xs text-slate-500 font-mono">{dev.ip}</p>
                                         </div>
                                     </div>

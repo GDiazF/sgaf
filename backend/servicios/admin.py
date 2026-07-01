@@ -17,14 +17,14 @@ class TipoDocumentoAdmin(admin.ModelAdmin):
 
 @admin.register(Servicio)
 class ServicioAdmin(admin.ModelAdmin):
-    list_display = ('proveedor', 'establecimiento', 'numero_cliente', 'numero_servicio', 'tipo_documento')
+    list_display = ('proveedor', 'establecimiento', 'numero_cliente', 'numero_servicio', 'tipo_documento', 'unidad_medida')
     list_filter = ('proveedor', 'tipo_documento', 'establecimiento')
     search_fields = ('numero_cliente', 'numero_servicio', 'proveedor__nombre', 'establecimiento__nombre')
     autocomplete_fields = ['proveedor', 'establecimiento']
 
 @admin.register(RegistroPago)
 class RegistroPagoAdmin(admin.ModelAdmin):
-    list_display = ('nro_documento', 'servicio', 'establecimiento', 'monto_total', 'fecha_pago')
+    list_display = ('nro_documento', 'servicio', 'establecimiento', 'monto_total', 'fecha_pago', 'consumo')
     list_filter = ('establecimiento', 'fecha_pago')
     search_fields = ('nro_documento', 'servicio__numero_cliente')
     autocomplete_fields = ['servicio', 'establecimiento']

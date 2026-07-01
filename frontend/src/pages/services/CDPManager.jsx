@@ -115,41 +115,46 @@ const CDPManager = () => {
     };
 
     return (
-        <div className="flex flex-col w-full lg:h-[calc(100vh-140px)] lg:overflow-hidden px-1">
-            {/* Header section with Premium design */}
-            <div className="shrink-0 mb-6 lg:mb-4">
-                <div className="flex justify-between items-start mb-4">
-                    <div className="space-y-1">
-                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight uppercase leading-none">Repositorio CDPs</h2>
-                        <p className="text-[10px] md:text-xs font-medium text-slate-500 mt-1.5 flex items-center gap-1.5 uppercase tracking-wide">
+        <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden w-full">
+            {/* Cabecera Premium Estándar */}
+            <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-end gap-3 border-b border-slate-200/60 pb-3 px-1">
+                <div>
+                    <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase">
+                        Repositorio CDPs
+                    </h2>
+                    <div className="flex items-center gap-2 mt-1.5">
+                        <p className="text-[10px] md:text-xs font-medium text-slate-500 uppercase tracking-wide">
                             Certificados de Disponibilidad Presupuestaria.
                         </p>
                     </div>
-
-                    <div className="flex gap-2">
-                        {canAdd && (
-                            <button
-                                onClick={handleNew}
-                                className="group relative inline-flex items-center justify-center p-2.5 lg:px-5 lg:py-2 bg-blue-600 text-white text-sm font-semibold rounded-[14px] lg:rounded-xl overflow-hidden transition-all hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-500/20 shrink-0"
-                            >
-                                <Plus className="w-5 h-5 lg:w-4 lg:h-4 lg:mr-2" />
-                                <span className="hidden lg:inline uppercase whitespace-nowrap">Subir CDP</span>
-                            </button>
-                        )}
-                    </div>
                 </div>
 
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                    <div className="flex flex-row flex-1 gap-2">
-                        <div className="relative w-full lg:max-w-md flex-1">
-                            <FilterBar onSearch={handleSearch} placeholder="Buscar por nombre, año o descripción..." />
-                        </div>
-                    </div>
+                <div className="flex gap-2 self-end md:self-auto shrink-0">
+                    {canAdd && (
+                        <button
+                            onClick={handleNew}
+                            className="flex items-center justify-center gap-2 h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all shadow-md shadow-blue-500/10 active:scale-95"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Subir CDP</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
-            {/* Grid Container - Matching Procedures Style */}
-            <div className="overflow-y-auto flex-1 p-4 md:p-6 custom-scrollbar">
+            {/* Barra de Filtros Unificada y Simétrica (h-10 / 40px) */}
+            <div className="shrink-0 flex flex-col md:flex-row items-center gap-3 w-full bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="w-full md:w-80 lg:w-96 shrink-0">
+                    <FilterBar 
+                        onSearch={handleSearch} 
+                        placeholder="Buscar por nombre, año o descripción..." 
+                        inputClassName="no-global !h-10 !text-[10px] !font-bold !rounded-xl !bg-white !border-slate-200 shadow-sm"
+                    />
+                </div>
+            </div>
+
+            {/* Grid Container con Zero-Scroll y Fondo Estándar */}
+            <div className="bg-slate-50 rounded-2xl shadow-sm border border-slate-200 overflow-y-auto flex-1 p-4 md:p-6 custom-scrollbar">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {cdps.map(cdp => (
                         <motion.div
@@ -277,7 +282,7 @@ const CDPManager = () => {
                                             type="text"
                                             required
                                             placeholder="EJ: CDP AGUA"
-                                            className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 placeholder:text-slate-300 placeholder:font-medium uppercase"
+                                            className="no-global w-full !h-12 px-4 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-bold text-slate-700 placeholder:text-slate-350 text-sm uppercase"
                                             value={formData.nombre}
                                             onChange={e => setFormData({ ...formData, nombre: e.target.value })}
                                         />
@@ -289,7 +294,7 @@ const CDPManager = () => {
                                             required
                                             min="2020"
                                             max="2100"
-                                            className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-black text-slate-700 text-center font-mono text-lg"
+                                            className="no-global w-full !h-12 px-4 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-black text-slate-700 text-center font-mono text-base"
                                             value={formData.anio}
                                             onChange={e => setFormData({ ...formData, anio: e.target.value })}
                                         />
@@ -300,7 +305,7 @@ const CDPManager = () => {
                                     <textarea
                                         rows="2"
                                         placeholder="BREVE DESCRIPCIÓN DEL CDP (OPCIONAL)..."
-                                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-semibold text-slate-600 resize-none placeholder:text-slate-300 uppercase text-xs"
+                                        className="no-global w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-semibold text-slate-600 resize-none placeholder:text-slate-350 uppercase text-xs"
                                         value={formData.descripcion}
                                         onChange={e => setFormData({ ...formData, descripcion: e.target.value })}
                                     />
@@ -314,7 +319,7 @@ const CDPManager = () => {
                                             type="file"
                                             required={!editingId}
                                             accept=".pdf,.doc,.docx"
-                                            className="w-full text-xs text-slate-500
+                                            className="no-global w-full text-xs text-slate-500
                                                 file:mr-4 file:py-3 file:px-6
                                                 file:rounded-2xl file:border-0
                                                 file:text-[10px] file:font-black file:uppercase

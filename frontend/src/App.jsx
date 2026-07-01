@@ -19,6 +19,10 @@ import CDPManager from './pages/services/CDPManager';
 import FacturasAdquisicionDashboard from './pages/services/FacturasAdquisicionDashboard';
 import Contracts from './pages/contracts/Contracts';
 import ContractDetail from './pages/contracts/ContractDetail';
+import PeriodoDetallePage from './pages/contracts/PeriodoDetallePage';
+import ServiciosDashboard from './pages/contracts/ServiciosDashboard';
+import ServicioDetailPage from './pages/contracts/ServicioDetailPage';
+import RutaDetailPage from './pages/contracts/RutaDetailPage';
 // Funcionarios
 import FuncionariosDashboard from './pages/funcionarios/FuncionariosDashboard';
 import FuncionariosList from './pages/funcionarios/FuncionariosList';
@@ -47,6 +51,16 @@ import WelfareWall from './pages/bienestar/WelfareWall';
 
 import ProceduresDashboard from './pages/procedimientos/ProceduresDashboard';
 
+// Tickets
+import TicketsDashboard from './pages/tickets/TicketsDashboard';
+import TicketForm from './pages/tickets/TicketForm';
+import TicketDetail from './pages/tickets/TicketDetail';
+import CategoryManagement from './pages/tickets/CategoryManagement';
+
+// Comunicaciones
+import EjecutivosMain from './pages/comunicaciones/EjecutivosMain';
+import EstablecimientoGestion from './pages/comunicaciones/EstablecimientoGestion';
+
 
 import Login from './pages/Login';
 import ForgotPassword from './pages/auth/ForgotPassword';
@@ -59,6 +73,7 @@ import RolesManagement from './pages/admin/RolesManagement';
 import AuditLog from './pages/admin/AuditLog';
 import EmailSettings from './pages/admin/EmailSettings';
 import ConciliacionDashboard from './pages/admin/ConciliacionDashboard';
+import LoginBackgroundsAdmin from './pages/admin/LoginBackgroundsAdmin';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -138,7 +153,15 @@ function App() {
                 <Route element={<ProtectedRoute permission="establecimientos.view_establecimiento" />}>
                   <Route path="establishments" element={<Establishments />} />
                 </Route>
-                {/* Contratos y Finanzas */}
+                {/* Gestión de Rutas de Transporte */}
+                <Route element={<ProtectedRoute permission="contratos.view_rutatransporte" />}>
+                  <Route path="contracts/servicios" element={<ServiciosDashboard />} />
+                  <Route path="contracts/servicios/:id" element={<ServicioDetailPage />} />
+                  <Route path="contracts/ruta/:id" element={<RutaDetailPage />} />
+                  <Route path="contracts/periodo/:id" element={<PeriodoDetallePage />} />
+                </Route>
+
+                {/* Contratos y Compras */}
                 <Route element={<ProtectedRoute permission="contratos.view_contrato" />}>
                   <Route path="contracts" element={<Contracts />} />
                   <Route path="contracts/:id" element={<ContractDetail />} />
@@ -214,9 +237,26 @@ function App() {
                 <Route element={<ProtectedRoute permission="insights.view_dashboardmetric" />}>
                   <Route path="insights" element={<InsightsDashboard />} />
                 </Route>
-                <Route path="bienestar" element={<WelfareBoard />} />
-                <Route path="bienestar/muro" element={<div className="h-full w-full overflow-hidden"><WelfareWall /></div>} />
+                <Route element={<ProtectedRoute permission="bienestar.view_beneficio" />}>
+                  <Route path="bienestar/muro" element={<div className="h-full w-full overflow-hidden"><WelfareWall /></div>} />
+                </Route>
+                <Route element={<ProtectedRoute permission={['bienestar.add_beneficio', 'bienestar.change_beneficio']} />}>
+                  <Route path="bienestar" element={<WelfareBoard />} />
+                </Route>
                 <Route path="procedimientos" element={<ProceduresDashboard />} />
+                
+                {/* Tickets / Mesa de Ayuda */}
+                <Route path="tickets" element={<TicketsDashboard />} />
+                <Route path="tickets/new" element={<TicketForm />} />
+                <Route path="tickets/categories" element={<CategoryManagement />} />
+                <Route path="tickets/:id" element={<TicketDetail />} />
+
+                {/* Comunicaciones */}
+                <Route element={<ProtectedRoute permission="establecimientos.view_establecimiento" />}>
+                  <Route path="comunicaciones/ejecutivos" element={<EjecutivosMain />} />
+                  <Route path="comunicaciones/ejecutivos/gestion/:id" element={<EstablecimientoGestion />} />
+                </Route>
+
                 {/* Administración */}
                 <Route element={<ProtectedRoute permission="auth.view_group" />}>
                   <Route path="admin/users" element={<UserManagement />} />
@@ -224,6 +264,7 @@ function App() {
                   <Route path="admin/audit-log" element={<AuditLog />} />
                   <Route path="admin/email-settings" element={<EmailSettings />} />
                   <Route path="admin/conciliacion" element={<ConciliacionDashboard />} />
+                  <Route path="admin/personalizacion/login/backgrounds" element={<LoginBackgroundsAdmin />} />
                 </Route>
               </Route>
             </Route>

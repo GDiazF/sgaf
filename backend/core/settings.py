@@ -11,7 +11,7 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-default-key-portable-
 DEBUG = config('DEBUG', default=True, cast=bool)
 
 # Portabilidad de Hosts: Se leen de una lista separada por comas en el .env
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,10.0.100.86', cast=Csv())
 
 # Application definition
 INSTALLED_APPS = [
@@ -51,6 +51,9 @@ INSTALLED_APPS = [
     'vehiculos',
     'biometrico',
     'conciliacion',
+    'tickets',
+    'ejecutivos',
+    'personalizacion_sistema',
 ]
 
 MIDDLEWARE = [
@@ -130,8 +133,12 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': ('rest_framework_simplejwt.authentication.JWTAuthentication',),
     'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated',],
-    'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'DEFAULT_FILTER_BACKENDS': (
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardResultsSetPagination',
     'PAGE_SIZE': 10,
 }
 
@@ -152,8 +159,8 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bool)
 
 # Se leen desde el .env. Por ejemplo: FRONTEND_URL=http://localhost:5173,http://10.0.100.119
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:5173', cast=Csv())
-CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://localhost:5173', cast=Csv())
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:5173,http://10.0.100.86:5173', cast=Csv())
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://localhost:5173,http://10.0.100.86:5173', cast=Csv())
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
@@ -172,3 +179,8 @@ RESERVAS_ADMIN_EMAIL = config('RESERVAS_ADMIN_EMAIL', default='')
 
 OTP_TOTP_ISSUER = 'SGAF - SLEP Iquique'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Límites de subida aumentados para procesamiento de múltiples PDFs
+DATA_UPLOAD_MAX_MEMORY_SIZE = 209715200  # 200MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 209715200  # 200MB
+

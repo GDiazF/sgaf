@@ -83,35 +83,41 @@ const AssetModal = ({
             icon={Box}
             saveLabel={editingId ? 'Actualizar Activo' : 'Registrar Activo'}
         >
-            <div className="space-y-8">
+            <div className="space-y-6">
                 {/* Section: Identificación */}
-                <div className="space-y-4">
-                    <h4 className="text-[11px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-2">
-                        <Hash className="w-3.5 h-3.5" /> Identificación del Activo
+                <div className="space-y-3.5">
+                    <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-1.5 select-none">
+                        <Hash className="w-3.5 h-3.5" /> <span>Identificación del Activo</span>
                     </h4>
-                    <div className="space-y-4">
+                    
+                    <div className="space-y-3.5">
+                        {/* Grid 100% Sincronizado */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                            <div className="form-container">
+                            {/* Columna Izquierda: Tipo de Activo */}
+                            <div className="space-y-1 flex flex-col">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1 select-none">
+                                    Tipo de Activo <span className="text-red-500">*</span>
+                                </label>
                                 <SearchableSelect
-                                    label="Tipo de Activo"
-                                    required
                                     options={tipoOptions}
                                     value={formData.tipo}
                                     onChange={val => setFormData({ ...formData, tipo: val })}
                                     placeholder={loadingTypes ? "Cargando..." : "Seleccione tipo..."}
                                     icon={Type}
-                                    className="!m-0"
                                 />
                             </div>
 
-                            <div className="space-y-1.5 flex flex-col">
-                                <label className="text-xs font-bold text-slate-600 ml-1">Código de Inventario <span className="text-slate-400 font-normal">(Opcional)</span></label>
+                            {/* Columna Derecha: Código de Inventario */}
+                            <div className="space-y-1 flex flex-col">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1 select-none">
+                                    Código de Inventario <span className="text-slate-400 font-normal">(Opcional)</span>
+                                </label>
                                 <div className="relative">
-                                    <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                    <QrCode className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                                     <input
                                         type="text"
-                                        placeholder="Ej: S/N..."
-                                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium h-[46px]"
+                                        placeholder="EJ: S/N..."
+                                        className="no-global w-full pl-10 pr-4 h-10 text-[10px] font-bold bg-white border border-slate-200 rounded-xl focus:border-indigo-500 outline-none transition-all shadow-sm placeholder:text-slate-350 uppercase"
                                         value={formData.codigo_inventario}
                                         onChange={e => setFormData({ ...formData, codigo_inventario: e.target.value })}
                                     />
@@ -119,46 +125,55 @@ const AssetModal = ({
                             </div>
                         </div>
 
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-600 ml-1">Nombre / Descripción <span className="text-red-500">*</span></label>
+                        {/* Nombre / Descripción */}
+                        <div className="space-y-1 flex flex-col">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1 select-none">
+                                Nombre / Descripción <span className="text-red-500">*</span>
+                            </label>
                             <div className="relative">
-                                <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                <Tag className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                                 <input
                                     type="text"
                                     required
-                                    placeholder="Ej: Proyector Epson X10..."
-                                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium h-[46px]"
+                                    placeholder="EJ: PROYECTOR EPSON X10..."
+                                    className="no-global w-full pl-10 pr-4 h-10 text-[10px] font-bold bg-white border border-slate-200 rounded-xl focus:border-indigo-500 outline-none transition-all shadow-sm placeholder:text-slate-355 uppercase"
                                     value={formData.nombre}
                                     onChange={e => setFormData({ ...formData, nombre: e.target.value })}
                                 />
                             </div>
                         </div>
 
-                        <SearchableSelect
-                            label="Establecimiento Base"
-                            required
-                            options={establishmentOptions}
-                            value={formData.establecimiento}
-                            onChange={val => setFormData({ ...formData, establecimiento: val })}
-                            placeholder="Seleccione establecimiento..."
-                            icon={Building}
-                        />
+                        {/* Establecimiento Base */}
+                        <div className="space-y-1 flex flex-col">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1 select-none">
+                                Establecimiento Base <span className="text-red-500">*</span>
+                            </label>
+                            <SearchableSelect
+                                options={establishmentOptions}
+                                value={formData.establecimiento}
+                                onChange={val => setFormData({ ...formData, establecimiento: val })}
+                                placeholder="Seleccione establecimiento..."
+                                icon={Building}
+                            />
+                        </div>
                     </div>
                 </div>
 
                 {/* Section: Ubicación */}
-                <div className="space-y-4">
-                    <h4 className="text-[11px] font-bold text-amber-600 uppercase tracking-widest flex items-center gap-2">
-                        <MapPin className="w-3.5 h-3.5" /> Ubicación Física
+                <div className="space-y-3.5">
+                    <h4 className="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-1.5 select-none">
+                        <MapPin className="w-3.5 h-3.5" /> <span>Ubicación Física</span>
                     </h4>
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-600 ml-1">Bodega / Estante <span className="text-slate-400 font-normal">(Opcional)</span></label>
+                    <div className="space-y-1 flex flex-col">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1 select-none">
+                            Bodega / Estante <span className="text-slate-400 font-normal">(Opcional)</span>
+                        </label>
                         <div className="relative">
-                            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                            <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                             <input
                                 type="text"
-                                placeholder="Ej: Casillero 4A..."
-                                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none transition-all text-sm font-medium h-[46px]"
+                                placeholder="EJ: CASILLERO 4A..."
+                                className="no-global w-full pl-10 pr-4 h-10 text-[10px] font-bold bg-white border border-slate-200 rounded-xl focus:border-indigo-500 outline-none transition-all shadow-sm placeholder:text-slate-355 uppercase"
                                 value={formData.ubicacion}
                                 onChange={e => setFormData({ ...formData, ubicacion: e.target.value })}
                             />
@@ -167,9 +182,9 @@ const AssetModal = ({
                 </div>
 
                 {/* Helper Note */}
-                <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 flex gap-3">
-                    <Info className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
-                    <p className="text-[10px] text-blue-700 leading-relaxed font-medium">
+                <div className="p-3.5 bg-blue-50/50 rounded-2xl border border-blue-100 flex gap-3 select-none">
+                    <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+                    <p className="text-[9px] text-blue-700 leading-relaxed font-medium uppercase tracking-wide">
                         Administre sus activos de forma centralizada. Los tipos de activos pueden ser gestionados desde el panel de administración.
                     </p>
                 </div>
@@ -177,6 +192,5 @@ const AssetModal = ({
         </BaseModal>
     );
 };
-
 
 export default AssetModal;

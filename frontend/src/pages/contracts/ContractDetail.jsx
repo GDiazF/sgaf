@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api';
@@ -6,13 +7,28 @@ import ContractModal from '../../components/contracts/ContractModal';
 import ContractReceptionModal from '../../components/contracts/ContractReceptionModal';
 import FormInput from '../../components/common/FormInput';
 import {
-    FileText, Calendar, Building2, User, Clock, CheckCircle2, AlertCircle,
-    Upload, Download, Trash2, Plus, ArrowRight, Shield, Globe, Hash, Info,
+    FileText, Building2, Clock, CheckCircle2, AlertCircle,
+    Download, Trash2, Plus, Hash, Info,
     Users, TrendingUp, Activity, DollarSign, Pencil, X, ArrowLeft, Eye, History,
-    FileSearch, ShieldCheck, ShoppingBag, ChevronRight, Tag, Save
+    FileSearch, FolderSearch, ShoppingBag, ChevronRight, Truck
 } from 'lucide-react';
+import ContratoServiciosTab from './ContratoServiciosTab';
 import { usePermission } from '../../hooks/usePermission';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+const DOC_INPUT_CLASS =
+    'no-global !w-full !h-10 !min-h-10 !text-[10px] !font-bold !bg-white !border !border-slate-200 !px-3 !py-0 !rounded-xl !outline-none focus:!border-blue-500 uppercase !transition-all !shadow-sm placeholder:!text-slate-300';
+
+const DOC_LABEL_CLASS =
+    '!block !text-[10px] !font-black !text-slate-500 !uppercase !tracking-widest !mb-1.5 !ml-1';
+
+const BTN_PRIMARY =
+    'bg-blue-600 hover:bg-blue-700 text-white h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20 flex items-center gap-2 shrink-0 active:scale-95';
+
+const BTN_SECONDARY =
+    'bg-slate-100 hover:bg-slate-200 text-slate-600 h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shrink-0';
+
+const ModalPortal = ({ children }) => createPortal(children, document.body);
 
 const ContractDetail = () => {
     const { id } = useParams();
@@ -344,10 +360,10 @@ const ContractDetail = () => {
                         {can('contratos.change_contrato') && (
                             <button
                                 onClick={() => setEditModalOpen(true)}
-                                className="flex items-center gap-2 bg-white text-slate-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-50 hover:text-blue-600 border border-slate-200 transition-all active:scale-95"
+                                className={BTN_PRIMARY}
                             >
-                                <Pencil className="w-3.5 h-3.5" />
-                                Editar Proyecto
+                                <Pencil className="w-4 h-4" />
+                                Editar Contrato
                             </button>
                         )}
                     </div>
@@ -358,6 +374,7 @@ const ContractDetail = () => {
                     {[
                         { id: 'info', label: 'General', icon: <Info className="w-4 h-4" /> },
                         { id: 'providers', label: 'Proveedores', icon: <Building2 className="w-4 h-4" />, count: contract.proveedores_asociados?.length },
+                        { id: 'servicios', label: 'Gestión de Contratos', icon: <Truck className="w-4 h-4" /> },
                         { id: 'receptions', label: 'Recepciones', icon: <ShoppingBag className="w-4 h-4" />, count: receptions?.length },
                         { id: 'docs', label: 'Archivos', icon: <FileSearch className="w-4 h-4" />, count: contract.documentos?.length },
                         { id: 'history', label: 'Historial', icon: <History className="w-4 h-4" />, count: history?.length }
@@ -389,34 +406,34 @@ const ContractDetail = () => {
                                 initial={{ opacity: 0, scale: 0.99 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.99 }}
-                                className="p-6 space-y-6"
+                                className="p-5 space-y-4"
                             >
                                 {/* AREA SUPERIOR: Estadísticas y Gráfico */}
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                                     {/* Izquierda: 4 Stats en rejilla 2x2 */}
-                                    <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
-                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Presupuesto Total</span>
+                                    <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">Presupuesto Total</span>
                                             <p className="text-xl font-black text-slate-900 leading-none">{formatCurrency(contract.monto_total)}</p>
                                         </div>
-                                        <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
-                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Monto Ejecutado</span>
+                                        <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">Monto Ejecutado</span>
                                             <p className="text-xl font-black text-slate-900 leading-none">{formatCurrency(contract.monto_ejecutado)}</p>
                                         </div>
-                                        <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
-                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Disponible</span>
+                                        <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">Disponible</span>
                                             <p className="text-xl font-black text-emerald-600 leading-none">{formatCurrency(contract.monto_restante)}</p>
                                         </div>
-                                        <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
-                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Plazo Restante</span>
+                                        <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">Plazo Restante</span>
                                             <p className="text-xl font-black text-slate-900 leading-none">{monthsLeft} <span className="text-xs font-bold text-slate-400 uppercase">Meses</span></p>
                                         </div>
                                     </div>
 
                                     {/* Derecha: Gráfico Grande */}
-                                    <div className="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col min-h-[220px]">
-                                        <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-                                            <TrendingUp className="w-3.5 h-3.5 text-indigo-500" /> Gráfico Histórico de Ejecución Mensual
+                                    <div className="lg:col-span-7 bg-white rounded-2xl p-5 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col h-[200px] lg:h-[210px]">
+                                        <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                            <TrendingUp className="w-3.5 h-3.5 text-blue-600" /> Gráfico Histórico de Ejecución Mensual
                                         </h4>
                                         <div className="flex-1 min-h-0">
                                             {contract.gastos_mensuales?.length > 0 ? (
@@ -424,8 +441,8 @@ const ContractDetail = () => {
                                                     <AreaChart data={contract.gastos_mensuales} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                                                         <defs>
                                                             <linearGradient id="colorMonto" x1="0" y1="0" x2="0" y2="1">
-                                                                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.1} />
-                                                                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                                                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1} />
+                                                                <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
                                                             </linearGradient>
                                                         </defs>
                                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -444,7 +461,7 @@ const ContractDetail = () => {
                                                                 return null;
                                                             }}
                                                         />
-                                                        <Area type="monotone" dataKey="monto" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorMonto)" />
+                                                        <Area type="monotone" dataKey="monto" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorMonto)" />
                                                     </AreaChart>
                                                 </ResponsiveContainer>
                                             ) : (
@@ -458,17 +475,17 @@ const ContractDetail = () => {
                                 </div>
 
                                 {/* AREA INFERIOR: 3 Columnas Sincronizadas */}
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-3 px-1 mb-2">
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-3 px-1 mb-1">
                                         <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-widest shrink-0">Resumen del Contrato</h3>
                                         <p className="text-[11px] font-black text-blue-600 uppercase tracking-tight truncate leading-none">
                                             {contract.descripcion}
                                         </p>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:h-[260px]">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 lg:h-[240px]">
                                         {/* Col 1: 4 ítems */}
-                                        <div className="flex flex-col justify-between h-full space-y-3 lg:space-y-0">
+                                        <div className="flex flex-col justify-between h-full space-y-2.5 lg:space-y-0">
                                             {[
                                                 { label: 'Tipo de Proceso', val: contract.proceso_nombre },
                                                 { label: 'Orientación', val: contract.orientacion_nombre || "No definida" },
@@ -497,10 +514,10 @@ const ContractDetail = () => {
                                         </div>
 
                                         {/* Col 3: 2 ítems Premium */}
-                                        <div className="flex flex-col justify-between h-full space-y-4 lg:space-y-0">
-                                            <div className="bg-emerald-600 p-6 lg:p-7 rounded-2xl shadow-xl shadow-emerald-600/20 flex flex-col justify-between transition-all hover:scale-[1.01] lg:h-[48%] min-h-[120px] relative overflow-hidden group">
+                                        <div className="flex flex-col justify-between h-full space-y-3 lg:space-y-0">
+                                            <div className="bg-emerald-600 p-5 lg:p-6 rounded-2xl shadow-xl shadow-emerald-600/20 flex flex-col justify-between transition-all hover:scale-[1.01] lg:h-[48%] min-h-[110px] relative overflow-hidden group">
                                                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
-                                                    <DollarSign className="w-16 lg:w-20 h-16 lg:h-20 text-white" />
+                                                    <DollarSign className="w-14 lg:w-16 h-14 lg:h-16 text-white" />
                                                 </div>
                                                 <div className="flex items-center gap-2 relative z-10">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -520,9 +537,9 @@ const ContractDetail = () => {
                                                 </p>
                                             </div>
 
-                                            <div className="bg-blue-600 p-6 lg:p-7 rounded-2xl shadow-xl shadow-blue-600/20 flex flex-col justify-between transition-all hover:scale-[1.01] lg:h-[48%] min-h-[120px] relative overflow-hidden group">
+                                            <div className="bg-blue-600 p-5 lg:p-6 rounded-2xl shadow-xl shadow-blue-600/20 flex flex-col justify-between transition-all hover:scale-[1.01] lg:h-[48%] min-h-[110px] relative overflow-hidden group">
                                                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
-                                                    <Clock className="w-16 lg:w-20 h-16 lg:h-20 text-white" />
+                                                    <Clock className="w-14 lg:w-16 h-14 lg:h-16 text-white" />
                                                 </div>
                                                 <div className="flex items-center gap-2 relative z-10">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-pulse" />
@@ -578,7 +595,7 @@ const ContractDetail = () => {
                                                     <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
                                                         <td className="px-6 py-4">
                                                             <div className="flex items-center gap-3">
-                                                                <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center">
+                                                                <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
                                                                     <Building2 className="w-4 h-4" />
                                                                 </div>
                                                                 <span className="font-bold text-slate-700 text-xs">{p.proveedor_nombre}</span>
@@ -595,7 +612,7 @@ const ContractDetail = () => {
                                                         <td className="px-6 py-4">
                                                             <div className="flex flex-col gap-1 items-center">
                                                                 <div className="w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                                                                    <div className="bg-indigo-500 h-full rounded-full transition-all" style={{ width: `${provPercentage}%` }}></div>
+                                                                    <div className="bg-blue-600 h-full rounded-full transition-all" style={{ width: `${provPercentage}%` }}></div>
                                                                 </div>
                                                                 <span className="text-[9px] font-black text-slate-500">{provPercentage}%</span>
                                                             </div>
@@ -615,6 +632,18 @@ const ContractDetail = () => {
                             </motion.div>
                         )}
 
+                        {activeTab === 'servicios' && (
+                            <motion.div
+                                key="servicios"
+                                initial={{ opacity: 0, scale: 0.99 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.99 }}
+                                className="p-6 lg:p-8"
+                            >
+                                <ContratoServiciosTab contractId={contract.id} />
+                            </motion.div>
+                        )}
+
                         {activeTab === 'docs' && (
                             <motion.div
                                 key="docs"
@@ -631,7 +660,7 @@ const ContractDetail = () => {
                                     {can('contratos.add_documentocontrato') && (
                                         <button
                                             onClick={() => setDocModalOpen(true)}
-                                            className="flex items-center gap-2.5 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/10 active:scale-95"
+                                            className={BTN_PRIMARY}
                                         >
                                             <Plus className="w-4 h-4" />
                                             Adjuntar
@@ -639,7 +668,7 @@ const ContractDetail = () => {
                                     )}
                                 </div>
 
-                                <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm max-h-[400px] overflow-y-auto">
+                                <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm max-h-[400px] overflow-y-auto custom-scrollbar">
                                     <table className="w-full text-left whitespace-nowrap relative">
                                         <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                                             <tr className="bg-slate-50/50 border-b border-slate-100">
@@ -653,35 +682,38 @@ const ContractDetail = () => {
                                                 <tr key={doc.id} className="hover:bg-slate-50/50 transition-colors group">
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
+                                                            <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center border border-blue-100">
                                                                 <FileText className="w-4 h-4" />
                                                             </div>
-                                                            <span className="font-bold text-slate-700 text-xs">{doc.nombre}</span>
+                                                            <span className="font-medium text-slate-700 text-[11px] uppercase tracking-tighter">{doc.nombre}</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <span className="text-[10px] font-black text-slate-400 bg-slate-100/50 px-2.5 py-1 rounded-md">
+                                                        <span className="text-[10px] font-medium text-slate-500 uppercase tracking-tighter">
                                                             {new Date(doc.fecha_subida).toLocaleDateString('es-CL')}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-4 text-right px-8">
+                                                    <td className="px-6 py-4 text-right">
                                                         <div className="flex justify-end gap-1.5">
                                                             <button
                                                                 onClick={() => setPreviewDoc(doc)}
-                                                                className="p-1.5 rounded-lg transition-all text-blue-500 hover:bg-blue-50"
+                                                                className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                                                title="Ver documento"
                                                             >
                                                                 <Eye className="w-3.5 h-3.5" />
                                                             </button>
                                                             <button
                                                                 onClick={() => window.open(doc.archivo)}
-                                                                className="p-1.5 rounded-lg transition-all text-emerald-500 hover:bg-emerald-50"
+                                                                className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                                                title="Descargar documento"
                                                             >
                                                                 <Download className="w-3.5 h-3.5" />
                                                             </button>
                                                             {can('contratos.delete_documentocontrato') && (
                                                                 <button
                                                                     onClick={() => handleDeleteDoc(doc.id)}
-                                                                    className="p-1.5 rounded-lg transition-all text-red-500 hover:bg-red-50"
+                                                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                                                    title="Eliminar documento"
                                                                 >
                                                                     <Trash2 className="w-3.5 h-3.5" />
                                                                 </button>
@@ -694,8 +726,8 @@ const ContractDetail = () => {
                                     </table>
                                     {(!contract.documentos || contract.documentos.length === 0) && (
                                         <div className="py-16 text-center">
-                                            <FileSearch className="w-8 h-8 text-slate-100 mx-auto mb-4" />
-                                            <p className="font-black text-slate-300 uppercase tracking-widest text-[10px]">Sin archivos</p>
+                                            <FolderSearch className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                                            <p className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">Sin archivos</p>
                                         </div>
                                     )}
                                 </div>
@@ -718,7 +750,7 @@ const ContractDetail = () => {
                                     {can('servicios.add_recepcionconforme') && (
                                         <button
                                             onClick={() => setReceptionModalOpen(true)}
-                                            className="flex items-center gap-2.5 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/10 active:scale-95"
+                                            className={BTN_PRIMARY}
                                         >
                                             <Plus className="w-4 h-4" />
                                             Nueva Recepción
@@ -807,7 +839,7 @@ const ContractDetail = () => {
                                                             {can('servicios.change_recepcionconforme') && (
                                                                 <button
                                                                     onClick={() => handleEditReception(rc)}
-                                                                    className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 transition-all"
+                                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                                                     title="Editar RC"
                                                                 >
                                                                     <Pencil className="w-3.5 h-3.5" />
@@ -823,7 +855,7 @@ const ContractDetail = () => {
                                                             {can('servicios.delete_recepcionconforme') && (
                                                                 <button
                                                                     onClick={() => handleDeleteReception(rc.id)}
-                                                                    className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-100 hover:bg-red-50 transition-all"
+                                                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                                                                     title="Anular RC"
                                                                 >
                                                                     <Trash2 className="w-3.5 h-3.5" />
@@ -919,54 +951,56 @@ const ContractDetail = () => {
             </div>
 
             {/* Upload Modal */}
+            <ModalPortal>
             <AnimatePresence>
                 {isDocModalOpen && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 overflow-hidden">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
+                            className="fixed top-0 left-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9998]"
                             onClick={() => setDocModalOpen(false)}
                         />
                         <motion.div
-                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                            className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden relative z-10"
+                            className="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-lg w-full mx-4 relative z-[10000] border border-slate-200 flex flex-col max-h-[90vh]"
                         >
-                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex justify-between items-center shrink-0">
                                 <div>
-                                    <h3 className="text-lg font-bold text-slate-800 leading-none mb-1">Adjuntar Expediente</h3>
-                                    <p className="text-xs text-slate-400 font-medium">Formatos aceptados: PDF, DOCX, Imágenes</p>
+                                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Adjuntar Expediente</h3>
+                                    <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter">Formatos aceptados: PDF, DOCX, Imágenes</p>
                                 </div>
-                                <button onClick={() => setDocModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-white rounded-xl">
-                                    <X className="w-6 h-6" />
+                                <button onClick={() => setDocModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors">
+                                    <X className="w-5 h-5" />
                                 </button>
                             </div>
 
-                            <form onSubmit={handleFileUpload} className="p-8 space-y-6">
+                            <form onSubmit={handleFileUpload} className="p-4 md:p-6 space-y-5 overflow-y-auto custom-scrollbar">
                                 <FormInput
                                     label="Nombre del Documento"
-                                    icon={<FileText />}
                                     required
                                     placeholder="Ej: Contrato Firmado, Resolución..."
                                     value={uploadFormData.nombre}
                                     onChange={e => setUploadFormData({ ...uploadFormData, nombre: e.target.value })}
+                                    labelClassName={DOC_LABEL_CLASS}
+                                    inputClassName={DOC_INPUT_CLASS}
                                 />
 
-                                <div className="space-y-2">
-                                    <label className="form-label">
-                                        <Plus className="w-3.5 h-3.5 text-blue-500" /> Seleccionar Archivo
+                                <div className="space-y-1.5">
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
+                                        Seleccionar Archivo
                                     </label>
                                     <div className="relative group/file">
-                                        <div className="w-full p-8 bg-slate-50/50 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center gap-3 group-hover/file:border-blue-400 group-hover/file:bg-blue-50/50 group-hover/file:shadow-xl group-hover/file:shadow-blue-500/5 transition-all cursor-pointer backdrop-blur-sm">
-                                            <div className="p-3 bg-white rounded-2xl shadow-sm text-blue-500 group-hover/file:scale-110 group-hover/file:bg-blue-500 group-hover/file:text-white transition-all duration-300">
-                                                <Plus className="w-6 h-6" />
+                                        <div className="w-full p-6 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center gap-2 group-hover/file:border-blue-200 group-hover/file:bg-blue-50/40 transition-colors cursor-pointer">
+                                            <div className="p-2 bg-white rounded-xl border border-slate-100 text-slate-400 group-hover/file:text-blue-500 transition-colors">
+                                                <FileText className="w-4 h-4" />
                                             </div>
                                             <div className="text-center">
-                                                <p className="text-sm font-black text-slate-700">{uploadFormData.archivo ? uploadFormData.archivo.name : "Haga clic para buscar archivo"}</p>
-                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mt-1">Máximo 10MB • PDF, DOCX, IMG</p>
+                                                <p className="text-[10px] font-bold text-slate-700 uppercase tracking-tighter">{uploadFormData.archivo ? uploadFormData.archivo.name : "Haga clic para buscar archivo"}</p>
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Máximo 10MB · PDF, DOCX, IMG</p>
                                             </div>
                                             <input
                                                 type="file"
@@ -978,19 +1012,19 @@ const ContractDetail = () => {
                                     </div>
                                 </div>
 
-                                <div className="pt-4 flex justify-end gap-3">
+                                <div className="pt-2 flex justify-end gap-2">
                                     <button
                                         type="button"
                                         onClick={() => setDocModalOpen(false)}
-                                        className="px-6 py-3 text-slate-600 font-bold hover:bg-slate-50 rounded-2xl transition-colors text-sm"
+                                        className={BTN_SECONDARY}
                                     >
                                         Cancelar
                                     </button>
                                     <button
                                         type="submit"
-                                        className="px-8 py-3 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-500/30 transition-all flex items-center gap-2 transform active:scale-95 text-sm"
+                                        className={BTN_PRIMARY}
                                     >
-                                        <Save className="w-4 h-4" />
+                                        <Plus className="w-4 h-4" />
                                         Subir Archivo
                                     </button>
                                 </div>
@@ -999,40 +1033,42 @@ const ContractDetail = () => {
                     </div>
                 )}
             </AnimatePresence>
+            </ModalPortal>
 
             {/* Preview Modal */}
+            <ModalPortal>
             <AnimatePresence>
                 {previewDoc && (
-                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 overflow-hidden">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-slate-900/80 backdrop-blur-md"
+                            className="fixed top-0 left-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9998]"
                             onClick={() => setPreviewDoc(null)}
                         />
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[90vh] overflow-hidden relative z-10 flex flex-col"
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] overflow-hidden relative z-[10000] border border-slate-200 flex flex-col"
                         >
-                            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                        <FileText className="w-5 h-5" />
+                            <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex justify-between items-center shrink-0">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center border border-blue-100 shrink-0">
+                                        <FileText className="w-4 h-4" />
                                     </div>
-                                    <div>
-                                        <h3 className="text-sm font-black text-slate-800 leading-none mb-1.5 uppercase tracking-tight">{previewDoc.nombre}</h3>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                            <span className="text-blue-600">Documento de Contrato</span>
+                                    <div className="min-w-0">
+                                        <h3 className="text-[10px] font-bold text-slate-800 leading-none mb-1.5 uppercase tracking-widest truncate">{previewDoc.nombre}</h3>
+                                        <p className="text-[10px] font-medium text-slate-500 uppercase tracking-tighter flex items-center gap-2">
+                                            <span className="text-blue-600 font-bold">Documento de Contrato</span>
                                             <span className="w-1 h-1 rounded-full bg-slate-200" />
                                             {contract.codigo_mercado_publico}
                                         </p>
                                     </div>
                                 </div>
-                                <button onClick={() => setPreviewDoc(null)} className="text-slate-400 hover:text-red-500 hover:bg-white p-2 rounded-xl transition-all">
-                                    <X className="w-6 h-6" />
+                                <button onClick={() => setPreviewDoc(null)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors">
+                                    <X className="w-5 h-5" />
                                 </button>
                             </div>
                             <div className="flex-1 bg-slate-200/50 p-4">
@@ -1042,19 +1078,19 @@ const ContractDetail = () => {
                                     title="PDF Preview"
                                 />
                             </div>
-                            <div className="p-5 border-t border-slate-100 flex justify-end bg-white gap-4">
+                            <div className="p-4 md:p-5 border-t border-slate-100 flex justify-end bg-white gap-2 shrink-0">
                                 <a
                                     href={previewDoc.archivo}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-6 py-2.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-xl font-bold text-sm transition-all"
+                                    className={BTN_SECONDARY}
                                 >
                                     Abrir en pestaña nueva
                                 </a>
                                 <a
                                     href={previewDoc.archivo}
                                     download
-                                    className="flex items-center gap-2 bg-blue-600 text-white px-8 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all"
+                                    className={BTN_PRIMARY}
                                 >
                                     <Download className="w-4 h-4" />
                                     Descargar Original
@@ -1064,6 +1100,7 @@ const ContractDetail = () => {
                     </div>
                 )}
             </AnimatePresence>
+            </ModalPortal>
 
             {
                 isReceptionModalOpen && (
@@ -1086,9 +1123,18 @@ const ContractDetail = () => {
                     <ContractModal
                         isOpen={isEditModalOpen}
                         onClose={() => setEditModalOpen(false)}
-                        onSave={() => {
-                            setEditModalOpen(false);
-                            fetchContract();
+                        onSave={async (dataToSubmit) => {
+                            try {
+                                const finalData = { ...dataToSubmit };
+                                if (finalData.orientacion === '') delete finalData.orientacion;
+                                
+                                await api.put(`contratos/contratos/${contract.id}/`, finalData);
+                                setEditModalOpen(false);
+                                fetchContract();
+                            } catch (error) {
+                                console.error(error);
+                                alert("Error al actualizar el contrato.");
+                            }
                         }}
                         editingId={contract.id}
                         initialData={contract}

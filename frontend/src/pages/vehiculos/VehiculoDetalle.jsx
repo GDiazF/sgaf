@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     X, Save, Trash2, FileText, ShieldCheck, Calendar, 
@@ -7,9 +8,15 @@ import {
 } from 'lucide-react';
 import api from '../../api';
 
+const MotionDiv = motion.div;
+const FIELD_CLASS = 'no-global w-full !h-10 min-h-10 !text-[10px] font-bold bg-white border border-slate-200 px-3 rounded-xl outline-none focus:border-blue-500 uppercase transition-all shadow-sm placeholder:text-slate-300 box-border leading-none';
+const LABEL_CLASS = 'block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1';
+const SECTION_TITLE = 'text-[10px] font-bold text-slate-400 uppercase tracking-widest';
+const PRIMARY_BTN = 'bg-blue-600 hover:bg-blue-700 text-white h-10 px-5 rounded-xl font-black text-[10px] uppercase tracking-widest inline-flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 transition-all active:scale-95 disabled:opacity-50';
+const DOC_ACTION_BTN = 'h-9 rounded-xl inline-flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95';
+
 const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
     const [activeTab, setActiveTab] = useState('info');
-    const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [editingVehiculo, setEditingVehiculo] = useState({ ...vehiculo });
     const [documentos, setDocumentos] = useState(vehiculo.documentos || []);
@@ -18,6 +25,8 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
     const [selectedTipoForUpload, setSelectedTipoForUpload] = useState(null);
     const [newImage, setNewImage] = useState(null);
     const [imagePreview, setImagePreview] = useState(vehiculo.imagen || null);
+    const [feedback, setFeedback] = useState(null);
+    const [pendingDeleteDocId, setPendingDeleteDocId] = useState(null);
     
     // Document Upload State
     const [uploadData, setUploadData] = useState({
@@ -45,8 +54,6 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
             setTiposDoc(response.data.results || response.data);
         } catch (error) {
             console.error("Error fetching document types:", error);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -86,10 +93,10 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
             });
             onUpdate(response.data);
             setNewImage(null);
-            alert("Información del vehículo actualizada.");
+            setFeedback({ type: 'success', text: 'Información del vehículo actualizada.' });
         } catch (error) {
             console.error("Error updating vehicle:", error);
-            alert("Error al actualizar la información.");
+            setFeedback({ type: 'error', text: 'Error al actualizar la información.' });
         } finally {
             setSubmitting(false);
         }
@@ -98,7 +105,7 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
     const handleFileUpload = async (e) => {
         e.preventDefault();
         if (!uploadData.archivo || !selectedTipoForUpload) {
-            alert("Por favor seleccione un archivo y tipo.");
+            setFeedback({ type: 'error', text: 'Por favor seleccione un archivo y tipo.' });
             return;
         }
 
@@ -126,22 +133,29 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
                 observaciones: ''
             });
             setSelectedTipoForUpload(null);
-            alert("Documento subido correctamente.");
+            setFeedback({ type: 'success', text: 'Documento subido correctamente.' });
         } catch (error) {
             console.error("Error uploading document:", error);
-            alert("Error al subir el documento.");
+            setFeedback({ type: 'error', text: 'Error al subir el documento.' });
         } finally {
             setSubmitting(false);
         }
     };
 
     const handleDeleteDocument = async (id) => {
-        if (!window.confirm("¿Está seguro de eliminar este documento?")) return;
+        setPendingDeleteDocId(id);
+    };
+
+    const confirmDeleteDocument = async () => {
+        if (!pendingDeleteDocId) return;
         try {
-            await api.delete(`vehiculos/documentos/${id}/`);
-            setDocumentos(documentos.filter(d => d.id !== id));
+            await api.delete(`vehiculos/documentos/${pendingDeleteDocId}/`);
+            setDocumentos(documentos.filter(d => d.id !== pendingDeleteDocId));
+            setPendingDeleteDocId(null);
+            setFeedback({ type: 'success', text: 'Documento eliminado correctamente.' });
         } catch (error) {
             console.error("Error deleting document:", error);
+            setFeedback({ type: 'error', text: 'Error al eliminar el documento.' });
         }
     };
 
@@ -172,98 +186,93 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
         const colors = {
             'blue': 'bg-blue-50 text-blue-600 border-blue-100',
             'emerald': 'bg-emerald-50 text-emerald-600 border-emerald-100',
-            'indigo': 'bg-indigo-50 text-indigo-600 border-indigo-100',
+            'indigo': 'bg-blue-50 text-blue-600 border-blue-100',
             'amber': 'bg-amber-50 text-amber-600 border-amber-100',
             'rose': 'bg-rose-50 text-rose-600 border-rose-100',
             'slate': 'bg-slate-50 text-slate-600 border-slate-100',
-            'purple': 'bg-purple-50 text-purple-600 border-purple-100'
+            'purple': 'bg-blue-50 text-blue-600 border-blue-100'
         };
         return colors[color] || colors.slate;
     };
 
     return (
         <>
-        <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="absolute inset-0 z-30 bg-slate-50 flex flex-col overflow-hidden"
+        <MotionDiv
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9998] bg-slate-900/60 backdrop-blur-sm"
+            onClick={onClose}
+        />
+        <MotionDiv 
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+            className="fixed inset-y-0 right-0 z-[10000] w-full sm:max-w-3xl xl:max-w-5xl bg-slate-50 flex flex-col overflow-hidden shadow-2xl border-l border-slate-200"
         >
-            {/* Premium Header */}
-            <div className="relative h-56 md:h-64 bg-slate-900 overflow-hidden shrink-0">
-                {/* Background Image / Gradient */}
-                {imagePreview ? (
-                    <div className="absolute inset-0">
-                        <img src={imagePreview} className="w-full h-full object-cover opacity-40 scale-105 blur-sm" alt="Vehículo" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent" />
-                    </div>
-                ) : (
-                    <div className="absolute inset-0 opacity-20">
-                        <div className="absolute -top-24 -left-24 w-96 h-96 bg-indigo-500 rounded-full blur-[100px]" />
-                        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-blue-500 rounded-full blur-[100px]" />
+            {/* Premium Header - Compact Dark Console Style with Background Image */}
+            <div className="relative bg-slate-900 shrink-0 border-b border-slate-800 overflow-hidden">
+                {imagePreview && (
+                    <div className="absolute inset-0 z-0">
+                        <img src={imagePreview} className="w-full h-full object-cover opacity-40 mix-blend-overlay" alt="Fondo Vehículo" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-slate-900/60" />
                     </div>
                 )}
                 
-                <div className="relative h-full flex flex-col justify-between p-6 md:p-10">
+                <div className="relative z-10 flex flex-col p-4 md:p-6 space-y-4">
                     <div className="flex justify-between items-start">
                         <button 
                             onClick={onClose}
-                            className="group flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl text-white transition-all active:scale-95 border border-white/10"
+                            className="group flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-lg text-slate-300 hover:text-white transition-all active:scale-95 border border-white/10"
                         >
-                            <X className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-                            <span className="text-xs font-black uppercase tracking-widest">Cerrar Ficha</span>
+                            <X className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform" />
+                            <span className="text-[9px] font-black uppercase tracking-widest">Cerrar</span>
                         </button>
 
                         <div className="flex gap-2">
-                            <span className="px-4 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-500/20 backdrop-blur-md">
-                                Activo
+                            <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-md text-[9px] font-black uppercase tracking-widest border border-emerald-500/20 flex items-center gap-1.5 backdrop-blur-md">
+                                <CheckCircle2 className="w-3 h-3" /> Activo
                             </span>
                         </div>
                     </div>
 
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                        <div className="flex items-center gap-6">
-                            <div className="w-20 h-20 md:w-28 md:h-28 bg-white/10 backdrop-blur-xl rounded-[2.5rem] border border-white/20 flex items-center justify-center shadow-2xl overflow-hidden group">
-                                {imagePreview ? (
-                                    <img src={imagePreview} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="Foto Vehículo" />
-                                ) : (
-                                    <Car className="w-10 h-10 md:w-12 md:h-12 text-white" />
-                                )}
-                            </div>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
                             <div>
-                                <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight leading-none mb-3">
+                                <h2 className="text-base md:text-lg font-black text-white tracking-tight leading-none mb-1.5 uppercase">
                                     {vehiculo.marca} {vehiculo.modelo}
                                 </h2>
-                                <div className="flex items-center gap-3">
-                                    <span className="bg-white text-slate-900 px-4 py-1.5 rounded-xl text-xs font-black tracking-[0.2em] shadow-lg">
-                                        {vehiculo.patente}
+                                <div className="flex items-center gap-2">
+                                    <span className="bg-white/10 text-white px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border border-white/10">
+                                        PATENTE: {vehiculo.patente}
                                     </span>
-                                    <span className="text-white/40 text-[11px] font-bold uppercase tracking-widest bg-white/5 px-3 py-1 rounded-lg backdrop-blur-sm">
-                                        Sistema de Gestión de Activos
+                                    <span className="text-slate-500 text-[8px] font-bold uppercase tracking-widest flex items-center gap-1">
+                                        <ShieldCheck className="w-3 h-3 text-blue-400/70" /> SGAF
                                     </span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex bg-white/5 backdrop-blur-md p-1.5 rounded-2xl border border-white/10">
+                        <div className="flex bg-slate-950/50 p-1 rounded-lg border border-white/5">
                             <button 
                                 onClick={() => setActiveTab('info')}
-                                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'info' ? 'bg-white text-slate-900 shadow-xl' : 'text-white/60 hover:text-white'}`}
+                                className={`px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${activeTab === 'info' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
                             >
-                                Ficha Técnica
+                                <Info className="w-3 h-3" /> Técnica
                             </button>
                             <button 
                                 onClick={() => setActiveTab('docs')}
-                                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'docs' ? 'bg-white text-slate-900 shadow-xl' : 'text-white/60 hover:text-white'}`}
+                                className={`px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${activeTab === 'docs' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
                             >
-                                Documentos ({documentos.length})
+                                <FileText className="w-3 h-3" /> Documentos ({documentos.length})
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 md:px-4 md:pt-4 md:pb-8 custom-scrollbar w-full">
+            <div className="flex-1 overflow-y-auto p-4 md:px-6 md:pt-6 md:pb-8 custom-scrollbar w-full">
                 <div className="w-full">
                     <AnimatePresence mode="wait">
                         {activeTab === 'info' ? (
@@ -271,106 +280,104 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
                                 key="info"
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="grid grid-cols-1 lg:grid-cols-12 gap-8"
                             >
-                                <div className="lg:col-span-4 space-y-6">
-                                    {/* Card de Foto con Subida */}
-                                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col items-center text-center relative overflow-hidden group">
-                                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 w-full text-left flex items-center gap-2">
-                                            <TrendingUp className="w-4 h-4 text-emerald-500" /> Fotografía Oficial
-                                        </h3>
-                                        
-                                        <div className="relative w-48 h-48 mb-6">
-                                            <div className="w-full h-full rounded-full border-4 border-slate-50 overflow-hidden shadow-2xl relative">
-                                                {imagePreview ? (
-                                                    <img src={imagePreview} className="w-full h-full object-cover" alt="Preview" />
-                                                ) : (
-                                                    <div className="w-full h-full bg-slate-50 flex items-center justify-center">
-                                                        <Car className="w-16 h-16 text-slate-200" />
-                                                    </div>
-                                                )}
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                                    <div className="lg:col-span-4 flex flex-col gap-6">
+                                        {/* Card de Foto con Subida */}
+                                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center text-center relative overflow-hidden group flex-1">
+                                            <h3 className={`${SECTION_TITLE} mb-4 w-full text-left flex items-center gap-2`}>
+                                                <TrendingUp className="w-4 h-4 text-emerald-500" /> Fotografía
+                                            </h3>
+                                            
+                                            <div className="relative w-32 h-32 mb-4 mt-auto">
+                                                <div className="w-full h-full rounded-full border-4 border-slate-50 overflow-hidden shadow-xl relative">
+                                                    {imagePreview ? (
+                                                        <img src={imagePreview} className="w-full h-full object-cover" alt="Preview" />
+                                                    ) : (
+                                                        <div className="w-full h-full bg-slate-50 flex items-center justify-center">
+                                                            <Car className="w-10 h-10 text-slate-200" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <label className="absolute bottom-0 right-0 w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg cursor-pointer hover:bg-blue-700 transition-all hover:scale-110">
+                                                    <Plus className="w-5 h-5" />
+                                                    <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+                                                </label>
                                             </div>
-                                            <label className="absolute bottom-2 right-2 w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-xl cursor-pointer hover:bg-indigo-700 transition-all hover:scale-110">
-                                                <Plus className="w-6 h-6" />
-                                                <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
-                                            </label>
+                                            <p className="text-[9px] font-medium text-slate-400 uppercase tracking-widest px-4 leading-relaxed mt-auto">
+                                                Sube una foto real de la unidad.
+                                            </p>
                                         </div>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-8 leading-relaxed">
-                                            Haz que tu flota luzca espectacular subiendo una foto real de la unidad.
-                                        </p>
-                                    </div>
 
-                                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-                                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-                                            <Info className="w-4 h-4 text-indigo-500" /> Resumen Técnico
-                                        </h3>
-                                        <div className="space-y-6">
+                                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-center flex-1">
+                                            <h3 className={`${SECTION_TITLE} mb-4 flex items-center gap-2`}>
+                                                <Info className="w-4 h-4 text-blue-500" /> Resumen Técnico
+                                            </h3>
+                                        <div className="space-y-5">
                                             <div className="flex flex-col">
                                                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Combustible</span>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <Fuel className="w-4 h-4 text-amber-500" />
-                                                    <span className="font-bold text-slate-700">{vehiculo.tipo_combustible || 'No definido'}</span>
+                                                    <span className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter">{vehiculo.tipo_combustible || 'No definido'}</span>
                                                 </div>
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Estado Documental</span>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                                    <span className="font-bold text-slate-700">{documentos.length} Documentos Cargados</span>
+                                                    <span className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter">{documentos.length} Documentos Cargados</span>
                                                 </div>
                                             </div>
                                         </div>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div className="lg:col-span-8">
-                                    <form onSubmit={handleUpdateVehiculo} className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-100 space-y-6">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Marca</label>
+                                    <div className="lg:col-span-8 flex flex-col">
+                                        <form onSubmit={handleUpdateVehiculo} className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 content-start">
+                                            <div className="space-y-1.5">
+                                                <label className={LABEL_CLASS}>Marca</label>
                                                 <input 
                                                     name="marca"
                                                     value={editingVehiculo.marca}
                                                     onChange={handleVehiculoChange}
-                                                    className="w-full px-5 h-12 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all"
+                                                    className={FIELD_CLASS}
                                                 />
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Modelo</label>
+                                            <div className="space-y-1.5">
+                                                <label className={LABEL_CLASS}>Modelo</label>
                                                 <input 
                                                     name="modelo"
                                                     value={editingVehiculo.modelo}
                                                     onChange={handleVehiculoChange}
-                                                    className="w-full px-5 h-12 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all"
+                                                    className={FIELD_CLASS}
                                                 />
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Año</label>
+                                            <div className="space-y-1.5">
+                                                <label className={LABEL_CLASS}>Año</label>
                                                 <input 
-                                                    type="number"
                                                     name="anio"
                                                     value={editingVehiculo.anio}
                                                     onChange={handleVehiculoChange}
-                                                    className="w-full px-5 h-12 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all"
+                                                    className={FIELD_CLASS}
                                                 />
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Patente</label>
+                                            <div className="space-y-1.5">
+                                                <label className={LABEL_CLASS}>Patente</label>
                                                 <input 
                                                     name="patente"
                                                     value={editingVehiculo.patente}
                                                     onChange={handleVehiculoChange}
-                                                    className="w-full px-5 h-12 bg-indigo-50 border border-indigo-100 rounded-xl font-black text-indigo-700 outline-none uppercase"
+                                                    className={FIELD_CLASS}
                                                 />
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo Combustible</label>
+                                            <div className="space-y-1.5">
+                                                <label className={LABEL_CLASS}>Tipo Combustible</label>
                                                 <select 
                                                     name="tipo_combustible"
                                                     value={editingVehiculo.tipo_combustible || ''}
                                                     onChange={handleVehiculoChange}
-                                                    className="w-full px-5 h-12 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all appearance-none"
+                                                    className={`${FIELD_CLASS} font-black tracking-widest cursor-pointer appearance-none`}
                                                 >
                                                     <option value="">Seleccionar...</option>
                                                     {tiposCombustible.map(c => (
@@ -378,35 +385,36 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
                                                     ))}
                                                 </select>
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">VIN / Chasis</label>
+                                            <div className="space-y-1.5">
+                                                <label className={LABEL_CLASS}>VIN / Chasis</label>
                                                 <input 
                                                     name="nro_chasis"
                                                     value={editingVehiculo.nro_chasis || ''}
                                                     onChange={handleVehiculoChange}
-                                                    className="w-full px-5 h-12 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all"
+                                                    className={FIELD_CLASS}
                                                 />
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nro. Motor</label>
+                                            <div className="space-y-1.5">
+                                                <label className={LABEL_CLASS}>Nro. Motor</label>
                                                 <input 
                                                     name="nro_motor"
                                                     value={editingVehiculo.nro_motor || ''}
                                                     onChange={handleVehiculoChange}
-                                                    className="w-full px-5 h-12 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all"
+                                                    className={FIELD_CLASS}
                                                 />
                                             </div>
-                                        </div>
-                                        <div className="pt-4 flex justify-end">
-                                            <button 
-                                                type="submit" 
-                                                disabled={submitting}
-                                                className="bg-slate-900 hover:bg-black text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center gap-3 shadow-xl transition-all active:scale-95"
-                                            >
-                                                {submitting ? 'Guardando...' : <><Save className="w-5 h-5" /> Guardar Cambios</>}
-                                            </button>
-                                        </div>
-                                    </form>
+                                            </div>
+                                            <div className="pt-6 mt-auto flex justify-end">
+                                                <button 
+                                                    type="submit" 
+                                                    disabled={submitting}
+                                                    className={PRIMARY_BTN}
+                                                >
+                                                    {submitting ? 'Guardando...' : <><Save className="w-4 h-4" /> Guardar Cambios</>}
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
                                 </div>
                             </motion.div>
                         ) : (
@@ -415,10 +423,10 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
-                                className="space-y-8"
+                                className="space-y-4"
                             >
                                 {/* Grid de tarjetas por tipo */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                                     {tiposDoc.map(tipo => {
                                         // Buscar si este tipo ya tiene un documento cargado
                                         const docCargado = documentos.find(d => d.tipo === tipo.id);
@@ -429,53 +437,53 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
                                         return (
                                             <div 
                                                 key={tipo.id}
-                                                className={`relative overflow-hidden bg-white p-6 rounded-[2.5rem] border shadow-sm transition-all flex flex-col h-full ${docCargado ? 'border-slate-100' : 'border-dashed border-slate-200 opacity-80 hover:opacity-100'}`}
+                                                className={`relative overflow-hidden bg-white p-3 rounded-2xl border shadow-sm transition-all flex flex-col h-full ${docCargado ? 'border-slate-200' : 'border-dashed border-slate-300 opacity-80 hover:opacity-100'}`}
                                             >
-                                                <div className="flex items-start justify-between mb-6">
-                                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${colors}`}>
-                                                        <Icon className="w-7 h-7" />
+                                                <div className="flex items-start justify-between gap-2 mb-3">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shadow-inner shrink-0 ${colors}`}>
+                                                        <Icon className="w-4 h-4" />
                                                     </div>
                                                     {docCargado ? (
-                                                        <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 ${status.bg} ${status.color}`}>
-                                                            <status.icon className="w-3.5 h-3.5" /> {status.label}
+                                                        <div className={`px-1.5 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-tighter flex items-center gap-1 ${status.bg} ${status.color}`}>
+                                                            <status.icon className="w-3 h-3" /> {status.label}
                                                         </div>
                                                     ) : (
-                                                        <div className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-400">
+                                                        <div className="px-1.5 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-tighter bg-slate-100 text-slate-400">
                                                             Pendiente
                                                         </div>
                                                     )}
                                                 </div>
 
                                                 <div className="flex-1">
-                                                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight mb-1">{tipo.nombre}</h4>
+                                                    <h4 className="text-[10px] font-medium text-slate-700 uppercase tracking-tighter mb-1 line-clamp-2">{tipo.nombre}</h4>
                                                     {docCargado ? (
-                                                        <div className="space-y-1">
-                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                        <div className="space-y-0.5">
+                                                            <p className="text-[9px] font-medium text-slate-400 uppercase tracking-tighter flex items-center gap-1">
                                                                 <Calendar className="w-3 h-3" /> Vencimiento: {docCargado.fecha_vencimiento || 'No expira'}
                                                             </p>
                                                             {docCargado.observaciones && (
-                                                                <p className="text-[10px] text-slate-500 italic truncate">"{docCargado.observaciones}"</p>
+                                                                <p className="text-[9px] font-medium text-slate-500 truncate">"{docCargado.observaciones}"</p>
                                                             )}
                                                         </div>
                                                     ) : (
-                                                        <p className="text-[10px] font-medium text-slate-400">Este documento aún no ha sido cargado al sistema.</p>
+                                                        <p className="text-[9px] font-medium text-slate-400 uppercase tracking-tighter leading-relaxed">Este documento aún no ha sido cargado al sistema.</p>
                                                     )}
                                                 </div>
 
-                                                <div className="mt-8 flex items-center gap-2">
+                                                <div className="mt-3 flex items-center gap-2">
                                                     {docCargado ? (
                                                         <>
                                                             <a 
                                                                 href={docCargado.archivo} 
                                                                 target="_blank" 
                                                                 rel="noreferrer"
-                                                                className="flex-1 bg-slate-900 hover:bg-black text-white h-11 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                                                                className={`${DOC_ACTION_BTN} flex-1 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20`}
                                                             >
                                                                 <Download className="w-4 h-4" /> Ver Archivo
                                                             </a>
                                                             <button 
                                                                 onClick={() => handleDeleteDocument(docCargado.id)}
-                                                                className="w-11 h-11 bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl flex items-center justify-center transition-all active:scale-95"
+                                                                className="w-9 h-9 bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl flex items-center justify-center transition-all active:scale-95 shrink-0"
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
                                                             </button>
@@ -483,7 +491,7 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
                                                     ) : (
                                                         <button 
                                                             onClick={() => setSelectedTipoForUpload(tipo)}
-                                                            className="w-full bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white h-11 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 border border-indigo-100"
+                                                            className={`${DOC_ACTION_BTN} w-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-100`}
                                                         >
                                                             <Plus className="w-4 h-4" /> Cargar Ahora
                                                         </button>
@@ -499,95 +507,154 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
                 </div>
             </div>
 
-        </motion.div>
+        </MotionDiv>
 
-        {/* Modal de Carga - Fuera del motion.div para evitar problemas de posicionamiento fixed */}
+        {/* Modal de Carga - Teletransportado vía Portal para cubrir viewport completo */}
+        {createPortal(
+            <AnimatePresence>
+                {selectedTipoForUpload && (
+                    <div className="fixed top-0 left-0 w-screen h-screen z-[10002] flex items-center justify-center p-4">
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setSelectedTipoForUpload(null)}
+                            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                        />
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+                        >
+                            <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+                                <div>
+                                    <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1">Cargar Documento</p>
+                                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">{selectedTipoForUpload.nombre}</h3>
+                                </div>
+                                <button onClick={() => setSelectedTipoForUpload(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                                    <X className="w-5 h-5 text-slate-400" />
+                                </button>
+                            </div>
+                            
+                            <form onSubmit={handleFileUpload} className="p-5 space-y-5">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className={LABEL_CLASS}>Fecha de Vencimiento</label>
+                                        <input 
+                                            type="date"
+                                            value={uploadData.fecha_vencimiento}
+                                            onChange={e => setUploadData({...uploadData, fecha_vencimiento: e.target.value})}
+                                            className={FIELD_CLASS}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className={LABEL_CLASS}>Días Aviso Previo</label>
+                                        <input 
+                                            type="text"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            placeholder={`Defecto: ${selectedTipoForUpload.dias_aviso_defecto || 15}`}
+                                            value={uploadData.dias_aviso}
+                                            onChange={e => setUploadData({...uploadData, dias_aviso: e.target.value})}
+                                            className={FIELD_CLASS}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className={LABEL_CLASS}>Archivo</label>
+                                    <div className="relative">
+                                        <input 
+                                            type="file"
+                                            onChange={e => setUploadData({...uploadData, archivo: e.target.files[0]})}
+                                            className="hidden"
+                                            id="modal-file-upload"
+                                            required
+                                        />
+                                        <label 
+                                            htmlFor="modal-file-upload"
+                                            className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-slate-200 rounded-2xl hover:bg-blue-50/50 hover:border-blue-300 transition-all cursor-pointer group"
+                                        >
+                                            {uploadData.archivo ? (
+                                                <div className="flex items-center gap-3">
+                                                    <FileIcon className="w-8 h-8 text-blue-600" />
+                                                    <span className="text-[10px] font-medium text-slate-600 truncate max-w-[200px] uppercase tracking-tighter">{uploadData.archivo.name}</span>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <UploadCloud className="w-10 h-10 text-slate-300 group-hover:text-blue-500 transition-colors mb-2" />
+                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seleccionar Archivo</span>
+                                                </>
+                                            )}
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    type="submit" 
+                                    disabled={submitting}
+                                    className={`${PRIMARY_BTN} w-full`}
+                                >
+                                    {submitting ? 'Subiendo...' : 'Vincular Documento'}
+                                </button>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>,
+            document.body
+        )}
         <AnimatePresence>
-            {selectedTipoForUpload && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-                    <motion.div 
+            {feedback && (
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[10001] text-[10px] font-bold uppercase p-3 rounded-xl border flex gap-2 items-center shadow-xl ${feedback.type === 'success' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}
+                >
+                    {feedback.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+                    {feedback.text}
+                    <button type="button" onClick={() => setFeedback(null)} className="p-1 hover:bg-white/60 rounded-lg">
+                        <X className="w-3.5 h-3.5" />
+                    </button>
+                </motion.div>
+            )}
+        </AnimatePresence>
+        <AnimatePresence>
+            {pendingDeleteDocId && (
+                <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4">
+                    <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        onClick={() => setSelectedTipoForUpload(null)}
                         className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                        onClick={() => setPendingDeleteDocId(null)}
                     />
-                    <motion.div 
-                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.96, y: 12 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                        className="relative w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden"
+                        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+                        className="relative z-10 bg-white rounded-2xl shadow-2xl overflow-hidden max-w-md w-full border border-slate-200"
                     >
-                        <div className="p-8 border-b border-slate-50 flex justify-between items-center">
-                            <div>
-                                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-1">Cargar Documento</p>
-                                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">{selectedTipoForUpload.nombre}</h3>
-                            </div>
-                            <button onClick={() => setSelectedTipoForUpload(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-                                <X className="w-5 h-5 text-slate-400" />
+                        <div className="bg-slate-50 border-b border-slate-100 p-4">
+                            <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Confirmación</p>
+                            <h3 className="text-sm font-bold text-slate-800 tracking-tight uppercase">Eliminar Documento</h3>
+                        </div>
+                        <div className="p-5">
+                            <p className="text-xs font-medium text-slate-700 uppercase leading-relaxed">
+                                ¿Está seguro de eliminar este documento?
+                            </p>
+                        </div>
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                            <button type="button" onClick={() => setPendingDeleteDocId(null)} className="bg-slate-100 hover:bg-slate-200 text-slate-600 h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shrink-0">
+                                Cancelar
+                            </button>
+                            <button type="button" onClick={confirmDeleteDocument} className="bg-rose-600 hover:bg-rose-700 text-white h-10 min-h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-rose-900/20 inline-flex items-center justify-center gap-2 shrink-0 active:scale-95 leading-none box-border">
+                                <Trash2 className="w-4 h-4" />
+                                Eliminar
                             </button>
                         </div>
-                        
-                        <form onSubmit={handleFileUpload} className="p-8 space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Fecha de Vencimiento</label>
-                                    <input 
-                                        type="date"
-                                        value={uploadData.fecha_vencimiento}
-                                        onChange={e => setUploadData({...uploadData, fecha_vencimiento: e.target.value})}
-                                        className="w-full px-4 h-12 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Días Aviso Previo</label>
-                                    <input 
-                                        type="number"
-                                        placeholder={`Defecto: ${selectedTipoForUpload.dias_aviso_defecto || 15}`}
-                                        value={uploadData.dias_aviso}
-                                        onChange={e => setUploadData({...uploadData, dias_aviso: e.target.value})}
-                                        className="w-full px-4 h-12 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Archivo</label>
-                                <div className="relative">
-                                    <input 
-                                        type="file"
-                                        onChange={e => setUploadData({...uploadData, archivo: e.target.files[0]})}
-                                        className="hidden"
-                                        id="modal-file-upload"
-                                        required
-                                    />
-                                    <label 
-                                        htmlFor="modal-file-upload"
-                                        className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-2xl hover:bg-indigo-50/50 hover:border-indigo-300 transition-all cursor-pointer group"
-                                    >
-                                        {uploadData.archivo ? (
-                                            <div className="flex items-center gap-3">
-                                                <FileIcon className="w-8 h-8 text-indigo-600" />
-                                                <span className="text-xs font-bold text-slate-600 truncate max-w-[200px]">{uploadData.archivo.name}</span>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <UploadCloud className="w-10 h-10 text-slate-300 group-hover:text-indigo-500 transition-colors mb-2" />
-                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seleccionar Archivo</span>
-                                            </>
-                                        )}
-                                    </label>
-                                </div>
-                            </div>
-
-                            <button 
-                                type="submit" 
-                                disabled={submitting}
-                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-200 transition-all active:scale-95"
-                            >
-                                {submitting ? 'Subiendo...' : 'Vincular Documento'}
-                            </button>
-                        </form>
                     </motion.div>
                 </div>
             )}

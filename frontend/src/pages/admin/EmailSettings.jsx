@@ -4,16 +4,39 @@ import {
     Mail, Server, Shield, Save, RefreshCw,
     CheckCircle2, AlertCircle, Eye, EyeOff, Send,
     Settings2, Plus, Trash2, Code2, 
-    Smartphone, Monitor, ChevronRight, X
+    Smartphone, Monitor, ChevronRight, X, Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api';
+
+const MotionDiv = motion.div;
+const DEFAULT_OPERATIONAL_PURPOSE = 'ALERTA_VENCIMIENTO_VEHICULO';
+const EXCLUDED_OPERATIONAL_PURPOSES = new Set([
+    'MFA',
+    'RESET_PASSWORD',
+    'RESERVA_SOLICITUD',
+    'RESERVA_APROBACION',
+    'RESERVA_RECORDATORIO',
+    'TEST'
+]);
+
+const createEmptyRecipientConfig = (proposito = DEFAULT_OPERATIONAL_PURPOSE) => ({
+    proposito,
+    grupos: [],
+    usuarios: [],
+    emails_adicionales: '',
+    activo: true
+});
 
 const EmailSettings = () => {
     const [activeTab, setActiveTab] = useState('accounts');
     const [accounts, setAccounts] = useState([]);
     const [templates, setTemplates] = useState([]);
-    const [globalConfig, setGlobalConfig] = useState({ reservas_admin_email: '' });
+    const [operationalRecipients, setOperationalRecipients] = useState([]);
+    const [selectedRecipientPurpose, setSelectedRecipientPurpose] = useState(DEFAULT_OPERATIONAL_PURPOSE);
+    const [groups, setGroups] = useState([]);
+    const [users, setUsers] = useState([]);
+    const [recipientForm, setRecipientForm] = useState(createEmptyRecipientConfig());
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [status, setStatus] = useState(null);
@@ -30,12 +53,16 @@ const EmailSettings = () => {
     const [selectedTemplate, setSelectedTemplate] = useState(null);
     const [previewHtml, setPreviewHtml] = useState('');
     const [previewMode, setPreviewMode] = useState('desktop');
-    const [previewTheme, setPreviewTheme] = useState('light'); // light or dark
+    const [previewTheme] = useState('light'); // light or dark
     const [testEmail, setTestEmail] = useState('');
     const [sendingTest, setSendingTest] = useState(false);
     const [isTestingConn, setIsTestingConn] = useState(null);
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => {
+        fetchData();
+    // fetchData initializes several admin resources once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const fetchData = async () => {
         setLoading(true);
@@ -45,17 +72,47 @@ const EmailSettings = () => {
                 api.get('comunicaciones/plantillas/')
             ]);
             setAccounts(accRes.data.results || accRes.data);
-            setTemplates(tempRes.data.results || tempRes.data);
-            if (tempRes.data.length > 0) handleSelectTemplate(tempRes.data[0]);
+            const templatesData = tempRes.data.results || tempRes.data;
+            setTemplates(templatesData);
+            if (templatesData.length > 0) handleSelectTemplate(templatesData[0]);
 
-            // Intentar cargar config global por separado para no bloquear el resto
-            try {
-                const configRes = await api.get('admin/email/config/');
-                setGlobalConfig(configRes.data);
-            } catch (e) {
-                console.log("Config global no disponible aún");
+            const [recipientsResult, groupsResult, usersResult] = await Promise.allSettled([
+                api.get('comunicaciones/destinatarios-operativos/'),
+                api.get('grupos/', { params: { page_size: 1000 } }),
+                api.get('admin/users/')
+            ]);
+
+            let recipientsData = [];
+            if (recipientsResult.status === 'fulfilled') {
+                recipientsData = recipientsResult.value.data.results || recipientsResult.value.data;
+                setOperationalRecipients(recipientsData);
+            } else {
+                console.error('No se pudieron cargar destinatarios operativos:', recipientsResult.reason);
+                setOperationalRecipients([]);
             }
+
+            if (groupsResult.status === 'fulfilled') {
+                setGroups(groupsResult.value.data.results || groupsResult.value.data);
+            } else {
+                console.error('No se pudieron cargar grupos de funcionarios:', groupsResult.reason);
+                setGroups([]);
+            }
+
+            if (usersResult.status === 'fulfilled') {
+                setUsers((usersResult.value.data.results || usersResult.value.data).filter(user => user.is_active && user.email));
+            } else {
+                console.error('No se pudieron cargar usuarios:', usersResult.reason);
+                setUsers([]);
+            }
+
+            const firstOperationalPurpose = templatesData.find(item => !EXCLUDED_OPERATIONAL_PURPOSES.has(item.proposito))?.proposito || DEFAULT_OPERATIONAL_PURPOSE;
+            const nextPurpose = recipientsData.find(item => item.proposito === selectedRecipientPurpose)?.proposito || firstOperationalPurpose;
+            const nextRecipientConfig = recipientsData.find(item => item.proposito === nextPurpose) || createEmptyRecipientConfig(nextPurpose);
+            setSelectedRecipientPurpose(nextPurpose);
+            setRecipientForm(nextRecipientConfig);
+
         } catch (error) { 
+            console.error("Error loading email settings:", error);
             showStatus('error', 'Error al cargar datos del servidor.'); 
         } finally { 
             setLoading(false); 
@@ -76,6 +133,19 @@ const EmailSettings = () => {
         return common;
     };
 
+    const getOperationalTemplates = () => templates.filter(item => !EXCLUDED_OPERATIONAL_PURPOSES.has(item.proposito));
+
+    const getPurposeLabel = (purpose) => {
+        const template = templates.find(item => item.proposito === purpose);
+        return template?.proposito_display || template?.nombre || purpose;
+    };
+
+    const handleRecipientPurposeChange = (purpose) => {
+        setSelectedRecipientPurpose(purpose);
+        const existingConfig = operationalRecipients.find(item => item.proposito === purpose);
+        setRecipientForm(existingConfig || createEmptyRecipientConfig(purpose));
+    };
+
     const handleSelectTemplate = async (template) => {
         setSelectedTemplate(template);
         updatePreview(template.cuerpo_html);
@@ -85,7 +155,9 @@ const EmailSettings = () => {
         try {
             const res = await api.post('comunicaciones/plantillas/preview/', { html });
             setPreviewHtml(res.data.html);
-        } catch (error) {}
+        } catch (error) {
+            console.error('Error al previsualizar plantilla:', error);
+        }
     };
 
     const handleTemplateChange = (field, value) => {
@@ -100,27 +172,80 @@ const EmailSettings = () => {
             await api.patch(`comunicaciones/plantillas/${selectedTemplate.id}/`, selectedTemplate);
             showStatus('success', 'Guardado con éxito.');
             fetchData();
-        } catch (error) { showStatus('error', 'Fallo al guardar.'); }
+        } catch (error) {
+            console.error('Error al guardar plantilla:', error);
+            showStatus('error', 'Fallo al guardar.');
+        }
         finally { setSaving(false); }
     };
 
     const sendTestMail = async () => {
-        if (!testEmail) return alert('Ingresa un correo');
+        if (!testEmail) {
+            showStatus('error', 'Ingresa un correo.');
+            return;
+        }
         setSendingTest(true);
         try {
             await api.post(`comunicaciones/plantillas/${selectedTemplate.id}/send_test/`, { email: testEmail });
             showStatus('success', 'Correo de prueba enviado.');
-        } catch (error) { showStatus('error', 'Error al enviar.'); }
+        } catch (error) {
+            console.error('Error al enviar prueba:', error);
+            showStatus('error', 'Error al enviar.');
+        }
         finally { setSendingTest(false); }
     };
 
-    const handleSaveGlobalConfig = async () => {
+    const toggleRecipientSelection = (field, id) => {
+        const current = recipientForm[field] || [];
+        const next = current.includes(id)
+            ? current.filter(item => item !== id)
+            : [...current, id];
+
+        setRecipientForm({ ...recipientForm, [field]: next });
+    };
+
+    const handleSaveOperationalRecipients = async () => {
         setSaving(true);
         try {
-            await api.post('comunicaciones/configuracion/', globalConfig);
-            showStatus('success', 'Configuración actualizada.');
-        } catch (error) { showStatus('error', 'Error al guardar.'); }
-        finally { setSaving(false); }
+            const hasRecipients = Boolean(
+                (recipientForm.grupos || []).length ||
+                (recipientForm.usuarios || []).length ||
+                (recipientForm.emails_adicionales || '').trim()
+            );
+
+            if (recipientForm.activo && !hasRecipients) {
+                showStatus('error', 'Selecciona al menos un grupo, usuario o email adicional.');
+                setSaving(false);
+                return;
+            }
+
+            const payload = {
+                ...recipientForm,
+                proposito: selectedRecipientPurpose
+            };
+            let response;
+            if (recipientForm.id) {
+                response = await api.patch(`comunicaciones/destinatarios-operativos/${recipientForm.id}/`, payload);
+            } else {
+                response = await api.post('comunicaciones/destinatarios-operativos/', payload);
+            }
+            const saved = response.data;
+            setRecipientForm(saved);
+            setOperationalRecipients(prev => {
+                const exists = prev.some(item => item.id === saved.id);
+                return exists ? prev.map(item => item.id === saved.id ? saved : item) : [...prev, saved];
+            });
+            showStatus('success', 'Destinatarios actualizados.');
+        } catch (error) {
+            console.error('Error al guardar destinatarios:', error);
+            const detail = error.response?.data?.non_field_errors?.[0]
+                || error.response?.data?.detail
+                || error.response?.data?.error
+                || 'Error al guardar destinatarios.';
+            showStatus('error', detail);
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleOpenAccountModal = (acc = null) => {
@@ -148,7 +273,10 @@ const EmailSettings = () => {
             else await api.post('comunicaciones/cuentas-smtp/', data);
             setIsAccountModalOpen(false);
             fetchData();
-        } catch (error) { showStatus('error', 'Error al guardar cuenta.'); }
+        } catch (error) {
+            console.error('Error al guardar cuenta SMTP:', error);
+            showStatus('error', 'Error al guardar cuenta.');
+        }
         finally { setSaving(false); }
     };
 
@@ -157,7 +285,10 @@ const EmailSettings = () => {
         try {
             await api.post(`comunicaciones/cuentas-smtp/${id}/test_connection/`);
             showStatus('success', 'Conexión Exitosa.');
-        } catch (error) { showStatus('error', 'Fallo de conexión.'); }
+        } catch (error) {
+            console.error('Error al probar conexión SMTP:', error);
+            showStatus('error', 'Fallo de conexión.');
+        }
         finally { setIsTestingConn(null); }
     };
 
@@ -182,6 +313,7 @@ const EmailSettings = () => {
                 <div className="flex border border-slate-200 rounded-xl w-fit p-1 bg-white shadow-sm">
                     <button onClick={() => setActiveTab('accounts')} className={`px-8 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'accounts' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400'}`}>Cuentas</button>
                     <button onClick={() => setActiveTab('templates')} className={`px-8 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'templates' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400'}`}>Editor</button>
+                    <button onClick={() => setActiveTab('recipients')} className={`px-8 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'recipients' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400'}`}>Destinatarios</button>
                 </div>
             </div>
 
@@ -277,6 +409,134 @@ const EmailSettings = () => {
                             </div>
                         </div>
                     </>
+                ) : activeTab === 'recipients' ? (
+                    <div className="flex-1 flex flex-col gap-6 overflow-hidden">
+                        <div className="flex justify-between items-center px-2">
+                            <div>
+                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Destinatarios Operativos</h3>
+                                <p className="text-[10px] font-medium text-slate-500 mt-1">Define quién recibe correos por propósito usando grupos de funcionarios, usuarios puntuales o correos externos.</p>
+                            </div>
+                            <button onClick={handleSaveOperationalRecipients} className="h-10 px-5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-900/20">
+                                {saving ? <RefreshCw size={12} className="animate-spin"/> : <Save size={12}/>} Guardar Configuración
+                            </button>
+                        </div>
+
+                        <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 overflow-hidden">
+                            <div className="xl:col-span-3 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                                <div className="p-4 bg-slate-50 border-b border-slate-100">
+                                    <span className="text-[9px] font-black text-slate-400 uppercase italic tracking-widest">Propósitos</span>
+                                </div>
+                                <div className="flex-1 overflow-y-auto custom-scroll p-2 space-y-1">
+                                    {getOperationalTemplates().map(template => (
+                                        <button
+                                            key={template.proposito}
+                                            onClick={() => handleRecipientPurposeChange(template.proposito)}
+                                            className={`w-full text-left px-4 py-3 rounded-xl transition-all ${selectedRecipientPurpose === template.proposito ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-slate-500 hover:bg-slate-50'}`}
+                                        >
+                                            <p className="text-[10px] font-black uppercase truncate">{template.proposito_display || template.nombre}</p>
+                                            <p className={`text-[8px] font-bold uppercase tracking-widest mt-1 truncate ${selectedRecipientPurpose === template.proposito ? 'text-blue-100' : 'text-slate-300'}`}>{template.proposito}</p>
+                                        </button>
+                                    ))}
+                                    {getOperationalTemplates().length === 0 && (
+                                        <div className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">No hay plantillas operativas.</div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="xl:col-span-9 flex flex-col gap-4 overflow-hidden">
+                                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm shrink-0">
+                                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                                        <div className="flex-1">
+                                            <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1">Propósito seleccionado</p>
+                                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">{getPurposeLabel(selectedRecipientPurpose)}</h3>
+                                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-tight mt-1">{selectedRecipientPurpose}</p>
+                                        </div>
+                                        <label className="inline-flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                            <input
+                                                type="checkbox"
+                                                checked={recipientForm.activo}
+                                                onChange={e => setRecipientForm({ ...recipientForm, activo: e.target.checked })}
+                                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            Activo
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0 flex-1">
+                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-0">
+                                        <div className="p-4 bg-slate-50 border-b border-slate-100">
+                                            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Grupos de Funcionarios</h4>
+                                            <p className="text-[9px] text-slate-400 mt-1">Tomados desde Funcionarios &gt; Grupos.</p>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto custom-scroll p-3 space-y-2">
+                                            {groups.map(group => {
+                                                const checked = (recipientForm.grupos || []).includes(group.id);
+                                                return (
+                                                    <label key={group.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${checked ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={checked}
+                                                            onChange={() => toggleRecipientSelection('grupos', group.id)}
+                                                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                        />
+                                                        <div className="min-w-0">
+                                                            <p className="text-[10px] font-black uppercase tracking-tight truncate">{group.nombre}</p>
+                                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{group.total_miembros || 0} miembros</p>
+                                                        </div>
+                                                    </label>
+                                                );
+                                            })}
+                                            {groups.length === 0 && (
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest p-3">No hay grupos disponibles.</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-0">
+                                        <div className="p-4 bg-slate-50 border-b border-slate-100">
+                                            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Usuarios Específicos</h4>
+                                            <p className="text-[9px] text-slate-400 mt-1">Opcional para casos fuera del grupo.</p>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto custom-scroll p-3 space-y-2">
+                                            {users.map(user => {
+                                                const checked = (recipientForm.usuarios || []).includes(user.id);
+                                                return (
+                                                    <label key={user.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${checked ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={checked}
+                                                            onChange={() => toggleRecipientSelection('usuarios', user.id)}
+                                                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                        />
+                                                        <div className="min-w-0">
+                                                            <p className="text-[10px] font-black uppercase tracking-tight truncate">{user.first_name || user.username} {user.last_name || ''}</p>
+                                                            <p className="text-[8px] font-bold text-slate-400 lowercase truncate">{user.email}</p>
+                                                        </div>
+                                                    </label>
+                                                );
+                                            })}
+                                            {users.length === 0 && (
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest p-3">No hay usuarios con email disponibles.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm shrink-0">
+                                    <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Emails Adicionales</label>
+                                    <textarea
+                                        rows={3}
+                                        placeholder="flota@slepiquique.cl"
+                                        value={recipientForm.emails_adicionales || ''}
+                                        onChange={e => setRecipientForm({ ...recipientForm, emails_adicionales: e.target.value })}
+                                        className="no-global w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-600 outline-none focus:border-blue-500 shadow-sm resize-none"
+                                    />
+                                    <p className="text-[9px] text-slate-400 mt-1">Separados por coma, punto y coma o salto de línea.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 ) : (
                     /* Accounts View - Balanced Grid */
                     <div className="flex-1 flex flex-col gap-6 overflow-hidden">
@@ -285,31 +545,6 @@ const EmailSettings = () => {
                             <button onClick={() => handleOpenAccountModal()} className="px-8 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest">+ Nueva Cuenta</button>
                         </div>
                         
-                        {/* Configuración Global */}
-                        <div className="bg-slate-100/50 rounded-2xl p-6 border border-slate-200">
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                <Settings2 size={12}/> Configuración Global
-                            </h3>
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-500 block mb-1">NOTIFICACIONES RESERVAS (ADMIN)</label>
-                                    <div className="flex gap-2">
-                                        <input 
-                                            type="text" 
-                                            placeholder="admin@ejemplo.cl, soporte@ejemplo.cl"
-                                            className="w-full max-w-lg bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] outline-none focus:border-blue-500"
-                                            value={globalConfig.reservas_admin_email}
-                                            onChange={e => setGlobalConfig({...globalConfig, reservas_admin_email: e.target.value})}
-                                        />
-                                        <button onClick={handleSaveGlobalConfig} className="px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-[10px] font-bold">
-                                            {saving ? <RefreshCw size={12} className="animate-spin"/> : <Save size={12}/>} Guardar
-                                        </button>
-                                    </div>
-                                    <p className="text-[9px] text-slate-400 mt-1">Correos de notificación para alertas de reservas (separados por coma).</p>
-                                </div>
-                            </div>
-                        </div>
-
                         <div className="flex-1 overflow-y-auto custom-scroll pr-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20 items-start">
                             {accounts.map(acc => (
                                 <div key={acc.id} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:border-slate-400 transition-all flex flex-col gap-6 relative group">
@@ -344,7 +579,7 @@ const EmailSettings = () => {
                 <AnimatePresence>
                     {isAccountModalOpen && (
                         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-                            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden border border-slate-200">
+                            <MotionDiv initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden border border-slate-200">
                                 <div className="px-10 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-900 text-white">
                                     <h3 className="font-black text-xs uppercase tracking-widest">Configuración SMTP</h3>
                                     <button onClick={() => setIsAccountModalOpen(false)}><X size={24}/></button>
@@ -392,7 +627,7 @@ const EmailSettings = () => {
                                     </div>
                                     <button type="submit" disabled={saving} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all">Guardar Configuración</button>
                                 </form>
-                            </motion.div>
+                            </MotionDiv>
                         </div>
                     )}
                 </AnimatePresence>,
@@ -402,10 +637,10 @@ const EmailSettings = () => {
             {/* Notification Toast */}
             <AnimatePresence>
                 {status && (
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className={`fixed bottom-8 right-8 z-[1000] px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 bg-slate-900 text-white`}>
+                    <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className={`fixed bottom-8 right-8 z-[1000] px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 bg-slate-900 text-white`}>
                         {status.type === 'success' ? <CheckCircle2 size={18} className="text-emerald-400" /> : <AlertCircle size={18} className="text-rose-400" />}
                         <span className="text-[11px] font-black uppercase tracking-widest">{status.message}</span>
-                    </motion.div>
+                    </MotionDiv>
                 )}
             </AnimatePresence>
         </div>

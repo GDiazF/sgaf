@@ -157,3 +157,87 @@ class EmailConfiguration(models.Model):
             config_obj.reservas_admin_email = getattr(settings, 'RESERVAS_ADMIN_EMAIL', '')
             config_obj.save()
         return config_obj
+
+
+class DocumentAsset(models.Model):
+    """Repositorio de imágenes para reportes (Logos, firmas, sellos)"""
+    nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre del Asset")
+    archivo = models.ImageField(upload_to='report_assets/', verbose_name="Archivo de Imagen")
+    descripcion = models.TextField(blank=True, null=True, verbose_name="Descripción")
+    fecha_subida = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Asset de Documento"
+        verbose_name_plural = "Assets de Documentos"
+
+    def __str__(self):
+        return self.nombre
+
+
+class ReportConfiguration(models.Model):
+    """Configuración dinámica de logos y colores por tipo de reporte"""
+    DOCUMENT_TYPES = [
+        ('RC_BASIC', 'Recepción Conforme (Servicios Básicos/Pagos)'),
+        ('RC_ADQ', 'Recepción Conforme (Adquisiciones/Facturas)'),
+        ('ACTA_CONTRATO', 'Acta de Conformidad (Contratos)'),
+        ('ORDEN_PAGO', 'Orden de Pago'),
+    ]
+    
+    report_type = models.CharField(
+        max_length=50, 
+        choices=DOCUMENT_TYPES, 
+        unique=True, 
+        verbose_name="Tipo de Reporte"
+    )
+    
+    logo_izquierdo = models.ForeignKey(
+        DocumentAsset, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='logos_izquierdos',
+        verbose_name="Logo Izquierdo (Encabezado)"
+    )
+    
+    logo_derecho = models.ForeignKey(
+        DocumentAsset, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='logos_derechos',
+        verbose_name="Logo Derecho (Encabezado)"
+    )
+    
+    logo_pie_pagina = models.ForeignKey(
+        DocumentAsset, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='logos_pie',
+        verbose_name="Logo Pie de Página"
+    )
+    
+    color_primario = models.CharField(
+        max_length=7, 
+        default='#000000', 
+        help_text="Color hexadecimal para franjas o detalles (ej: #004488)",
+        verbose_name="Color Primario"
+    )
+    
+    color_secundario = models.CharField(
+        max_length=7, 
+        default='#FFFFFF',
+        verbose_name="Color Secundario"
+    )
+
+    class Meta:
+        verbose_name = "Configuración de Reporte"
+        verbose_name_plural = "Configuraciones de Reportes"
+
+    def __str__(self):
+        return self.get_report_type_display()
+
+    @classmethod
+    def get_for_type(cls, report_type):
+        """Retorna la configuración para un tipo, o None si no existe"""
+        return cls.objects.filter(report_type=report_type).first()

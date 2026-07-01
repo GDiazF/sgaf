@@ -122,9 +122,9 @@ const InterestLinksSection = ({ isCompact = false, isSidebar = false, onRefresh 
             Instagram: 'text-pink-600 fill-pink-600/10',
             Linkedin: 'text-blue-700 fill-blue-700/10',
             Globe: 'text-cyan-500 fill-cyan-500/10',
-            Video: 'text-violet-500 fill-violet-500/10',
+            Video: 'text-blue-500 fill-blue-500/10',
             Star: 'text-amber-500 fill-amber-500/10',
-            MessageSquare: 'text-indigo-500 fill-indigo-500/10',
+            MessageSquare: 'text-blue-500 fill-blue-500/10',
             Book: 'text-orange-500 fill-orange-500/10',
             FileText: 'text-blue-500 fill-blue-500/10',
             Monitor: 'text-slate-600 fill-slate-600/10',
@@ -132,7 +132,7 @@ const InterestLinksSection = ({ isCompact = false, isSidebar = false, onRefresh 
             Link2: 'text-blue-600 fill-blue-600/10',
             Activity: 'text-rose-500 fill-rose-500/10',
             Phone: 'text-green-500 fill-green-500/10',
-            Shield: 'text-indigo-600 fill-indigo-600/10',
+            Shield: 'text-blue-600 fill-blue-600/10',
             Box: 'text-brown-500 fill-brown-500/10',
             ShoppingCart: 'text-emerald-500 fill-emerald-500/10',
             Calendar: 'text-red-400 fill-red-400/10',
@@ -151,8 +151,8 @@ const InterestLinksSection = ({ isCompact = false, isSidebar = false, onRefresh 
             <div className={`${(isCompact || isSidebar) ? 'p-5 py-4' : 'p-6'} border-b border-slate-50 shrink-0`}>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                            <Star className="w-4 h-4 fill-indigo-600/10" />
+                        <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <Star className="w-4 h-4 fill-blue-600/10" />
                         </div>
                         <h2 className="text-xs font-bold text-slate-800 uppercase tracking-widest leading-none">
                             {activeTab === 'LINK' ? 'Links de Interés' : 'Redes Sociales'}
@@ -175,7 +175,7 @@ const InterestLinksSection = ({ isCompact = false, isSidebar = false, onRefresh 
                         {can('core.add_linkinteres') && (
                             <button
                                 onClick={() => handleOpenModal()}
-                                className="p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all shadow-lg active:scale-95"
+                                className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-lg active:scale-95"
                             >
                                 <Plus className="w-4 h-4" />
                             </button>
@@ -189,13 +189,13 @@ const InterestLinksSection = ({ isCompact = false, isSidebar = false, onRefresh 
                 <div className="flex px-4 py-2 gap-2 bg-slate-50/50 border-b border-slate-100 shrink-0">
                     <button
                         onClick={() => setActiveTab('LINK')}
-                        className={`flex-1 py-1 rounded-lg text-[9px] font-bold uppercase transition-all ${activeTab === 'LINK' ? 'bg-white shadow-sm text-indigo-600 border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`flex-1 py-1 rounded-lg text-[9px] font-bold uppercase transition-all ${activeTab === 'LINK' ? 'bg-white shadow-sm text-blue-600 border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
                     >
                         Links
                     </button>
                     <button
                         onClick={() => setActiveTab('RED_SOCIAL')}
-                        className={`flex-1 py-1 rounded-lg text-[9px] font-bold uppercase transition-all ${activeTab === 'RED_SOCIAL' ? 'bg-white shadow-sm text-indigo-600 border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`flex-1 py-1 rounded-lg text-[9px] font-bold uppercase transition-all ${activeTab === 'RED_SOCIAL' ? 'bg-white shadow-sm text-blue-600 border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
                     >
                         Redes
                     </button>

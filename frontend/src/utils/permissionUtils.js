@@ -8,8 +8,6 @@ export const groupPermissions = (permissions) => {
         let module = 'Otros';
         // Normalize to remove accents for easier matching
         const name = perm.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const codename = (perm.codename || '').toLowerCase();
-
         // Módulos del Navbar (Modelo Dummy eliminado)
 
         const appLabel = (perm.content_type_app_label || '').toLowerCase();
@@ -18,6 +16,7 @@ export const groupPermissions = (permissions) => {
         if (name.includes('llave') || name.includes('prestamo') || name.includes('solicitante')) module = 'Préstamo de Llaves';
         else if (name.includes('establecimiento')) module = 'Establecimientos';
         else if (name.includes('proveedor')) module = 'Proveedores';
+        else if (name.includes('ruta') || name.includes('periodo de cobro') || name.includes('periodo cobro') || name.includes('ausencia de ruta') || name.includes('ausencia ruta') || name.includes('feriado nacional') || name.includes('servicio de contrato') || name.includes('servicio contrato') || name.includes('tipo de servicio operativo') || name.includes('grupo de rutas')) module = 'Gestión de Rutas';
         else if (name.includes('contrato') || name.includes('proceso') || name.includes('licitacion')) module = 'Contratos y Licitaciones';
         else if (name.includes('orden de compra') || name.includes('ordencompra')) module = 'Órdenes de Compra';
         else if (appLabel === 'solicitudes_reservas' || name.includes('reserva') || name.includes('bloqueo') || name.includes('recurso')) module = 'Reservas de Espacios';
@@ -37,6 +36,7 @@ export const groupPermissions = (permissions) => {
         else if (name.includes('user') || name.includes('group') || name.includes('permission')) module = 'Seguridad y Usuarios';
         else if (name.includes('log entry') || name.includes('logentry')) module = 'Auditoría';
         else if (name.includes('link de interes') || name.includes('linkinteres')) module = 'Dashboard, Links y Redes';
+        else if (appLabel === 'tickets' || name.includes('ticket')) module = 'Mesa de Ayuda (Tickets)';
 
         if (!groups[module]) groups[module] = [];
         groups[module].push(perm);
@@ -121,7 +121,20 @@ export const getFriendlyPermName = (perm) => {
         'logentry': 'Logs de Auditoría',
         'emailconfiguration': 'Configuración Global de Correo',
         'plantillacorreo': 'Plantillas de Correo',
-        'cuentasmtp': 'Cuentas SMTP (Servidores)'
+        'cuentasmtp': 'Cuentas SMTP (Servidores)',
+        'destinatarioscorreooperativo': 'Destinatarios de Correos Operativos',
+        'rutatransporte': 'Rutas de Transporte',
+        'serviciocontrato': 'Gestión Operativa de Rutas',
+        'periodocobro': 'Periodos de Cobro / Asistencia',
+        'ausenciaruta': 'Registros de Asistencia',
+        'feriadonacional': 'Calendario de Feriados',
+        'grupopresetrutas': 'Grupos / Presets de Rutas',
+        'tiposerviciooperativo': 'Categorías Operativas',
+        'ticket': 'Tickets / Solicitudes',
+        'ticketcategory': 'Categorías de Tickets',
+        'ticketmessage': 'Mensajes y Chat de Soporte',
+        'supportagent': 'Agentes de Mesa de Ayuda',
+        'ticketattachment': 'Adjuntos de Tickets'
     };
 
     const modelKey = codename.split('_')[1];

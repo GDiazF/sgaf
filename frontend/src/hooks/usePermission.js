@@ -10,6 +10,10 @@ export const usePermission = () => {
         if (!user) return false;
         if (user.is_superuser) return true;
 
+        if (Array.isArray(permission)) {
+            return permission.some(p => user.user_permissions?.includes(p));
+        }
+
         // Django permissions are usually in the format 'app_label.codename'
         return user.user_permissions?.includes(permission);
     };

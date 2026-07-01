@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShieldCheck, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Chrome, Box, Globe, UserCircle2, Settings, History, Info, Bell, Trash2, Check, X, TrendingUp, Heart, Mail } from 'lucide-react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShieldCheck, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Chrome, Box, Globe, UserCircle2, Settings, History, Info, Bell, Trash2, Check, X, TrendingUp, Heart, Mail, HelpCircle, MessageSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../hooks/usePermission';
@@ -10,6 +10,14 @@ import AboutModal from './common/AboutModal';
 import { APP_VERSION } from '../version';
 
 const Layout = () => {
+    const navigate = useNavigate();
+    const toDateStr = d => {
+        if (!(d instanceof Date)) d = new Date(d);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
     const location = useLocation();
     const { user, logout, checkUserStatus } = useAuth();
     const { can, hasRole } = usePermission();
@@ -22,6 +30,7 @@ const Layout = () => {
     const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
     const [isOnline, setIsOnline] = useState(true); // Backend status
     const [pendingReservas, setPendingReservas] = useState([]);
+    const [notifications, setNotifications] = useState([]);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const profileRef = useRef(null);
     const notificationsRef = useRef(null);
@@ -49,21 +58,44 @@ const Layout = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Close sidebar/mobile menu when route changes
+    // Auto-expand submenus based on path
     useEffect(() => {
+        const path = location.pathname;
+
+        // Reset if at root
+        if (path === '/') return;
+
+        // SSGG Group
+        const ssggPaths = [
+            '/services', '/contracts', '/telecomunicaciones', '/impresoras', '/vehiculos', 
+            '/personal-ti', '/insights', '/usuarios-google', '/biometrico', '/monitoreo-red', 
+            '/keys', '/loans', '/history', '/admin/conciliacion'
+        ];
+        
+        if (ssggPaths.some(p => path.startsWith(p))) {
+            setActiveMainGroup('ssgg');
+            if (path.startsWith('/contracts')) setActiveSubMenu('contratos');
+            else if (path.startsWith('/services')) setActiveSubMenu('services');
+            else if (path.startsWith('/vehiculos')) setActiveSubMenu('vehiculos');
+            else if (path.startsWith('/usuarios-google') || path.startsWith('/biometrico') || path.startsWith('/admin/conciliacion')) setActiveSubMenu('usuarios');
+            else if (path.startsWith('/loans') || path.startsWith('/keys') || path.startsWith('/history')) setActiveSubMenu('loans');
+        } 
+        else if (path.startsWith('/tesoreria')) {
+            setActiveMainGroup('tesoreria');
+        } 
+        else if (path.startsWith('/orden-compra') || path.startsWith('/licitaciones')) {
+            setActiveMainGroup('mp');
+        } 
+        else if (path.startsWith('/bienestar')) {
+            setActiveMainGroup('bienestar');
+        }
+
         setMobileMenuOpen(false);
-        // Si venimos con instrucción de configurar MFA, abrimos el modal
         if (location.state?.setup_mfa) {
             setIsProfileModalOpen(true);
         }
         if (windowWidth <= 1366) {
             setSidebarOpen(false);
-        }
-
-        // Auto-expand submenus based on path
-        if (location.pathname.startsWith('/vehiculos')) {
-            setActiveMainGroup('ssgg');
-            setActiveSubMenu('vehiculos');
         }
     }, [location.pathname, location.state, windowWidth]);
 
@@ -104,13 +136,13 @@ const Layout = () => {
             '/establishments': 'Establecimientos',
             '/funcionarios': 'Funcionarios',
             '/reservas-externas': 'Reservas Externas',
-            '/contracts': 'Contratos',
+            '/contracts': 'Compras',
             '/services/providers': 'Proveedores',
             '/services/adquisiciones': 'Factura sin OC',
-            '/services': 'Servicios',
-            '/services/payments': 'Pagos de Servicios',
+            '/services': 'Gestión de Rutas',
+            '/services/payments': 'Pagos de Contratos',
             '/services/reporte-consumos': 'Reporte Consumos',
-            '/services/rc': 'Recepción Conforme',
+            '/services/rc': 'Recepciones de Contratos',
             '/services/cdp': 'CDPs',
             '/telecomunicaciones': 'Teléfonos',
             '/impresoras': 'Impresoras',
@@ -123,7 +155,8 @@ const Layout = () => {
             '/reservas': 'Reservas',
             '/personal-ti': 'Personal TI',
             '/procedimientos': 'Procedimientos',
-            '/admin/audit-log': 'Auditoría de Sistema'
+            '/admin/audit-log': 'Auditoría de Sistema',
+            '/admin/personalizacion/login/backgrounds': 'Personalización'
         };
 
         const baseTitle = 'SGAF - SLEP Iquique';
@@ -157,6 +190,36 @@ const Layout = () => {
             window.removeEventListener('refresh-notifications', handleRefresh);
         };
     }, [user]);
+    
+    // Check general notifications
+    useEffect(() => {
+        if (!user) return;
+        
+        const fetchNotifications = async () => {
+            try {
+                const res = await api.get('notificaciones/');
+                let fetchedNotifs = res.data.results || res.data || [];
+                
+                // Si el usuario ya está en la página del ticket, marcamos esas notificaciones como leídas automáticamente
+                const currentPath = location.pathname;
+                const matchNotifs = fetchedNotifs.filter(n => !n.leida && n.link === currentPath);
+                
+                if (matchNotifs.length > 0) {
+                    await Promise.all(matchNotifs.map(n => api.post(`notificaciones/${n.id}/marcar_leida/`)));
+                    // Actualizamos localmente para no esperar al siguiente fetch
+                    fetchedNotifs = fetchedNotifs.map(n => n.link === currentPath ? {...n, leida: true} : n);
+                }
+                
+                setNotifications(fetchedNotifs);
+            } catch (error) {
+                console.warn('Error fetching general notifications');
+            }
+        };
+
+        fetchNotifications();
+        const interval = setInterval(fetchNotifications, 30000); // Check every 30s
+        return () => clearInterval(interval);
+    }, [user, location.pathname]);
 
     // Check backend status
     useEffect(() => {
@@ -252,6 +315,20 @@ const Layout = () => {
                         </motion.span>
                     </Link>
 
+                    <Link
+                        to="/tickets"
+                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${location.pathname.startsWith('/tickets') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                    >
+                        <HelpCircle className="w-5 h-5 flex-shrink-0" />
+                        <motion.span
+                            initial={false}
+                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                            className="font-medium whitespace-nowrap"
+                        >
+                            Mesa de Ayuda
+                        </motion.span>
+                    </Link>
+
                     {can('establecimientos.view_establecimiento') && (
                         <Link
                             to="/establishments"
@@ -283,57 +360,6 @@ const Layout = () => {
                             </motion.span>
                         </Link>
                     )}
-
-                    {/* Grupo: Bienestar */}
-                    <div>
-                        <button
-                            onClick={() => {
-                                setActiveMainGroup(activeMainGroup === 'bienestar' ? null : 'bienestar');
-                                setActiveSubMenu(null);
-                            }}
-                            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'bienestar' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <Heart className="w-5 h-5 flex-shrink-0 text-rose-400" />
-                                <motion.span
-                                    initial={false}
-                                    animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                                    className="font-medium whitespace-nowrap"
-                                >
-                                    Bienestar
-                                </motion.span>
-                            </div>
-                            <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
-                                {activeMainGroup === 'bienestar' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                            </motion.div>
-                        </button>
-
-                        <AnimatePresence>
-                            {activeMainGroup === 'bienestar' && (sidebarOpen || mobileMenuOpen) && (
-                                <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: "auto", opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    className="overflow-hidden space-y-1 mt-2 pl-2 border-l border-slate-700/50 ml-6"
-                                >
-                                    <Link
-                                        to="/bienestar/muro"
-                                        className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/bienestar/muro') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                                    >
-                                        <Globe className="w-4 h-4 flex-shrink-0" />
-                                        <span className="font-medium whitespace-nowrap">Bienestar</span>
-                                    </Link>
-                                    <Link
-                                        to="/bienestar"
-                                        className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/bienestar') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                                    >
-                                        <Settings className="w-4 h-4 flex-shrink-0" />
-                                        <span className="font-medium whitespace-nowrap">Beneficios</span>
-                                    </Link>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
 
 
 
@@ -416,10 +442,30 @@ const Layout = () => {
                                                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Finanzas</span>
                                                 </div>
                                                 {can('contratos.view_contrato') && (
-                                                    <Link to="/contracts" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/contracts') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                                                        <FileText className="w-4 h-4 flex-shrink-0" />
-                                                        <span className="font-medium whitespace-nowrap">Contratos</span>
-                                                    </Link>
+                                                    <div>
+                                                        <button 
+                                                            onClick={() => setActiveSubMenu(activeSubMenu === 'contratos' ? null : 'contratos')} 
+                                                            className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'contratos' || isActive('/contracts') || isActive('/contracts/servicios') ? 'text-blue-400' : ''}`}
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                <FileText className="w-4 h-4 flex-shrink-0" />
+                                                                <span className="font-medium whitespace-nowrap">Compras</span>
+                                                            </div>
+                                                            {activeSubMenu === 'contratos' ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                                        </button>
+                                                        {activeSubMenu === 'contratos' && (
+                                                            <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
+                                                                <Link to="/contracts" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/contracts') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                                    Contratos
+                                                                </Link>
+                                                                {can('contratos.view_rutatransporte') && (
+                                                                    <Link to="/contracts/servicios" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/contracts/servicios') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
+                                                                        Gestión de Rutas
+                                                                    </Link>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
                                                 {can('servicios.view_proveedor') && (
                                                     <Link to="/services/providers" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/services/providers') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
@@ -439,21 +485,21 @@ const Layout = () => {
                                                         <button onClick={() => setActiveSubMenu(activeSubMenu === 'services' ? null : 'services')} className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'services' || (isActive('/services') || isActive('/services/payments') || isActive('/services/rc') || isActive('/services/cdp')) ? 'text-blue-400' : ''}`}>
                                                             <div className="flex items-center gap-3">
                                                                 <ClipboardList className="w-4 h-4 flex-shrink-0" />
-                                                                <span className="font-medium whitespace-nowrap">Servicios</span>
+                                                                <span className="font-medium whitespace-nowrap">Servicios Básicos</span>
                                                             </div>
                                                             {activeSubMenu === 'services' ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                                                         </button>
                                                         {activeSubMenu === 'services' && (
                                                             <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
-                                                                {can('servicios.view_servicio') && <Link to="/services" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Panel Principal</Link>}
+                                                                {can('servicios.view_servicio') && <Link to="/services" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Panel Operativo</Link>}
                                                                 {can('servicios.view_registropago') && (
-                                                                    <>
-                                                                        <Link to="/services/payments" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/payments') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Pagos</Link>
-                                                                        <Link to="/services/reporte-consumos" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/reporte-consumos') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Reporte Consumos</Link>
-                                                                    </>
+                                                                    <Link to="/services/payments" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/payments') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Pagos</Link>
                                                                 )}
                                                                 {can('servicios.view_recepcionconforme') && <Link to="/services/rc" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/rc') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Recepciones</Link>}
                                                                 {can('servicios.view_cdp') && <Link to="/services/cdp" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/cdp') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>CDPs</Link>}
+                                                                {can('servicios.view_registropago') && (
+                                                                    <Link to="/services/reporte-consumos" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/reporte-consumos') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Reporte Consumos</Link>
+                                                                )}
                                                             </div>
                                                         )}
                                                     </div>
@@ -462,7 +508,7 @@ const Layout = () => {
                                         )}
 
                                         {/* Section: RECURSOS */}
-                                        {(can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo') || can('personal_ti.view_personalti') || can('solicitudes_reservas.view_solicitudreserva') || can('usuarios_google.view_googleuser')) && (
+                                        {(can('servicios.view_servicio') || can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('personal_ti.view_personalti') || can('insights.view_dashboardmetric') || can('usuarios_google.view_googleuser') || can('biometrico.view_biometrico')) && (
                                             <div className="space-y-0.5 pt-2">
                                                 <div className="px-4 mb-1">
                                                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Recursos</span>
@@ -558,29 +604,13 @@ const Layout = () => {
                                                     </Link>
                                                 )}
                                                 {(can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo')) && (
-                                                    <div>
-                                                        <button onClick={() => setActiveSubMenu(activeSubMenu === 'loans' ? null : 'loans')} className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'loans' || (isActive('/loans') || isActive('/loans/new') || isActive('/history') || isActive('/keys')) ? 'text-blue-400' : ''}`}>
-                                                            <div className="flex items-center gap-3">
-                                                                <Box className="w-4 h-4 flex-shrink-0" />
-                                                                <span className="font-medium whitespace-nowrap">Préstamos</span>
-                                                            </div>
-                                                            {activeSubMenu === 'loans' ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                                                        </button>
-                                                        {activeSubMenu === 'loans' && (
-                                                            <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
-                                                                {can('prestamo_llaves.view_activo') && (
-                                                                    <Link to="/keys" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/keys') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Inventario Activos</Link>
-                                                                )}
-                                                                {can('prestamo_llaves.view_prestamo') && (
-                                                                    <>
-                                                                        <Link to="/loans" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/loans') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Panel Activos</Link>
-                                                                        <Link to="/loans/new" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/loans/new') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Nuevo Préstamo</Link>
-                                                                        <Link to="/history" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/history') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Historial</Link>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    <Link
+                                                        to={can('prestamo_llaves.view_prestamo') ? "/loans" : "/keys"}
+                                                        className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/loans') || isActive('/loans/new') || isActive('/history') || isActive('/keys') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                                    >
+                                                        <Box className="w-4 h-4 flex-shrink-0" />
+                                                        <span className="font-medium whitespace-nowrap">Préstamos</span>
+                                                    </Link>
                                                 )}
                                             </div>
                                         )}
@@ -655,6 +685,58 @@ const Layout = () => {
                         <div className="border-t border-slate-700/50" />
                     </div>
 
+                    {/* Comunicaciones Submenu */}
+                    {(can('establecimientos.view_establecimiento') || user?.is_superuser) && (
+                        <div>
+                            <button
+                                onClick={() => {
+                                    setActiveMainGroup(activeMainGroup === 'comunicaciones' ? null : 'comunicaciones');
+                                    setActiveSubMenu(null);
+                                }}
+                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'comunicaciones' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <MessageSquare className="w-5 h-5 flex-shrink-0" />
+                                    <motion.span
+                                        initial={false}
+                                        animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                                        className="font-medium whitespace-nowrap"
+                                    >
+                                        Comunicaciones
+                                    </motion.span>
+                                </div>
+                                <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
+                                    {activeMainGroup === 'comunicaciones' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                </motion.div>
+                            </button>
+
+                            <AnimatePresence>
+                                {activeMainGroup === 'comunicaciones' && (sidebarOpen || mobileMenuOpen) && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="overflow-hidden space-y-3 mt-2 pl-2 border-l border-slate-700/50 ml-6"
+                                    >
+                                        <div className="space-y-0.5">
+                                            <Link
+                                                to="/comunicaciones/ejecutivos"
+                                                className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/comunicaciones/ejecutivos') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                            >
+                                                <Users className="w-4 h-4 flex-shrink-0" />
+                                                <span className="font-medium whitespace-nowrap">Ejecutivos</span>
+                                            </Link>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
+
+                    <div className="py-2 px-4">
+                        <div className="border-t border-slate-700/50" />
+                    </div>
+
                     {/* Mercado Público Submenu */}
                     {(can('orden_compra.view_ordencompramp') || can('licitaciones.view_licitacionmp')) && (
                         <div>
@@ -698,6 +780,67 @@ const Layout = () => {
                                             <Link to="/licitaciones" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/licitaciones') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
                                                 <FileStack className="w-4 h-4 flex-shrink-0" />
                                                 <span className="font-medium whitespace-nowrap">Visor Licitaciones</span>
+                                            </Link>
+                                        )}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
+
+                    <div className="py-2 px-4">
+                        <div className="border-t border-slate-700/50" />
+                    </div>
+
+                    {/* Grupo: Bienestar */}
+                    {can('bienestar.view_beneficio') && (
+                        <div>
+                            <button
+                                onClick={() => {
+                                    setActiveMainGroup(activeMainGroup === 'bienestar' ? null : 'bienestar');
+                                    setActiveSubMenu(null);
+                                }}
+                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'bienestar' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <Heart className="w-5 h-5 flex-shrink-0 fill-current" />
+                                    <motion.span
+                                        initial={false}
+                                        animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                                        className="font-medium whitespace-nowrap"
+                                    >
+                                        Bienestar
+                                    </motion.span>
+                                </div>
+                                <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
+                                    {activeMainGroup === 'bienestar' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                </motion.div>
+                            </button>
+
+                            <AnimatePresence>
+                                {activeMainGroup === 'bienestar' && (sidebarOpen || mobileMenuOpen) && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="overflow-hidden space-y-1 mt-2 pl-2 border-l border-slate-700/50 ml-6"
+                                    >
+                                        {can('bienestar.view_beneficio') && (
+                                            <Link
+                                                to="/bienestar/muro"
+                                                className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/bienestar/muro') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                            >
+                                                <Globe className="w-4 h-4 flex-shrink-0" />
+                                                <span className="font-medium whitespace-nowrap">Beneficios</span>
+                                            </Link>
+                                        )}
+                                        {(can('bienestar.add_beneficio') || can('bienestar.change_beneficio')) && (
+                                            <Link
+                                                to="/bienestar"
+                                                className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/bienestar') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                            >
+                                                <Settings className="w-4 h-4 flex-shrink-0" />
+                                                <span className="font-medium whitespace-nowrap">Configuración</span>
                                             </Link>
                                         )}
                                     </motion.div>
@@ -886,6 +1029,16 @@ const Layout = () => {
                                                         Auditoría de Sistema
                                                     </Link>
                                                     <Link
+                                                        to="/admin/personalizacion/login/backgrounds"
+                                                        onClick={() => setIsProfileOpen(false)}
+                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                    >
+                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                            <Settings className="w-4 h-4" />
+                                                        </div>
+                                                        Personalización
+                                                    </Link>
+                                                    <Link
                                                         to="/admin/email-settings"
                                                         onClick={() => setIsProfileOpen(false)}
                                                         className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
@@ -917,75 +1070,114 @@ const Layout = () => {
 
                         {/* Notifications Bell */}
                         <div className="relative" ref={notificationsRef}>
-                            <button
-                                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                                className={`p-2.5 rounded-xl transition-all duration-300 relative group ${isNotificationsOpen ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                            >
-                                <Bell className={`w-5 h-5 ${pendingReservas.length > 0 && !isNotificationsOpen ? 'animate-[bounce_2s_infinite]' : ''}`} />
-                                {pendingReservas.length > 0 && (
-                                    <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 bg-rose-600 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white shadow-lg shadow-rose-500/40 animate-pulse-subtle">
-                                        {pendingReservas.length}
-                                    </span>
-                                )}
-                            </button>
-
-                            {/* Notifications Drawer */}
-                            <AnimatePresence>
-                                {isNotificationsOpen && (
-                                    <motion.div
-                                        initial={{ opacity: 0, x: 20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: 20 }}
-                                        className="absolute right-0 mt-3 w-80 md:w-96 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-[60]"
-                                    >
-                                        <div className="p-5 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
-                                            <div className="flex items-center gap-2">
-                                                <Bell className="w-4 h-4 text-indigo-600" />
-                                                <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Notificaciones</h3>
-                                            </div>
-                                            {pendingReservas.length > 0 && (
-                                                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-                                                    {pendingReservas.length} Pendientes
+                            {(() => {
+                                const unreadNotifications = notifications.filter(n => !n.leida);
+                                const totalCount = pendingReservas.length + unreadNotifications.length;
+                                return (
+                                    <>
+                                        <button
+                                            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                                            className={`p-2.5 rounded-xl transition-all duration-300 relative group ${isNotificationsOpen ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                        >
+                                            <Bell className={`w-5 h-5 ${totalCount > 0 && !isNotificationsOpen ? 'animate-[bounce_2s_infinite]' : ''}`} />
+                                            {totalCount > 0 && (
+                                                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 bg-rose-600 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white shadow-lg shadow-rose-500/40 animate-pulse-subtle">
+                                                    {totalCount}
                                                 </span>
                                             )}
-                                        </div>
+                                        </button>
 
-                                        <div className="max-h-[70vh] overflow-y-auto p-2 space-y-2">
-                                            {pendingReservas.length === 0 ? (
-                                                <div className="p-10 text-center space-y-3">
-                                                    <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto">
-                                                        <Check className="w-6 h-6 text-slate-300" />
-                                                    </div>
-                                                    <p className="text-sm font-medium text-slate-400">Todo al día, no hay reservas pendientes.</p>
-                                                </div>
-                                            ) : (
-                                                pendingReservas.map((res) => (
-                                                    <Link
-                                                        key={res.id}
-                                                        to="/reservas"
-                                                        onClick={() => setIsNotificationsOpen(false)}
-                                                        className="block p-3 rounded-2xl hover:bg-indigo-50/50 transition-all border border-transparent hover:border-indigo-100 group"
-                                                    >
-                                                        <div className="flex gap-3">
-                                                            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-sm">
-                                                                <Truck className="w-5 h-5" />
-                                                            </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <div className="flex justify-between items-start">
-                                                                    <p className="text-xs font-black text-slate-800 uppercase tracking-tighter truncate">{res.titulo || 'Sin título'}</p>
-                                                                    <span className="text-[9px] font-bold text-slate-400">{new Date(res.fecha_inicio).toLocaleDateString()}</span>
-                                                                </div>
-                                                                <p className="text-[11px] font-bold text-slate-500 truncate mt-0.5">Por: {res.nombre_funcionario}</p>
-                                                            </div>
+                                        {/* Notifications Drawer */}
+                                        <AnimatePresence>
+                                            {isNotificationsOpen && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, x: 20 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    exit={{ opacity: 0, x: 20 }}
+                                                    className="absolute right-0 mt-3 w-80 md:w-96 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-[60]"
+                                                >
+                                                    <div className="p-5 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
+                                                        <div className="flex items-center gap-2">
+                                                            <Bell className="w-4 h-4 text-blue-600" />
+                                                            <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Notificaciones</h3>
                                                         </div>
-                                                    </Link>
-                                                ))
-                                            )}
+                                                        {totalCount > 0 && (
+                                                            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                                                                {totalCount} Pendientes
+                                                            </span>
+                                                        )}
+                                                    </div>
 
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
+                                                    <div className="max-h-[70vh] overflow-y-auto p-2 space-y-1">
+                                                        {totalCount === 0 ? (
+                                                            <div className="p-10 text-center space-y-3">
+                                                                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto">
+                                                                    <Check className="w-6 h-6 text-slate-300" />
+                                                                </div>
+                                                                <p className="text-sm font-medium text-slate-400">Todo al día, no hay notificaciones.</p>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                {/* General Notifications */}
+                                                                {unreadNotifications.map((notif) => (
+                                                                    <div 
+                                                                        key={`notif-${notif.id}`}
+                                                                        onClick={async () => {
+                                                                            try {
+                                                                                await api.post(`notificaciones/${notif.id}/marcar_leida/`);
+                                                                                setNotifications(notifications.map(n => n.id === notif.id ? {...n, leida: true} : n));
+                                                                                if (notif.link) navigate(notif.link);
+                                                                                setIsNotificationsOpen(false);
+                                                                            } catch (e) {}
+                                                                        }}
+                                                                        className="block p-3 rounded-2xl hover:bg-blue-50/50 transition-all border border-transparent hover:border-blue-100 group cursor-pointer"
+                                                                    >
+                                                                        <div className="flex gap-3">
+                                                                            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm bg-blue-600">
+                                                                                {notif.tipo === 'TICKET' ? <HelpCircle className="w-5 h-5" /> : <Info className="w-5 h-5" />}
+                                                                            </div>
+                                                                            <div className="min-w-0 flex-1">
+                                                                                <div className="flex justify-between items-start">
+                                                                                    <p className="text-xs font-black text-slate-800 uppercase tracking-tighter truncate">{notif.titulo}</p>
+                                                                                    <span className="text-[9px] font-bold text-slate-400">{new Date(notif.fecha_creacion).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                                                                </div>
+                                                                                <p className="text-[11px] font-medium text-slate-500 line-clamp-2 mt-0.5">{notif.mensaje}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+
+                                                                {/* Reservations */}
+                                                                {pendingReservas.map((res) => (
+                                                                    <Link
+                                                                        key={`res-${res.id}`}
+                                                                        to={`/reservas?date=${toDateStr(res.fecha_inicio)}&highlight=${res.id}`}
+                                                                        onClick={() => setIsNotificationsOpen(false)}
+                                                                        className="block p-3 rounded-2xl hover:bg-blue-50/50 transition-all border border-transparent hover:border-blue-100 group"
+                                                                    >
+                                                                        <div className="flex gap-3">
+                                                                            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+                                                                                <Truck className="w-5 h-5" />
+                                                                            </div>
+                                                                            <div className="min-w-0 flex-1">
+                                                                                <div className="flex justify-between items-start">
+                                                                                    <p className="text-xs font-black text-slate-800 uppercase tracking-tighter truncate">Reserva: {res.titulo || 'Sin título'}</p>
+                                                                                    <span className="text-[9px] font-bold text-slate-400">{new Date(res.fecha_inicio).toLocaleDateString()}</span>
+                                                                                </div>
+                                                                                <p className="text-[11px] font-bold text-slate-500 truncate mt-0.5">Por: {res.nombre_funcionario}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </Link>
+                                                                ))}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
                 </header>
