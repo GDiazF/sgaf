@@ -13,6 +13,7 @@ import {
     FileSearch, FolderSearch, ShoppingBag, ChevronRight, Truck
 } from 'lucide-react';
 import ContratoServiciosTab from './ContratoServiciosTab';
+import DocumentViewerModal from '../../components/common/DocumentViewerModal';
 import { usePermission } from '../../hooks/usePermission';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
