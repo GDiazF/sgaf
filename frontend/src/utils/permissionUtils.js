@@ -12,34 +12,65 @@ export const groupPermissions = (permissions) => {
 
         const appLabel = (perm.content_type_app_label || '').toLowerCase();
 
-        // Categorización por app_label o palabras clave
-        if (name.includes('llave') || name.includes('prestamo') || name.includes('solicitante')) module = 'Préstamo de Llaves';
-        else if (name.includes('establecimiento')) module = 'Establecimientos';
-        else if (name.includes('proveedor')) module = 'Proveedores';
-        else if (name.includes('ruta') || name.includes('periodo de cobro') || name.includes('periodo cobro') || name.includes('ausencia de ruta') || name.includes('ausencia ruta') || name.includes('feriado nacional') || name.includes('servicio de contrato') || name.includes('servicio contrato') || name.includes('tipo de servicio operativo') || name.includes('grupo de rutas')) module = 'Gestión de Rutas';
-        else if (name.includes('contrato') || name.includes('proceso') || name.includes('licitacion')) module = 'Contratos y Licitaciones';
-        else if (name.includes('orden de compra') || name.includes('ordencompra')) module = 'Órdenes de Compra';
-        else if (appLabel === 'solicitudes_reservas' || name.includes('reserva') || name.includes('bloqueo') || name.includes('recurso')) module = 'Reservas de Espacios';
-        else if (name.includes('personal ti') || name.includes('personalti')) module = 'Funcionarios TI';
-        else if (name.includes('servicio contratado') || name.includes('tipo documento') || name.includes('cdp')) module = 'Configuración Servicios';
-        else if (name.includes('registro de pago') || name.includes('pago')) module = 'Pagos de Servicios';
-        else if (name.includes('recepcion conforme')) module = 'Recepciones Conformes';
-        else if (name.includes('factura adquisicion') || name.includes('adquisicion')) module = 'Adquisiciones';
-        else if (name.includes('funcionario') || name.includes('personal') || name.includes('subdireccion') || name.includes('departamento') || name.includes('unidad')) module = 'Funcionarios y Estructura';
-        else if (name.includes('tesoreria') || name.includes('remuneracion')) module = 'Tesorería';
-        else if (name.includes('impresora') || name.includes('printer')) module = 'Impresoras';
-        else if (name.includes('vehiculo') || name.includes('registro mensual')) module = 'Vehículos';
-        else if (name.includes('anexo')) module = 'Telecomunicaciones';
-        else if (name.includes('procedimiento') || name.includes('tipo de documento')) module = 'Gestor Documental';
-        else if (name.includes('beneficio') || name.includes('bienestar')) module = 'Bienestar y Beneficios';
-        else if (appLabel === 'comunicaciones' || name.includes('plantilla') || name.includes('smtp')) module = 'Comunicaciones y Notificaciones';
-        else if (name.includes('user') || name.includes('group') || name.includes('permission')) module = 'Seguridad y Usuarios';
-        else if (name.includes('log entry') || name.includes('logentry')) module = 'Auditoría';
-        else if (name.includes('link de interes') || name.includes('linkinteres')) module = 'Dashboard, Links y Redes';
-        else if (appLabel === 'tickets' || name.includes('ticket')) module = 'Mesa de Ayuda (Tickets)';
+        // Categorización estructurada por appLabel
+        switch (appLabel) {
+            case 'prestamo_llaves': module = 'Préstamo de Llaves'; break;
+            case 'establecimientos': module = 'Establecimientos'; break;
+            case 'contratos':
+            case 'licitaciones': module = 'Contratos y Licitaciones'; break;
+            case 'orden_compra': module = 'Órdenes de Compra'; break;
+            case 'solicitudes_reservas': module = 'Reservas de Espacios'; break;
+            case 'personal_ti': module = 'Funcionarios TI'; break;
+            case 'funcionarios': module = 'Funcionarios y Estructura'; break;
+            case 'remuneraciones': module = 'Tesorería'; break;
+            case 'impresoras': module = 'Impresoras'; break;
+            case 'vehiculos': module = 'Vehículos'; break;
+            case 'procedimientos': module = 'Gestor Documental'; break;
+            case 'bienestar': module = 'Bienestar y Beneficios'; break;
+            case 'comunicaciones':
+            case 'notificaciones': module = 'Comunicaciones y Notificaciones'; break;
+            case 'auth':
+            case 'otp_totp':
+            case 'usuarios_google': module = 'Seguridad y Usuarios'; break;
+            case 'admin': module = 'Auditoría'; break;
+            case 'tickets': module = 'Mesa de Ayuda (Tickets)'; break;
+            case 'biometrico': module = 'Biometría y Asistencia'; break;
+            case 'conectividad': module = 'Conectividad y Redes'; break;
+            case 'ejecutivos': module = 'Ejecutivos y Directivos'; break;
+            case 'insights': module = 'Dashboard y Reportes'; break;
+            case 'contenttypes':
+            case 'sessions':
+            case 'core':
+            case 'personalizacion_sistema': module = 'Sistema y Configuración'; break;
+            case 'servicios':
+                // La app servicios tiene sub-módulos internos, los clasificamos por nombre
+                if (name.includes('ruta') || name.includes('periodo de cobro') || name.includes('ausencia') || name.includes('feriado') || name.includes('servicio operativo')) module = 'Gestión de Rutas';
+                else if (name.includes('registro de pago') || name.includes('pago')) module = 'Pagos de Servicios';
+                else if (name.includes('recepcion conforme')) module = 'Recepciones Conformes';
+                else if (name.includes('factura adquisicion') || name.includes('adquisicion')) module = 'Adquisiciones';
+                else if (name.includes('proveedor')) module = 'Proveedores';
+                else if (name.includes('anexo')) module = 'Telecomunicaciones';
+                else module = 'Configuración Servicios';
+                break;
+            default:
+                // Fallbacks adicionales por nombre por si hay modelos sueltos o apps genéricas
+                if (name.includes('link de interes') || name.includes('linkinteres')) module = 'Dashboard, Links y Redes';
+                else if (name.includes('user') || name.includes('group') || name.includes('permission')) module = 'Seguridad y Usuarios';
+                else if (name.includes('log entry') || name.includes('logentry')) module = 'Auditoría';
+                else module = 'Otros';
+        }
 
         if (!groups[module]) groups[module] = [];
         groups[module].push(perm);
+    });
+
+    // Ordenar alfabéticamente los permisos dentro de cada grupo por su nombre amigable
+    Object.keys(groups).forEach(module => {
+        groups[module].sort((a, b) => {
+            const nameA = getFriendlyPermName(a).toLowerCase();
+            const nameB = getFriendlyPermName(b).toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
     });
 
     return groups;
@@ -131,6 +162,7 @@ export const getFriendlyPermName = (perm) => {
         'grupopresetrutas': 'Grupos / Presets de Rutas',
         'tiposerviciooperativo': 'Categorías Operativas',
         'ticket': 'Tickets / Solicitudes',
+        'tickets': 'Tickets / Solicitudes',
         'ticketcategory': 'Categorías de Tickets',
         'ticketmessage': 'Mensajes y Chat de Soporte',
         'supportagent': 'Agentes de Mesa de Ayuda',

@@ -444,12 +444,74 @@ Los formularios con múltiples inputs nunca deben usar anchos fijos manuales ni 
 </div>
 
 {/* Contenedor de formulario de 3 columnas */}
+
+- **Item Activo**: Fondo suave índigo/azul con texto fuerte. 
+  - Ejemplo: `bg-indigo-50 text-indigo-600 font-bold` (o `bg-blue-50 text-blue-600`).
+- **Item Inactivo**: Fondo transparente con texto gris.
+  - Ejemplo: `text-slate-500 hover:bg-slate-50 hover:text-slate-700 font-medium`.
+
+## 18. Ordenadores de Columnas (Sortable Headers)
+
+Cuando una tabla permite ordenar por columnas, la cabecera (`<th>`) debe indicar visualmente esta acción de forma sutil, usando los íconos de `lucide-react` en un tamaño muy reducido (`w-3 h-3`).
+
+```jsx
+<th className="px-4 py-3 border-r border-slate-100 cursor-pointer hover:bg-slate-200 transition-colors group select-none">
+    <div className="flex items-center gap-1.5">
+        <span>CAMPO ORDENABLE</span>
+        {/* Si no está ordenado por este campo: */}
+        <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-indigo-400" />
+        {/* Si está ordenado (ascendente o descendente): */}
+        {/* <ArrowDown className="w-3 h-3 text-indigo-600" /> */}
+    </div>
+</th>
+```
+
+## 19. Barras de Desplazamiento (Scrollbars)
+
+**REGLA CRÍTICA PARA WINDOWS**: Para evitar las barras de desplazamiento grises nativas que rompen la estética, TODO contenedor que utilice `overflow-auto` o `overflow-y-auto` debe incluir la clase `custom-scrollbar` (configurada en el `index.css` global).
+
+- Uso correcto: `<div className="overflow-auto custom-scrollbar">`
+
+## 20. Estructura de Formularios Múltiples (Grid Layout)
+
+Los formularios con múltiples inputs nunca deben usar anchos fijos manuales ni flexbox confusos. Deben utilizar el sistema Grid de CSS a través de Tailwind para asegurar que sean responsivos.
+
+```jsx
+{/* Contenedor de formulario de 2 columnas (1 en móviles, 2 en PC) */}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <FormInput label="Nombre" />
+    <FormInput label="Apellido" />
+</div>
+
+{/* Contenedor de formulario de 3 columnas */}
 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
     {/* Inputs... */}
 </div>
 ```
 
+## 21. Visor de Documentos Estandarizado (DocumentViewerModal)
+
+Para cualquier módulo que requiera previsualizar documentos (PDFs, imágenes, etc.) en un modal a pantalla completa, se debe utilizar **ESTRICTAMENTE** el componente compartido `DocumentViewerModal` ubicado en `frontend/src/components/common/DocumentViewerModal.jsx`.
+
+**Prohibido**:
+- Crear modales de visualización de documentos hardcodeados por módulo.
+- Usar colores inconsistentes para los botones de descarga y visualización.
+
+**Uso**:
+```jsx
+import DocumentViewerModal from '../../components/common/DocumentViewerModal';
+
+{/* Dentro del render: */}
+<DocumentViewerModal
+    isOpen={!!previewDoc}
+    onClose={() => setPreviewDoc(null)}
+    title={previewDoc?.nombre}
+    subtitle="INFORMACIÓN ADICIONAL O FOLIO"
+    documentType="Tipo de Documento"
+    fileUrl={previewDoc?.archivo}
+/>
+```
+
 ---
 **FIN DEL DOCUMENTO.**
 *Nota para IA: Analiza minuciosamente estas reglas antes de modificar componentes visuales.*
-

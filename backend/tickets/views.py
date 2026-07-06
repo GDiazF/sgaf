@@ -13,7 +13,16 @@ from .utils import registrar_historial, notificar_nuevo_ticket, notificar_cambio
 class TicketCategoryViewSet(viewsets.ModelViewSet):
     queryset = TicketCategory.objects.filter(activo=True)
     serializer_class = TicketCategorySerializer
-    permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        """Lectura: cualquier usuario autenticado. Escritura: requiere permiso add/change/delete_ticketcategory."""
+        if self.action in ('list', 'retrieve'):
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(), permissions.DjangoModelPermissions()]
+
+    def get_queryset(self):
+        # DjangoModelPermissions necesita un queryset no filtrado para evaluar correctamente
+        return TicketCategory.objects.filter(activo=True)
 
 from django_filters.rest_framework import DjangoFilterBackend
 
@@ -32,7 +41,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         # Admins, Superusuarios y Agentes de Soporte ven todo el universo de tickets
         es_agente = SupportAgent.objects.filter(user=user, activo=True).exists()
         
-        if user.is_superuser or user.is_staff or es_agente:
+        if user.is_superuser or es_agente or user.has_perm('tickets.can_view_all_tickets'):
             return Ticket.objects.all()
         
         # Los demás solo ven lo que crearon o lo que tienen asignado
@@ -52,9 +61,9 @@ class TicketViewSet(viewsets.ModelViewSet):
         old_estado = instance.estado
         old_prioridad = instance.prioridad
         old_asignado = instance.asignado_a
-        
+
         ticket = serializer.save()
-        
+
         # Tracking de cambios
         if old_estado != ticket.estado:
             registrar_historial(ticket, self.request.user, 'estado', old_estado, ticket.estado)
@@ -62,14 +71,33 @@ class TicketViewSet(viewsets.ModelViewSet):
             if ticket.estado in ['RESUELTO', 'CERRADO']:
                 ticket.fecha_resolucion = timezone.now()
                 ticket.save()
-        
+
         if old_prioridad != ticket.prioridad:
             registrar_historial(ticket, self.request.user, 'prioridad', old_prioridad, ticket.prioridad)
-            
+
         if old_asignado != ticket.asignado_a:
+            # Verificar permiso para asignar a otros usuarios
+            es_agente = SupportAgent.objects.filter(user=self.request.user, activo=True).exists()
+            puede_asignar = (
+                self.request.user.is_superuser
+                or es_agente
+                or self.request.user.has_perm('tickets.can_assign_ticket')
+            )
+            if not puede_asignar:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("No tienes permiso para asignar tickets a otros usuarios.")
             val_ant = old_asignado.username if old_asignado else "Sin asignar"
             val_nue = ticket.asignado_a.username if ticket.asignado_a else "Sin asignar"
             registrar_historial(ticket, self.request.user, 'asignado_a', val_ant, val_nue)
+
+    def destroy(self, request, *args, **kwargs):
+        """Eliminar ticket: requiere permiso delete_ticket asignable o ser superusuario."""
+        if not (request.user.is_superuser or request.user.has_perm('tickets.delete_ticket')):
+            return Response(
+                {'error': 'No tienes permiso para eliminar tickets.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=['post'])
     def agregar_mensaje(self, request, pk=None):

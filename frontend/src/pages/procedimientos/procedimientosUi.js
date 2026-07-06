@@ -12,7 +12,7 @@ export const FILTER_CHIP =
     'bg-white text-slate-500 border-slate-200 hover:border-slate-300';
 
 export const FILE_INPUT =
-    'no-global w-full h-10 text-[10px] font-bold bg-white border border-slate-200 px-3 rounded-xl file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-blue-600 file:text-white';
+    'no-global w-full text-[10px] font-bold bg-white border border-slate-200 py-1.5 px-2 rounded-xl file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-blue-600 file:text-white file:cursor-pointer hover:file:bg-blue-700 transition-all cursor-pointer';
 
 export const CHECKBOX_FORM = 'w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500';
 

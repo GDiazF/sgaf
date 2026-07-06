@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, Clock, CheckCircle2, Tag, Activity, Eye, Loader2, FolderSearch, HelpCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../../api';
+import { useAuth } from '../../context/AuthContext';
 import { BTN_BLUE, BTN_SECONDARY, INPUT_FILTER, SELECT_FILTER, LOADER_SPIN, FOLIO_TEXT, TITLE_ICON_BOX } from './ticketsUi';
 
 const STATUS_STYLES = {
@@ -45,6 +46,9 @@ const TicketsDashboard = () => {
     const [stats, setStats] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL');
+    const { user } = useAuth();
+    
+    const canManageCategories = user?.is_superuser || user?.user_permissions?.includes('tickets.add_ticketcategory');
 
     const fetchTickets = async (showLoader = false) => {
         if (showLoader) setLoading(true);
@@ -99,9 +103,11 @@ const TicketsDashboard = () => {
                     </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <Link to="/tickets/categories" className={BTN_SECONDARY}>
-                        Categorías
-                    </Link>
+                    {canManageCategories && (
+                        <Link to="/tickets/categories" className={BTN_SECONDARY}>
+                            Categorías
+                        </Link>
+                    )}
                     <Link to="/tickets/new" className={BTN_BLUE}>
                         <Plus className="w-4 h-4 shrink-0" />
                         Crear Ticket

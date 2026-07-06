@@ -90,9 +90,14 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
         # Enviar correo de notificación (no bloquea la respuesta)
         enviar_correo_nueva_solicitud(instance)
 
-    # ─── Acción: Aprobar ──────────────────────────────────────────────────────
+    # ─── Acción: Aprobar ────────────────────────────────────────────────────────
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def aprobar(self, request, pk=None):
+        if not (request.user.is_superuser or request.user.has_perm('solicitudes_reservas.can_approve_reserva')):
+            return Response(
+                {"detail": "No tienes permiso para aprobar reservas."},
+                status=403
+            )
         solicitud = self.get_object()
         if solicitud.fecha_fin < timezone.now():
             return Response({"detail": "No se pueden aprobar reservas que ya han pasado su hora de término."}, status=400)
@@ -104,9 +109,14 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
         enviar_correo_aprobacion(solicitud)
         return Response(SolicitudReservaSerializer(solicitud, context={'request': request}).data)
 
-    # ─── Acción: Rechazar ─────────────────────────────────────────────────────
+    # ─── Acción: Rechazar ───────────────────────────────────────────────────────
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def rechazar(self, request, pk=None):
+        if not (request.user.is_superuser or request.user.has_perm('solicitudes_reservas.can_approve_reserva')):
+            return Response(
+                {"detail": "No tienes permiso para rechazar reservas."},
+                status=403
+            )
         solicitud = self.get_object()
         if solicitud.fecha_fin < timezone.now():
             return Response({"detail": "No se pueden rechazar reservas que ya han pasado su hora de término."}, status=400)
@@ -165,11 +175,17 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         instance = self.get_object()
+        user = self.request.user
+        if not (user.is_superuser or user.has_perm('solicitudes_reservas.change_solicitudreserva') or instance.solicitante == user):
+            raise serializers.ValidationError("No tienes permiso para modificar esta reserva.")
         if instance.fecha_fin < timezone.now():
             raise serializers.ValidationError("No se pueden modificar reservas que ya han finalizado.")
         serializer.save()
 
     def perform_destroy(self, instance):
+        user = self.request.user
+        if not (user.is_superuser or user.has_perm('solicitudes_reservas.delete_solicitudreserva') or user.has_perm('solicitudes_reservas.can_force_delete_reserva') or instance.solicitante == user):
+            raise serializers.ValidationError("No tienes permiso para eliminar esta reserva.")
         if instance.fecha_fin < timezone.now():
             raise serializers.ValidationError("No se pueden eliminar reservas que ya han finalizado. Use 'Eliminar Permanentemente' si tiene el permiso.")
         instance.delete()

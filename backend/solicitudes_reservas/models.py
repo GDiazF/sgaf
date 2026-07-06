@@ -141,6 +141,8 @@ class SolicitudReserva(models.Model):
             ("can_force_delete_reserva", "Puede eliminar permanentemente cualquier reserva"),
             ("can_view_logs", "Puede ver historial de cambios (Logs)"),
             ("can_manage_settings", "Puede configurar horario y antelación"),
+            ("can_approve_reserva", "Puede aprobar o rechazar reservas"),
+            ("can_view_calendar", "Puede ver el calendario de reservas"),
         ]
 
 class ReservaSetting(models.Model):

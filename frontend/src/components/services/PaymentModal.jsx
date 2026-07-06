@@ -36,6 +36,8 @@ const PaymentModal = ({
         monto_total: '',
         consumo: ''
     });
+    const [modalError, setModalError] = useState('');
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         if (initialData) {
@@ -52,11 +54,24 @@ const PaymentModal = ({
                 monto_total: initialData.monto_total || '',
                 consumo: initialData.consumo || ''
             });
+            setModalError('');
         }
     }, [initialData]);
 
-    const handleFormSave = () => {
-        onSave(formData);
+    const handleFormSave = async () => {
+        setModalError('');
+        setSaving(true);
+        try {
+            await onSave(formData);
+        } catch (error) {
+            console.error(error);
+            const detail = error.response?.data
+                ? JSON.stringify(error.response.data)
+                : error.message;
+            setModalError(`Error al guardar registro: ${detail}`);
+        } finally {
+            setSaving(false);
+        }
     };
 
     // Filter services based on selected establishment
@@ -75,9 +90,15 @@ const PaymentModal = ({
             title={editingId ? 'Editar Registro de Pago' : 'Registrar Pago / Consumo'}
             subtitle="Ingrese los datos de facturación recibidos del proveedor"
             maxWidth="max-w-3xl"
-            saveLabel={editingId ? 'Actualizar Registro' : 'Registrar Pago'}
+            saveLabel={saving ? 'Guardando...' : editingId ? 'Actualizar Registro' : 'Registrar Pago'}
+            saveDisabled={saving}
         >
             <div className="space-y-6 min-w-0 overflow-x-hidden">
+                {modalError && (
+                    <div className="bg-rose-50 text-rose-700 text-[10px] font-bold uppercase p-3 rounded-xl border border-rose-200 leading-relaxed">
+                        {modalError}
+                    </div>
+                )}
                 {/* Section: Contexto */}
                 <div className="space-y-3">
                     <SectionHeader icon={Building2}>Contexto del Servicio</SectionHeader>

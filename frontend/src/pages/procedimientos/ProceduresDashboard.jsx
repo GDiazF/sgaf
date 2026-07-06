@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
-    Search, Plus, Download, Eye, Trash2, FilePlus, Edit3, X, Loader2, FilterX, FileStack,
+    Search, Plus, Download, Eye, Trash2, FilePlus, Edit3, X, Loader2, FilterX, FileStack, ExternalLink,
 } from 'lucide-react';
 import api from '../../api';
 import { usePermission as usePerm } from '../../hooks/usePermission';
@@ -15,6 +15,7 @@ import {
 import {
     TITLE_ICON_BOX, TYPE_BADGE, FILTER_CHIP_ACTIVE, FILTER_CHIP, FILE_INPUT, CHECKBOX_FORM, CARD_HOVER,
 } from './procedimientosUi';
+import DocumentViewerModal from '../../components/common/DocumentViewerModal';
 
 const EMPTY_FORM = {
     titulo: '',
@@ -107,6 +108,7 @@ const ProceduresDashboard = () => {
     const canAdd = can('procedimientos.add_procedimiento');
     const canDelete = can('procedimientos.delete_procedimiento');
     const canChange = can('procedimientos.change_procedimiento');
+    const canManageTypes = can('procedimientos.add_tipoprocedimiento') || can('procedimientos.change_tipoprocedimiento') || can('procedimientos.delete_tipoprocedimiento');
 
     const [procedures, setProcedures] = useState([]);
     const [types, setTypes] = useState([]);
@@ -126,6 +128,42 @@ const ProceduresDashboard = () => {
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState(EMPTY_FORM);
     const [formError, setFormError] = useState('');
+    
+    // Tipos de Procedimiento
+    const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
+    const [newTypeName, setNewTypeName] = useState('');
+    const [typeSubmitting, setTypeSubmitting] = useState(false);
+
+    const handleAddType = async (e) => {
+        e.preventDefault();
+        if (!newTypeName.trim()) return;
+        setTypeSubmitting(true);
+        try {
+            await api.post('procedimientos/tipos/', { nombre: newTypeName.trim() });
+            setNewTypeName('');
+            const ts = Date.now();
+            const typeRes = await api.get(`procedimientos/tipos/?_ts=${ts}`);
+            setTypes(typeRes.data.results || typeRes.data || []);
+        } catch (err) {
+            console.error('Error adding type:', err);
+            alert('Error al agregar el tipo.');
+        } finally {
+            setTypeSubmitting(false);
+        }
+    };
+
+    const handleDeleteType = async (id) => {
+        if (!window.confirm('¿Eliminar este tipo de procedimiento?')) return;
+        try {
+            await api.delete(`procedimientos/tipos/${id}/`);
+            const ts = Date.now();
+            const typeRes = await api.get(`procedimientos/tipos/?_ts=${ts}`);
+            setTypes(typeRes.data.results || typeRes.data || []);
+        } catch (err) {
+            console.error('Error deleting type:', err);
+            alert('Error al eliminar el tipo. Es posible que esté en uso por algún procedimiento.');
+        }
+    };
 
     const fetchData = async () => {
         setLoading(true);
@@ -222,6 +260,10 @@ const ProceduresDashboard = () => {
             setFormError('Debes seleccionar un archivo.');
             return;
         }
+        if (formData.archivo && formData.archivo.type !== 'application/pdf') {
+            setFormError('Solo se permiten archivos en formato PDF.');
+            return;
+        }
         if (!formData.tipo) {
             setFormError('Debes seleccionar un tipo de documento.');
             return;
@@ -290,12 +332,19 @@ const ProceduresDashboard = () => {
                         </p>
                     </div>
                 </div>
-                {canAdd && (
-                    <button type="button" onClick={openCreate} className={BTN_PRIMARY}>
-                        <Plus className="w-4 h-4 shrink-0" />
-                        Nuevo documento
-                    </button>
-                )}
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {canManageTypes && (
+                        <button type="button" onClick={() => setIsTypeModalOpen(true)} className={BTN_SECONDARY}>
+                            Gestionar Tipos
+                        </button>
+                    )}
+                    {canAdd && (
+                        <button type="button" onClick={openCreate} className={BTN_PRIMARY}>
+                            <Plus className="w-4 h-4 shrink-0" />
+                            Nuevo documento
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className={TABLE_PANEL}>
@@ -572,16 +621,20 @@ const ProceduresDashboard = () => {
                                             ))}
                                         </select>
                                     </div>
-                                    <div className="md:col-span-6">
-                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Archivo</label>
+                                    <div className="md:col-span-12">
+                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Archivo PDF</label>
                                         <input
                                             required={!editingId}
                                             type="file"
+                                            accept=".pdf"
                                             className={FILE_INPUT}
                                             onChange={(e) => setFormData({ ...formData, archivo: e.target.files[0] })}
                                         />
+                                        {editingId && (
+                                            <p className="text-[9px] text-slate-400 mt-1 ml-1">Deja en blanco para mantener el archivo actual.</p>
+                                        )}
                                     </div>
-                                    <div className="md:col-span-6 flex flex-col justify-end">
+                                    <div className="md:col-span-12 flex flex-col justify-end">
                                         <label className="flex items-center gap-3 h-10 px-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
                                             <input
                                                 type="checkbox"
@@ -611,61 +664,67 @@ const ProceduresDashboard = () => {
                 document.body
             )}
 
-            {isViewerOpen && selectedDoc && createPortal(
-                <div className={`${MODAL_SHELL} !items-stretch !p-0`}>
-                    <div className={MODAL_BACKDROP_LAYER} onClick={() => setIsViewerOpen(false)} aria-hidden />
-                    <div className="relative z-10 flex flex-col flex-1 min-h-0 w-full max-h-[100vh] bg-white md:max-w-[calc(100vw-2rem)] md:max-h-[90vh] md:mx-auto md:my-4 md:rounded-2xl md:border md:border-slate-200 md:shadow-2xl md:overflow-hidden">
-                    <div className="shrink-0 bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                            <p className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter line-clamp-1">
-                                {selectedDoc.titulo}
-                            </p>
-                            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-tighter">
-                                {selectedDoc.subdireccion_nombre || 'General'}
-                                {selectedDoc.departamento_nombre ? ` · ${selectedDoc.departamento_nombre}` : ''}
-                            </p>
-                            {selectedDoc.descripcion && (
-                                <p className="text-[10px] font-medium text-slate-400 normal-case tracking-tight mt-1 line-clamp-2">
-                                    {selectedDoc.descripcion}
-                                </p>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                            <a
-                                href={getFileUrl(selectedDoc.archivo)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={BTN_SECONDARY}
-                            >
-                                <Eye className="w-4 h-4" />
-                                Abrir
-                            </a>
-                            <button type="button" onClick={() => setIsViewerOpen(false)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500">
-                                <X className="w-4 h-4" />
+            <DocumentViewerModal
+                isOpen={isViewerOpen}
+                onClose={() => setIsViewerOpen(false)}
+                title={selectedDoc?.titulo}
+                subtitle={`${selectedDoc?.tipo_data?.nombre || 'DOCUMENTO'}${selectedDoc?.subdireccion_nombre ? ` · ${selectedDoc.subdireccion_nombre}` : ''}`}
+                documentType="Procedimiento"
+                fileUrl={selectedDoc ? getFileUrl(selectedDoc.archivo) : ''}
+            />
+            {/* Modal: Gestionar Tipos */}
+            {isTypeModalOpen && createPortal(
+                <div className={MODAL_SHELL}>
+                    <div className={MODAL_BACKDROP_LAYER} onClick={() => setIsTypeModalOpen(false)} />
+                    <div className="relative w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh] overflow-hidden my-4 pointer-events-auto">
+                        <div className={MODAL_HEADER}>
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className={MODAL_HEADER_ICON}>
+                                    <FileStack className="w-5 h-5" />
+                                </div>
+                                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider truncate">
+                                    Tipos de Procedimiento
+                                </h3>
+                            </div>
+                            <button onClick={() => setIsTypeModalOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition">
+                                <X className="w-5 h-5" />
                             </button>
                         </div>
-                    </div>
-                    <div className="flex-1 min-h-0 bg-white hidden md:block">
-                        <iframe
-                            src={getFileUrl(selectedDoc.archivo)}
-                            className="w-full h-full border-none"
-                            title={selectedDoc.titulo}
-                        />
-                    </div>
-                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center md:hidden bg-white">
-                        <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest mb-4">
-                            Vista previa disponible en escritorio o abrir en nueva pestaña
-                        </p>
-                        <a
-                            href={getFileUrl(selectedDoc.archivo)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={BTN_PRIMARY}
-                        >
-                            <Eye className="w-4 h-4" />
-                            Abrir documento
-                        </a>
-                    </div>
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                            <form onSubmit={handleAddType} className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={newTypeName}
+                                    onChange={e => setNewTypeName(e.target.value)}
+                                    placeholder="Nuevo tipo..."
+                                    className={`${INPUT_FORM} flex-1`}
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={!newTypeName.trim() || typeSubmitting}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 transition"
+                                >
+                                    {typeSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Añadir'}
+                                </button>
+                            </form>
+                            <div className="space-y-2">
+                                {types.map(t => (
+                                    <div key={t.id} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                                        <span className="text-xs font-medium text-slate-700">{t.nombre}</span>
+                                        <button
+                                            onClick={() => handleDeleteType(t.id)}
+                                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                                            title="Eliminar"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                ))}
+                                {types.length === 0 && (
+                                    <p className="text-center text-xs text-slate-400 py-4">No hay tipos registrados.</p>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>,
                 document.body

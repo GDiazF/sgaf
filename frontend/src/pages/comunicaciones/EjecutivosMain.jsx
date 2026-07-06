@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
 import { Building2, BarChart3, Settings, LayoutList, MessageSquare } from 'lucide-react';
+import { usePermission } from '../../hooks/usePermission';
 import { TITLE_ICON_BOX, TAB_ACTIVE, TAB_INACTIVE } from './comunicacionesUi';
 import AdminAsignaciones from './AdminAsignaciones';
 import EjecutivoDashboard from './EjecutivosDashboard';
@@ -10,8 +11,10 @@ import AdminGestionesGlobal from './AdminGestionesGlobal';
 
 const EjecutivosMain = () => {
     const { user } = useAuth();
-    // Determinamos el rol: si es superusuario o tiene permisos específicos, es Admin
-    const isAdmin = user?.is_superuser || user?.groups?.includes('Administrador Comunicaciones');
+    const { can } = usePermission();
+    
+    // Determinamos el rol: si es superusuario o tiene el permiso de crear asignaciones, es Admin
+    const isAdmin = user?.is_superuser || can('ejecutivos.add_asignacionejecutivo') || user?.groups?.includes('Administrador Comunicaciones');
     
     const [activeTab, setActiveTab] = useState(isAdmin ? 'kpi' : 'mis_establecimientos');
 

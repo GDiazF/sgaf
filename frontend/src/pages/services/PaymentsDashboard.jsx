@@ -353,28 +353,22 @@ const PaymentsDashboard = () => {
     };
 
     const handleSave = async (dataToSubmit) => {
-        try {
-            const preparedData = {
-                ...dataToSubmit,
-                monto_total: parseInt(dataToSubmit.monto_total) || 0,
-                monto_interes: parseInt(dataToSubmit.monto_interes) || 0,
-                consumo: dataToSubmit.consumo !== '' ? parseFloat(dataToSubmit.consumo) : null
-            };
+        const preparedData = {
+            ...dataToSubmit,
+            monto_total: parseInt(dataToSubmit.monto_total) || 0,
+            monto_interes: parseInt(dataToSubmit.monto_interes) || 0,
+            consumo: dataToSubmit.consumo !== '' ? parseFloat(dataToSubmit.consumo) : null
+        };
 
-            if (editingId) {
-                await api.put(`registros-pagos/${editingId}/`, preparedData);
-            } else {
-                await api.post('registros-pagos/', preparedData);
-            }
-            setShowForm(false);
-            setErrorMessage('');
-            setNoticeMessage(editingId ? 'Registro de pago actualizado correctamente.' : 'Registro de pago creado correctamente.');
-            fetchData(currentPage, searchQuery, statusFilter);
-        } catch (error) {
-            console.error(error);
-            const detail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
-            setErrorMessage(`Error al guardar registro: ${detail}`);
+        if (editingId) {
+            await api.put(`registros-pagos/${editingId}/`, preparedData);
+        } else {
+            await api.post('registros-pagos/', preparedData);
         }
+        setShowForm(false);
+        setErrorMessage('');
+        setNoticeMessage(editingId ? 'Registro de pago actualizado correctamente.' : 'Registro de pago creado correctamente.');
+        fetchData(currentPage, searchQuery, statusFilter);
     };
 
     const handleDownloadTemplate = async () => {

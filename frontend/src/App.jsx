@@ -221,7 +221,7 @@ function App() {
                 <Route element={<ProtectedRoute permission="orden_compra.view_ordencompramp" />}>
                   <Route path="orden-compra" element={<OCDashboard />} />
                 </Route>
-                <Route element={<ProtectedRoute permission="solicitudes_reservas.view_solicitudreserva" />}>
+                <Route element={<ProtectedRoute permission={['solicitudes_reservas.view_solicitudreserva', 'solicitudes_reservas.can_view_calendar']} />}>
                   <Route path="reservas" element={<ReservasDashboard />} />
                 </Route>
                 <Route element={<ProtectedRoute permission="personal_ti.view_personalti" />}>
@@ -252,7 +252,7 @@ function App() {
                 <Route path="tickets/:id" element={<TicketDetail />} />
 
                 {/* Comunicaciones */}
-                <Route element={<ProtectedRoute permission="establecimientos.view_establecimiento" />}>
+                <Route element={<ProtectedRoute permission={['establecimientos.view_establecimiento', 'ejecutivos.add_gestionestablecimiento', 'ejecutivos.view_gestionestablecimiento']} />}>
                   <Route path="comunicaciones/ejecutivos" element={<EjecutivosMain />} />
                   <Route path="comunicaciones/ejecutivos/gestion/:id" element={<EstablecimientoGestion />} />
                 </Route>
@@ -268,6 +268,7 @@ function App() {
                 </Route>
               </Route>
             </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

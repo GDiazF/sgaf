@@ -64,6 +64,10 @@ class Ticket(models.Model):
         verbose_name = "Ticket"
         verbose_name_plural = "Tickets"
         ordering = ['-fecha_creacion']
+        permissions = [
+            ("can_assign_ticket", "Puede asignar tickets a otros usuarios"),
+            ("can_view_all_tickets", "Puede ver todos los tickets creados por cualquier usuario"),
+        ]
 
 def ticket_attachment_path(instance, filename):
     return f'tickets/{instance.ticket.correlativo}/{filename}'

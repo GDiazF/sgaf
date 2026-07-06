@@ -60,6 +60,22 @@ const OCDashboard = () => {
         setRangeWarning(check.valid ? check.warning || null : null);
     }, [selectedStartDate, selectedEndDate]);
 
+    const getMaxEndDate = () => {
+        if (!selectedStartDate) return todayIsoDate();
+        const start = new Date(selectedStartDate);
+        start.setDate(start.getDate() + MP_MAX_RANGE_DAYS - 1);
+        const maxAllowed = start.toISOString().split('T')[0];
+        const today = todayIsoDate();
+        return maxAllowed < today ? maxAllowed : today;
+    };
+
+    const getMinStartDate = () => {
+        if (!selectedEndDate) return undefined;
+        const end = new Date(selectedEndDate);
+        end.setDate(end.getDate() - (MP_MAX_RANGE_DAYS - 1));
+        return end.toISOString().split('T')[0];
+    };
+
     const getLoadingMessage = () => {
         if (loadingTime < 5) return "Conectando con Mercado Público...";
         if (loadingTime < 15) return "Sincronizando registros...";
@@ -191,8 +207,23 @@ const OCDashboard = () => {
                         <DateInput
                             compact
                             value={selectedStartDate}
+                            min={getMinStartDate()}
                             max={selectedEndDate}
-                            onChange={setSelectedStartDate}
+                            onChange={(val) => {
+                                setSelectedStartDate(val);
+                                if (val) {
+                                    const start = new Date(val);
+                                    const end = new Date(selectedEndDate);
+                                    const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                                    if (diffDays > MP_MAX_RANGE_DAYS) {
+                                        const maxEnd = new Date(start);
+                                        maxEnd.setDate(maxEnd.getDate() + MP_MAX_RANGE_DAYS - 1);
+                                        const maxAllowed = maxEnd.toISOString().split('T')[0];
+                                        const today = todayIsoDate();
+                                        setSelectedEndDate(maxAllowed < today ? maxAllowed : today);
+                                    }
+                                }
+                            }}
                             className="w-full sm:w-[8.5rem] shrink-0"
                         />
                         <span className="text-[10px] font-bold text-slate-300 hidden sm:inline">→</span>
@@ -200,8 +231,20 @@ const OCDashboard = () => {
                             compact
                             value={selectedEndDate}
                             min={selectedStartDate}
-                            max={todayIsoDate()}
-                            onChange={setSelectedEndDate}
+                            max={getMaxEndDate()}
+                            onChange={(val) => {
+                                setSelectedEndDate(val);
+                                if (val) {
+                                    const start = new Date(selectedStartDate);
+                                    const end = new Date(val);
+                                    const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                                    if (diffDays > MP_MAX_RANGE_DAYS) {
+                                        const minStart = new Date(end);
+                                        minStart.setDate(minStart.getDate() - (MP_MAX_RANGE_DAYS - 1));
+                                        setSelectedStartDate(minStart.toISOString().split('T')[0]);
+                                    }
+                                }
+                            }}
                             className="w-full sm:w-[8.5rem] shrink-0"
                         />
                         <button

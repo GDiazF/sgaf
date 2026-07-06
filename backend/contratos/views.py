@@ -58,12 +58,17 @@ class ContratoViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         user = self.request.user
+        instance = self.get_object()
+        # Pasar el usuario al signal via atributo temporal en la instancia
+        instance._current_user = user
+        # Re-asignar para que el signal pre_save use la instancia correcta
+        serializer.instance._current_user = user
         instance = serializer.save()
         HistorialContrato.objects.create(
             contrato=instance,
             accion="MODIFICACION",
             detalle="Se actualizaron los datos básicos del contrato.",
-            usuario=user
+            usuario=str(user)
         )
 
 # =====================================================================

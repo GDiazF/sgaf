@@ -117,6 +117,7 @@ const ReservasDashboard = () => {
     const canViewLogs = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_view_logs'));
     const canManageSettings = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_manage_settings'));
     const canManageRecursos = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.add_recursoreservable')) || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.change_recursoreservable'));
+    const canApproveReserva = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_approve_reserva'));
 
     const defaultName = user?.funcionario_data?.nombre_funcionario || (user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : '') || user?.username || '';
 
@@ -1527,7 +1528,7 @@ const ReservasDashboard = () => {
                                     </div>
                                 )}
 
-                                {detailReserva.estado === 'PENDIENTE' && !isRechazando && (
+                                {detailReserva.estado === 'PENDIENTE' && !isRechazando && canApproveReserva && (
                                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
                                         <button onClick={() => handleEstado(detailReserva.id, 'APROBADA', '')} className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl font-black text-xs hover:bg-emerald-100 border border-emerald-200">
                                             <Check className="w-4 h-4" /> Aprobar
@@ -1537,7 +1538,7 @@ const ReservasDashboard = () => {
                                         </button>
                                     </div>
                                 )}
-                                {detailReserva.estado === 'APROBADA' && (
+                                {detailReserva.estado === 'APROBADA' && canApproveReserva && (
                                     <div className="pt-2 border-t border-slate-100">
                                         {!isPast ? (
                                             <button onClick={() => handleEstado(detailReserva.id, 'FINALIZADA', '')} className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-50 text-blue-700 rounded-xl font-black text-xs hover:bg-blue-100 border border-blue-200">
@@ -1549,6 +1550,28 @@ const ReservasDashboard = () => {
                                                 <p className="text-[9px] text-slate-400 mt-0.5">Esta reserva ya ha finalizado su horario.</p>
                                             </div>
                                         )}
+                                    </div>
+                                )}
+
+                                {/* Zona peligro: Cancelar Propia Reserva */}
+                                {detailReserva.solicitante === user?.id && !isPast && !isRechazando && (
+                                    <div className="pt-3 border-t border-slate-100">
+                                        <button
+                                            onClick={async () => {
+                                                if (!window.confirm(`¿Estás seguro de que deseas cancelar tu reserva "${detailReserva.titulo}"?`)) return;
+                                                try {
+                                                    await api.delete(`reservas/solicitudes/${detailReserva.id}/`);
+                                                    setDetailReserva(null);
+                                                    fetchData();
+                                                    window.dispatchEvent(new CustomEvent('refresh-notifications'));
+                                                } catch (err) {
+                                                    alert(err.response?.data?.detail || 'Error al cancelar la reserva.');
+                                                }
+                                            }}
+                                            className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-50 text-amber-700 rounded-xl font-black text-xs hover:bg-amber-100 border border-amber-200 transition"
+                                        >
+                                            <X className="w-4 h-4" /> Cancelar Mi Reserva
+                                        </button>
                                     </div>
                                 )}
 

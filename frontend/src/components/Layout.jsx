@@ -363,7 +363,7 @@ const Layout = () => {
 
 
 
-                    {can('solicitudes_reservas.view_solicitudreserva') && (
+                    {(can('solicitudes_reservas.view_solicitudreserva') || can('solicitudes_reservas.can_view_calendar')) && (
                         <Link
                             to="/reservas"
                             className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/reservas') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
@@ -686,7 +686,7 @@ const Layout = () => {
                     </div>
 
                     {/* Comunicaciones Submenu */}
-                    {(can('establecimientos.view_establecimiento') || user?.is_superuser) && (
+                    {(can('establecimientos.view_establecimiento') || can('ejecutivos.add_gestionestablecimiento') || can('ejecutivos.view_gestionestablecimiento') || user?.is_superuser) && (
                         <div>
                             <button
                                 onClick={() => {
@@ -719,13 +719,15 @@ const Layout = () => {
                                         className="overflow-hidden space-y-3 mt-2 pl-2 border-l border-slate-700/50 ml-6"
                                     >
                                         <div className="space-y-0.5">
-                                            <Link
-                                                to="/comunicaciones/ejecutivos"
-                                                className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/comunicaciones/ejecutivos') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                                            >
-                                                <Users className="w-4 h-4 flex-shrink-0" />
-                                                <span className="font-medium whitespace-nowrap">Ejecutivos</span>
-                                            </Link>
+                                            {(can('ejecutivos.add_gestionestablecimiento') || can('ejecutivos.view_gestionestablecimiento') || user?.is_superuser) && (
+                                                <Link
+                                                    to="/comunicaciones/ejecutivos"
+                                                    className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/comunicaciones/ejecutivos') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                                                >
+                                                    <Users className="w-4 h-4 flex-shrink-0" />
+                                                    <span className="font-medium whitespace-nowrap">Ejecutivos</span>
+                                                </Link>
+                                            )}
                                         </div>
                                     </motion.div>
                                 )}

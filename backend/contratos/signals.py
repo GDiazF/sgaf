@@ -52,10 +52,15 @@ def log_contrato_save(sender, instance, created, **kwargs):
         else:
             detalle = f"Se ha modificado el contrato {instance.codigo_mercado_publico}."
 
+    # Usar el usuario real si fue pasado desde la vista, si no, usar 'Sistema'
+    current_user = getattr(instance, '_current_user', None)
+    usuario_str = str(current_user) if current_user else 'Sistema'
+
     HistorialContrato.objects.create(
         contrato=instance,
         accion=accion,
-        detalle=detalle
+        detalle=detalle,
+        usuario=usuario_str
     )
 
 @receiver(m2m_changed, sender=ContratoProveedor.establecimientos.through)

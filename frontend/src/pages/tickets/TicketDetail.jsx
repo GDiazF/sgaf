@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, MessageSquare, Clock, User, CheckCircle2, AlertCircle, Paperclip, Calendar, History, Loader2, Tag, Building, Briefcase, Activity } from 'lucide-react';
+import { ArrowLeft, Send, MessageSquare, Clock, User, CheckCircle2, AlertCircle, Paperclip, Calendar, History, Loader2, Tag, Building, Briefcase, Activity, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api';
 import { useAuth } from '../../context/AuthContext';
@@ -135,6 +135,19 @@ const TicketDetail = () => {
     );
 
     const canManage = ticket.user_role?.is_agent || ticket.user_role?.is_admin || ticket.user_role?.is_assigned;
+    const canDelete = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('tickets.delete_ticket'));
+
+    const handleDelete = async () => {
+        if (!window.confirm('¿Estás seguro de que deseas eliminar este ticket permanentemente?\n\nEsta acción no se puede deshacer.')) return;
+        try {
+            await api.delete(`tickets/tickets/${id}/`);
+            navigate('/tickets');
+            window.dispatchEvent(new CustomEvent('refresh-notifications'));
+        } catch (error) {
+            console.error("Error eliminando ticket:", error);
+            alert(error.response?.data?.error || "Error al eliminar el ticket.");
+        }
+    };
 
     return (
         <div className="max-w-7xl mx-auto space-y-6 pb-10">
@@ -348,6 +361,23 @@ const TicketDetail = () => {
                             )}
                         </div>
                     </div>
+
+                    {/* Zona de Peligro */}
+                    {canDelete && (
+                        <div className="bg-white rounded-2xl shadow-sm border border-rose-200 overflow-hidden mt-6">
+                            <div className="bg-rose-50 px-5 py-3 border-b border-rose-200">
+                                <h3 className="text-xs font-bold text-rose-700 uppercase tracking-wider">Zona de Peligro</h3>
+                            </div>
+                            <div className="p-5">
+                                <button 
+                                    onClick={handleDelete}
+                                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-rose-50 text-rose-600 rounded-xl font-black text-xs hover:bg-rose-100 border border-rose-200 transition shadow-sm"
+                                >
+                                    <Trash2 className="w-4 h-4" /> Eliminar Permanentemente
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                 </div>
             </div>
