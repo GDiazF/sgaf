@@ -3,6 +3,7 @@ import api from '../../api';
 import { FileText, Plus, Trash2, Download, Search, X, Save, Edit2, Eye, Pencil } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FilterBar from '../../components/common/FilterBar';
+import DocumentViewerModal from '../../components/common/DocumentViewerModal';
 import { usePermission } from '../../hooks/usePermission';
 
 const CDPManager = () => {
@@ -354,72 +355,16 @@ const CDPManager = () => {
                 )}
             </AnimatePresence>
 
-            {/* Preview Modal - Matching Procedures Style with Mobile Overlay */}
-            <AnimatePresence>
-                {previewUrl && (
-                    <div className="fixed inset-0 z-[150] bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-end md:justify-start overflow-hidden">
-                        {/* Header: Visible en Desktop */}
-                        <div className="hidden md:flex items-center justify-between py-4 px-6 w-full text-white bg-slate-900/50">
-                            <div className="flex items-center gap-3 min-w-0">
-                                <div className="p-2 bg-blue-600 rounded-xl flex-shrink-0"><FileText className="w-5 h-5" /></div>
-                                <div className="min-w-0">
-                                    <h3 className="font-bold truncate text-base uppercase">{selectedDoc?.nombre}</h3>
-                                    <p className="text-[10px] text-white/50 uppercase tracking-widest truncate">CDP - Año {selectedDoc?.anio}</p>
-                                </div>
-                            </div>
-                            <button onClick={() => setPreviewUrl(null)} className="bg-white/10 p-3 rounded-full hover:bg-white/20 transition-colors border border-white/10">
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
-
-                        {/* Content Area */}
-                        <div className="w-full h-full md:flex-1 bg-slate-800 relative flex flex-col">
-                            {/* Mobile Overlay: Solo para celulares */}
-                            <div className="md:hidden flex flex-col items-center justify-center h-full p-8 text-center text-white space-y-6 animate-in slide-in-from-bottom duration-300">
-                                <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-blue-500/40 animate-bounce">
-                                    <FileText className="w-10 h-10" />
-                                </div>
-                                <div className="space-y-2">
-                                    <h3 className="text-xl font-bold leading-tight uppercase">{selectedDoc?.nombre}</h3>
-                                    <p className="text-sm text-slate-400">Certificado de Disponibilidad Presupuestaria {selectedDoc?.anio}</p>
-                                </div>
-                                <div className="w-full space-y-3 pt-4">
-                                    <a
-                                        href={previewUrl}
-                                        target="_blank" rel="noopener noreferrer"
-                                        className="flex items-center justify-center gap-3 w-full py-4 bg-blue-600 rounded-2xl font-bold text-lg shadow-xl shadow-blue-500/20 active:scale-95 transition-all"
-                                    >
-                                        <Eye className="w-5 h-5" /> Abrir Documento
-                                    </a>
-                                    <button
-                                        onClick={() => setPreviewUrl(null)}
-                                        className="w-full py-4 bg-slate-700/50 rounded-2xl font-bold text-slate-300 border border-slate-600"
-                                    >
-                                        Cerrar
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Desktop Viewer: Solo para pantallas grandes */}
-                            <div className="hidden md:block w-full h-full p-6">
-                                <div className="w-full h-full rounded-t-[3rem] overflow-hidden bg-white">
-                                    {previewUrl?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                                        <div className="w-full h-full flex items-center justify-center p-4">
-                                            <img src={previewUrl} className="max-w-full max-h-full object-contain" alt="Preview" />
-                                        </div>
-                                    ) : (
-                                        <iframe
-                                            src={previewUrl}
-                                            className="w-full h-full border-none"
-                                            title="PDF Preview"
-                                        />
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </AnimatePresence>
+            <DocumentViewerModal
+                isOpen={!!previewUrl}
+                onClose={() => {
+                    setPreviewUrl(null);
+                    setSelectedDoc(null);
+                }}
+                fileUrl={previewUrl}
+                title={selectedDoc?.nombre || 'Documento'}
+                subtitle={selectedDoc ? `CDP - Año ${selectedDoc.anio}` : ''}
+            />
         </div>
     );
 };
