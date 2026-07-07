@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
-import { FileText, Search, Plus, Edit2, Trash2, X, Save, Calendar, Tag, ShieldCheck, Info, Building2, Eye, Pencil } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Plus, Trash2, Info, Building2, Pencil, Loader2, FolderSearch, AlertCircle, FileText } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { usePermission } from '../../hooks/usePermission';
+import useDebouncedValue from '../../hooks/useDebouncedValue';
 import Pagination from '../../components/common/Pagination';
-import FilterBar from '../../components/common/FilterBar';
 import SortableHeader from '../../components/common/SortableHeader';
 import ContractModal from '../../components/contracts/ContractModal';
+import { BTN_PRIMARY, INPUT_FILTER, SELECT_FILTER, BTN_MOBILE_EDIT, TITLE_ICON_BOX } from './contractsUi';
 
 const Contracts = () => {
     const [contracts, setContracts] = useState([]);
@@ -33,6 +34,8 @@ const Contracts = () => {
     const [totalCount, setTotalCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [ordering, setOrdering] = useState('vigente_first');
+    const [errorMessage, setErrorMessage] = useState('');
+    const debouncedSearchQuery = useDebouncedValue(searchQuery);
 
     // Filters
     const [filterCategoria, setFilterCategoria] = useState('');
@@ -52,19 +55,18 @@ const Contracts = () => {
         fecha_termino: '',
         tipo_oc: 'UNICA',
         nro_oc: '',
-        nro_oc: '',
         cdp: '',
         proveedores_asociados: [],
         establecimientos: []
     });
 
-    const fetchData = async (page = 1, size = pageSize) => {
+    const fetchData = async (page = 1, size = pageSize, search = debouncedSearchQuery) => {
         setLoading(true);
         try {
             const params = {
                 page,
                 page_size: size,
-                search: searchQuery,
+                search,
                 ordering: ordering === 'vigente_first' ? '-estado__nombre, -fecha_inicio' : ordering,
                 ...(filterCategoria && { categoria: filterCategoria }),
                 ...(filterEstado && { estado: filterEstado }),
@@ -107,8 +109,8 @@ const Contracts = () => {
     };
 
     useEffect(() => {
-        fetchData(1);
-    }, [ordering, filterCategoria, filterEstado, filterOrientacion]);
+        fetchData(1, pageSize, debouncedSearchQuery);
+    }, [ordering, filterCategoria, filterEstado, filterOrientacion, pageSize, debouncedSearchQuery]);
 
     useEffect(() => {
         fetchLookups();
@@ -116,16 +118,8 @@ const Contracts = () => {
 
     const handleSearch = (query) => {
         setSearchQuery(query);
-        // El useEffect de fetchData con currentPage reaccionará ? No, necesitamos llamar manual o efecto en searchQuery
+        setCurrentPage(1);
     };
-
-    // Efecto para búsqueda con debounce simple
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            fetchData(1);
-        }, 400);
-        return () => clearTimeout(timer);
-    }, [searchQuery]);
 
     const handleSort = (newOrdering) => {
         setOrdering(newOrdering);
@@ -180,9 +174,10 @@ const Contracts = () => {
         if (!window.confirm("¿Seguro que desea eliminar este contrato?")) return;
         try {
             await api.delete(`contratos/contratos/${id}/`);
-            fetchData(currentPage);
+            setErrorMessage('');
+            fetchData(currentPage, pageSize, searchQuery);
         } catch (error) {
-            alert("Error al eliminar.");
+            setErrorMessage('Error al eliminar el contrato.');
         }
     };
 
@@ -197,36 +192,49 @@ const Contracts = () => {
                 await api.post('contratos/contratos/', finalData);
             }
             setShowForm(false);
-            fetchData(currentPage);
+            setErrorMessage('');
+            fetchData(currentPage, pageSize, searchQuery);
         } catch (error) {
             console.error(error);
-            alert("Error al guardar el contrato. Verifique los datos.");
+            setErrorMessage('Error al guardar el contrato. Verifique los datos.');
         }
     };
 
     return (
         <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden">
             {/* Header Limpio */}
-            <div className="shrink-0 flex flex-row justify-between items-start lg:items-end gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
-                <div>
-                    <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight flex items-center gap-2 leading-none uppercase">
-                        Contratos Vigentes
-                    </h2>
-                    <p className="text-[10px] md:text-xs font-medium text-slate-500 mt-1.5 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                        Gestión de convenios y compras ({totalCount})
-                    </p>
+            <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-end gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
+                <div className="flex items-center gap-3">
+                    <div className={TITLE_ICON_BOX}>
+                        <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase">
+                            Contratos Vigentes
+                        </h2>
+                        <p className="text-[10px] md:text-xs font-medium text-slate-500 mt-1.5 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                            Gestión de convenios y compras ({totalCount})
+                        </p>
+                    </div>
                 </div>
                 {can('contratos.add_contrato') && (
                     <button
                         onClick={handleNew}
-                        className="group relative inline-flex items-center justify-center p-2.5 lg:px-5 lg:py-2 bg-blue-600 text-white text-sm font-semibold rounded-[14px] lg:rounded-xl overflow-hidden transition-all hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-500/20 shrink-0"
+                        className={BTN_PRIMARY}
                     >
-                        <Plus className="w-5 h-5 lg:w-4 lg:h-4 lg:mr-2" />
-                        <span className="hidden lg:inline">Nuevo Contrato</span>
+                        <Plus className="w-4 h-4" />
+                        <span>Nuevo Contrato</span>
                     </button>
                 )}
             </div>
+
+            {errorMessage && (
+                <div className="shrink-0 bg-rose-50 text-rose-600 text-[10px] font-bold uppercase p-3 rounded-xl border border-rose-100 flex gap-2 items-center">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{errorMessage}</span>
+                </div>
+            )}
 
             <ContractModal
                 isOpen={showForm}
@@ -238,19 +246,19 @@ const Contracts = () => {
             />
 
             {/* Table Container con Filtros Integrados */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-0">
+            <div className="bg-slate-50 rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-0">
                 {/* Search & Filters Bar */}
-                <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3 shrink-0">
+                <div className="p-3 border-b border-slate-200 bg-slate-50 flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3 shrink-0">
                     <div className="flex flex-col md:flex-row flex-1 gap-3">
                         <div className="flex flex-row flex-1 gap-2">
                             <div className="relative flex-1 max-w-md">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
                                 <input
                                     type="text"
                                     placeholder="Buscar por código o descripción..."
                                     value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-[11px] focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    onChange={(e) => handleSearch(e.target.value)}
+                                    className={`${INPUT_FILTER} placeholder:text-slate-400`}
                                 />
                             </div>
                             <div className="flex lg:hidden shrink-0">
@@ -259,9 +267,9 @@ const Contracts = () => {
                                     onChange={(e) => {
                                         const newSize = Number(e.target.value);
                                         setPageSize(newSize);
-                                        fetchData(1, newSize);
+                                        setCurrentPage(1);
                                     }}
-                                    className="w-[76px] sm:w-[84px] pl-3 pr-7 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                    className={`${SELECT_FILTER} w-[84px] pl-3 pr-7 min-w-0`}
                                 >
                                     <option value={10}>10</option>
                                     <option value={20}>20</option>
@@ -274,7 +282,7 @@ const Contracts = () => {
                             <select
                                 value={filterOrientacion}
                                 onChange={(e) => setFilterOrientacion(e.target.value)}
-                                className="flex-1 lg:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm min-w-[140px]"
+                                className={`${SELECT_FILTER} min-w-[140px]`}
                             >
                                 <option value="">Orientaciones</option>
                                 {orientaciones.map(o => <option key={o.id} value={o.id}>{o.nombre}</option>)}
@@ -282,7 +290,7 @@ const Contracts = () => {
                             <select
                                 value={filterCategoria}
                                 onChange={(e) => setFilterCategoria(e.target.value)}
-                                className="flex-1 lg:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm min-w-[140px]"
+                                className={`${SELECT_FILTER} min-w-[140px]`}
                             >
                                 <option value="">Categorías</option>
                                 {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
@@ -296,9 +304,9 @@ const Contracts = () => {
                             onChange={(e) => {
                                 const newSize = Number(e.target.value);
                                 setPageSize(newSize);
-                                fetchData(1, newSize);
+                                setCurrentPage(1);
                             }}
-                            className="w-[76px] sm:w-[84px] pl-3 pr-7 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                            className={`${SELECT_FILTER} w-[84px] pl-3 pr-7 min-w-0`}
                         >
                             <option value={10}>10</option>
                             <option value={20}>20</option>
@@ -309,9 +317,9 @@ const Contracts = () => {
                 </div>
 
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center flex-1 gap-4">
-                        <div className="w-10 h-10 rounded-full border-4 border-slate-100 border-t-blue-600 animate-spin"></div>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cargando contratos...</span>
+                    <div className="flex flex-col items-center justify-center p-12 h-full flex-1 gap-3">
+                        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cargando Datos...</span>
                     </div>
                 ) : (
                     <>
@@ -329,10 +337,10 @@ const Contracts = () => {
                                         className="flex justify-between items-start cursor-pointer group-hover:opacity-80 transition-all"
                                     >
                                         <div className="flex flex-col gap-1">
-                                            <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">{item.codigo_mercado_publico}</span>
-                                            <h3 className="text-sm font-bold text-slate-900 leading-tight line-clamp-2">{item.descripcion}</h3>
+                                            <span className="text-[10px] font-medium text-blue-500 uppercase tracking-widest">{item.codigo_mercado_publico}</span>
+                                            <h3 className="text-xs font-medium text-slate-700 uppercase leading-relaxed line-clamp-2">{item.descripcion}</h3>
                                             <div className="flex items-center gap-2 mt-1">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-all ${(item.estado_nombre?.toLowerCase() || '').includes('activo') || (item.estado_nombre?.toLowerCase() || '').includes('vigente') ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-50 text-slate-400'}`}>
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition-all ${(item.estado_nombre?.toLowerCase() || '').includes('activo') || (item.estado_nombre?.toLowerCase() || '').includes('vigente') ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-50 text-slate-400'}`}>
                                                     {item.estado_nombre}
                                                 </span>
                                             </div>
@@ -342,7 +350,7 @@ const Contracts = () => {
                                     <div className="grid grid-cols-2 gap-3 py-3 border-y border-slate-50" onClick={() => navigate(`/contracts/${item.id}`)}>
                                         <div className="flex flex-col cursor-pointer">
                                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Proveedores</span>
-                                            <span className="text-xs font-black text-slate-700 truncate" title={item.proveedores_asociados?.map(p => p.proveedor_nombre).join(', ') || 'N/A'}>
+                                            <span className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter truncate" title={item.proveedores_asociados?.map(p => p.proveedor_nombre).join(', ') || 'N/A'}>
                                                 {item.proveedores_asociados?.length > 0 
                                                     ? item.proveedores_asociados.map(p => p.proveedor_nombre).join(', ') 
                                                     : 'N/A'}
@@ -350,7 +358,7 @@ const Contracts = () => {
                                         </div>
                                         <div className="flex flex-col text-right cursor-pointer">
                                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Vencimiento</span>
-                                            <span className="text-xs font-black text-rose-500">{new Date(item.fecha_termino).toLocaleDateString('es-CL')}</span>
+                                            <span className="text-[11px] font-medium text-rose-500 uppercase tracking-tighter">{new Date(item.fecha_termino).toLocaleDateString('es-CL')}</span>
                                         </div>
                                     </div>
 
@@ -358,7 +366,7 @@ const Contracts = () => {
                                         {can('contratos.change_contrato') && (
                                             <button
                                                 onClick={() => handleEdit(item)}
-                                                className="flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 py-2.5 rounded-xl font-semibold text-[10px] uppercase shadow-sm active:scale-95 transition-all"
+                                                className={BTN_MOBILE_EDIT}
                                             >
                                                 <Pencil className="w-3.5 h-3.5" /> Editar
                                             </button>
@@ -366,7 +374,7 @@ const Contracts = () => {
                                         {can('contratos.delete_contrato') && (
                                             <button
                                                 onClick={() => handleDelete(item.id)}
-                                                className="flex items-center justify-center gap-2 bg-red-50 text-red-600 py-2.5 rounded-xl font-semibold text-[10px] uppercase shadow-sm active:scale-95 transition-all"
+                                                className="flex items-center justify-center gap-2 bg-rose-50 text-rose-600 h-10 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm active:scale-95 transition-all"
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" /> Borrar
                                             </button>
@@ -375,24 +383,25 @@ const Contracts = () => {
                                 </motion.div>
                             ))}
                             {contracts.length === 0 && (
-                                <div className="py-20 text-center text-slate-400 font-medium text-xs italic">
-                                    No se encontraron contratos
+                                <div className="flex flex-col items-center justify-center p-12 text-center h-full flex-1">
+                                    <FolderSearch className="w-10 h-10 text-slate-200 mb-3" />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No se encontraron registros</span>
                                 </div>
                             )}
                         </div>
 
                         {/* Desktop Table List */}
-                        <div className="hidden lg:block flex-1 overflow-auto custom-scrollbar">
+                        <div className="hidden lg:block flex-1 overflow-auto custom-scrollbar bg-white">
                             <table className="w-full text-left whitespace-nowrap">
                                 <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200">
                                     <tr>
                                         <SortableHeader label="Código / Referencia" sortKey="codigo_mercado_publico" currentOrdering={ordering} onSort={handleSort} />
                                         <SortableHeader label="Estado" sortKey="estado__nombre" currentOrdering={ordering} onSort={handleSort} />
                                         <SortableHeader label="Categoría / Proceso" sortKey="categoria__nombre" currentOrdering={ordering} onSort={handleSort} />
-                                        <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-left">Proveedores Adjudicados</th>
+                                        <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left border-r border-slate-100">Proveedores Adjudicados</th>
                                         <SortableHeader label="Vencimiento" sortKey="fecha_termino" currentOrdering={ordering} onSort={handleSort} />
-                                        <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Plazo</th>
-                                        <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
+                                        <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-r border-slate-100">Plazo</th>
+                                        <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 font-sans">
@@ -404,18 +413,18 @@ const Contracts = () => {
                                         >
                                             <td className="py-2 px-4 max-w-[300px]">
                                                 <div className="flex flex-col">
-                                                    <span className="text-[9px] font-semibold text-blue-500 uppercase tracking-widest mb-0.5">{item.codigo_mercado_publico}</span>
+                                                    <span className="text-[9px] font-medium text-blue-500 uppercase tracking-widest mb-0.5">{item.codigo_mercado_publico}</span>
                                                     <span className="font-medium text-slate-700 text-[11px] leading-tight break-words whitespace-normal" title={item.descripcion}>{item.descripcion}</span>
                                                 </div>
                                             </td>
                                             <td className="py-2 px-4">
-                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${(item.estado_nombre?.toLowerCase() || '').includes('activo') || (item.estado_nombre?.toLowerCase() || '').includes('vigente') ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-50 text-slate-400'}`}>
+                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${(item.estado_nombre?.toLowerCase() || '').includes('activo') || (item.estado_nombre?.toLowerCase() || '').includes('vigente') ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-50 text-slate-400'}`}>
                                                     {item.estado_nombre || 'N/A'}
                                                 </span>
                                             </td>
                                             <td className="py-2 px-4">
                                                 <div className="flex flex-col gap-0.5">
-                                                    <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[9px] font-bold border border-blue-100 uppercase w-fit">
+                                                    <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[9px] font-black border border-blue-100 uppercase w-fit">
                                                         {item.categoria_nombre}
                                                     </span>
                                                     <span className="text-[10px] text-slate-400 font-normal">{item.proceso_nombre}</span>
@@ -440,19 +449,19 @@ const Contracts = () => {
                                             </td>
                                             <td className="py-2 px-4 text-center">
                                                 <div className="flex flex-col items-center">
-                                                    <span className="text-blue-600 font-bold text-[12px]">{item.plazo_meses}</span>
+                                                    <span className="text-blue-600 font-medium text-[11px]">{item.plazo_meses}</span>
                                                     <span className="text-[9px] font-medium text-slate-300 uppercase tracking-tighter">meses</span>
                                                 </div>
                                             </td>
                                             <td className="py-2 px-4 text-right" onClick={e => e.stopPropagation()}>
                                                 <div className="flex justify-end gap-1.5">
                                                     {can('contratos.change_contrato') && (
-                                                        <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm border border-slate-100 bg-white">
+                                                        <button onClick={() => handleEdit(item)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors bg-white">
                                                             <Pencil className="w-3.5 h-3.5" />
                                                         </button>
                                                     )}
                                                     {can('contratos.delete_contrato') && (
-                                                        <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all shadow-sm border border-slate-100 bg-white">
+                                                        <button onClick={() => handleDelete(item.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors bg-white">
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                         </button>
                                                     )}
@@ -480,7 +489,7 @@ const Contracts = () => {
                     <Pagination
                         currentPage={currentPage}
                         totalPages={totalPages}
-                        onPageChange={(p) => fetchData(p)}
+                        onPageChange={(p) => fetchData(p, pageSize, debouncedSearchQuery)}
                         totalCount={totalCount}
                     />
                 </div>

@@ -4,6 +4,7 @@ import {
     Clock, Truck, Monitor, Package, User, AlertCircle, Lock,
     RefreshCw, Building2, Settings, Power, Trash2, Users, MapPin
 } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../api';
 import { useAuth } from '../../context/AuthContext';
 
@@ -116,6 +117,7 @@ const ReservasDashboard = () => {
     const canViewLogs = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_view_logs'));
     const canManageSettings = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_manage_settings'));
     const canManageRecursos = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.add_recursoreservable')) || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.change_recursoreservable'));
+    const canApproveReserva = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.can_approve_reserva'));
 
     const defaultName = user?.funcionario_data?.nombre_funcionario || (user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : '') || user?.username || '';
 
@@ -181,6 +183,9 @@ const ReservasDashboard = () => {
     // Antelación masiva
     const [bulkDays, setBulkDays] = useState(0);
     const [selectedBulk, setSelectedBulk] = useState([]);
+    const [highlightedId, setHighlightedId] = useState(null);
+    const location = useLocation();
+    const navigate = useNavigate();
 
     const handleBulkUpdate = async () => {
         setAdminSaving(true);
@@ -199,15 +204,17 @@ const ReservasDashboard = () => {
 
     const scrollRef = useRef(null);
     const headerScrollRef = useRef(null);
+    const weekScrollRef = useRef(null);
 
-    // Responsividad: Ajustes menores si es necesario, pero permitimos libertad de vista
+    const [isMobile, setIsMobile] = useState(() =>
+        typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+    );
     useEffect(() => {
-        const checkMobile = () => {
-            // Ya no forzamos setViewMode('day'), dejamos que el usuario elija
-        };
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
+        const mq = window.matchMedia('(max-width: 767px)');
+        const onChange = e => setIsMobile(e.matches);
+        setIsMobile(mq.matches);
+        mq.addEventListener('change', onChange);
+        return () => mq.removeEventListener('change', onChange);
     }, []);
 
     // ── Data ──────────────────────────────────────────────────────────────────
@@ -254,6 +261,72 @@ const ReservasDashboard = () => {
             scrollRef.current.scrollTop = px;
         }
     }, [loading]);
+
+    const processedSearch = useRef('');
+
+    const clearDeepLinkParams = useCallback(() => {
+        const params = new URLSearchParams(location.search);
+        const hadDeepLink = params.has('date') || params.has('highlight');
+        if (!hadDeepLink) return;
+
+        params.delete('date');
+        params.delete('highlight');
+        const nextSearch = params.toString();
+        navigate(
+            {
+                pathname: location.pathname,
+                search: nextSearch ? `?${nextSearch}` : ''
+            },
+            { replace: true }
+        );
+    }, [location.pathname, location.search, navigate]);
+
+    // Handle Deep Linking from Notifications
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const dateParam = params.get('date');
+        const highlightParam = params.get('highlight');
+
+        if (!dateParam && !highlightParam) {
+            processedSearch.current = '';
+            return;
+        }
+
+        if (location.search === processedSearch.current && processedSearch.current !== '') return;
+
+        // 1. Navegar a la fecha
+        if (dateParam) {
+            const newDate = new Date(dateParam + 'T12:00:00'); 
+            if (!isNaN(newDate.getTime()) && toDateStr(newDate) !== toDateStr(currentDate)) {
+                setCurrentDate(newDate);
+            }
+        }
+
+        // 2. Resaltar y hacer scroll
+        if (highlightParam && !loading && reservas.length > 0) {
+            const id = parseInt(highlightParam);
+            const reserva = reservas.find(r => Number(r.id) === Number(id));
+            
+            if (reserva) {
+                setHighlightedId(id);
+                processedSearch.current = location.search;
+
+                // Esperar a que se renderice
+                setTimeout(() => {
+                    const el = document.getElementById(`reserva-${id}`);
+                    if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                    }
+                    // Quitar el resaltado después de un tiempo
+                    setTimeout(() => setHighlightedId(null), 5000);
+                }, 500);
+                clearDeepLinkParams();
+            } else if (!loading) {
+                processedSearch.current = location.search;
+                clearDeepLinkParams();
+            }
+        }
+    }, [location.search, loading, reservas, currentDate, clearDeepLinkParams]);
 
     // Auto-ajustar horas disponibles cuando cambia el recurso o fecha en el modal
     useEffect(() => {
@@ -307,6 +380,22 @@ const ReservasDashboard = () => {
             return addDays(mon, i);
         })
         : [currentDate];
+
+    // Móvil: al abrir la semana, desplazar a la columna de hoy
+    useEffect(() => {
+        if (!isMobile || viewMode !== 'week' || loading) return;
+        const container = weekScrollRef.current;
+        if (!container) return;
+        const weekDates = visibleDays.map(d => toDateStr(d));
+        const target = weekDates.includes(todayStr) ? todayStr : toDateStr(currentDate);
+        const scroll = () => {
+            const col = container.querySelector(`#week-day-col-${target}`);
+            if (!col) return;
+            container.scrollTo({ left: Math.max(0, col.offsetLeft - 80), behavior: 'smooth' });
+        };
+        const t = window.setTimeout(scroll, 120);
+        return () => clearTimeout(t);
+    }, [isMobile, viewMode, loading, currentDate, todayStr, filtroRecurso, recursos.length]);
 
     // Optimización: Agrupar reservas por recurso y día una sola vez
     const reservasBuckets = useMemo(() => {
@@ -624,7 +713,7 @@ const ReservasDashboard = () => {
                     </div>
 
                     <div className="flex items-center bg-slate-100 rounded-lg p-0.5 flex-shrink-0">
-                        {['day', 'week'].map(v => (
+                        {['week', 'day'].map(v => (
                             <button key={v} onClick={() => setViewMode(v)} className={`px-4 py-1.5 text-[11px] font-bold rounded-md transition ${viewMode === v ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
                                 {v === 'day' ? 'Día' : 'Semana'}
                             </button>
@@ -749,15 +838,20 @@ const ReservasDashboard = () => {
             <div className="flex-1 overflow-hidden flex flex-col min-h-0">
                 {viewMode === 'week' ? (
                     /* MODO MATRIZ (RECURSOS EN FILAS, DÍAS EN COLUMNAS) */
-                    <div className="flex-1 overflow-auto bg-slate-50/20">
+                    <div ref={weekScrollRef} className="flex-1 overflow-auto scroll-smooth bg-slate-50/20">
                         <div className="min-w-max">
                             {/* Cabecera de Días */}
                             <div className="flex sticky top-0 z-30 bg-white border-b border-slate-200">
-                                <div className="w-48 flex-shrink-0 p-4 font-black text-slate-400 text-[10px] uppercase tracking-widest bg-slate-50 border-r border-slate-200">
-                                    RECURSO / FECHA
+                                <div className="w-20 md:w-48 flex-shrink-0 p-2 md:p-4 font-black text-slate-400 text-[8px] md:text-[10px] uppercase tracking-widest bg-slate-50 border-r border-slate-200 leading-tight">
+                                    <span className="md:hidden">Rec.</span>
+                                    <span className="hidden md:inline">RECURSO / FECHA</span>
                                 </div>
                                 {visibleDays.map(day => (
-                                    <div key={toDateStr(day)} className={`flex-1 min-w-[110px] p-3 text-center border-r border-slate-100 ${toDateStr(day) === todayStr ? 'bg-indigo-50/50' : ''}`}>
+                                    <div
+                                        key={toDateStr(day)}
+                                        id={`week-day-col-${toDateStr(day)}`}
+                                        className={`flex-1 min-w-[calc(100vw-5rem)] md:min-w-[110px] p-2 md:p-3 text-center border-r border-slate-100 ${toDateStr(day) === todayStr ? 'bg-indigo-50/50' : ''}`}
+                                    >
                                         <div className="text-[10px] font-black text-indigo-500 uppercase tracking-wider">{fmtDay(day).split(' ')[0]}</div>
                                         <div className={`text-xl font-black ${toDateStr(day) === todayStr ? 'text-indigo-600' : 'text-slate-700'}`}>{day.getDate()}</div>
                                     </div>
@@ -772,13 +866,13 @@ const ReservasDashboard = () => {
                                 return (
                                     <div key={rec.id} className="flex border-b border-slate-100 group bg-white hover:bg-slate-50/30 transition-colors">
                                         {/* Info de Recurso (Sticky Left) */}
-                                        <div className="w-48 sticky left-0 z-20 flex-shrink-0 p-4 bg-white border-r border-slate-200 flex items-start gap-3 shadow-[4px_0_12px_rgba(0,0,0,0.03)]">
-                                            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm border border-slate-100" style={{ background: hexToRgba(color, 0.08), color }}>
-                                                <Icon className="w-5 h-5" />
+                                        <div className="w-20 md:w-48 sticky left-0 z-20 flex-shrink-0 p-2 md:p-4 bg-white border-r border-slate-200 flex flex-col md:flex-row items-center md:items-start gap-1 md:gap-3 shadow-[4px_0_12px_rgba(0,0,0,0.03)]">
+                                            <div className="w-7 h-7 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm border border-slate-100" style={{ background: hexToRgba(color, 0.08), color }}>
+                                                <Icon className="w-3.5 h-3.5 md:w-5 md:h-5" />
                                             </div>
-                                            <div className="min-w-0">
-                                                <h4 className="font-bold text-slate-800 text-[11px] leading-tight mb-1 truncate" title={rec.nombre}>{rec.nombre}</h4>
-                                                <span className="text-[8px] font-black uppercase tracking-wider text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded">
+                                            <div className="min-w-0 w-full text-center md:text-left">
+                                                <h4 className="font-bold text-slate-800 text-[9px] md:text-[11px] leading-tight mb-0 md:mb-1 line-clamp-2 md:truncate" title={rec.nombre}>{rec.nombre}</h4>
+                                                <span className="hidden md:inline text-[8px] font-black uppercase tracking-wider text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded">
                                                     {TYPE_LABELS[rec.tipo]}
                                                 </span>
                                             </div>
@@ -798,7 +892,7 @@ const ReservasDashboard = () => {
                                             return (
                                                 <div key={dayS}
                                                     onClick={() => !isDayBlocked && handleSlotClick(day, '', rec.id)}
-                                                    className={`flex-1 min-w-[110px] p-2 border-r border-slate-50 min-h-[140px] transition-colors relative hover:bg-indigo-50/10 ${!isDayBlocked ? 'cursor-pointer' : 'bg-slate-100/50'} ${dayS === todayStr ? 'bg-indigo-50/5' : ''}`}>
+                                                    className={`flex-1 min-w-[calc(100vw-5rem)] md:min-w-[110px] p-2 border-r border-slate-50 min-h-[140px] transition-colors relative hover:bg-indigo-50/10 ${!isDayBlocked ? 'cursor-pointer' : 'bg-slate-100/50'} ${dayS === todayStr ? 'bg-indigo-50/5' : ''}`}>
 
                                                     {isDayBlocked && (
                                                         <div className="absolute inset-0 z-0 opacity-40" style={{ background: 'repeating-linear-gradient(45deg, #f1f5f9 0, #f1f5f9 10px, transparent 10px, transparent 20px)' }} />
@@ -824,8 +918,9 @@ const ReservasDashboard = () => {
 
                                                             return (
                                                                 <div key={ev.id}
+                                                                    id={`reserva-${ev.id}`}
                                                                     onClick={(e) => { e.stopPropagation(); setDetailReserva(ev); }}
-                                                                    className="p-2.5 rounded-xl border flex flex-col gap-1 transition-all hover:translate-x-1 group/item shadow-sm mb-1.5 last:mb-0"
+                                                                    className={`p-2.5 rounded-xl border flex flex-col gap-1 transition-all hover:translate-x-1 group/item shadow-sm mb-1.5 last:mb-0 ${Number(ev.id) === Number(highlightedId) ? 'animate-highlight' : ''}`}
                                                                     style={{
                                                                         background: isApproved ? hexToRgba(color, 0.15) : 'white',
                                                                         borderColor: hexToRgba(color, 0.2),
@@ -870,7 +965,7 @@ const ReservasDashboard = () => {
                     </div>
                 ) : (
                     /* MODO DÍA (CALENDARIO DE TIEMPO CLÁSICO) */
-                    window.innerWidth < 768 ? (
+                    isMobile ? (
                         /* ── VISTA MÓVIL (LISTA DE TARJETAS) ── */
                         <div className="flex-1 overflow-y-auto bg-slate-50/50 flex flex-col">
                             {/* Header de fecha pegajoso en móvil */}
@@ -1064,7 +1159,7 @@ const ReservasDashboard = () => {
                                                         const subLeft = colLeft + colIndex * subW;
 
                                                         return (
-                                                            <div key={ev.id} className="absolute z-20 cursor-pointer group transition-all hover:z-40"
+                                                            <div key={ev.id} id={`reserva-${ev.id}`} className={`absolute z-20 cursor-pointer group transition-all hover:z-40 ${Number(ev.id) === Number(highlightedId) ? 'animate-highlight' : ''}`}
                                                                 style={{
                                                                     top: `${top}px`, height: `${height}px`,
                                                                     left: `${subLeft}%`, width: `calc(${subW}% - 3px)`,
@@ -1433,7 +1528,7 @@ const ReservasDashboard = () => {
                                     </div>
                                 )}
 
-                                {detailReserva.estado === 'PENDIENTE' && !isRechazando && (
+                                {detailReserva.estado === 'PENDIENTE' && !isRechazando && canApproveReserva && (
                                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
                                         <button onClick={() => handleEstado(detailReserva.id, 'APROBADA', '')} className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl font-black text-xs hover:bg-emerald-100 border border-emerald-200">
                                             <Check className="w-4 h-4" /> Aprobar
@@ -1443,7 +1538,7 @@ const ReservasDashboard = () => {
                                         </button>
                                     </div>
                                 )}
-                                {detailReserva.estado === 'APROBADA' && (
+                                {detailReserva.estado === 'APROBADA' && canApproveReserva && (
                                     <div className="pt-2 border-t border-slate-100">
                                         {!isPast ? (
                                             <button onClick={() => handleEstado(detailReserva.id, 'FINALIZADA', '')} className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-50 text-blue-700 rounded-xl font-black text-xs hover:bg-blue-100 border border-blue-200">
@@ -1455,6 +1550,28 @@ const ReservasDashboard = () => {
                                                 <p className="text-[9px] text-slate-400 mt-0.5">Esta reserva ya ha finalizado su horario.</p>
                                             </div>
                                         )}
+                                    </div>
+                                )}
+
+                                {/* Zona peligro: Cancelar Propia Reserva */}
+                                {detailReserva.solicitante === user?.id && !isPast && !isRechazando && (
+                                    <div className="pt-3 border-t border-slate-100">
+                                        <button
+                                            onClick={async () => {
+                                                if (!window.confirm(`¿Estás seguro de que deseas cancelar tu reserva "${detailReserva.titulo}"?`)) return;
+                                                try {
+                                                    await api.delete(`reservas/solicitudes/${detailReserva.id}/`);
+                                                    setDetailReserva(null);
+                                                    fetchData();
+                                                    window.dispatchEvent(new CustomEvent('refresh-notifications'));
+                                                } catch (err) {
+                                                    alert(err.response?.data?.detail || 'Error al cancelar la reserva.');
+                                                }
+                                            }}
+                                            className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-50 text-amber-700 rounded-xl font-black text-xs hover:bg-amber-100 border border-amber-200 transition"
+                                        >
+                                            <X className="w-4 h-4" /> Cancelar Mi Reserva
+                                        </button>
                                     </div>
                                 )}
 

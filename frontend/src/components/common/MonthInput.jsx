@@ -53,15 +53,15 @@ const MonthInput = ({ label, value, onChange, required = false, className = "" }
             {label && (
                 <label className="form-label">
                     <Calendar className="w-3.5 h-3.5 text-blue-500" />
-                    {label} {required && <span className="text-red-500">*</span>}
+                    {label} {required && <span className="text-rose-500">*</span>}
                 </label>
             )}
             <div className="relative">
                 <div
                     onClick={() => setIsOpen(!isOpen)}
-                    className="form-input flex items-center justify-between cursor-pointer bg-white group hover:border-blue-300 transition-all"
+                    className="no-global w-full h-10 text-[10px] font-bold bg-white border border-slate-200 px-3 rounded-xl outline-none focus:border-blue-500 uppercase transition-all shadow-sm flex items-center justify-between cursor-pointer group"
                 >
-                    <span className={displayValue ? "text-slate-900 font-bold" : "text-slate-400 font-medium italic"}>
+                    <span className={displayValue ? "text-slate-700 font-bold" : "text-slate-400 font-bold"}>
                         {displayValue || "Seleccione periodo..."}
                     </span>
                     <Calendar className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
@@ -120,7 +120,7 @@ const MonthInput = ({ label, value, onChange, required = false, className = "" }
                                     onChange('');
                                     setIsOpen(false);
                                 }}
-                                className="text-[9px] font-black text-red-500 uppercase hover:underline"
+                                className="text-[9px] font-black text-rose-600 uppercase hover:underline"
                             >
                                 Limpiar
                             </button>

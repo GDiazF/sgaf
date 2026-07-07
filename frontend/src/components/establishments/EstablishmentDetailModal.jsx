@@ -1,9 +1,12 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MapPin, Navigation, Info, ExternalLink, Building, User, Mail, Phone, Activity, Hash, Globe } from 'lucide-react';
+import Portal from '../common/Portal';
+import { X, MapPin, ExternalLink, Building2, User, Mail, Phone, Hash, Globe } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { statusBadgeClass } from '../../pages/funcionarios/shared/funcionariosUi';
+import { BTN_BLUE_SM, BTN_MAPS, TYPE_BADGE } from '../../pages/establishments/establishmentsUi';
 
 const createMarkerIcon = (color) => L.divIcon({
     className: 'custom-div-icon',
@@ -12,11 +15,11 @@ const createMarkerIcon = (color) => L.divIcon({
           </div>`,
     iconSize: [36, 36],
     iconAnchor: [18, 36],
-    popupAnchor: [0, -36]
+    popupAnchor: [0, -36],
 });
 
 const greenIcon = createMarkerIcon('#10b981');
-const blueIcon = createMarkerIcon('#3b82f6');
+const blueIcon = createMarkerIcon('#2563eb');
 
 const ChangeView = ({ center }) => {
     const map = useMap();
@@ -27,7 +30,7 @@ const ChangeView = ({ center }) => {
 };
 
 const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablishments = [] }) => {
-    if (!isOpen || !establishment) return null;
+    if (!establishment) return null;
 
     const { nombre, direccion, latitud, longitud, director, email, url_web, tipo_nombre, logo, rbd, activo } = establishment;
     const phones = establishment.telefonos || [];
@@ -41,15 +44,19 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
         ? `https://www.google.com/maps/search/?api=1&query=${latitud},${longitud}`
         : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion || nombre)}`;
 
-    const InfoBox = ({ icon: Icon, label, value, subValue, highlight = false }) => (
-        <div className={`flex gap-3 p-2 rounded-2xl border transition-all ${highlight ? 'bg-blue-50 border-blue-100 shadow-sm shadow-blue-500/5' : 'bg-slate-50/50 border-slate-100 hover:bg-white hover:shadow-sm'}`}>
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 border shadow-sm ${highlight ? 'bg-white border-blue-200 text-blue-600' : 'bg-white border-slate-100 text-slate-400'}`}>
-                <Icon className="w-4 h-4" />
+    const InfoBox = ({ icon: Icon, label, value, subValue, className = '' }) => (
+        <div className={`flex gap-2 p-2 rounded-lg border border-slate-200 bg-slate-50/80 ${className}`}>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border border-blue-100 bg-blue-50 text-blue-600">
+                <Icon className="w-3.5 h-3.5" />
             </div>
             <div className="min-w-0 flex-1">
-                <span className={`text-[8px] font-bold uppercase tracking-widest block leading-none mb-1 ${highlight ? 'text-blue-400' : 'text-slate-400'}`}>{label}</span>
-                <p className={`text-[13px] font-bold leading-tight break-words ${highlight ? 'text-blue-900' : 'text-slate-700'}`}>{value || 'No declarado'}</p>
-                {subValue && <p className={`text-[9px] mt-0.5 font-semibold uppercase tracking-tighter ${highlight ? 'text-blue-500' : 'text-slate-400'}`}>{subValue}</p>}
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block leading-none">{label}</span>
+                <p className="text-[10px] font-medium text-slate-700 uppercase tracking-tighter leading-tight break-words mt-0.5">
+                    {value || '—'}
+                </p>
+                {subValue && (
+                    <p className="text-[8px] font-medium text-slate-400 uppercase tracking-tighter truncate">{subValue}</p>
+                )}
             </div>
         </div>
     );
@@ -59,30 +66,14 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
         const estPrincipalP = estPhones.find(p => p.es_principal) || estPhones[0];
 
         return (
-            <div className="p-3 min-w-[220px]">
-                <div className="font-bold text-slate-900 border-b border-slate-100 pb-2 mb-2 flex items-center gap-2 leading-tight">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] flex-shrink-0" />
+            <div className="p-3 min-w-[200px]">
+                <p className="text-[10px] font-medium text-slate-800 uppercase tracking-tighter border-b border-slate-100 pb-2 mb-2 leading-tight">
                     {est.nombre}
-                </div>
-                <div className="space-y-2">
-                    <div className="flex items-start gap-2 text-slate-500">
-                        <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                        <span className="text-[9px] font-semibold uppercase tracking-widest leading-relaxed">
-                            {est.direccion || 'Sin dirección registrada'}
-                        </span>
-                    </div>
-                    {estPrincipalP && (
-                        <div className="flex items-center gap-2 text-slate-500">
-                            <Phone className="w-3.5 h-3.5 flex-shrink-0" />
-                            <span className="text-[9px] font-semibold uppercase tracking-widest">
-                                {estPrincipalP.numero}
-                            </span>
-                        </div>
-                    )}
-                    <div className="flex items-center gap-2 text-slate-400">
-                        <Hash className="w-3 h-3 flex-shrink-0" />
-                        <span className="text-[8px] font-bold uppercase tracking-widest">RBD: {est.rbd}</span>
-                    </div>
+                </p>
+                <div className="space-y-1.5 text-[9px] font-medium text-slate-500 uppercase tracking-tighter">
+                    <p>{est.direccion || 'Sin dirección'}</p>
+                    {estPrincipalP && <p>{estPrincipalP.numero}</p>}
+                    <p>RBD {est.rbd}</p>
                 </div>
             </div>
         );
@@ -91,122 +82,133 @@ const EstablishmentDetailModal = ({ isOpen, onClose, establishment, allEstablish
     return (
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                        className="relative w-full max-w-lg md:max-w-6xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[700px] max-h-[90vh] border border-white/20"
-                    >
-                        {/* Botón Cerrar Absoluto */}
-                        <button
+                <Portal>
+                    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
                             onClick={onClose}
-                            className="absolute top-4 right-4 z-[1100] p-2 bg-white/80 backdrop-blur-md text-slate-500 hover:text-slate-900 rounded-full shadow-xl border border-white/50 transition-all active:scale-95 hover:bg-white"
+                            aria-hidden
+                        />
+
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                            className="relative z-10 w-full max-w-lg md:max-w-6xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[700px] max-h-[90vh] border border-slate-200"
+                            onClick={e => e.stopPropagation()}
                         >
-                            <X className="w-5 h-5" />
-                        </button>
-
-                        {/* Map Area - Visible only on Desktop */}
-                        <div className="hidden md:block flex-1 relative bg-slate-100 overflow-hidden min-h-full">
-                            {hasCoordinates ? (
-                                <MapContainer center={position} zoom={16} className="w-full h-full" scrollWheelZoom={true} zoomControl={false}>
-                                    <TileLayer attribution='&copy; CARTO' url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-
-                                    {/* Selected Marker */}
-                                    <Marker position={position} icon={greenIcon}>
-                                        <Popup className="premium-popup pb-2"><MarkerPopup est={establishment} /></Popup>
-                                    </Marker>
-
-                                    {/* Other Markers */}
-                                    {otherMarkers.map(marker => (
-                                        <Marker key={marker.id} position={[parseFloat(marker.latitud), parseFloat(marker.longitud)]} icon={blueIcon}>
-                                            <Popup className="premium-popup pb-2"><MarkerPopup est={marker} /></Popup>
+                            {/* Mapa — escritorio */}
+                            <div className="hidden md:block flex-1 relative bg-slate-100 overflow-hidden min-h-0">
+                                {hasCoordinates ? (
+                                    <MapContainer center={position} zoom={16} className="w-full h-full" scrollWheelZoom zoomControl={false}>
+                                        <TileLayer attribution="&copy; CARTO" url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+                                        <Marker position={position} icon={greenIcon}>
+                                            <Popup className="premium-popup"><MarkerPopup est={establishment} /></Popup>
                                         </Marker>
-                                    ))}
-                                    <ChangeView center={position} />
-                                </MapContainer>
-                            ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 p-12 text-center pointer-events-none">
-                                    <MapPin className="w-16 h-16 text-slate-200 mb-4" />
-                                    <p className="text-sm text-slate-400 font-bold uppercase tracking-widest italic">Coordenadas No Registradas</p>
-                                </div>
-                            )}
-                            <div className="absolute top-5 left-5 z-[1000] flex flex-col gap-2">
-                                <div className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-white shadow-xl flex items-center gap-2">
-                                    <div className="bg-emerald-500 w-2.5 h-2.5 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)] animate-pulse" />
-                                    <span className="text-[9px] font-black text-slate-800 tracking-[1.5px] uppercase">G.I.S SLEP IQUIQUE</span>
+                                        {otherMarkers.map(marker => (
+                                            <Marker
+                                                key={marker.id}
+                                                position={[parseFloat(marker.latitud), parseFloat(marker.longitud)]}
+                                                icon={blueIcon}
+                                            >
+                                                <Popup className="premium-popup"><MarkerPopup est={marker} /></Popup>
+                                            </Marker>
+                                        ))}
+                                        <ChangeView center={position} />
+                                    </MapContainer>
+                                ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 p-12 text-center">
+                                        <MapPin className="w-12 h-12 text-slate-200 mb-3" />
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sin coordenadas registradas</p>
+                                    </div>
+                                )}
+                                <div className="absolute top-4 left-4 z-[1000]">
+                                    <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                        <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">GIS SLEP Iquique</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="w-full md:w-[380px] p-6 lg:p-7 flex flex-col bg-white overflow-y-auto md:border-l border-slate-100 custom-scrollbar">
-                            <div className="flex-1 space-y-2 pt-4">
-                                {/* Header */}
-                                <div className="flex items-center gap-4 mb-2 bg-white p-4 rounded-[1.8rem] border border-slate-100 shadow-sm">
-                                    <div className="w-12 h-12 rounded-2xl bg-slate-50 p-2 shadow-inner border border-slate-100 flex items-center justify-center flex-shrink-0">
-                                        {logo ? <img src={logo} alt={nombre} className="w-full h-full object-contain" /> : <Building className="w-6 h-6 text-slate-300" />}
-                                    </div>
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${activo ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                                                {activo ? 'Activo' : 'Inactivo'}
-                                            </span>
-                                            <p className="text-[9px] text-blue-600 font-bold uppercase tracking-widest truncate">{tipo_nombre}</p>
+                            {/* Panel de información */}
+                            <div className="w-full md:w-[360px] flex flex-col bg-white md:border-l border-slate-200 min-h-0">
+                                <div className="shrink-0 px-3 py-2.5 border-b border-slate-100 bg-slate-50 flex justify-between items-center gap-2">
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Detalle</p>
+                                    <button
+                                        type="button"
+                                        onClick={onClose}
+                                        className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors shrink-0"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto custom-scrollbar px-3 py-2.5 space-y-2 min-h-0">
+                                    <div className="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-200 bg-white">
+                                        <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 p-1">
+                                            {logo ? (
+                                                <img src={logo} alt="" className="w-full h-full object-contain" />
+                                            ) : (
+                                                <Building2 className="w-4 h-4 text-slate-300" />
+                                            )}
                                         </div>
-                                        <h3 className="text-base font-black text-slate-800 leading-tight break-words pr-2 uppercase italic">{nombre}</h3>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                                                <span className={statusBadgeClass(activo)}>{activo ? 'Activo' : 'Inactivo'}</span>
+                                                {tipo_nombre && <span className={TYPE_BADGE}>{tipo_nombre}</span>}
+                                            </div>
+                                            <h3 className="text-[11px] font-bold text-slate-800 uppercase tracking-tight leading-tight line-clamp-2">
+                                                {nombre}
+                                            </h3>
+                                        </div>
                                     </div>
-                                </div>
 
-                                {/* RBD and Main Info Grid */}
-                                <div className="grid grid-cols-1 gap-2">
-                                    <InfoBox icon={Hash} label="RBD" value={rbd} highlight={true} />
-                                    <InfoBox icon={User} label="Director" value={director} />
-                                    <InfoBox icon={Mail} label="Email" value={email} />
-                                    <InfoBox icon={Navigation} label="Dirección" value={direccion} />
-                                    <InfoBox icon={Phone} label="Teléfono" value={principalPhone?.numero} subValue={principalPhone?.etiqueta} />
-                                </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        <InfoBox icon={Hash} label="RBD" value={String(rbd)} />
+                                        <InfoBox icon={User} label="Director/a" value={director} />
+                                        <InfoBox icon={Mail} label="Correo" value={email} />
+                                        <InfoBox icon={Phone} label="Teléfono" value={principalPhone?.numero} subValue={principalPhone?.etiqueta} />
+                                        <InfoBox icon={MapPin} label="Dirección" value={direccion} />
+                                    </div>
 
-                                {/* Other Phones */}
-                                {phones.length > 1 && (
-                                    <div className="pt-2 border-t border-slate-50 space-y-1">
-                                        <h4 className="text-[7px] font-bold text-slate-400 uppercase tracking-widest px-1">Anexos Directos</h4>
-                                        <div className="grid grid-cols-2 gap-1.5">
-                                            {phones.filter(p => !p.es_principal).map((p, idx) => (
-                                                <div key={idx} className="flex items-center gap-2 p-1.5 rounded-lg bg-slate-50/50 border border-slate-100">
-                                                    <Phone className="w-2.5 h-2.5 text-slate-300 flex-shrink-0" />
-                                                    <div className="min-w-0">
-                                                        <p className="text-[10px] font-medium text-slate-700 truncate">{p.numero}</p>
-                                                        <p className="text-[7px] font-bold text-slate-400 uppercase leading-none truncate">{p.etiqueta}</p>
+                                    {phones.length > 1 && (
+                                        <div className="pt-1 border-t border-slate-100">
+                                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Otros teléfonos</p>
+                                            <div className="grid grid-cols-2 gap-1">
+                                                {phones.filter(p => !p.es_principal).map((p, idx) => (
+                                                    <div key={idx} className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-100">
+                                                        <p className="text-[9px] font-medium text-slate-700 uppercase tracking-tighter truncate">{p.numero}</p>
+                                                        <p className="text-[7px] font-medium text-slate-400 uppercase truncate">{p.etiqueta}</p>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
-                            </div>
+                                    )}
+                                </div>
 
-                            {/* Redirect Buttons */}
-                            <div className="mt-2 pt-2 border-t border-slate-50 flex flex-col gap-2">
-                                {url_web && (
-                                    <a href={url_web} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-2 rounded-2xl font-bold text-[10px] uppercase tracking-[1px] hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 group">
-                                        <Globe className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-                                        Sitio Web Oficial
-                                        <ExternalLink className="w-3.5 h-3.5 text-white/50" />
+                                <div className="shrink-0 px-3 py-2.5 border-t border-slate-100 bg-slate-50/80 flex flex-col gap-1.5">
+                                    {url_web && (
+                                        <a href={url_web} target="_blank" rel="noopener noreferrer" className={BTN_BLUE_SM}>
+                                            <Globe className="w-3.5 h-3.5 shrink-0" />
+                                            Sitio web
+                                            <ExternalLink className="w-3 h-3 opacity-70" />
+                                        </a>
+                                    )}
+                                    <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer" className={BTN_MAPS}>
+                                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                                        Google Maps
+                                        <ExternalLink className="w-3 h-3 opacity-70" />
                                     </a>
-                                )}
-                                <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-2xl font-bold text-[10px] uppercase tracking-[1px] hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 group">
-                                    <img src="https://www.google.com/images/branding/product/ico/maps_32dp.ico" alt="Maps" className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                                    Google Maps
-                                    <ExternalLink className="w-3.5 h-3.5 text-white/50" />
-                                </a>
+                                </div>
                             </div>
-                        </div>
-                    </motion.div>
-                </div>
+                        </motion.div>
+                    </div>
+                </Portal>
             )}
-            <style dangerouslySetInnerHTML={{ __html: `.premium-popup .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; box-shadow: 0 10px 40px rgba(0,0,0,0.1); background: white; border: 1px solid rgba(0,0,0,0.05); } .premium-popup .leaflet-popup-content { margin: 0; width: auto !important; } .premium-popup .leaflet-popup-tip { display: none; } .custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }` }} />
+            <style dangerouslySetInnerHTML={{ __html: `.premium-popup .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; box-shadow: 0 10px 40px rgba(0,0,0,0.1); background: white; border: 1px solid #f1f5f9; } .premium-popup .leaflet-popup-content { margin: 0; width: auto !important; } .premium-popup .leaflet-popup-tip { display: none; }` }} />
         </AnimatePresence>
     );
 };

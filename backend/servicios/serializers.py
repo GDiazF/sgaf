@@ -37,15 +37,32 @@ class RegistroPagoSerializer(serializers.ModelSerializer):
     servicio_detalle = serializers.SerializerMethodField()
     establecimiento_nombre = serializers.ReadOnlyField(source='establecimiento.nombre', default='')
     servicio_proveedor_nombre = serializers.ReadOnlyField(source='servicio.proveedor.nombre', default='')
+    servicio_proveedor_acronimo = serializers.ReadOnlyField(source='servicio.proveedor.acronimo', default='')
     servicio_numero_cliente = serializers.ReadOnlyField(source='servicio.numero_cliente', default='')
+    servicio_numero_servicio = serializers.ReadOnlyField(source='servicio.numero_servicio', default='')
+    servicio_unidad_medida = serializers.ReadOnlyField(source='servicio.unidad_medida', default='')
     recepcion_conforme_folio = serializers.ReadOnlyField(source='recepcion_conforme.folio', default=None)
 
     class Meta:
         model = RegistroPago
         fields = '__all__'
 
+    def validate(self, data):
+        nro_documento = data.get('nro_documento', self.instance.nro_documento if self.instance else None)
+        servicio = data.get('servicio', self.instance.servicio if self.instance else None)
+        
+        if nro_documento and servicio:
+            qs = RegistroPago.objects.filter(nro_documento=nro_documento, servicio=servicio)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+                
+            if qs.exists():
+                raise serializers.ValidationError({"nro_documento": f"La factura '{nro_documento}' ya fue ingresada previamente para el servicio seleccionado."})
+                
+        return super().validate(data)
+
     def get_servicio_detalle(self, obj):
-        return f"{obj.servicio.proveedor.nombre} - Cliente: {obj.servicio.numero_cliente}"
+        return obj.servicio.proveedor.acronimo or obj.servicio.proveedor.nombre
 
 class HistorialRecepcionConformeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -120,6 +137,15 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
                 recepcion_conforme=instance,
                 accion='MODIFICACION',
                 detalle="Se actualizaron las observaciones.",
+                usuario=user
+            )
+
+        # Track File Upload
+        if 'archivo_escaneado' in validated_data and validated_data['archivo_escaneado']:
+            HistorialRecepcionConforme.objects.create(
+                recepcion_conforme=instance,
+                accion='COMPLETADO',
+                detalle="Se subió el documento firmado y escaneado. Estado actualizado a COMPLETADA.",
                 usuario=user
             )
 

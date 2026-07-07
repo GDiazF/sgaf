@@ -2,10 +2,11 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from datetime import timedelta
 from vehiculos.models import VehiculoDocumento
-from comunicaciones.utils import enviar_correo_maestro
+from comunicaciones.utils import enviar_correo_maestro, obtener_destinatarios_correo_operativo
 import logging
 
 logger = logging.getLogger(__name__)
+PROPOSITO_ALERTA = 'ALERTA_VENCIMIENTO_VEHICULO'
 
 class Command(BaseCommand):
     help = 'Verifica documentos por vencer y envía notificaciones por correo'
@@ -21,6 +22,13 @@ class Command(BaseCommand):
         )
 
         enviados = 0
+        destinatarios = obtener_destinatarios_correo_operativo(PROPOSITO_ALERTA)
+        if not destinatarios:
+            mensaje = 'No hay destinatarios configurados para alertas de vencimiento vehicular.'
+            logger.warning(mensaje)
+            self.stdout.write(self.style.WARNING(mensaje))
+            return
+
         for doc in documentos:
             # Determinar cuántos días de aviso se usan
             dias_aviso = doc.dias_aviso if doc.dias_aviso is not None else doc.tipo.dias_aviso_defecto
@@ -44,23 +52,16 @@ class Command(BaseCommand):
                     'dias_restantes': (doc.fecha_vencimiento - hoy).days
                 }
 
-                # Destinatarios: Podríamos sacarlos de una configuración global
-                # Por ahora usaremos el sistema maestro que debería tener configurado un admin de flota
-                # O podemos buscar usuarios con permisos de flota
-                from django.contrib.auth.models import User
-                admins = User.objects.filter(is_superuser=True, email__isnull=False).values_list('email', flat=True)
+                success = enviar_correo_maestro(
+                    proposito=PROPOSITO_ALERTA,
+                    destinatarios=destinatarios,
+                    contexto=contexto
+                )
                 
-                if admins:
-                    success = enviar_correo_maestro(
-                        proposito='ALERTA_VENCIMIENTO_VEHICULO',
-                        destinatarios=list(admins),
-                        contexto=contexto
-                    )
-                    
-                    if success:
-                        doc.ultima_notificacion = hoy
-                        doc.save()
-                        enviados += 1
-                        self.stdout.write(f'Notificación enviada para {doc.vehiculo.patente} - {doc.tipo.nombre}')
+                if success:
+                    doc.ultima_notificacion = hoy
+                    doc.save()
+                    enviados += 1
+                    self.stdout.write(f'Notificación enviada para {doc.vehiculo.patente} - {doc.tipo.nombre}')
 
         self.stdout.write(self.style.SUCCESS(f'Proceso terminado. Notificaciones enviadas: {enviados}'))

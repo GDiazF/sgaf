@@ -51,6 +51,16 @@ import WelfareWall from './pages/bienestar/WelfareWall';
 
 import ProceduresDashboard from './pages/procedimientos/ProceduresDashboard';
 
+// Tickets
+import TicketsDashboard from './pages/tickets/TicketsDashboard';
+import TicketForm from './pages/tickets/TicketForm';
+import TicketDetail from './pages/tickets/TicketDetail';
+import CategoryManagement from './pages/tickets/CategoryManagement';
+
+// Comunicaciones
+import EjecutivosMain from './pages/comunicaciones/EjecutivosMain';
+import EstablecimientoGestion from './pages/comunicaciones/EstablecimientoGestion';
+
 
 import Login from './pages/Login';
 import ForgotPassword from './pages/auth/ForgotPassword';
@@ -63,6 +73,7 @@ import RolesManagement from './pages/admin/RolesManagement';
 import AuditLog from './pages/admin/AuditLog';
 import EmailSettings from './pages/admin/EmailSettings';
 import ConciliacionDashboard from './pages/admin/ConciliacionDashboard';
+import LoginBackgroundsAdmin from './pages/admin/LoginBackgroundsAdmin';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -210,7 +221,7 @@ function App() {
                 <Route element={<ProtectedRoute permission="orden_compra.view_ordencompramp" />}>
                   <Route path="orden-compra" element={<OCDashboard />} />
                 </Route>
-                <Route element={<ProtectedRoute permission="solicitudes_reservas.view_solicitudreserva" />}>
+                <Route element={<ProtectedRoute permission={['solicitudes_reservas.view_solicitudreserva', 'solicitudes_reservas.can_view_calendar']} />}>
                   <Route path="reservas" element={<ReservasDashboard />} />
                 </Route>
                 <Route element={<ProtectedRoute permission="personal_ti.view_personalti" />}>
@@ -233,6 +244,19 @@ function App() {
                   <Route path="bienestar" element={<WelfareBoard />} />
                 </Route>
                 <Route path="procedimientos" element={<ProceduresDashboard />} />
+                
+                {/* Tickets / Mesa de Ayuda */}
+                <Route path="tickets" element={<TicketsDashboard />} />
+                <Route path="tickets/new" element={<TicketForm />} />
+                <Route path="tickets/categories" element={<CategoryManagement />} />
+                <Route path="tickets/:id" element={<TicketDetail />} />
+
+                {/* Comunicaciones */}
+                <Route element={<ProtectedRoute permission={['establecimientos.view_establecimiento', 'ejecutivos.add_gestionestablecimiento', 'ejecutivos.view_gestionestablecimiento']} />}>
+                  <Route path="comunicaciones/ejecutivos" element={<EjecutivosMain />} />
+                  <Route path="comunicaciones/ejecutivos/gestion/:id" element={<EstablecimientoGestion />} />
+                </Route>
+
                 {/* Administración */}
                 <Route element={<ProtectedRoute permission="auth.view_group" />}>
                   <Route path="admin/users" element={<UserManagement />} />
@@ -240,9 +264,11 @@ function App() {
                   <Route path="admin/audit-log" element={<AuditLog />} />
                   <Route path="admin/email-settings" element={<EmailSettings />} />
                   <Route path="admin/conciliacion" element={<ConciliacionDashboard />} />
+                  <Route path="admin/personalizacion/login/backgrounds" element={<LoginBackgroundsAdmin />} />
                 </Route>
               </Route>
             </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

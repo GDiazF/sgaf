@@ -1,13 +1,24 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
-    Search, Loader2, Info, Calendar, Clock, Globe, RefreshCcw, Landmark,
-    Star, ArrowUpRight, CheckCircle2, AlertCircle, ShoppingCart, Users,
-    Zap, User, MapPin, Wallet, Filter, X, ChevronDown, Mail, Phone,
-    Building2, Hash, Package, TrendingUp, BarChart3, Receipt, FileText,
-    ExternalLink, MapPinned, CreditCard, Layers
+    Search, Loader2, Clock, Globe, RefreshCcw,
+    AlertCircle, User, Wallet, Mail, Phone,
+    Building2, Hash, Package,
+    ExternalLink, CreditCard, Layers, FolderSearch, Eye, X, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api';
+import { validateMpDateRange, validateMpCodeSearch, MP_MAX_RANGE_DAYS } from '../../utils/mpDateValidation';
+import DateInput from '../../components/common/DateInput';
+import {
+    TITLE_ICON_BOX, BTN_PRIMARY, INPUT_FILTER, LOADER_SPIN, LINK_MUTED,
+    BADGE_BLUE, CODE_TEXT, CARD_HOVER, GROUP_HOVER_TITLE, INFO_BANNER, ICON_CLOCK,
+    MODAL_SHELL, MODAL_BACKDROP, MODAL_PANEL,
+} from './ordenCompraUi';
+
+const ModalPortal = ({ children }) => createPortal(children, document.body);
+
+const todayIsoDate = () => new Date().toISOString().split('T')[0];
 
 const OCDashboard = () => {
     const [ocs, setOcs] = useState([]);
@@ -17,6 +28,7 @@ const OCDashboard = () => {
     const [selectedStartDate, setSelectedStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
     const [selectedEndDate, setSelectedEndDate] = useState(new Date().toISOString().split('T')[0]);
     const [error, setError] = useState(null);
+    const [rangeWarning, setRangeWarning] = useState(null);
     const [hasSearched, setHasSearched] = useState(false);
     const [apiMeta, setApiMeta] = useState(null);
     const [loadingTime, setLoadingTime] = useState(0);
@@ -43,6 +55,27 @@ const OCDashboard = () => {
         return () => clearInterval(interval);
     }, [loading]);
 
+    useEffect(() => {
+        const check = validateMpDateRange(selectedStartDate, selectedEndDate);
+        setRangeWarning(check.valid ? check.warning || null : null);
+    }, [selectedStartDate, selectedEndDate]);
+
+    const getMaxEndDate = () => {
+        if (!selectedStartDate) return todayIsoDate();
+        const start = new Date(selectedStartDate);
+        start.setDate(start.getDate() + MP_MAX_RANGE_DAYS - 1);
+        const maxAllowed = start.toISOString().split('T')[0];
+        const today = todayIsoDate();
+        return maxAllowed < today ? maxAllowed : today;
+    };
+
+    const getMinStartDate = () => {
+        if (!selectedEndDate) return undefined;
+        const end = new Date(selectedEndDate);
+        end.setDate(end.getDate() - (MP_MAX_RANGE_DAYS - 1));
+        return end.toISOString().split('T')[0];
+    };
+
     const getLoadingMessage = () => {
         if (loadingTime < 5) return "Conectando con Mercado Público...";
         if (loadingTime < 15) return "Sincronizando registros...";
@@ -51,26 +84,37 @@ const OCDashboard = () => {
     };
 
     const fetchOCs = async (isCodeSearch = false, forceScan = false) => {
-        setLoading(true);
         setError(null);
-        try {
-            const params = {
-                CodigoOrganismo: slepIquiqueCode,
-                ticket: ticket,
-                force: forceScan
-            };
 
-            if (isCodeSearch) {
-                if (!searchCode.trim()) {
-                    setError("Ingrese un código de OC válido");
-                    setLoading(false);
-                    return;
-                }
-                params.codigo = searchCode.trim();
-            } else {
-                params.fecha_inicio = selectedStartDate;
-                params.fecha_fin = selectedEndDate;
+        const params = {
+            CodigoOrganismo: slepIquiqueCode,
+            ticket: ticket,
+            force: forceScan
+        };
+
+        if (isCodeSearch) {
+            const codeCheck = validateMpCodeSearch(searchCode);
+            if (!codeCheck.valid) {
+                setRangeWarning(null);
+                setError(codeCheck.error);
+                return;
             }
+            setRangeWarning(null);
+            params.codigo = codeCheck.code;
+        } else {
+            const rangeCheck = validateMpDateRange(selectedStartDate, selectedEndDate);
+            if (!rangeCheck.valid) {
+                setRangeWarning(null);
+                setError(rangeCheck.error);
+                return;
+            }
+            setRangeWarning(rangeCheck.warning || null);
+            params.fecha_inicio = selectedStartDate;
+            params.fecha_fin = selectedEndDate;
+        }
+
+        setLoading(true);
+        try {
 
             const response = await api.get('orden_compra/visor/', {
                 params,
@@ -118,141 +162,169 @@ const OCDashboard = () => {
         }
     };
 
-    const getStatusColor = (estado) => {
+    const getStatusBadgeClass = (estado) => {
         const e = (estado || '').toLowerCase();
-        if (e.includes('recepcion')) return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-        if (e.includes('acepta') || e.includes('envia') || e.includes('enviada')) return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-        if (e.includes('cancela') || e.includes('rechaza') || e.includes('rechazada')) return 'bg-red-500/10 text-red-500 border-red-500/20';
-        return 'bg-slate-500/10 text-slate-500 border-slate-500/20';
+        const base = 'text-[9px] font-black px-2 py-0.5 rounded-lg border uppercase tracking-tighter';
+        if (e.includes('recepcion')) return `${base} bg-emerald-50 text-emerald-600 border-emerald-100`;
+        if (e.includes('acepta') || e.includes('envia') || e.includes('enviada')) return `${base} bg-blue-50 text-blue-600 border-blue-100`;
+        if (e.includes('cancela') || e.includes('rechaza') || e.includes('rechazada')) return `${base} bg-rose-50 text-rose-600 border-rose-100`;
+        return `${base} bg-slate-50 text-slate-500 border-slate-100`;
     };
 
     return (
-        <div className="space-y-4 w-full px-4 sm:px-6 lg:px-8 pb-8">
-            {/* Header Area */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/40 backdrop-blur-md p-4 rounded-xl border border-white/20 shadow-xl shadow-slate-200/50">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl shadow-lg shadow-indigo-200">
-                        <ShoppingCart className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-base font-bold text-slate-800 tracking-tight">Visor de Órdenes de Compra</h1>
-                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                            SLEP Iquique <span className="w-1 h-1 bg-slate-300 rounded-full"></span> {slepIquiqueCode}
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative flex items-center bg-white rounded-2xl border border-slate-100 p-1 shadow-sm focus-within:ring-2 ring-indigo-500/20 transition-all">
-                        <div className="pl-3 pr-2 text-slate-400">
-                            <Calendar className="w-4 h-4" />
+        <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden">
+            <div className="shrink-0 flex flex-col gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={TITLE_ICON_BOX}>
+                            <FileText className="w-4 h-4" />
                         </div>
-                        <div className="flex items-center gap-2 pr-2">
-                            <input
-                                type="date"
-                                value={selectedStartDate}
-                                onChange={(e) => setSelectedStartDate(e.target.value)}
-                                className="bg-transparent border-none text-[11px] font-medium text-slate-700 focus:ring-0 p-2 w-[120px]"
-                            />
-                            <div className="text-slate-300 font-bold">→</div>
-                            <input
-                                type="date"
-                                value={selectedEndDate}
-                                onChange={(e) => setSelectedEndDate(e.target.value)}
-                                className="bg-transparent border-none text-[11px] font-medium text-slate-700 focus:ring-0 p-2 w-[120px]"
-                            />
+                        <div className="min-w-0">
+                            <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase select-none">
+                                Visor de Órdenes de Compra
+                            </h2>
+                            <p className="text-[10px] md:text-xs font-medium text-slate-500 mt-1.5 select-none">
+                                SLEP Iquique · Organismo {slepIquiqueCode}
+                            </p>
                         </div>
-                        <button
-                            onClick={() => fetchOCs(false, true)}
-                            disabled={loading}
-                            className="bg-slate-900 hover:bg-slate-800 text-white p-2 rounded-lg transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                        >
-                            {loading && !searchCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
-                        </button>
                     </div>
-
-                    <div className="h-8 w-[1px] bg-slate-200 hidden md:block mx-1"></div>
-
-                    <div className="relative flex items-center bg-white rounded-2xl border border-slate-100 p-1 shadow-sm focus-within:ring-2 ring-blue-500/20 transition-all group">
-                        <div className="pl-3 pr-2 text-slate-400 group-focus-within:text-blue-500 transition-colors">
-                            <Hash className="w-4 h-4" />
-                        </div>
-                        <input
-                            type="text"
-                            placeholder="Código OC"
-                            value={searchCode}
-                            onChange={(e) => setSearchCode(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && fetchOCs(true, true)}
-                            className="bg-transparent border-none text-xs font-medium text-slate-700 placeholder:text-slate-300 focus:ring-0 p-2 w-32"
-                        />
+                    <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest select-none">
+                            Ticket {ticket ? String(ticket).substring(0, 8) : '---'}…
+                        </span>
                         <button
-                            onClick={() => fetchOCs(true, true)}
-                            disabled={loading}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-[9px] font-semibold transition-all shadow-lg shadow-blue-200 active:scale-95 disabled:opacity-50"
-                        >
-                            {loading && searchCode ? <Loader2 className="w-3 h-3 animate-spin" /> : "BUSCAR"}
-                        </button>
-                    </div>
-
-                    <div className="flex items-center gap-2 ml-2">
-                        <span className="text-[8px] font-bold text-slate-300 uppercase italic">Ticket: {ticket ? String(ticket).substring(0, 8) : '---'}...</span>
-                        <button
-                            onClick={() => {
-                                localStorage.removeItem('mp_ticket');
-                                window.location.reload();
-                            }}
-                            className="text-[8px] font-black text-indigo-400 hover:text-indigo-600 uppercase underline decoration-dotted"
+                            type="button"
+                            onClick={() => { localStorage.removeItem('mp_ticket'); window.location.reload(); }}
+                            className={LINK_MUTED}
                         >
                             Reset
                         </button>
                     </div>
                 </div>
+
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 w-full bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div className="flex flex-wrap items-center gap-2 flex-1">
+                        <DateInput
+                            compact
+                            value={selectedStartDate}
+                            min={getMinStartDate()}
+                            max={selectedEndDate}
+                            onChange={(val) => {
+                                setSelectedStartDate(val);
+                                if (val) {
+                                    const start = new Date(val);
+                                    const end = new Date(selectedEndDate);
+                                    const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                                    if (diffDays > MP_MAX_RANGE_DAYS) {
+                                        const maxEnd = new Date(start);
+                                        maxEnd.setDate(maxEnd.getDate() + MP_MAX_RANGE_DAYS - 1);
+                                        const maxAllowed = maxEnd.toISOString().split('T')[0];
+                                        const today = todayIsoDate();
+                                        setSelectedEndDate(maxAllowed < today ? maxAllowed : today);
+                                    }
+                                }
+                            }}
+                            className="w-full sm:w-[8.5rem] shrink-0"
+                        />
+                        <span className="text-[10px] font-bold text-slate-300 hidden sm:inline">→</span>
+                        <DateInput
+                            compact
+                            value={selectedEndDate}
+                            min={selectedStartDate}
+                            max={getMaxEndDate()}
+                            onChange={(val) => {
+                                setSelectedEndDate(val);
+                                if (val) {
+                                    const start = new Date(selectedStartDate);
+                                    const end = new Date(val);
+                                    const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                                    if (diffDays > MP_MAX_RANGE_DAYS) {
+                                        const minStart = new Date(end);
+                                        minStart.setDate(minStart.getDate() - (MP_MAX_RANGE_DAYS - 1));
+                                        setSelectedStartDate(minStart.toISOString().split('T')[0]);
+                                    }
+                                }
+                            }}
+                            className="w-full sm:w-[8.5rem] shrink-0"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => fetchOCs(false, true)}
+                            disabled={loading}
+                            className={BTN_PRIMARY}
+                        >
+                            {loading && !searchCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
+                            Sincronizar
+                        </button>
+                    </div>
+                    <div className="flex items-center gap-2 w-full lg:w-auto lg:max-w-xs">
+                        <div className="relative flex-1 min-w-0">
+                            <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Código OC"
+                                value={searchCode}
+                                onChange={(e) => setSearchCode(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && fetchOCs(true, true)}
+                                className={INPUT_FILTER}
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => fetchOCs(true, true)}
+                            disabled={loading}
+                            className={BTN_PRIMARY}
+                        >
+                            {loading && searchCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                            Buscar
+                        </button>
+                    </div>
+                    <p className="text-[9px] font-medium text-slate-500 uppercase tracking-widest px-1">
+                        Período máximo {MP_MAX_RANGE_DAYS} días · Mercado Público consulta día a día
+                    </p>
+                </div>
             </div>
+
+            {rangeWarning && !error && (
+                <div className="shrink-0 p-3 bg-amber-50 border border-amber-100 rounded-xl flex items-center gap-2 text-amber-800">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <p className="text-[10px] font-medium uppercase tracking-tighter">{rangeWarning}</p>
+                </div>
+            )}
 
             <AnimatePresence>
                 {error && (
                     <motion.div
-                        initial={{ opacity: 0, y: -20 }}
+                        initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-4 text-red-600 shadow-sm"
+                        exit={{ opacity: 0 }}
+                        className="shrink-0 p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-center gap-3 text-rose-600"
                     >
-                        <div className="bg-red-500 text-white p-2 rounded-full">
-                            <AlertCircle className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-bold">Error en la consulta</p>
-                            <p className="text-xs font-medium opacity-80">{error}</p>
-                        </div>
-                        <button onClick={() => setError(null)} className="ml-auto p-2 hover:bg-red-100 rounded-full transition-colors">
-                            <X className="w-4 h-4" />
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <p className="text-[10px] font-medium uppercase tracking-tighter flex-1">{error}</p>
+                        <button type="button" onClick={() => setError(null)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                            <X className="w-3.5 h-3.5" />
                         </button>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            <div className="w-full">
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                 <AnimatePresence mode="wait">
                     {loading ? (
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="h-[300px] flex flex-col items-center justify-center bg-white/40 backdrop-blur-sm rounded-xl border border-white/50"
+                            className="flex-1 flex flex-col items-center justify-center gap-3"
                         >
-                            <div className="relative">
-                                <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
-                                <div className="absolute -bottom-2 -right-2 bg-indigo-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-lg">
-                                    {loadingTime}s
-                                </div>
-                            </div>
-                            <div className="text-center mt-6">
-                                <p className="font-bold text-slate-800 text-base tracking-tight">{getLoadingMessage()}</p>
-                                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Sincronización en tiempo real • Canal Seguro</p>
-                            </div>
+                            <Loader2 className={LOADER_SPIN} />
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest select-none">{getLoadingMessage()}</span>
+                            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">{loadingTime}s</span>
                         </motion.div>
                     ) : ocs.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-2">
                             {ocs.map((oc, idx) => (
                                 <motion.div
                                     key={oc.CodigoExterno || idx}
@@ -260,226 +332,191 @@ const OCDashboard = () => {
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: idx * 0.05 }}
                                     onClick={() => handleOpenDetail(oc)}
-                                    className="group bg-white hover:bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-300 relative overflow-hidden cursor-pointer"
+                                    className={`group bg-white p-4 rounded-2xl border border-slate-200 shadow-sm transition-all cursor-pointer flex flex-col ${CARD_HOVER}`}
                                 >
-                                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-indigo-50 to-transparent -mr-8 -mt-8 rounded-full transition-transform group-hover:scale-150"></div>
-
-                                    <div className="flex justify-between items-start mb-4 relative z-10">
-                                        <div className="max-w-[65%]">
+                                    <div className="flex justify-between items-start gap-2 mb-3">
+                                        <div className="min-w-0 flex-1">
                                             <div className="flex flex-wrap gap-1 items-center mb-1">
-                                                <span className="text-[9px] font-bold text-indigo-500 uppercase tracking-[0.2em]">{oc.CodigoExterno}</span>
+                                                <span className={CODE_TEXT}>{oc.CodigoExterno}</span>
                                                 {oc.TipoCompraRepresentativo && oc.TipoCompraRepresentativo !== 'No especificado' && (
-                                                    <span className="text-[8px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md uppercase tracking-tighter">
+                                                    <span className={BADGE_BLUE}>
                                                         {oc.TipoCompraRepresentativo}
                                                     </span>
                                                 )}
                                             </div>
-                                            <h3 className="font-semibold text-slate-800 line-clamp-1 group-hover:text-indigo-600 transition-colors uppercase text-xs">{oc.Nombre || 'Sin nombre'}</h3>
+                                            <h3 className={`text-[11px] font-medium text-slate-700 line-clamp-2 uppercase tracking-tighter transition-colors ${GROUP_HOVER_TITLE}`}>{oc.Nombre || 'Sin nombre'}</h3>
                                         </div>
-                                        <div className={`px-2.5 py-1 rounded-full border text-[9px] font-bold uppercase tracking-wider ${getStatusColor(oc.Estado)}`}>
-                                            {oc.Estado}
-                                        </div>
+                                        <span className={`shrink-0 ${getStatusBadgeClass(oc.Estado)}`}>{oc.Estado}</span>
                                     </div>
 
-                                    <div className="space-y-3 relative z-10">
-                                        <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-100">
-                                            <div className="p-1.5 bg-white rounded-lg shadow-sm">
-                                                <Building2 className="w-3 h-3 text-slate-400" />
-                                            </div>
+                                    <div className="space-y-2 flex-1">
+                                        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                            <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                                             <div className="min-w-0">
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase">Proveedor</p>
-                                                {oc.Proveedor?.Nombre || oc.Proveedor?.RazonSocial || oc.Proveedor?.Rut ? (
-                                                    <p className="text-xs font-black text-slate-700 uppercase truncate">
-                                                        {oc.Proveedor?.Nombre || oc.Proveedor?.RazonSocial || oc.Proveedor?.Rut}
-                                                    </p>
-                                                ) : (
-                                                    <p className="text-xs font-bold text-slate-400 italic truncate">Sin info pública aún</p>
-                                                )}
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Proveedor</p>
+                                                <p className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter truncate">
+                                                    {oc.Proveedor?.Nombre || oc.Proveedor?.RazonSocial || oc.Proveedor?.Rut || 'Sin info pública'}
+                                                </p>
                                             </div>
                                         </div>
-
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-1.5 bg-emerald-50 rounded-xl">
-                                                    <Wallet className="w-3 h-3 text-emerald-500" />
-                                                </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <Wallet className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                                                 <div>
-                                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Monto</p>
-                                                    <p className="text-sm font-black text-emerald-600 tracking-tight">
-                                                        ${(oc.MontoTotal || 0).toLocaleString()}
-                                                    </p>
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Monto</p>
+                                                    <p className="text-[11px] font-medium text-emerald-600 tracking-tighter">${(oc.MontoTotal || 0).toLocaleString()}</p>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-1.5 bg-indigo-50 rounded-xl">
-                                                    <Clock className="w-3 h-3 text-indigo-500" />
-                                                </div>
+                                            <div className="flex items-center gap-2">
+                                                <Clock className={ICON_CLOCK} />
                                                 <div>
-                                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Fecha</p>
-                                                    <p className="text-xs font-black text-slate-700">{oc.Fechas?.FechaCreacion?.split('T')[0] || '---'}</p>
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Fecha</p>
+                                                    <p className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter">{oc.Fechas?.FechaCreacion?.split('T')[0] || '---'}</p>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="mt-4 flex items-center justify-between">
-                                        <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                                    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                                        <span className="text-[10px] font-medium text-slate-400 uppercase tracking-widest flex items-center gap-1">
                                             <Package className="w-3 h-3" />
                                             {oc.Items?.Cantidad || 0} items
-                                        </div>
-                                        <div className="text-[10px] font-black text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            VER DETALLE →
-                                        </div>
+                                        </span>
+                                        <span className="p-1.5 text-slate-400 group-hover:text-blue-500 group-hover:bg-blue-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                                            <Eye className="w-3.5 h-3.5" />
+                                        </span>
                                     </div>
                                 </motion.div>
                             ))}
                         </div>
+                        </div>
                     ) : hasSearched ? (
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="h-[400px] flex flex-col items-center justify-center bg-white/40 backdrop-blur-sm rounded-[2.5rem] border border-white/50 text-center p-8"
-                        >
-                            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                                <Search className="w-8 h-8 text-slate-300" />
-                            </div>
-                            <h3 className="font-black text-slate-800 text-lg tracking-tight">No se encontraron resultados</h3>
-                            <p className="text-slate-400 font-medium text-sm mt-2 max-w-xs">Intente con otra fecha o verifique el código de la orden de compra.</p>
-                        </motion.div>
+                        <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
+                            <FolderSearch className="w-10 h-10 text-slate-200 mb-3" />
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No se encontraron registros</span>
+                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mt-2 max-w-xs">Pruebe otro rango de fechas o código de OC</p>
+                        </div>
                     ) : (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="h-[400px] flex flex-col items-center justify-center bg-indigo-600 bg-opacity-[0.03] rounded-[2.5rem] border-2 border-dashed border-indigo-100 text-center p-8"
-                        >
-                            <div className="w-24 h-24 bg-white rounded-[2rem] shadow-2xl flex items-center justify-center mb-6 relative">
-                                <div className="absolute -top-2 -right-2 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-black text-xs shadow-lg">?</div>
-                                <Receipt className="w-12 h-12 text-indigo-500" />
-                            </div>
-                            <h3 className="font-bold text-slate-800 text-lg tracking-tight">Explorador de OCs</h3>
-                            <p className="text-slate-500 font-bold text-sm mt-2 max-w-xs uppercase tracking-widest leading-relaxed">
-                                Ingrese un código o seleccione un rango para sincronizar datos
+                        <div className="flex-1 flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-slate-200 rounded-2xl mx-1">
+                            <FolderSearch className="w-10 h-10 text-slate-200 mb-3" />
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Explorador de órdenes de compra</span>
+                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mt-2 max-w-sm">
+                                Seleccione fechas y sincronice, o busque por código OC
                             </p>
-                        </motion.div>
+                        </div>
                     )}
                 </AnimatePresence>
             </div>
 
-            {/* Premium Detail Modal */}
+            <ModalPortal>
             <AnimatePresence>
                 {isModalOpen && selectedOC && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
-                        onClick={() => setIsModalOpen(false)}
-                    >
+                    <div className={MODAL_SHELL}>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsModalOpen(false)}
+                            className={MODAL_BACKDROP}
+                            aria-hidden
+                        />
                         <motion.div
                             initial={{ scale: 0.95, y: 20, opacity: 0 }}
                             animate={{ scale: 1, y: 0, opacity: 1 }}
                             exit={{ scale: 0.95, y: 20, opacity: 0 }}
                             onClick={(e) => e.stopPropagation()}
-                            className="bg-white w-full max-w-5xl max-h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-white"
+                            className={MODAL_PANEL}
                         >
-                            {/* Modal Header */}
-                            <div className="p-8 pb-4 flex justify-between items-start border-b border-slate-50">
-                                <div>
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full tracking-widest uppercase">
-                                            Ficha de Orden de Compra
+                            <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex justify-between items-start gap-4 shrink-0">
+                                <div className="flex items-start gap-3 min-w-0 flex-1">
+                                    <div className={TITLE_ICON_BOX}>
+                                        <FileText className="w-4 h-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                                        <span className={BADGE_BLUE}>
+                                            Ficha OC
                                         </span>
                                         {selectedOC.TipoCompraRepresentativo && selectedOC.TipoCompraRepresentativo !== 'No especificado' && (
-                                            <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black rounded-full tracking-widest uppercase">
+                                            <span className={BADGE_BLUE}>
                                                 {selectedOC.TipoCompraRepresentativo}
                                             </span>
                                         )}
-                                        <span className={`px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-wider ${getStatusColor(selectedOC.Estado)}`}>
-                                            {selectedOC.Estado}
-                                        </span>
+                                        <span className={getStatusBadgeClass(selectedOC.Estado)}>{selectedOC.Estado}</span>
                                     </div>
-                                    <h2 className="text-lg font-bold text-slate-800 uppercase leading-none mb-1">
+                                    <h3 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase line-clamp-2">
                                         {selectedOC.Nombre || 'Orden de Compra s/n'}
-                                    </h2>
-                                    <p className="text-sm font-bold text-slate-400 flex items-center gap-2">
-                                        <Hash className="w-4 h-4" /> {selectedOC.CodigoExterno}
+                                    </h3>
+                                    <p className="text-[10px] font-medium text-slate-500 mt-1.5 uppercase tracking-tighter">
+                                        {selectedOC.CodigoExterno}
                                     </p>
+                                    </div>
                                 </div>
                                 <button
+                                    type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-800 rounded-2xl transition-all active:scale-95"
+                                    className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors shrink-0"
                                 >
-                                    <X className="w-6 h-6" />
+                                    <X className="w-5 h-5" />
                                 </button>
                             </div>
 
-                            {/* Modal Body */}
-                            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                            <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar min-h-0">
                                 {detailLoading ? (
-                                    <div className="h-64 flex flex-col items-center justify-center space-y-4">
-                                        <div className="relative">
-                                            <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
-                                            <div className="absolute inset-0 blur-xl bg-indigo-400/20 animate-pulse"></div>
-                                        </div>
-                                        <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Obteniendo detalles completos...</p>
+                                    <div className="h-64 flex flex-col items-center justify-center gap-3">
+                                        <Loader2 className={LOADER_SPIN} />
+                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest select-none">Cargando detalle...</span>
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                         {/* Left Column: Core Info */}
                                         <div className="lg:col-span-1 space-y-6">
                                             {/* General Section */}
-                                            <div className="bg-slate-50/50 p-6 rounded-3xl border border-slate-100 space-y-4">
-                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-2">
-                                                    <Info className="w-3 h-3" /> Información General
+                                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+                                                    Información general
                                                 </h4>
-
                                                 <div>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Fecha Envío</p>
-                                                    <p className="text-sm font-black text-slate-700">{selectedOC.Fechas?.FechaCreacion?.replace('T', ' ').split('.')[0] || '---'}</p>
+                                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Fecha envío</p>
+                                                    <p className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter">{selectedOC.Fechas?.FechaCreacion?.replace('T', ' ').split('.')[0] || '---'}</p>
                                                 </div>
-
                                                 <div>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Tipo</p>
-                                                    <p className="text-sm font-black text-indigo-600 uppercase">{selectedOC.Tipo || 'Consignación'}</p>
+                                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tipo</p>
+                                                    <p className={CODE_TEXT}>{selectedOC.Tipo || 'Consignación'}</p>
                                                 </div>
-
                                                 <div>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Monto Total</p>
-                                                    <p className="text-xl font-bold text-emerald-600">
-                                                        ${(selectedOC.MontoTotal || 0).toLocaleString()} <span className="text-xs">{selectedOC.Moneda || 'CLP'}</span>
+                                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Monto total</p>
+                                                    <p className="text-[11px] font-medium text-emerald-600 tracking-tighter">
+                                                        ${(selectedOC.MontoTotal || 0).toLocaleString()} {selectedOC.Moneda || 'CLP'}
                                                     </p>
                                                 </div>
                                             </div>
 
-                                            {/* Provider Section */}
-                                            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-                                                <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-2 mb-2">
-                                                    <Building2 className="w-3 h-3" /> Proveedor
+                                            <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-3">
+                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+                                                    Proveedor
                                                 </h4>
-
                                                 <div>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Razón Social</p>
-                                                    <p className="text-sm font-black text-slate-700 uppercase">{selectedOC.Proveedor?.Nombre}</p>
+                                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Razón social</p>
+                                                    <p className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter">{selectedOC.Proveedor?.Nombre || '---'}</p>
                                                 </div>
-
                                                 <div>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase">RUT</p>
-                                                    <p className="text-sm font-black text-slate-700">{selectedOC.Proveedor?.Rut}</p>
+                                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">RUT</p>
+                                                    <p className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter">{selectedOC.Proveedor?.Rut || '---'}</p>
                                                 </div>
-
                                                 {selectedOC.Proveedor?.Contacto && (
-                                                    <div className="pt-2 border-t border-slate-50 space-y-2">
-                                                        <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
-                                                            <User className="w-3 h-3 text-slate-400" /> {selectedOC.Proveedor.Contacto}
+                                                    <div className="pt-2 border-t border-slate-100 space-y-2">
+                                                        <div className="flex items-center gap-2 text-[11px] font-medium text-slate-600 uppercase tracking-tighter">
+                                                            <User className="w-3 h-3 text-slate-400 shrink-0" /> {selectedOC.Proveedor.Contacto}
                                                         </div>
                                                         {selectedOC.Proveedor.Mail && (
-                                                            <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
-                                                                <Mail className="w-3 h-3 text-slate-400" /> {selectedOC.Proveedor.Mail}
+                                                            <div className="flex items-center gap-2 text-[11px] font-medium text-slate-600 uppercase tracking-tighter">
+                                                                <Mail className="w-3 h-3 text-slate-400 shrink-0" /> {selectedOC.Proveedor.Mail}
                                                             </div>
                                                         )}
                                                         {selectedOC.Proveedor.Fono && (
-                                                            <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
-                                                                <Phone className="w-3 h-3 text-slate-400" /> {selectedOC.Proveedor.Fono}
+                                                            <div className="flex items-center gap-2 text-[11px] font-medium text-slate-600 uppercase tracking-tighter">
+                                                                <Phone className="w-3 h-3 text-slate-400 shrink-0" /> {selectedOC.Proveedor.Fono}
                                                             </div>
                                                         )}
                                                     </div>
@@ -490,13 +527,10 @@ const OCDashboard = () => {
                                         {/* Main Column: Items & Details */}
                                         <div className="lg:col-span-2 space-y-6">
                                             {/* Summary/Description */}
-                                            <div className="p-6 bg-indigo-600/5 rounded-3xl border border-indigo-100 relative overflow-hidden group">
-                                                <div className="absolute -right-4 -top-4 text-indigo-600/10 group-hover:scale-110 transition-transform">
-                                                    <FileText className="w-24 h-24 rotate-12" />
-                                                </div>
-                                                <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-3">Descripción / Observación</h4>
-                                                <p className="text-sm font-bold text-slate-600 leading-relaxed whitespace-pre-line relative z-10">
-                                                    {selectedOC.Observacion || 'Sin descripción detallada disponible en esta ficha.'}
+                                            <div className={INFO_BANNER}>
+                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Descripción / observación</h4>
+                                                <p className="text-xs font-medium text-slate-700 uppercase leading-relaxed whitespace-pre-line">
+                                                    {selectedOC.Observacion || 'Sin descripción detallada disponible.'}
                                                 </p>
                                             </div>
 
@@ -511,44 +545,34 @@ const OCDashboard = () => {
                                                     </span>
                                                 </div>
 
-                                                <div className="overflow-x-auto rounded-3xl border border-slate-100 shadow-sm">
-                                                    <table className="w-full text-left border-collapse whitespace-nowrap">
-                                                        <thead>
-                                                            <tr className="bg-slate-50">
-                                                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cod. / Producto</th>
-                                                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Cant.</th>
-                                                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Unitario</th>
-                                                                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total</th>
+                                                <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white custom-scrollbar">
+                                                    <table className="w-full text-left border-collapse border-spacing-0">
+                                                        <thead className="sticky top-0 z-10">
+                                                            <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-200">
+                                                                <th className="px-4 py-3 border-r border-slate-100">Cod. / producto</th>
+                                                                <th className="px-4 py-3 border-r border-slate-100 text-center w-24">Cant.</th>
+                                                                <th className="px-4 py-3 border-r border-slate-100 text-right">Unitario</th>
+                                                                <th className="px-4 py-3 text-right">Total</th>
                                                             </tr>
                                                         </thead>
-                                                        <tbody className="divide-y divide-slate-50">
+                                                        <tbody className="divide-y divide-slate-100">
                                                             {selectedOC.Items?.Listado?.map((item, idx) => (
                                                                 <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                                                    <td className="p-4">
-                                                                        <div className="flex flex-col gap-0.5">
-                                                                            <span className="text-[9px] font-bold text-indigo-500 uppercase tracking-tighter">
-                                                                                {item.CodigoProducto}
-                                                                            </span>
-                                                                            <span className="text-xs font-black text-slate-700 uppercase line-clamp-1">
-                                                                                {item.NombreProducto}
-                                                                            </span>
-                                                                            {item.Categoria && (
-                                                                                <span className="text-[8px] font-bold text-slate-300 uppercase">
-                                                                                    {item.Categoria}
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
+                                                                    <td className="px-4 py-3 align-middle border-r border-slate-50">
+                                                                        <span className={`block ${CODE_TEXT}`}>{item.CodigoProducto}</span>
+                                                                        <span className="block text-[11px] font-medium text-slate-700 uppercase tracking-tighter line-clamp-1">{item.NombreProducto}</span>
+                                                                        {item.Categoria && (
+                                                                            <span className="block text-[10px] font-medium text-slate-400 uppercase tracking-tighter">{item.Categoria}</span>
+                                                                        )}
                                                                     </td>
-                                                                    <td className="p-4 text-center">
-                                                                        <div className="inline-flex flex-col items-center">
-                                                                            <span className="text-xs font-black text-slate-700">{item.Cantidad}</span>
-                                                                            <span className="text-[8px] font-bold text-slate-400 uppercase">{item.UnidadMedida || 'Un'}</span>
-                                                                        </div>
+                                                                    <td className="px-4 py-3 align-middle border-r border-slate-50 text-center">
+                                                                        <span className="text-[11px] font-medium text-slate-700">{item.Cantidad}</span>
+                                                                        <span className="block text-[10px] font-medium text-slate-400 uppercase tracking-tighter">{item.UnidadMedida || 'Un'}</span>
                                                                     </td>
-                                                                    <td className="p-4 text-right font-bold text-slate-600 text-xs">
+                                                                    <td className="px-4 py-3 align-middle border-r border-slate-50 text-right text-[11px] font-medium text-slate-500 uppercase tracking-tighter whitespace-nowrap">
                                                                         ${(item.PrecioNeto || 0).toLocaleString()}
                                                                     </td>
-                                                                    <td className="p-4 text-right font-black text-slate-800 text-xs">
+                                                                    <td className="px-4 py-3 align-middle text-right text-[11px] font-medium text-slate-700 uppercase tracking-tighter whitespace-nowrap">
                                                                         ${(item.Total || 0).toLocaleString()}
                                                                     </td>
                                                                 </tr>
@@ -560,22 +584,18 @@ const OCDashboard = () => {
 
                                             {/* Extra Metadata Footer */}
                                             <div className="grid grid-cols-2 gap-4">
-                                                <div className="bg-slate-50/30 p-4 rounded-2xl border border-slate-50 flex items-center gap-3">
-                                                    <div className="p-2 bg-white rounded-xl">
-                                                        <CreditCard className="w-3 h-3 text-slate-400" />
-                                                    </div>
+                                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center gap-3">
+                                                    <CreditCard className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                                                     <div>
-                                                        <p className="text-[8px] font-bold text-slate-400 uppercase">Condición de Pago</p>
-                                                        <p className="text-[10px] font-black text-slate-600 uppercase">{selectedOC.CondicionPago || '30 Días contra factura'}</p>
+                                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Condición de pago</p>
+                                                        <p className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter">{selectedOC.CondicionPago || '30 días contra factura'}</p>
                                                     </div>
                                                 </div>
-                                                <div className="bg-slate-50/30 p-4 rounded-2xl border border-slate-50 flex items-center gap-3">
-                                                    <div className="p-2 bg-white rounded-xl">
-                                                        <Layers className="w-3 h-3 text-slate-400" />
-                                                    </div>
+                                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center gap-3">
+                                                    <Layers className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                                                     <div>
-                                                        <p className="text-[8px] font-bold text-slate-400 uppercase">Financiamiento</p>
-                                                        <p className="text-[10px] font-black text-slate-600 uppercase">{selectedOC.Financiamiento || 'Fondos Propios'}</p>
+                                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Financiamiento</p>
+                                                        <p className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter">{selectedOC.Financiamiento || 'Fondos propios'}</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -584,25 +604,24 @@ const OCDashboard = () => {
                                 )}
                             </div>
 
-                            {/* Modal Footer */}
-                            <div className="p-6 bg-slate-50 flex items-center justify-between">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase flex items-center gap-2">
-                                    <Globe className="w-3 h-3" /> Datos sincronizados en tiempo real desde la API de Mercado Público
+                            <div className="p-3 md:p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <Globe className="w-3 h-3 shrink-0" /> API Mercado Público
                                 </p>
-                                <div className="flex gap-2">
-                                    <button
-                                        className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 flex items-center gap-2 shadow-lg"
-                                        onClick={() => window.open(`https://www.mercadopublico.cl/Directorio/Ticket/TicketOC?codigooc=${selectedOC.CodigoExterno}`, '_blank')}
-                                    >
-                                        VER EN PORTAL MP <ExternalLink className="w-3 h-3" />
-                                    </button>
-                                </div>
+                                <button
+                                    type="button"
+                                    className={BTN_PRIMARY}
+                                    onClick={() => window.open(`https://www.mercadopublico.cl/Directorio/Ticket/TicketOC?codigooc=${selectedOC.CodigoExterno}`, '_blank')}
+                                >
+                                    <ExternalLink className="w-4 h-4" /> Ver en portal MP
+                                </button>
                             </div>
                         </motion.div>
-                    </motion.div>
+                    </div>
                 )}
             </AnimatePresence>
-        </div >
+            </ModalPortal>
+        </div>
     );
 };
 

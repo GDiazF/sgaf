@@ -1,12 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import BaseModal from '../common/BaseModal';
-import { ShoppingBag, Calendar, FileText, DollarSign, List, Briefcase, Building2, Info, Hash, Users, CreditCard, PenLine } from 'lucide-react';
+import { Building2, Info } from 'lucide-react';
 import DateInput from '../common/DateInput';
 import SearchableSelect from '../common/SearchableSelect';
 import MultiSearchableSelect from '../common/MultiSearchableSelect';
 import FormInput from '../common/FormInput';
 import FormSelect from '../common/FormSelect';
 import MonthInput from '../common/MonthInput';
+
+const ACQ_INPUT_CLASS =
+    'no-global !w-full !h-10 !min-h-10 !text-[10px] !font-bold !bg-white !border !border-slate-200 !px-3 !py-0 !rounded-xl !outline-none focus:!border-blue-500 uppercase !transition-all !shadow-sm placeholder:!text-slate-300';
+
+const ACQ_READONLY_INPUT_CLASS =
+    `${ACQ_INPUT_CLASS} !bg-slate-50 !font-mono !opacity-60 !cursor-not-allowed`;
+
+const ACQ_TOTAL_INPUT_CLASS =
+    `${ACQ_INPUT_CLASS} !bg-blue-50/50 !border-blue-200 !text-blue-700 !font-black !text-center focus:!bg-white`;
+
+const ACQ_SELECT_CLASS =
+    "no-global !w-full !h-10 !min-h-10 !text-[10px] !font-black uppercase tracking-widest !px-3 !py-0 !rounded-xl !border !border-slate-200 !outline-none cursor-pointer appearance-none !bg-white !text-slate-700 focus:!border-blue-500 !shadow-sm bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M7%209l3%203%203-3%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1rem_1rem] bg-[right_0.5rem_center] bg-no-repeat";
+
+const ACQ_LABEL_CLASS =
+    '!block !text-[10px] !font-black !text-slate-500 !uppercase !tracking-widest !mb-1.5 !ml-1';
+
+const BULK_BUTTON_CLASS =
+    'h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent bg-slate-100 text-slate-600 hover:bg-slate-200';
+
+const SectionHeader = ({ children }) => (
+    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2">
+        {children}
+    </h4>
+);
 
 const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, lookups }) => {
     const [formData, setFormData] = useState(initialData);
@@ -111,63 +135,61 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
             onSave={handleFormSave}
             title={editingId ? 'Editar Factura de Adquisición' : 'Registrar Adquisición Directa'}
             subtitle="Complete los detalles de la compra sin número de servicio asociado"
-            icon={ShoppingBag}
             maxWidth="max-w-3xl"
             saveLabel={editingId ? 'Actualizar Factura' : 'Guardar Factura'}
         >
             <div className="space-y-6">
                 {/* Section: Identificación del Documento */}
                 <div className="space-y-4">
-                    <h4 className="form-section-header">
-                        <Hash className="w-3.5 h-3.5" /> Identificación del Documento
-                    </h4>
+                    <SectionHeader>Identificación del Documento</SectionHeader>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2">
                         <FormInput
                             label="Folio RC"
-                            icon={<FileText />}
                             name="folio"
                             placeholder="Automático..."
                             value={formData.folio}
                             readOnly
-                            inputClassName="bg-slate-50 font-mono opacity-60 cursor-not-allowed"
+                            labelClassName={ACQ_LABEL_CLASS}
+                            inputClassName={ACQ_READONLY_INPUT_CLASS}
                         />
                         <FormInput
                             label="Nº CDP"
-                            icon={<Hash />}
                             name="cdp"
                             required
                             placeholder="Certificado..."
                             value={formData.cdp}
                             onChange={handleChange}
+                            labelClassName={ACQ_LABEL_CLASS}
+                            inputClassName={ACQ_INPUT_CLASS}
                         />
                         <FormInput
                             label="Nº Factura"
-                            icon={<FileText />}
                             name="nro_factura"
                             placeholder="Folio..."
                             value={formData.nro_factura}
                             onChange={handleChange}
+                            labelClassName={ACQ_LABEL_CLASS}
+                            inputClassName={ACQ_INPUT_CLASS}
                         />
                         <FormInput
                             label="Nº Orden de Compra"
-                            icon={<Hash />}
                             name="nro_oc"
                             placeholder="Opcional..."
                             value={formData.nro_oc}
                             onChange={handleChange}
+                            labelClassName={ACQ_LABEL_CLASS}
+                            inputClassName={ACQ_INPUT_CLASS}
                         />
                     </div>
                 </div>
 
                 {/* Section: Actores Involucrados */}
                 <div className="space-y-4">
-                    <h4 className="form-section-header">
-                        <Users className="w-3.5 h-3.5" /> Proveedor y Establecimientos
-                    </h4>
+                    <SectionHeader>Proveedor y Establecimientos</SectionHeader>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2">
                         <SearchableSelect
                             label="Proveedor / Emisor"
-                            icon={<Building2 className="w-3.5 h-3.5" />}
+                            icon={Building2}
                             options={providers.map(p => ({ value: p.id, label: `${p.nombre} (RUT: ${p.rut})` }))}
                             value={formData.proveedor}
                             onChange={(val) => handleSelectChange('proveedor', val)}
@@ -177,7 +199,7 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
                         <div className="space-y-2">
                             <MultiSearchableSelect
                                 label="Establecimientos de Destino"
-                                icon={<Building2 className="w-3.5 h-3.5" />}
+                                icon={Building2}
                                 options={establishments.map(e => ({ value: e.id, label: e.nombre }))}
                                 value={formData.establecimientos || []}
                                 onChange={(val) => handleSelectChange('establecimientos', val)}
@@ -187,21 +209,21 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
                                 <button
                                     type="button"
                                     onClick={() => handleBulkSelect('ALL')}
-                                    className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                    className={BULK_BUTTON_CLASS}
                                 >
                                     Todos
                                 </button>
 
                                 {[
-                                    { key: 'ESTABLECIMIENTO', label: 'Establecimientos', color: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
-                                    { key: 'JARDIN', label: 'Jardines VTF', color: 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' },
-                                    { key: 'OFICINA', label: 'Oficina Central', color: 'bg-amber-50 text-amber-600 hover:bg-amber-100' }
+                                    { key: 'ESTABLECIMIENTO', label: 'Establecimientos' },
+                                    { key: 'JARDIN', label: 'Jardines VTF' },
+                                    { key: 'OFICINA', label: 'Oficina Central' }
                                 ].map(area => (
                                     <button
                                         key={area.key}
                                         type="button"
                                         onClick={() => handleBulkSelect(area.key)}
-                                        className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent ${area.color}`}
+                                        className={BULK_BUTTON_CLASS}
                                     >
                                         {area.label}
                                     </button>
@@ -210,7 +232,7 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
                                 <button
                                     type="button"
                                     onClick={() => handleBulkSelect('CLEAR')}
-                                    className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent text-red-500 hover:bg-red-50"
+                                    className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent text-rose-600 hover:bg-rose-50"
                                 >
                                     Limpiar
                                 </button>
@@ -221,13 +243,11 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
 
                 {/* Section: Tiempos y Entrega */}
                 <div className="space-y-4">
-                    <h4 className="form-section-header">
-                        <Calendar className="w-3.5 h-3.5" /> Cronología y Entrega
-                    </h4>
+                    <SectionHeader>Cronología y Entrega</SectionHeader>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 pt-2">
                         <div className="space-y-2">
-                            <label className="form-label">
-                                <Calendar className="w-3.5 h-3.5 text-blue-500" /> Fecha Recepción
+                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
+                                Fecha Recepción
                             </label>
                             <DateInput
                                 value={formData.fecha_recepcion}
@@ -243,32 +263,32 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
                         />
                         <FormSelect
                             label="Tipo de Entrega"
-                            icon={<List />}
                             name="tipo_entrega"
                             value={formData.tipo_entrega}
                             onChange={handleChange}
                             required
                             placeholder="Seleccione..."
                             options={deliveryTypes.map(t => ({ value: t.id, label: t.nombre }))}
+                            labelClassName={ACQ_LABEL_CLASS}
+                            inputClassName={ACQ_SELECT_CLASS}
                         />
                     </div>
                 </div>
 
                 {/* Section: Detalle y Costos */}
                 <div className="space-y-4">
-                    <h4 className="form-section-header">
-                        <PenLine className="w-3.5 h-3.5" /> Contenido y Finanzas
-                    </h4>
+                    <SectionHeader>Contenido y Finanzas</SectionHeader>
                     <div className="space-y-4 pt-2">
                         <div className="space-y-3">
                             <FormInput
                                 label="Concepto / Glosa Base"
-                                icon={<PenLine />}
                                 name="descripcion"
                                 value={formData.descripcion || ''}
                                 onChange={handleChange}
                                 required
                                 placeholder="Ej: Servicios de transporte, Compra de computadores..."
+                                labelClassName={ACQ_LABEL_CLASS}
+                                inputClassName={ACQ_INPUT_CLASS}
                             />
 
                             {/* Preview of the final combined description */}
@@ -291,22 +311,24 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
                                 <FormInput
                                     type="number"
                                     label="Monto Neto ($)"
-                                    icon={<DollarSign />}
                                     name="total_neto"
                                     value={formData.total_neto}
                                     onChange={handleChange}
                                     required
                                     placeholder="0"
+                                    labelClassName={ACQ_LABEL_CLASS}
+                                    inputClassName={ACQ_INPUT_CLASS}
                                 />
                                 <FormInput
                                     type="number"
                                     label="IVA ($)"
-                                    icon={<DollarSign className="text-slate-300" />}
                                     name="iva"
                                     value={formData.iva}
                                     onChange={handleChange}
                                     required
                                     placeholder="0"
+                                    labelClassName={ACQ_LABEL_CLASS}
+                                    inputClassName={ACQ_INPUT_CLASS}
                                 />
                             </div>
                             <div className="flex justify-center">
@@ -314,14 +336,13 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
                                     <FormInput
                                         type="number"
                                         label="Total a Pagar"
-                                        icon={<CreditCard className="text-blue-500" />}
                                         name="total_pagar"
                                         value={formData.total_pagar}
                                         onChange={handleChange}
                                         required
                                         placeholder="0"
-                                        inputClassName="bg-blue-50/50 border-blue-200 text-blue-700 font-black text-center"
-                                        labelClassName="text-blue-600 text-center block w-full"
+                                        inputClassName={ACQ_TOTAL_INPUT_CLASS}
+                                        labelClassName={`${ACQ_LABEL_CLASS} !text-blue-600 !text-center !ml-0`}
                                     />
                                 </div>
                             </div>
@@ -331,13 +352,10 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
 
                 {/* Section: Aprobación */}
                 <div className="space-y-4">
-                    <h4 className="form-section-header">
-                        < PenLine className="w-3.5 h-3.5" /> Firmante de la RC
-                    </h4>
+                    <SectionHeader>Firmante de la RC</SectionHeader>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2">
                         <FormSelect
                             label="Grupo de Firmantes"
-                            icon={<Users className="text-blue-500" />}
                             name="grupo_firmante"
                             value={formData.grupo_firmante || ''}
                             onChange={(e) => {
@@ -351,12 +369,11 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
                             }}
                             placeholder="Seleccione grupo..."
                             options={lookups.groups?.map(g => ({ value: g.id, label: g.nombre }))}
-                            inputClassName="bg-blue-50/50 border-blue-100 text-blue-700"
-                            labelClassName="text-blue-600"
+                            inputClassName={ACQ_SELECT_CLASS}
+                            labelClassName={ACQ_LABEL_CLASS}
                         />
                         <FormSelect
                             label="Funcionario Firmante"
-                            icon={<Users className="text-amber-500" />}
                             name="firmante"
                             value={formData.firmante || ''}
                             onChange={handleChange}
@@ -366,8 +383,8 @@ const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, loo
                                 value: m.id,
                                 label: `${m.nombre} ${m.id === lookups.groups?.find(g => g.id.toString() === formData.grupo_firmante.toString())?.jefe ? '(Jefe)' : ''}`
                             })) || []}
-                            inputClassName="bg-amber-50/50 border-amber-100 text-amber-700"
-                            labelClassName="text-amber-600"
+                            inputClassName={ACQ_SELECT_CLASS}
+                            labelClassName={ACQ_LABEL_CLASS}
                         />
                     </div>
                 </div>

@@ -30,8 +30,8 @@ import {
     RotateCcw,
     Edit3,
     Loader2,
+    FolderSearch,
     Tag,
-    Save,
     Star,
     Book,
     Coffee,
@@ -39,7 +39,8 @@ import {
     Briefcase,
     GraduationCap,
     Utensils,
-    Plane
+    Plane,
+    Settings
 } from 'lucide-react';
 
 // --- Icon Map ---
@@ -62,6 +63,13 @@ const LucidIcon = ({ name, ...props }) => {
 };
 import api from '../../api';
 import { usePermission } from '../../hooks/usePermission';
+import {
+    TITLE_ICON_BOX, BTN_PRIMARY, BTN_SECONDARY, BTN_ICON_EDIT,
+    INPUT_FORM, TEXTAREA_FORM, SELECT_FORM,
+    MODAL_SHELL, MODAL_BACKDROP_LAYER, MODAL_PANEL, MODAL_PANEL_LG,
+    DEFAULT_CATEGORY_COLOR, ICON_PICK_ACTIVE, ICON_PICK, CARD_HOVER,
+    DND_GRIP, UPLOAD_ZONE, ADD_POSTIT_BTN, COLOR_SWATCH_HOVER,
+} from './bienestarUi';
 
 // --- Portal Component ---
 const ModalPortal = ({ children }) => {
@@ -88,24 +96,24 @@ const SortableBenefit = ({ b, categorias, onDelete, onMove, onEdit }) => {
                 <div className="flex items-center gap-1">
                     {can('bienestar.change_beneficio') && (
                         <>
-                            <button onClick={(e) => { e.stopPropagation(); onEdit(b); }} className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-slate-900 hover:text-white transition-all"><Edit3 className="w-3.5 h-3.5" /></button>
-                            <button onClick={(e) => { e.stopPropagation(); onMove(b.id, b.estado === 'BORRADOR' ? 'PUBLICADO' : 'BORRADOR'); }} className={`p-1.5 rounded-lg transition-all active:scale-95 ${b.estado === 'BORRADOR' ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-slate-50 text-slate-400 hover:bg-slate-900 hover:text-white'}`}>{b.estado === 'BORRADOR' ? <Send className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}</button>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); onEdit(b); }} className={BTN_ICON_EDIT} title="Editar"><Edit3 className="w-3.5 h-3.5" /></button>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); onMove(b.id, b.estado === 'BORRADOR' ? 'PUBLICADO' : 'BORRADOR'); }} className={`p-1.5 rounded-lg transition-colors active:scale-95 ${b.estado === 'BORRADOR' ? 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50' : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'}`} title={b.estado === 'BORRADOR' ? 'Publicar' : 'Volver a borrador'}>{b.estado === 'BORRADOR' ? <Send className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}</button>
                         </>
                     )}
                     {can('bienestar.delete_beneficio') && (
-                        <button onClick={() => onDelete(b.id)} className="p-1.5 hover:bg-rose-50 rounded-lg text-rose-300 hover:text-rose-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button type="button" onClick={() => onDelete(b.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Eliminar"><Trash2 className="w-3.5 h-3.5" /></button>
                     )}
                 </div>
             </div>
-            <h4 className="font-bold text-slate-800 mb-1 leading-tight text-sm pl-1">{b.titulo}</h4>
-            <p className="text-[10px] text-slate-400 line-clamp-2 mb-4 font-medium leading-relaxed pl-1">{b.descripcion}</p>
+            <h4 className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter mb-1 leading-tight pl-1 line-clamp-2">{b.titulo}</h4>
+            <p className="text-[10px] text-slate-400 line-clamp-2 mb-4 font-medium leading-relaxed pl-1 uppercase tracking-tighter">{b.descripcion}</p>
             <div className="flex items-center justify-between border-t border-slate-50 pt-3 mt-auto pl-1">
                 <div className="flex items-center gap-2">
                     {b.archivos?.length > 0 && <div className="flex items-center gap-1 text-[8px] font-bold text-slate-300 uppercase tracking-widest"><FileIcon className="w-3 h-3" /> {b.archivos.length}</div>}
                     {b.estado === 'PUBLICADO' && <span className="text-[8px] font-medium text-slate-300 uppercase tracking-widest italic">{b.creado_por_nombre}</span>}
                 </div>
                 {can('bienestar.change_beneficio') && (
-                    <div {...attributes} {...listeners} className="text-slate-100 hover:text-indigo-300 cursor-grab active:cursor-grabbing p-1"><GripVertical className="w-5 h-5" /></div>
+                    <div {...attributes} {...listeners} className={DND_GRIP}><GripVertical className="w-5 h-5" /></div>
                 )}
             </div>
         </div>
@@ -123,7 +131,7 @@ const WelfareBoard = () => {
     const [editingCategoryId, setEditingCategoryId] = useState(null);
     const fileInputRef = useRef(null);
     const [newData, setNewData] = useState({ titulo: '', descripcion: '', categoria: '', estado: 'BORRADOR', tempFiles: [] });
-    const [newCategory, setNewCategory] = useState({ nombre: '', icono: 'Heart', color: '#6366f1' });
+    const [newCategory, setNewCategory] = useState({ nombre: '', icono: 'Heart', color: DEFAULT_CATEGORY_COLOR });
 
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
@@ -146,7 +154,7 @@ const WelfareBoard = () => {
             } else {
                 await api.post('bienestar/categorias/', newCategory);
             }
-            setNewCategory({ nombre: '', icono: 'Heart', color: '#6366f1' });
+            setNewCategory({ nombre: '', icono: 'Heart', color: DEFAULT_CATEGORY_COLOR });
             setEditingCategoryId(null);
             fetchData();
         } catch (e) {
@@ -237,27 +245,38 @@ const WelfareBoard = () => {
     const { can } = usePermission();
 
     return (
-        <div className="h-[calc(100vh-170px)] sm:h-[calc(100vh-180px)] flex flex-col space-y-4 overflow-hidden">
-            <div className="flex flex-col sm:flex-row items-center justify-between px-1 gap-4">
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                    <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 shadow-sm shrink-0"><Heart className="w-5 h-5 fill-rose-500/10" /></div>
-                    <div className="flex flex-col min-w-0">
-                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight uppercase leading-none mb-1 truncate">Muro de Comunicaciones</h2>
-                        <span className="text-[10px] font-medium text-slate-400 uppercase tracking-widest truncate">Tablero de Gestión</span>
+        <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden">
+            <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-end gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={TITLE_ICON_BOX}>
+                        <Settings className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase select-none line-clamp-2">
+                            Gestión de Bienestar
+                        </h2>
+                        <p className="text-[10px] md:text-xs font-medium text-slate-500 mt-1.5 select-none">
+                            Tablero de post-its y publicaciones
+                        </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto sm:overflow-visible pb-2 sm:pb-0 scrollbar-hide">
+                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto md:overflow-visible shrink-0">
                     {can('bienestar.add_categoriabienestar') && (
                         <button
+                            type="button"
                             onClick={() => setCategoryModalOpen(true)}
-                            className="bg-white border border-slate-200 text-slate-700 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-bold uppercase tracking-wider text-[9px] sm:text-[10px] hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2 active:scale-95 whitespace-nowrap"
+                            className={`${BTN_SECONDARY} whitespace-nowrap`}
                         >
-                            <Tag className="w-3.5 h-3.5 text-indigo-500" /> Categorías
+                            <Tag className="w-4 h-4" /> Categorías
                         </button>
                     )}
                     {can('bienestar.add_beneficio') && (
-                        <button onClick={() => { setEditingId(null); setIsModalOpen(true); }} className="bg-slate-900 text-white px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-bold uppercase tracking-wider text-[9px] sm:text-[10px] hover:bg-rose-500 transition-all shadow-lg flex items-center gap-2 active:scale-95 whitespace-nowrap">
-                            <Plus className="w-3.5 h-3.5" /> Nuevo Post-it
+                        <button
+                            type="button"
+                            onClick={() => { setEditingId(null); setIsModalOpen(true); }}
+                            className={`${BTN_PRIMARY} whitespace-nowrap`}
+                        >
+                            <Plus className="w-4 h-4" /> Nuevo Post-it
                         </button>
                     )}
                 </div>
@@ -283,7 +302,7 @@ const WelfareBoard = () => {
                                     ))}
                                 </SortableContext>
                                 {can('bienestar.add_beneficio') && (
-                                    <button onClick={() => { setEditingId(null); setNewData({ ...newData, estado: colId }); setIsModalOpen(true); }} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[1.5rem] sm:rounded-[1.8rem] text-slate-300 flex flex-col items-center justify-center gap-1 hover:border-indigo-200 hover:text-indigo-400 hover:bg-white/50 transition-all group">
+                                    <button type="button" onClick={() => { setEditingId(null); setNewData({ ...newData, estado: colId }); setIsModalOpen(true); }} className={ADD_POSTIT_BTN}>
                                         <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform" />
                                         <span className="text-[10px] font-bold uppercase tracking-widest">Añadir Post-it</span>
                                     </button>
@@ -297,42 +316,47 @@ const WelfareBoard = () => {
             <ModalPortal>
                 <AnimatePresence>
                     {isModalOpen && (
-                        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-2 sm:p-4">
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !loading && setIsModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-                            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="relative bg-white w-full max-w-2xl rounded-[1.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
-                                <div className="p-4 sm:p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/50 shrink-0">
-                                    <h3 className="text-base sm:text-lg font-bold text-slate-800 leading-none">{editingId ? 'Editar Post-it' : 'Nuevo Post-it'}</h3>
-                                    <button disabled={loading} onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white rounded-xl transition-all"><X className="w-5 h-5 text-slate-400" /></button>
-                                </div>
-                                <div className="p-4 sm:p-8 space-y-4 sm:space-y-5 overflow-y-auto custom-scrollbar">
-                                    <div className="space-y-1">
-                                        <label className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Título del Anuncio</label>
-                                        <input type="text" placeholder="Ej: Nuevo Convenio Dental" value={newData.titulo} onChange={e => setNewData({ ...newData, titulo: e.target.value })} className="w-full bg-slate-50 border-none rounded-xl p-3 sm:p-3.5 font-semibold text-slate-700 placeholder:text-slate-300 focus:ring-2 focus:ring-indigo-100 transition-all text-sm" />
+                        <div className={MODAL_SHELL}>
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !loading && setIsModalOpen(false)} className={MODAL_BACKDROP_LAYER} />
+                            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} onClick={(e) => e.stopPropagation()} className={`${MODAL_PANEL_LG} max-h-[95vh]`}>
+                                <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex items-center justify-between gap-4 shrink-0">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className={TITLE_ICON_BOX}>
+                                            <Settings className="w-4 h-4" />
+                                        </div>
+                                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">{editingId ? 'Editar Post-it' : 'Nuevo Post-it'}</h3>
                                     </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Descripción / Cuerpo</label>
-                                        <textarea placeholder="Cuéntales más detalles..." rows="6" value={newData.descripcion} onChange={e => setNewData({ ...newData, descripcion: e.target.value })} className="w-full bg-slate-50 border-none rounded-xl p-4 text-slate-600 placeholder:text-slate-300 focus:ring-2 focus:ring-indigo-100 transition-all text-sm leading-relaxed min-h-[150px] sm:min-h-[200px]" />
+                                    <button type="button" disabled={loading} onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
+                                </div>
+                                <div className="p-4 md:p-6 space-y-4 overflow-y-auto custom-scrollbar">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Título del Anuncio</label>
+                                        <input type="text" placeholder="Ej: Nuevo Convenio Dental" value={newData.titulo} onChange={e => setNewData({ ...newData, titulo: e.target.value })} className={INPUT_FORM} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Descripción / Cuerpo</label>
+                                        <textarea placeholder="Cuéntales más detalles..." rows="6" value={newData.descripcion} onChange={e => setNewData({ ...newData, descripcion: e.target.value })} className={`${TEXTAREA_FORM} min-h-[150px] text-slate-700`} />
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Categoría</label>
-                                            <select value={newData.categoria} onChange={e => setNewData({ ...newData, categoria: e.target.value })} className="w-full bg-slate-50 border-none rounded-xl p-3 sm:p-3.5 font-semibold text-slate-700 appearance-none cursor-pointer text-sm">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Categoría</label>
+                                            <select value={newData.categoria} onChange={e => setNewData({ ...newData, categoria: e.target.value })} className={`${SELECT_FORM} pr-8`}>
                                                 <option value="">Selecciona...</option>
                                                 {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                                             </select>
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Estado Inicial</label>
-                                            <select value={newData.estado} onChange={e => setNewData({ ...newData, estado: e.target.value })} className="w-full bg-slate-50 border-none rounded-xl p-3 sm:p-3.5 font-semibold text-slate-700 appearance-none cursor-pointer text-sm">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Estado Inicial</label>
+                                            <select value={newData.estado} onChange={e => setNewData({ ...newData, estado: e.target.value })} className={`${SELECT_FORM} pr-8`}>
                                                 <option value="BORRADOR">Como Borrador</option>
                                                 <option value="PUBLICADO">Publicar Ahora</option>
                                             </select>
                                         </div>
                                     </div>
 
-                                    <div onClick={() => !loading && fileInputRef.current?.click()} className="border-2 border-dashed border-slate-100 rounded-2xl p-4 sm:p-6 flex flex-col items-center justify-center gap-1 hover:border-indigo-200 hover:bg-slate-50 transition-all cursor-pointer group">
+                                    <div onClick={() => !loading && fileInputRef.current?.click()} className={UPLOAD_ZONE}>
                                         <input type="file" ref={fileInputRef} onChange={e => setNewData(p => ({ ...p, tempFiles: [...p.tempFiles, ...Array.from(e.target.files)] }))} multiple hidden />
-                                        <Upload className="w-6 h-6 text-slate-200 group-hover:text-indigo-400 transition-all mb-1" />
+                                        <Upload className="w-6 h-6 text-slate-200 group-hover:text-blue-400 transition-all mb-1" />
                                         <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Documentos o Imágenes</p>
                                     </div>
 
@@ -346,8 +370,8 @@ const WelfareBoard = () => {
                                         </div>
                                     )}
 
-                                    <button disabled={loading || !newData.titulo} onClick={handleSave} className={`w-full py-3.5 sm:py-4 rounded-xl font-bold text-[10px] sm:text-[11px] uppercase tracking-[0.2em] shadow-xl transition-all flex items-center justify-center gap-2 shrink-0 ${loading ? 'bg-slate-200 text-slate-400' : 'bg-slate-900 text-white hover:bg-indigo-600 active:scale-95'}`}>
-                                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : editingId ? 'Guardar Cambios' : 'Crear Post-it'}
+                                    <button type="button" disabled={loading || !newData.titulo} onClick={handleSave} className={`w-full rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shrink-0 ${loading ? 'bg-slate-200 text-slate-400 h-10' : BTN_PRIMARY}`}>
+                                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4" />{editingId ? 'Guardar Cambios' : 'Crear Post-it'}</>}
                                     </button>
                                 </div>
                             </motion.div>
@@ -360,99 +384,106 @@ const WelfareBoard = () => {
             <ModalPortal>
                 <AnimatePresence>
                     {isCategoryModalOpen && (
-                        <div className="fixed inset-0 z-[10001] flex items-center justify-center p-2 sm:p-4">
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setCategoryModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-                            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white w-full max-w-sm rounded-[1.5rem] sm:rounded-[2rem] shadow-2xl overflow-hidden text-left flex flex-col max-h-[90vh]">
-                                <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
-                                    <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase tracking-widest leading-none">{editingCategoryId ? 'Editar Categoría' : 'Gestionar Categorías'}</h3>
-                                    <button onClick={() => { setCategoryModalOpen(false); setEditingCategoryId(null); setNewCategory({ nombre: '', icono: 'Heart', color: '#6366f1' }); }} className="p-2 hover:bg-slate-100 rounded-full transition-all"><X className="w-5 h-5 text-slate-400" /></button>
+                        <div className={MODAL_SHELL}>
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setCategoryModalOpen(false)} className={MODAL_BACKDROP_LAYER} />
+                            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={(e) => e.stopPropagation()} className={MODAL_PANEL}>
+                                <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex items-center justify-between gap-4 shrink-0">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className={TITLE_ICON_BOX}>
+                                            <Tag className="w-4 h-4" />
+                                        </div>
+                                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">{editingCategoryId ? 'Editar Categoría' : 'Gestionar Categorías'}</h3>
+                                    </div>
+                                    <button type="button" onClick={() => { setCategoryModalOpen(false); setEditingCategoryId(null); setNewCategory({ nombre: '', icono: 'Heart', color: DEFAULT_CATEGORY_COLOR }); }} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors shrink-0"><X className="w-5 h-5" /></button>
                                 </div>
-                                <div className="p-4 overflow-y-auto custom-scrollbar flex-1">
-                                    <form onSubmit={handleSaveCategory} className="mb-4 space-y-3 bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre y Color</label>
+                                <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar flex-1 flex flex-col gap-5 min-h-0">
+                                    <form onSubmit={handleSaveCategory} className="space-y-4 shrink-0">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Nombre</label>
                                             <div className="flex gap-2 items-center">
                                                 <input
                                                     type="text"
                                                     placeholder="Ej: Salud"
-                                                    className="flex-1 px-4 h-11 bg-white border border-slate-100 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                                                    className={`${INPUT_FORM} flex-1 text-slate-700`}
                                                     value={newCategory.nombre}
                                                     onChange={e => setNewCategory({ ...newCategory, nombre: e.target.value })}
                                                     required
                                                 />
-                                                <div className="relative w-11 h-11 shrink-0 group">
+                                                <div className="relative w-10 h-10 shrink-0 group" title="Color de categoría">
                                                     <input
                                                         type="color"
-                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                        className="no-global absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 p-0 border-0"
                                                         value={newCategory.color}
                                                         onChange={e => setNewCategory({ ...newCategory, color: e.target.value })}
-                                                        title="Elegir Color"
                                                     />
                                                     <div
-                                                        className="w-full h-full rounded-xl border border-slate-100 shadow-sm transition-all group-hover:scale-105 group-hover:shadow-md"
+                                                        className={`w-full h-full rounded-xl border border-slate-200 shadow-sm transition-all ${COLOR_SWATCH_HOVER}`}
                                                         style={{ backgroundColor: newCategory.color }}
                                                     />
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Icono Representativo</label>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Icono representativo</label>
                                             <div className="grid grid-cols-5 gap-2">
                                                 {ICON_OPTIONS.map(opt => (
                                                     <button
                                                         key={opt.name}
                                                         type="button"
                                                         onClick={() => setNewCategory({ ...newCategory, icono: opt.name })}
-                                                        className={`p-2 rounded-xl border-2 transition-all flex items-center justify-center ${newCategory.icono === opt.name ? 'border-indigo-500 bg-indigo-50 text-indigo-600 scale-105' : 'border-white bg-white text-slate-300 hover:border-slate-200'}`}
+                                                        className={`h-10 rounded-xl border transition-all flex items-center justify-center ${newCategory.icono === opt.name ? ICON_PICK_ACTIVE : ICON_PICK}`}
                                                     >
-                                                        <opt.icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                        <opt.icon className="w-4 h-4" />
                                                     </button>
                                                 ))}
                                             </div>
                                         </div>
 
-                                        <div className="flex gap-2 pt-2">
+                                        <div className="flex gap-2 pt-1">
                                             {editingCategoryId && (
-                                                <button type="button" onClick={() => { setEditingCategoryId(null); setNewCategory({ nombre: '', icono: 'Heart', color: '#6366f1' }); }} className="flex-1 py-2.5 bg-slate-200 text-slate-600 rounded-xl hover:bg-slate-300 transition-all font-bold uppercase tracking-widest text-[9px]">Cancelar</button>
+                                                <button type="button" onClick={() => { setEditingCategoryId(null); setNewCategory({ nombre: '', icono: 'Heart', color: DEFAULT_CATEGORY_COLOR }); }} className={`flex-1 ${BTN_SECONDARY}`}>Cancelar</button>
                                             )}
-                                            <button type="submit" className="flex-[2] py-2.5 bg-slate-900 text-white rounded-xl hover:bg-indigo-600 transition-all font-bold uppercase tracking-widest text-[9px] shadow-lg flex items-center justify-center gap-2">
-                                                {editingCategoryId ? <Save className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                                            <button type="submit" className={`${editingCategoryId ? 'flex-1' : 'w-full'} ${BTN_PRIMARY}`}>
+                                                <Plus className="w-4 h-4" />
                                                 {editingCategoryId ? 'Actualizar' : 'Crear Categoría'}
                                             </button>
                                         </div>
                                     </form>
 
-                                    <div className="space-y-3">
-                                        <div className="flex items-center justify-between px-1">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Existentes ({categorias.length})</p>
-                                        </div>
-                                        <div className="space-y-2 h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                                            {categorias.map(cat => (
-                                                <div key={cat.id} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-2xl group transition-all hover:bg-white hover:shadow-sm">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-xl shadow-sm flex items-center justify-center" style={{ backgroundColor: cat.color + '20', color: cat.color }}>
-                                                            <LucidIcon name={cat.icono} className="w-4 h-4" />
-                                                        </div>
-                                                        <span className="text-xs font-bold text-slate-700">{cat.nombre}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1">
-                                                        {can('bienestar.change_categoriabienestar') && (
-                                                            <button onClick={() => handleEditCategory(cat)} className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"><Edit3 className="w-3.5 h-3.5" /></button>
-                                                        )}
-                                                        {can('bienestar.delete_categoriabienestar') && (
-                                                            <button onClick={() => handleDeleteCategory(cat.id)} className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
-                                                        )}
-                                                    </div>
+                                    <div className="flex flex-col min-h-0 flex-1">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 shrink-0">
+                                            Categorías existentes ({categorias.length})
+                                        </p>
+                                        <div className="flex-1 min-h-[180px] max-h-[240px] overflow-y-auto pr-1 custom-scrollbar">
+                                            {categorias.length === 0 ? (
+                                                <div className="flex flex-col items-center justify-center py-10 text-center h-full">
+                                                    <FolderSearch className="w-10 h-10 text-slate-200 mb-3" />
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No se encontraron categorías</span>
                                                 </div>
-                                            ))}
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    {categorias.map(cat => (
+                                                        <div key={cat.id} className={`flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl ${CARD_HOVER} transition-all`}>
+                                                            <div className="flex items-center gap-3 min-w-0">
+                                                                <div className="w-10 h-10 rounded-xl border border-slate-100 flex items-center justify-center shrink-0" style={{ backgroundColor: `${cat.color}20`, color: cat.color }}>
+                                                                    <LucidIcon name={cat.icono} className="w-4 h-4" />
+                                                                </div>
+                                                                <span className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter truncate">{cat.nombre}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1 shrink-0">
+                                                                {can('bienestar.change_categoriabienestar') && (
+                                                                    <button type="button" onClick={() => handleEditCategory(cat)} className={BTN_ICON_EDIT} title="Editar"><Edit3 className="w-3.5 h-3.5" /></button>
+                                                                )}
+                                                                {can('bienestar.delete_categoriabienestar') && (
+                                                                    <button type="button" onClick={() => handleDeleteCategory(cat.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Eliminar"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
-                                        {categorias.length === 0 && (
-                                            <div className="py-10 text-center">
-                                                <Tag className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                                                <p className="text-[10px] font-bold text-slate-300 uppercase">Sin categorías</p>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             </motion.div>

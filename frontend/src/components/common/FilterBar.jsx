@@ -1,19 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X } from 'lucide-react';
+import useDebouncedValue from '../../hooks/useDebouncedValue';
 
-const FilterBar = ({ onSearch, placeholder = "Buscar...", initialValue = "", className = "", inputClassName = "", showIcon = true }) => {
+const FilterBar = ({ onSearch, placeholder = "Buscar...", initialValue = "", className = "", inputClassName = "", showIcon = true, debounceMs = 300 }) => {
     const [searchTerm, setSearchTerm] = useState(initialValue);
+    const debouncedSearchTerm = useDebouncedValue(searchTerm, debounceMs);
 
-    // Debounce search
     useEffect(() => {
-        const handler = setTimeout(() => {
-            onSearch(searchTerm);
-        }, 400); // 400ms delay
-
-        return () => {
-            clearTimeout(handler);
-        };
-    }, [searchTerm]);
+        onSearch(debouncedSearchTerm);
+    }, [debouncedSearchTerm]);
 
     const handleClear = () => {
         setSearchTerm("");

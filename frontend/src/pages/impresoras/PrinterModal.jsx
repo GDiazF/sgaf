@@ -153,7 +153,7 @@ const PrinterModal = ({ isOpen, onClose, onSave, printer = null, loading = false
                         onChange={handleChange}
                         className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 transition-all pointer-events-auto cursor-pointer"
                     />
-                    <label htmlFor="enabled" className="text-sm font-bold text-slate-700 cursor-pointer">
+                    <label htmlFor="enabled" className="text-sm font-semibold text-slate-700 cursor-pointer">
                         Monitoreo Activo (SNMP habilitado)
                     </label>
                 </div>

@@ -13,13 +13,20 @@ class SolicitanteAdmin(admin.ModelAdmin):
 
 @admin.register(Activo)
 class ActivoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'establecimiento', 'ubicacion')
-    search_fields = ('nombre', 'establecimiento__nombre')
-    list_filter = ('establecimiento',)
+    list_display = ('nombre', 'get_establecimiento', 'tipo', 'ubicacion')
+    search_fields = ('nombre',)
+    list_select_related = ('establecimiento', 'tipo')
+
+    def get_establecimiento(self, obj):
+        try:
+            return obj.establecimiento.nombre
+        except Exception:
+            return '—'
+    get_establecimiento.short_description = 'Establecimiento'
 
 @admin.register(Prestamo)
 class PrestamoAdmin(admin.ModelAdmin):
-    list_display = ('activo', 'solicitante', 'fecha_prestamo', 'fecha_devolucion', 'usuario_entrega')
-    list_filter = ('fecha_prestamo', 'fecha_devolucion')
+    list_display = ('activo', 'solicitante', 'fecha_prestamo', 'fecha_devolucion')
+    list_filter = ('fecha_prestamo',)
     search_fields = ('activo__nombre', 'solicitante__nombre', 'solicitante__rut')
-    date_hierarchy = 'fecha_prestamo'
+    list_select_related = ('activo', 'solicitante')

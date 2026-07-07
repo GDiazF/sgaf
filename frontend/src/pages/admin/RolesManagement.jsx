@@ -23,6 +23,7 @@ const RolesManagement = () => {
 
     // Accordion state for permissions
     const [expandedGroups, setExpandedGroups] = useState({});
+    const [permSearchQuery, setPermSearchQuery] = useState('');
 
     useEffect(() => {
         fetchData();
@@ -47,10 +48,39 @@ const RolesManagement = () => {
 
     const groupedPermissions = useMemo(() => groupPermissions(permissions), [permissions]);
 
+    // Filtrado dinámico de permisos por búsqueda
+    const filteredGroupedPermissions = useMemo(() => {
+        if (!permSearchQuery.trim()) return groupedPermissions;
+        const q = permSearchQuery.toLowerCase();
+        const result = {};
+        Object.entries(groupedPermissions).forEach(([module, perms]) => {
+            const matched = perms.filter(
+                p =>
+                    getFriendlyPermName(p).toLowerCase().includes(q) ||
+                    p.codename.toLowerCase().includes(q) ||
+                    module.toLowerCase().includes(q)
+            );
+            if (matched.length > 0) result[module] = matched;
+        });
+        return result;
+    }, [groupedPermissions, permSearchQuery]);
+
+    // Auto-expandir grupos con resultados cuando se busca
+    useEffect(() => {
+        if (permSearchQuery.trim()) {
+            const expanded = {};
+            Object.keys(filteredGroupedPermissions).forEach(m => { expanded[m] = true; });
+            setExpandedGroups(expanded);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [permSearchQuery]);
+
     const handleEdit = (role) => {
         setEditingId(role.id);
         setRoleName(role.name);
         setSelectedPermissions(role.permissions);
+        setPermSearchQuery('');
+        setExpandedGroups({});
         setIsModalOpen(true);
     };
 
@@ -58,6 +88,8 @@ const RolesManagement = () => {
         setEditingId(null);
         setRoleName('');
         setSelectedPermissions([]);
+        setPermSearchQuery('');
+        setExpandedGroups({});
         setIsModalOpen(true);
     };
 
@@ -312,18 +344,51 @@ const RolesManagement = () => {
                                 </div>
 
                                 <div className="space-y-4">
-                                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
                                         <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                             <Info className="w-4 h-4 text-blue-500" />
                                             Configuración de Privilegios por Módulo
                                         </h4>
-                                        <div className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                                            {selectedPermissions.length} SELECCIONADOS
+                                        <div className="flex items-center gap-3">
+                                            <div className="relative">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Buscar permiso..."
+                                                    value={permSearchQuery}
+                                                    onChange={(e) => setPermSearchQuery(e.target.value)}
+                                                    className="pl-9 pr-4 h-9 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-bold placeholder:text-slate-300 focus:bg-white focus:border-blue-500 outline-none transition-all uppercase w-56"
+                                                />
+                                                {permSearchQuery && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPermSearchQuery('')}
+                                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                                    >
+                                                        <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                                {selectedPermissions.length} SELECCIONADOS
+                                            </div>
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 gap-2">
-                                        {Object.entries(groupedPermissions).map(([module, perms]) => (
+                                        {Object.keys(filteredGroupedPermissions).length === 0 && permSearchQuery ? (
+                                            <div className="py-10 flex flex-col items-center justify-center text-center">
+                                                <Shield className="w-8 h-8 text-slate-200 mb-2" />
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sin resultados para "{permSearchQuery}"</p>
+                                            </div>
+                                        ) : (
+                                            Object.entries(filteredGroupedPermissions)
+                                                .sort(([moduleA], [moduleB]) => {
+                                                    if (moduleA === 'Otros') return 1;
+                                                    if (moduleB === 'Otros') return -1;
+                                                    return moduleA.localeCompare(moduleB);
+                                                })
+                                                .map(([module, perms]) => (
                                             <div key={module} className="bg-slate-50/50 border border-slate-100 rounded-2xl overflow-hidden">
                                                 <div className="w-full flex items-center justify-between p-4 hover:bg-white transition-all group">
                                                     <button
@@ -334,6 +399,11 @@ const RolesManagement = () => {
                                                             {expandedGroups[module] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                                         </div>
                                                         <span className="font-bold text-[11px] text-slate-700 uppercase tracking-widest">{module}</span>
+                                                        {permSearchQuery && (
+                                                            <span className="text-[9px] font-black px-2 py-0.5 rounded-lg bg-blue-100 text-blue-600 border border-blue-200">
+                                                                {perms.length} coincidencia{perms.length !== 1 ? 's' : ''}
+                                                            </span>
+                                                        )}
                                                     </button>
 
                                                     <div className="flex items-center gap-4">
@@ -391,7 +461,8 @@ const RolesManagement = () => {
                                                     )}
                                                 </AnimatePresence>
                                             </div>
-                                        ))}
+                                        ))
+                                        )}
                                     </div>
                                 </div>
                             </div>

@@ -1,100 +1,112 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Info, ShieldCheck, Cpu, Code2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import { X, Cpu, Code2, ShieldCheck } from 'lucide-react';
 
 import { APP_DEVELOPER, APP_RELEASE_DATE } from '../../version';
+import {
+    MODAL_SHELL,
+    MODAL_BACKDROP_LAYER,
+    BTN_SECONDARY,
+    statusBadgeClass,
+} from '../../pages/funcionarios/shared/funcionariosUi';
+
+const InfoBox = ({ icon: Icon, label, value, subValue }) => (
+    <div className="flex gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/80 min-h-[3.75rem]">
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border border-blue-100 bg-blue-50 text-blue-600">
+            <Icon className="w-4 h-4" />
+        </div>
+        <div className="min-w-0 flex-1 flex flex-col justify-center">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+                {label}
+            </span>
+            <div className="text-[10px] font-medium text-slate-700 uppercase tracking-tight leading-snug break-words mt-1">
+                {value || '—'}
+            </div>
+            {subValue ? (
+                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-tight mt-0.5">
+                    {subValue}
+                </p>
+            ) : (
+                <span className="mt-0.5 block min-h-[0.875rem]" aria-hidden />
+            )}
+        </div>
+    </div>
+);
 
 const AboutModal = ({ isOpen, onClose, version }) => {
-    return (
+    if (typeof document === 'undefined') return null;
+
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <div className={MODAL_SHELL}>
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
+                        className={MODAL_BACKDROP_LAYER}
                         onClick={onClose}
-                        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                        aria-hidden
                     />
-
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                        className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200"
+                        initial={{ scale: 0.95, opacity: 0, y: 12 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.95, opacity: 0, y: 12 }}
+                        transition={{ type: 'spring', damping: 26, stiffness: 340 }}
+                        className="relative z-10 bg-white rounded-2xl shadow-2xl overflow-hidden w-full max-w-md border border-slate-200 max-h-[90vh] flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
                     >
-                        {/* Header Image/Pattern */}
-                        <div className="h-32 bg-gradient-to-br from-blue-600 to-indigo-800 relative flex items-center justify-center overflow-hidden">
-                            <div className="absolute inset-0 opacity-10">
-                                <div className="absolute top-0 left-0 w-20 h-20 border-4 border-white rounded-full -translate-x-1/2 -translate-y-1/2" />
-                                <div className="absolute bottom-0 right-0 w-32 h-32 border-8 border-white rounded-full translate-x-1/3 translate-y-1/3" />
-                            </div>
-                            <img src="/logo.png" alt="Logo" className="h-16 relative z-10 brightness-0 invert" />
+                        <div className="shrink-0 px-5 py-4 bg-slate-900 flex justify-between items-center gap-2 shadow-lg shadow-slate-900/30">
+                            <p className="text-xs font-bold text-white uppercase tracking-widest">
+                                Acerca del sistema SGAF
+                            </p>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="p-2 hover:bg-slate-800 rounded-xl text-slate-300 hover:text-white transition-colors shrink-0"
+                                aria-label="Cerrar"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
                         </div>
 
-                        {/* Content */}
-                        <div className="p-8">
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <h2 className="text-2xl font-bold text-slate-900">SGAF</h2>
-                                    <p className="text-slate-500 font-medium">Sistema de Gestión Administrativa y Financiera</p>
-                                </div>
-                                <button
-                                    onClick={onClose}
-                                    className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400 hover:text-slate-600"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
+                        <p className="shrink-0 px-4 pt-5 pb-1 text-xs font-medium text-slate-500 uppercase tracking-widest text-center leading-snug">
+                            Sistema de Gestión Administrativa y Financiera
+                        </p>
 
-                            <div className="space-y-6">
-                                <div className="flex items-start gap-4">
-                                    <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl">
-                                        <Cpu className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-900">Versión del Sistema</p>
-                                        <p className="text-sm text-slate-600 font-mono">v{version}</p>
-                                    </div>
-                                </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-4 pt-2 space-y-3 min-h-0">
+                            <InfoBox icon={Cpu} label="Versión" value={`v${version}`} />
+                            <InfoBox
+                                icon={Code2}
+                                label="Desarrollado por"
+                                value={APP_DEVELOPER}
+                                subValue={`Lanzamiento ${APP_RELEASE_DATE}`}
+                            />
+                            <InfoBox
+                                icon={ShieldCheck}
+                                label="Estado"
+                                value={
+                                    <span className={statusBadgeClass(true)}>
+                                        Producción estable
+                                    </span>
+                                }
+                            />
+                        </div>
 
-                                <div className="flex items-start gap-4">
-                                    <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-2xl">
-                                        <Code2 className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-900">Desarrollado por</p>
-                                        <p className="text-sm text-slate-600 leading-relaxed">
-                                            {APP_DEVELOPER}
-                                        </p>
-                                        <p className="text-[10px] text-slate-400 mt-1 font-mono">Lanzamiento: {APP_RELEASE_DATE}</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-start gap-4">
-                                    <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl">
-                                        <ShieldCheck className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-900">Estado</p>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                                            <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Producción Estable</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-                                <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">
-                                    © {new Date().getFullYear()} SLEP IQUIQUE - Reservados todos los derechos
-                                </p>
-                            </div>
+                        <div className="shrink-0 px-4 py-3 border-t border-slate-100 bg-slate-50/80 space-y-3">
+                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest text-center leading-snug">
+                                © {new Date().getFullYear()} SLEP Iquique
+                            </p>
+                            <button type="button" onClick={onClose} className={`${BTN_SECONDARY} w-full`}>
+                                Cerrar
+                            </button>
                         </div>
                     </motion.div>
                 </div>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 };
 
