@@ -185,18 +185,18 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 209715200  # 200MB
 # SEGURIDAD EN PRODUCCIÓN (Art. 14 quinquies — Ley 21.719)
 # ────────────────────────────────────────────────────────────
 if not DEBUG:
-    # Forzar HTTPS
-    SECURE_SSL_REDIRECT = True
+    # Forzar HTTPS (configurable en .env, por defecto False para pruebas locales/intranet)
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-    # HTTP Strict Transport Security (1 año)
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+    # HTTP Strict Transport Security (1 año) - Solo si se fuerza SSL
+    SECURE_HSTS_SECONDS = 31536000 if SECURE_SSL_REDIRECT else 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_SSL_REDIRECT
+    SECURE_HSTS_PRELOAD = SECURE_SSL_REDIRECT
 
-    # Cookies seguras
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    # Cookies seguras (requiere HTTPS)
+    SESSION_COOKIE_SECURE = SECURE_SSL_REDIRECT
+    CSRF_COOKIE_SECURE = SECURE_SSL_REDIRECT
     SESSION_COOKIE_HTTPONLY = True
 
     # Headers de protección
