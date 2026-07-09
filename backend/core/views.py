@@ -61,7 +61,9 @@ def get_full_user_data(user):
         'avatar': avatar_url,
         'funcionario_data': funcionario_data,
         'groups': list(user.groups.values_list('name', flat=True)),
-        'user_permissions': list(user.get_all_permissions())
+        'user_permissions': list(user.get_all_permissions()),
+        'acepto_terminos': user.profile.acepto_terminos if hasattr(user, 'profile') else False,
+        'fecha_aceptacion': user.profile.fecha_aceptacion if hasattr(user, 'profile') else None,
     }
 
 class LinkInteresViewSet(viewsets.ModelViewSet):
@@ -75,6 +77,22 @@ class UserProfileView(APIView):
 
     def get(self, request):
         return Response(get_full_user_data(request.user))
+
+class AceptarTerminosView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from django.utils import timezone
+        user = request.user
+        if not hasattr(user, 'profile'):
+            Profile.objects.create(user=user)
+        user.profile.acepto_terminos = True
+        user.profile.fecha_aceptacion = timezone.now()
+        user.profile.save()
+        return Response({
+            'message': 'Políticas de privacidad aceptadas.',
+            'user': get_full_user_data(user)
+        })
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().prefetch_related('groups', 'user_permissions')
@@ -569,3 +587,81 @@ class EmailConfigurationView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+from rest_framework import viewsets
+from .models import AuditLog
+from .serializers import AuditLogSerializer
+from django.db.models import Q
+
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = AuditLogSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not (user.is_superuser or user.is_staff or user.has_perm('auth.view_group')):
+            return AuditLog.objects.none()
+
+        queryset = AuditLog.objects.all().select_related('user')
+
+        # Filters
+        action = self.request.query_params.get('action')
+        if action:
+            if action == '0':
+                queryset = queryset.filter(action__icontains='CREACION')
+            elif action == '1':
+                queryset = queryset.filter(Q(action__icontains='MODIFICACION') | Q(action__icontains='ACCESO'))
+            elif action == '2':
+                queryset = queryset.filter(action__icontains='ELIMINACION')
+
+        content_type_name = self.request.query_params.get('content_type_name')
+        if content_type_name:
+            queryset = queryset.filter(model_name__icontains=content_type_name)
+
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(user__username__icontains=search) |
+                Q(user__first_name__icontains=search) |
+                Q(user__last_name__icontains=search) |
+                Q(details__icontains=search) |
+                Q(ip_address__icontains=search)
+            )
+
+        ordering = self.request.query_params.get('ordering', '-timestamp')
+        if ordering:
+            queryset = queryset.order_by(ordering)
+
+        return queryset
+
+
+from .models import BreachReport, CiberseguridadPlan, CiberseguridadCapacitacion
+from .serializers import BreachReportSerializer, CiberseguridadPlanSerializer, CiberseguridadCapacitacionSerializer
+
+class BreachReportViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para registrar y gestionar reportes de brechas e incidentes (CSIRT y APDP).
+    """
+    queryset = BreachReport.objects.all().select_related('registrado_por')
+    serializer_class = BreachReportSerializer
+    permission_classes = [permissions.DjangoModelPermissions]
+
+    def perform_create(self, serializer):
+        serializer.save(registrado_por=self.request.user)
+
+class CiberseguridadPlanViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para Planes de Ciberseguridad
+    """
+    queryset = CiberseguridadPlan.objects.all()
+    serializer_class = CiberseguridadPlanSerializer
+    permission_classes = [permissions.DjangoModelPermissions]
+
+class CiberseguridadCapacitacionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para Campañas de Ciberhigiene
+    """
+    queryset = CiberseguridadCapacitacion.objects.all()
+    serializer_class = CiberseguridadCapacitacionSerializer
+    permission_classes = [permissions.DjangoModelPermissions]
+

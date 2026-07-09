@@ -31,11 +31,9 @@ INSTALLED_APPS = [
     'comunicaciones',
     'core',
     'bienestar',
-    'conectividad',
     'contratos',
     'establecimientos',
     'funcionarios',
-    'impresoras',
     'insights',
     'licitaciones',
     'notificaciones',
@@ -47,13 +45,11 @@ INSTALLED_APPS = [
     'servicios',
     'solicitudes_reservas',
     'tesoreria',
-    'usuarios_google',
     'vehiculos',
-    'biometrico',
-    'conciliacion',
     'tickets',
     'ejecutivos',
     'personalizacion_sistema',
+    'arco',
 ]
 
 MIDDLEWARE = [
@@ -66,6 +62,7 @@ MIDDLEWARE = [
     'django_otp.middleware.OTPMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.audit_middleware.AuditRequestMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -184,3 +181,28 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 DATA_UPLOAD_MAX_MEMORY_SIZE = 209715200  # 200MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 209715200  # 200MB
 
+# ────────────────────────────────────────────────────────────
+# SEGURIDAD EN PRODUCCIÓN (Art. 14 quinquies — Ley 21.719)
+# ────────────────────────────────────────────────────────────
+if not DEBUG:
+    # Forzar HTTPS
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+    # HTTP Strict Transport Security (1 año)
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+    # Cookies seguras
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+
+    # Headers de protección
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+
+    # Expiración de sesión por inactividad (30 min)
+    SESSION_COOKIE_AGE = 1800
+    SESSION_SAVE_EVERY_REQUEST = True

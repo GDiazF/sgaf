@@ -129,3 +129,76 @@ class EmailConfigurationSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'smtp_password': {'write_only': True}
         }
+
+from .models import AuditLog
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    actor_name = serializers.SerializerMethodField()
+    remote_addr = serializers.CharField(source='ip_address', read_only=True)
+    content_type_name = serializers.CharField(source='model_name', read_only=True)
+    object_repr = serializers.CharField(source='details', read_only=True)
+    action = serializers.SerializerMethodField()
+    changes = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AuditLog
+        fields = ['id', 'action', 'timestamp', 'actor_name', 'remote_addr', 'content_type_name', 'object_repr', 'changes']
+
+    def get_actor_name(self, obj):
+        if obj.user:
+            full_name = obj.user.get_full_name()
+            return full_name if full_name else obj.user.username
+        return 'Sistema'
+
+    def get_action(self, obj):
+        act = str(obj.action or '').upper()
+        if 'CREACION' in act:
+            return 0
+        elif 'MODIFICACION' in act or 'ACCESO' in act:
+            return 1
+        elif 'ELIMINACION' in act:
+            return 2
+        return 3
+
+    def get_changes(self, obj):
+        return {}
+
+
+from .models import BreachReport, CiberseguridadPlan, CiberseguridadCapacitacion
+
+class BreachReportSerializer(serializers.ModelSerializer):
+    registrado_por_nombre = serializers.ReadOnlyField(source='registrado_por.username')
+
+    class Meta:
+        model = BreachReport
+        fields = [
+            'id', 'titulo', 'descripcion', 'tipo_amenaza', 'gravedad_incidente',
+            'fecha_incidente', 'fecha_descubrimiento', 'fecha_creacion',
+            'estimacion_afectados', 'datos_comprometidos', 'medidas_mitigacion',
+            'notificado_agencia', 'fecha_notificacion_agencia',
+            'notificado_titulares', 'fecha_notificacion_titulares',
+            'estado_csirt', 'fecha_alerta_temprana', 'fecha_actualizacion', 'fecha_informe_final',
+            'registrado_por', 'registrado_por_nombre'
+        ]
+        read_only_fields = ['registrado_por', 'fecha_creacion']
+
+class CiberseguridadPlanSerializer(serializers.ModelSerializer):
+    documento_url = MediaRelativeFileField(source='documento', read_only=True)
+    
+    class Meta:
+        model = CiberseguridadPlan
+        fields = [
+            'id', 'titulo', 'tipo', 'documento', 'documento_url',
+            'fecha_aprobacion', 'fecha_proxima_revision', 'activo'
+        ]
+
+class CiberseguridadCapacitacionSerializer(serializers.ModelSerializer):
+    documento_url = MediaRelativeFileField(source='documento', read_only=True)
+    
+    class Meta:
+        model = CiberseguridadCapacitacion
+        fields = [
+            'id', 'nombre_campana', 'descripcion', 'documento', 'documento_url',
+            'fecha_inicio', 'fecha_termino'
+        ]
+

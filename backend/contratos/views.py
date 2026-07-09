@@ -53,7 +53,7 @@ class ContratoViewSet(viewsets.ModelViewSet):
     pagination_class = LargeResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['proceso', 'estado', 'categoria', 'orientacion']
-    search_fields = ['codigo_mercado_publico', 'descripcion', 'id_licitacion']
+    search_fields = ['codigo_mercado_publico', 'descripcion', 'nro_oc', 'cdp', 'proveedores_asociados__proveedor__nombre']
     ordering_fields = ['fecha_inicio', 'monto_total', 'created_at']
 
     def perform_update(self, serializer):

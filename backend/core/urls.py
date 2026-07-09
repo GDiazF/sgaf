@@ -25,12 +25,17 @@ from core.views import (
     UserProfileView, UserViewSet, GroupViewSet, PermissionListView, 
     ChangePasswordView, AvatarUploadView, PasswordResetRequestView, PasswordResetConfirmView,
     LinkInteresViewSet, MFATokenObtainPairView, MFAVerifyView, MFASetupView, MFASendEmailOTPView,
-    SecurityConfigView, AdminMFAUserManagementView, EmailConfigurationView
+    SecurityConfigView, AdminMFAUserManagementView, EmailConfigurationView, AuditLogViewSet,
+    BreachReportViewSet, AceptarTerminosView, CiberseguridadPlanViewSet, CiberseguridadCapacitacionViewSet
 )
 
 router = DefaultRouter()
 router.register(r'admin/users', UserViewSet, basename='admin-users')
 router.register(r'admin/roles', GroupViewSet, basename='admin-roles')
+router.register(r'admin/audit-log', AuditLogViewSet, basename='admin-audit-log')
+router.register(r'ciberseguridad/breach', BreachReportViewSet, basename='ciberseguridad-breach')
+router.register(r'ciberseguridad/planes', CiberseguridadPlanViewSet, basename='ciberseguridad-planes')
+router.register(r'ciberseguridad/capacitaciones', CiberseguridadCapacitacionViewSet, basename='ciberseguridad-capacitaciones')
 router.register(r'links-interes', LinkInteresViewSet, basename='links-interes')
 
 urlpatterns = [
@@ -39,6 +44,7 @@ urlpatterns = [
     path('api/token/verify-mfa/', MFAVerifyView.as_view(), name='token_verify_mfa'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/auth/me/', UserProfileView.as_view(), name='user-profile'),
+    path('api/auth/me/aceptar-terminos/', AceptarTerminosView.as_view(), name='user-accept-terms'),
     path('api/auth/change-password/', ChangePasswordView.as_view(), name='change-password'),
     path('api/auth/avatar/', AvatarUploadView.as_view(), name='avatar-upload'),
     path('api/auth/password-reset-request/', PasswordResetRequestView.as_view(), name='password_reset_request'),
@@ -55,7 +61,6 @@ urlpatterns = [
     path('api/', include('servicios.urls')),
     path('api/contratos/', include('contratos.urls')),
     path('api/', include('funcionarios.urls')),
-    path('api/', include('impresoras.urls')),
     path('api/', include('vehiculos.urls')),
     path('api/remuneraciones/', include('remuneraciones.urls')),
     path('api/licitaciones/', include('licitaciones.urls')),
@@ -64,17 +69,14 @@ urlpatterns = [
     path('api/', include('personal_ti.urls')),
     path('api/tesoreria/', include('tesoreria.urls')),
     path('api/procedimientos/', include('procedimientos.urls')),
-    path('api/usuarios-google/', include('usuarios_google.urls')),
-    path('api/conectividad/', include('conectividad.urls')),
     path('api/insights/', include('insights.urls')),
     path('api/comunicaciones/', include('comunicaciones.urls')),
     path('api/bienestar/', include('bienestar.urls')),
-    path('api/biometrico/', include('biometrico.urls')),
-    path('api/conciliacion/', include('conciliacion.urls')),
     path('api/notificaciones/', include('notificaciones.urls')),
     path('api/tickets/', include('tickets.urls')),
     path('api/ejecutivos/', include('ejecutivos.urls')),
     path('api/personalizacion/', include('personalizacion_sistema.urls')),
+    path('api/', include('arco.urls')),
 ]
 
 from django.conf import settings

@@ -73,6 +73,17 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
     ordering_fields = ['nombre_funcionario', 'rut', 'cargo', 'creado_en']
     ordering = ['nombre_funcionario']
     
+    def list(self, request, *args, **kwargs):
+        from core.utils.audit import log_audit
+        log_audit(action='ACCESO', model_name='Funcionario', object_id=None, details="Listado de funcionarios consultado")
+        return super().list(request, *args, **kwargs)
+
+    def retrieve(self, request, *args, **kwargs):
+        from core.utils.audit import log_audit
+        instance = self.get_object()
+        log_audit(action='ACCESO', model_name='Funcionario', object_id=instance.id, details=f"Perfil de funcionario consultado: {instance.nombre_funcionario} ({instance.rut})")
+        return super().retrieve(request, *args, **kwargs)
+
     def get_serializer_class(self):
         """Usar serializer simplificado para listados"""
         if self.action == 'list':

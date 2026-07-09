@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShieldCheck, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Chrome, Box, Globe, UserCircle2, Settings, History, Info, Bell, Trash2, Check, X, TrendingUp, Heart, Mail, HelpCircle, MessageSquare } from 'lucide-react';
+import { AlertTriangle, Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShieldCheck, ShieldAlert, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Chrome, Box, Globe, UserCircle2, Settings, History, Info, Bell, Trash2, Check, X, TrendingUp, Heart, Mail, HelpCircle, MessageSquare, RefreshCw } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../hooks/usePermission';
@@ -35,6 +35,9 @@ const Layout = () => {
     const profileRef = useRef(null);
     const notificationsRef = useRef(null);
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+    const [acceptLoading, setAcceptLoading] = useState(false);
+    const [termsAcceptedCheckbox, setTermsAcceptedCheckbox] = useState(false);
+
 
     const isActive = (path) => location.pathname === path;
 
@@ -67,9 +70,9 @@ const Layout = () => {
 
         // SSGG Group
         const ssggPaths = [
-            '/services', '/contracts', '/telecomunicaciones', '/impresoras', '/vehiculos', 
-            '/personal-ti', '/insights', '/usuarios-google', '/biometrico', '/monitoreo-red', 
-            '/keys', '/loans', '/history', '/admin/conciliacion'
+            '/services', '/contracts', '/telecomunicaciones', '/vehiculos', 
+            '/personal-ti', '/insights', 
+            '/keys', '/loans', '/history'
         ];
         
         if (ssggPaths.some(p => path.startsWith(p))) {
@@ -77,7 +80,6 @@ const Layout = () => {
             if (path.startsWith('/contracts')) setActiveSubMenu('contratos');
             else if (path.startsWith('/services')) setActiveSubMenu('services');
             else if (path.startsWith('/vehiculos')) setActiveSubMenu('vehiculos');
-            else if (path.startsWith('/usuarios-google') || path.startsWith('/biometrico') || path.startsWith('/admin/conciliacion')) setActiveSubMenu('usuarios');
             else if (path.startsWith('/loans') || path.startsWith('/keys') || path.startsWith('/history')) setActiveSubMenu('loans');
         } 
         else if (path.startsWith('/tesoreria')) {
@@ -250,6 +252,88 @@ const Layout = () => {
 
     return (
         <div className="h-screen bg-slate-50 flex font-sans text-slate-800 overflow-hidden">
+            {user && user.acepto_terminos === false && (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col p-6 shadow-2xl text-left">
+                        {/* Title */}
+                        <div className="flex items-center gap-3 border-b border-slate-100 pb-3 flex-shrink-0">
+                            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                                <ShieldCheck className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Tratamiento y Protección de sus Datos Personales</h2>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Servicio Local de Educación Pública (SLEP) Iquique</p>
+                            </div>
+                        </div>
+
+                        {/* Policy Content */}
+                        <div className="flex-1 overflow-y-auto my-4 pr-1 space-y-4 text-xs text-slate-600 font-medium">
+                            <p className="bg-blue-50/50 border border-blue-100 text-blue-700 p-3.5 rounded-2xl leading-relaxed">
+                                <strong>IMPORTANTE:</strong> En conformidad a la <strong>Ley N° 21.719</strong> sobre Protección de Datos Personales en Chile (Diario Oficial, 13-Dic-2024), requerimos informarle de manera transparente sobre el uso de su información en el sistema SGAF antes de iniciar su sesión.
+                            </p>
+
+                            <div>
+                                <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-wider mb-1">1. Finalidad y Licitud del Tratamiento</h3>
+                                <p className="leading-relaxed">
+                                    El SLEP Iquique, en su calidad de órgano de la Administración del Estado, recopila y procesa sus datos personales (RUT, nombre completo, cargo, anexo telefónico, correo institucional) exclusivamente para el cumplimiento de sus funciones legales y administrativas (ej: gestión de reservas, control de activos y préstamos de llaves). Su información no será comunicada ni cedida a terceros no autorizados.
+                                </p>
+                            </div>
+
+                            <div>
+                                <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-wider mb-1">2. Sus Derechos ARCO y Bloqueo Temporal</h3>
+                                <p className="leading-relaxed">
+                                    Usted goza plenamente de los derechos de Acceso, Rectificación, Supresión, Oposición y Portabilidad. Asimismo, tiene derecho a solicitar el <strong>Bloqueo Temporal (Art. 8° ter)</strong> de sus datos mientras se tramita una rectificación o supresión. Puede ejercerlos en cualquier momento ingresando a la sección "Mis Datos" de su perfil.
+                                </p>
+                            </div>
+
+                            <div>
+                                <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-wider mb-1">3. Vía de Reclamación</h3>
+                                <p className="leading-relaxed">
+                                    Si estima que el SLEP Iquique ha infringido sus derechos, puede interponer un reclamo de tutela ante la <strong>Agencia de Protección de Datos Personales (APDP)</strong> de conformidad al Artículo 41° de la ley.
+                                </p>
+                            </div>
+
+                            <p className="border-t border-slate-100 pt-3 text-[10px] text-slate-400 italic">
+                                Para conocer en detalle las medidas de seguridad adoptadas (como el cifrado simétrico robusto de sus claves y MFA), puede leer la Política de Privacidad completa ingresando al pie de página del sistema.
+                            </p>
+                        </div>
+
+                        {/* Acceptance Checkbox */}
+                        <div className="border-t border-slate-100 pt-4 flex flex-col gap-4 flex-shrink-0">
+                            <label className="flex items-start gap-3 cursor-pointer p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/50 transition-colors border border-slate-200">
+                                <input
+                                    type="checkbox"
+                                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 mt-0.5"
+                                    checked={termsAcceptedCheckbox}
+                                    onChange={(e) => setTermsAcceptedCheckbox(e.target.checked)}
+                                />
+                                <div className="text-left">
+                                    <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider block">Declaro estar informado</span>
+                                    <span className="text-[9px] text-slate-400 font-bold leading-normal block mt-0.5">Confirmo que he leído y comprendo cómo se tratan mis datos y las medidas de seguridad del SGAF en cumplimiento con la Ley N° 21.719.</span>
+                                </div>
+                            </label>
+
+                            <button
+                                onClick={async () => {
+                                    setAcceptLoading(true);
+                                    try {
+                                        await api.post('auth/me/aceptar-terminos/');
+                                        await checkUserStatus();
+                                    } catch (err) {
+                                        console.error("Error al aceptar términos:", err);
+                                    } finally {
+                                        setAcceptLoading(false);
+                                    }
+                                }}
+                                disabled={!termsAcceptedCheckbox || acceptLoading}
+                                className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs uppercase font-black tracking-widest transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                            >
+                                {acceptLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Entendido, Aceptar y Continuar"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* Mobile Overlay */}
             <AnimatePresence>
                 {mobileMenuOpen && (
@@ -400,10 +484,25 @@ const Layout = () => {
                     )}
 
 
-
+                    {/* Ciberseguridad */}
+                    {(can('core.view_breachreport') || can('core.view_ciberseguridadplan') || can('core.view_ciberseguridadcapacitacion')) && (
+                        <Link
+                            to="/ciberseguridad"
+                            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/ciberseguridad') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+                        >
+                            <ShieldCheck className="w-5 h-5 flex-shrink-0" />
+                            <motion.span
+                                initial={false}
+                                animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
+                                className="font-medium whitespace-nowrap"
+                            >
+                                Ciberseguridad
+                            </motion.span>
+                        </Link>
+                    )}
 
                     {/* Main SSGG Submenu */}
-                    {(can('contratos.view_contrato') || can('servicios.view_proveedor') || can('servicios.view_facturaadquisicion') || can('prestamo_llaves.view_prestamo') || can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('servicios.view_servicio') || can('servicios.view_registropago') || can('servicios.view_recepcionconforme') || can('servicios.view_cdp') || can('usuarios_google.view_googleuser')) && (
+                    {(can('contratos.view_contrato') || can('servicios.view_proveedor') || can('servicios.view_facturaadquisicion') || can('prestamo_llaves.view_prestamo') || can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('servicios.view_servicio') || can('servicios.view_registropago') || can('servicios.view_recepcionconforme') || can('servicios.view_cdp')) && (
                         <div>
                             <button
                                 onClick={() => {
@@ -508,7 +607,7 @@ const Layout = () => {
                                         )}
 
                                         {/* Section: RECURSOS */}
-                                        {(can('servicios.view_servicio') || can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('personal_ti.view_personalti') || can('insights.view_dashboardmetric') || can('usuarios_google.view_googleuser') || can('biometrico.view_biometrico')) && (
+                                        {(can('servicios.view_servicio') || can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('personal_ti.view_personalti') || can('insights.view_dashboardmetric')) && (
                                             <div className="space-y-0.5 pt-2">
                                                 <div className="px-4 mb-1">
                                                     <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Recursos</span>
@@ -519,12 +618,7 @@ const Layout = () => {
                                                         <span className="font-medium whitespace-nowrap">Teléfonos</span>
                                                     </Link>
                                                 )}
-                                                {can('impresoras.view_printer') && (
-                                                    <Link to="/impresoras" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/impresoras') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                                                        <Printer className="w-4 h-4 flex-shrink-0" />
-                                                        <span className="font-medium whitespace-nowrap">Impresoras</span>
-                                                    </Link>
-                                                )}
+
                                                 {can('vehiculos.view_registromensual') && (
                                                     <div>
                                                         <button 
@@ -568,41 +662,9 @@ const Layout = () => {
 
 
 
-                                                {(can('usuarios_google.view_googleuser') || can('biometrico.view_biometrico')) && (
-                                                    <div>
-                                                        <button onClick={() => setActiveSubMenu(activeSubMenu === 'usuarios' ? null : 'usuarios')} className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'usuarios' || isActive('/usuarios-google') || isActive('/biometrico') ? 'text-blue-400' : ''}`}>
-                                                            <div className="flex items-center gap-3">
-                                                                <Users className="w-4 h-4 flex-shrink-0" />
-                                                                <span className="font-medium whitespace-nowrap">Usuarios</span>
-                                                            </div>
-                                                            {activeSubMenu === 'usuarios' ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                                                        </button>
-                                                        {activeSubMenu === 'usuarios' && (
-                                                            <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
-                                                                {can('usuarios_google.view_googleuser') && (
-                                                                    <Link to="/usuarios-google" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/usuarios-google') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
-                                                                        GoogleWorkspace
-                                                                    </Link>
-                                                                )}
-                                                                <Link to="/biometrico" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/biometrico') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
-                                                                    Biométrico
-                                                                </Link>
-                                                                {(user?.is_superuser || hasRole('Administrador TI')) && (
-                                                                    <Link to="/admin/conciliacion" className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs transition-colors ${isActive('/admin/conciliacion') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
-                                                                        Conciliación
-                                                                    </Link>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
 
-                                                {can('conectividad.view_escuelared') && (
-                                                    <Link to="/monitoreo-red" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/monitoreo-red') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                                                        <Globe className="w-4 h-4 flex-shrink-0" />
-                                                        <span className="font-medium whitespace-nowrap">Monitoreo Red</span>
-                                                    </Link>
-                                                )}
+
+
                                                 {(can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo')) && (
                                                     <Link
                                                         to={can('prestamo_llaves.view_prestamo') ? "/loans" : "/keys"}
@@ -874,9 +936,10 @@ const Layout = () => {
                     <motion.div
                         initial={false}
                         animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}
-                        className="px-4 mt-1"
+                        className="px-4 mt-1 flex justify-between"
                     >
                         <span className="text-[10px] text-slate-600 font-medium">v{APP_VERSION}</span>
+                        <a href="/legal" target="_blank" rel="noreferrer" className="text-[10px] text-slate-600 hover:text-blue-400 font-medium hover:underline">Marco Legal</a>
                     </motion.div>
                 </div >
             </motion.aside >
@@ -1030,6 +1093,17 @@ const Layout = () => {
                                                         </div>
                                                         Auditoría de Sistema
                                                     </Link>
+                                                    <Link
+                                                        to="/admin/arco"
+                                                        onClick={() => setIsProfileOpen(false)}
+                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
+                                                    >
+                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                                            <ShieldAlert className="w-4 h-4" />
+                                                        </div>
+                                                        Derechos ARCO
+                                                    </Link>
+
                                                     <Link
                                                         to="/admin/personalizacion/login/backgrounds"
                                                         onClick={() => setIsProfileOpen(false)}

@@ -32,7 +32,6 @@ import Departamentos from './pages/funcionarios/Departamentos';
 import Unidades from './pages/funcionarios/Unidades';
 import Grupos from './pages/funcionarios/Grupos';
 import AnexosDashboard from './pages/telecomunicaciones/AnexosDashboard';
-import ImpresorasDashboard from './pages/impresoras/ImpresorasDashboard';
 // Vehiculos
 import VehiculosDashboard from './pages/vehiculos/VehiculosDashboard';
 import RemuneracionesDashboard from './pages/tesoreria/Remuneraciones';
@@ -42,9 +41,6 @@ import OCDashboard from './pages/orden_compra/OCDashboard';
 import ReservasDashboard from './pages/reservas/ReservasDashboard';
 import PublicReservas from './pages/reservas/PublicReservas';
 import PersonalTIDashboard from './pages/personal_ti/PersonalTIDashboard';
-import UsuariosGoogleDashboard from './pages/usuarios_google/UsuariosGoogleDashboard';
-import BiometricoDashboard from './pages/biometrico/BiometricoDashboard';
-import MonitoreoRed from './pages/conectividad/MonitoreoRed';
 import InsightsDashboard from './pages/insights/InsightsDashboard';
 import WelfareBoard from './pages/bienestar/WelfareBoard';
 import WelfareWall from './pages/bienestar/WelfareWall';
@@ -72,8 +68,10 @@ import UserManagement from './pages/admin/UserManagement';
 import RolesManagement from './pages/admin/RolesManagement';
 import AuditLog from './pages/admin/AuditLog';
 import EmailSettings from './pages/admin/EmailSettings';
-import ConciliacionDashboard from './pages/admin/ConciliacionDashboard';
+import ArcoManagement from './pages/admin/ArcoManagement';
 import LoginBackgroundsAdmin from './pages/admin/LoginBackgroundsAdmin';
+import CiberseguridadDashboard from './pages/ciberseguridad/CiberseguridadDashboard';
+import LegalPage from './pages/LegalPage';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -133,6 +131,7 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
             <Route path="/reservas-externas" element={<PublicReservas />} />
+            <Route path="/legal" element={<LegalPage />} />
             {/* Protected Routes */}
             <Route element={<PrivateRoute />}>
               <Route path="/" element={<Layout />}>
@@ -198,10 +197,6 @@ function App() {
                 <Route element={<ProtectedRoute permission="servicios.view_servicio" />}>
                   <Route path="telecomunicaciones" element={<AnexosDashboard />} />
                 </Route>
-                {/* Impresoras */}
-                <Route element={<ProtectedRoute permission="impresoras.view_printer" />}>
-                  <Route path="impresoras" element={<ImpresorasDashboard />} />
-                </Route>
                 {/* Vehiculos */}
                 <Route element={<ProtectedRoute permission="vehiculos.view_registromensual" />}>
                   <Route path="vehiculos" element={<VehiculosDashboard />} />
@@ -226,13 +221,6 @@ function App() {
                 </Route>
                 <Route element={<ProtectedRoute permission="personal_ti.view_personalti" />}>
                   <Route path="personal-ti" element={<PersonalTIDashboard />} />
-                </Route>
-                <Route element={<ProtectedRoute permission="usuarios_google.view_googleuser" />}>
-                  <Route path="usuarios-google" element={<UsuariosGoogleDashboard />} />
-                  <Route path="biometrico" element={<BiometricoDashboard />} />
-                </Route>
-                <Route element={<ProtectedRoute permission="conectividad.view_escuelared" />}>
-                  <Route path="monitoreo-red" element={<MonitoreoRed />} />
                 </Route>
                 <Route element={<ProtectedRoute permission="insights.view_dashboardmetric" />}>
                   <Route path="insights" element={<InsightsDashboard />} />
@@ -262,8 +250,11 @@ function App() {
                   <Route path="admin/users" element={<UserManagement />} />
                   <Route path="admin/roles" element={<RolesManagement />} />
                   <Route path="admin/audit-log" element={<AuditLog />} />
+                  <Route path="admin/arco" element={<ArcoManagement />} />
+                  <Route element={<ProtectedRoute permission={['core.view_breachreport', 'core.view_ciberseguridadplan', 'core.view_ciberseguridadcapacitacion']} />}>
+                    <Route path="ciberseguridad" element={<CiberseguridadDashboard />} />
+                  </Route>
                   <Route path="admin/email-settings" element={<EmailSettings />} />
-                  <Route path="admin/conciliacion" element={<ConciliacionDashboard />} />
                   <Route path="admin/personalizacion/login/backgrounds" element={<LoginBackgroundsAdmin />} />
                 </Route>
               </Route>

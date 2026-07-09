@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from core.utils.encryption import encrypt_value, decrypt_value
 
 def user_avatar_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/avatars/user_<id>/<filename>
@@ -21,6 +22,22 @@ class Profile(models.Model):
     mfa_enforced = models.BooleanField(default=False, verbose_name="MFA Obligatorio (Admin)")
     mfa_secret = models.CharField(max_length=100, null=True, blank=True) # Para TOTP
     
+    # Consentimiento de Privacidad (Art. 12 / 14 ter)
+    acepto_terminos = models.BooleanField(default=False, verbose_name="Aceptó Políticas de Privacidad")
+    fecha_aceptacion = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de Aceptación")
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.mfa_secret:
+            self.mfa_secret = decrypt_value(self.mfa_secret)
+
+    def save(self, *args, **kwargs):
+        plain_mfa_secret = self.mfa_secret
+        if self.mfa_secret:
+            self.mfa_secret = encrypt_value(self.mfa_secret)
+        super().save(*args, **kwargs)
+        self.mfa_secret = plain_mfa_secret
+
     def __str__(self):
         return f"Perfil de {self.user.username}"
 
@@ -127,6 +144,18 @@ class EmailConfiguration(models.Model):
     
     # Notificaciones específicas (soporta lista separada por comas)
     reservas_admin_email = models.CharField(max_length=500, default='ssgg@slepiquique.cl', help_text="Emails que reciben avisos (separar por comas para varios)", verbose_name="Emails Admin Reservas")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.smtp_password:
+            self.smtp_password = decrypt_value(self.smtp_password)
+
+    def save(self, *args, **kwargs):
+        plain_password = self.smtp_password
+        if self.smtp_password:
+            self.smtp_password = encrypt_value(self.smtp_password)
+        super().save(*args, **kwargs)
+        self.smtp_password = plain_password
 
     def get_reservas_emails_list(self):
         if not self.reservas_admin_email:
@@ -241,3 +270,111 @@ class ReportConfiguration(models.Model):
     def get_for_type(cls, report_type):
         """Retorna la configuración para un tipo, o None si no existe"""
         return cls.objects.filter(report_type=report_type).first()
+
+
+class AuditLog(models.Model):
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Usuario")
+    action = models.CharField(max_length=50, verbose_name="Acción")  # e.g., LECTURA, CREACION, MODIFICACION, ELIMINACION
+    model_name = models.CharField(max_length=100, verbose_name="Modelo Afectado")
+    object_id = models.CharField(max_length=50, blank=True, null=True, verbose_name="ID Objeto")
+    details = models.TextField(blank=True, null=True, verbose_name="Detalles")
+    ip_address = models.GenericIPAddressField(blank=True, null=True, verbose_name="Dirección IP")
+    user_agent = models.TextField(blank=True, null=True, verbose_name="User Agent")
+    timestamp = models.DateTimeField(auto_now_add=True, verbose_name="Fecha y Hora")
+
+    class Meta:
+        verbose_name = "Registro de Auditoría"
+        verbose_name_plural = "Registros de Auditoría"
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        actor = self.user.username if self.user else "Sistema"
+        return f"{actor} - {self.action} en {self.model_name} ({self.timestamp})"
+
+
+class BreachReport(models.Model):
+    ESTADO_CSIRT_CHOICES = [
+        ('NO_REPORTADO', 'No Reportado'),
+        ('ALERTA_TEMPRANA', 'Alerta Temprana (3h)'),
+        ('ACTUALIZACION', 'Actualización (72h)'),
+        ('INFORME_FINAL', 'Informe Final (15 días)'),
+    ]
+
+    titulo = models.CharField(max_length=200, verbose_name="Título del Incidente")
+    descripcion = models.TextField(verbose_name="Descripción Técnica / Vulnerabilidad")
+    tipo_amenaza = models.CharField(max_length=150, blank=True, null=True, verbose_name="Tipo de Amenaza (Ej. Ransomware, Phishing)")
+    gravedad_incidente = models.CharField(max_length=50, blank=True, null=True, verbose_name="Gravedad / Impacto Inicial")
+    
+    # Tiempos
+    fecha_incidente = models.DateTimeField(verbose_name="Fecha/Hora Estimada del Incidente")
+    fecha_descubrimiento = models.DateTimeField(verbose_name="Fecha/Hora de Descubrimiento")
+    fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Registro")
+    
+    # Alcance de la brecha
+    estimacion_afectados = models.PositiveIntegerField(default=0, verbose_name="Número Estimado de Afectados")
+    datos_comprometidos = models.TextField(blank=True, null=True, help_text="Ej: Nombres, RUT, claves, etc.", verbose_name="Categorías de Datos Afectados")
+    
+    # Acciones de mitigación
+    medidas_mitigacion = models.TextField(blank=True, null=True, verbose_name="Medidas de Solución / Mitigación Adoptadas")
+    
+    # Ley de Datos (APDP)
+    notificado_agencia = models.BooleanField(default=False, verbose_name="Reportado a la Agencia (APDP)")
+    fecha_notificacion_agencia = models.DateTimeField(blank=True, null=True, verbose_name="Fecha de Reporte a la Agencia APDP")
+    notificado_titulares = models.BooleanField(default=False, verbose_name="Notificado a los Funcionarios Afectados")
+    fecha_notificacion_titulares = models.DateTimeField(blank=True, null=True, verbose_name="Fecha de Notificación a Titulares")
+
+    # Ley Marco Ciberseguridad (CSIRT Nacional)
+    estado_csirt = models.CharField(max_length=50, choices=ESTADO_CSIRT_CHOICES, default='NO_REPORTADO', verbose_name="Estado Reporte CSIRT")
+    fecha_alerta_temprana = models.DateTimeField(blank=True, null=True, verbose_name="Fecha Alerta Temprana")
+    fecha_actualizacion = models.DateTimeField(blank=True, null=True, verbose_name="Fecha Actualización")
+    fecha_informe_final = models.DateTimeField(blank=True, null=True, verbose_name="Fecha Informe Final")
+
+    registrado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Registrado Por")
+
+    class Meta:
+        verbose_name = "Reporte de Incidente / Brecha"
+        verbose_name_plural = "Reportes de Incidentes y Brechas"
+        ordering = ['-fecha_descubrimiento']
+
+    def __str__(self):
+        return f"{self.titulo} ({self.fecha_descubrimiento.date() if self.fecha_descubrimiento else 'Sin fecha'})"
+
+
+class CiberseguridadPlan(models.Model):
+    TIPO_PLAN_CHOICES = [
+        ('CONTINUIDAD', 'Continuidad Operacional'),
+        ('RECUPERACION', 'Recuperación ante Desastres (DRP)'),
+        ('RIESGOS', 'Gestión de Riesgos'),
+        ('OTRO', 'Otro Plan'),
+    ]
+    titulo = models.CharField(max_length=200, verbose_name="Título del Plan")
+    tipo = models.CharField(max_length=50, choices=TIPO_PLAN_CHOICES, verbose_name="Tipo de Plan")
+    documento = models.FileField(upload_to='ciberseguridad/planes/', verbose_name="Documento (PDF)")
+    fecha_aprobacion = models.DateField(verbose_name="Fecha de Aprobación")
+    fecha_proxima_revision = models.DateField(verbose_name="Fecha Próxima Revisión")
+    activo = models.BooleanField(default=True, verbose_name="Plan Activo")
+
+    class Meta:
+        verbose_name = "Plan de Ciberseguridad"
+        verbose_name_plural = "Planes de Ciberseguridad"
+        ordering = ['fecha_proxima_revision']
+
+    def __str__(self):
+        return f"{self.titulo} ({self.get_tipo_display()})"
+
+
+class CiberseguridadCapacitacion(models.Model):
+    nombre_campana = models.CharField(max_length=200, verbose_name="Nombre de la Campaña")
+    descripcion = models.TextField(verbose_name="Descripción de la Capacitación / Ciberhigiene")
+    documento = models.FileField(upload_to='ciberseguridad/capacitaciones/', blank=True, null=True, verbose_name="Material Adjunto")
+    fecha_inicio = models.DateField(verbose_name="Fecha de Inicio")
+    fecha_termino = models.DateField(blank=True, null=True, verbose_name="Fecha de Término")
+    
+    class Meta:
+        verbose_name = "Campaña de Ciberhigiene"
+        verbose_name_plural = "Campañas de Ciberhigiene"
+        ordering = ['-fecha_inicio']
+
+    def __str__(self):
+        return self.nombre_campana
+

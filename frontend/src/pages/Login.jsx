@@ -561,7 +561,7 @@ const Login = () => {
                             (c) 2026 SLEP Iquique. Todos los derechos reservados.
                         </p>
                         <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium mt-1">
-                            Version {APP_VERSION}
+                            Version {APP_VERSION} | <a href="/legal" target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline">Marco Legal y Normativo</a>
                         </p>
                     </div>
 
