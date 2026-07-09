@@ -70,11 +70,11 @@ export const APP_DEVELOPER = "Departamento de Servicios Generales, Operaciones y
     execSync('git add ..', { stdio: 'inherit' });
     execSync(`git commit -m "${type}: ${message} (v${newVersion})"`, { stdio: 'inherit' });
 
-    // Empuja desde tu rama actual (HEAD) hacia la rama 'local' de GitHub
-    console.log(`📤 Empujando cambios a la rama [local] de GitHub...`);
-    execSync(`git push origin HEAD:local`, { stdio: 'inherit' });
+    // Empuja desde tu rama actual (HEAD) hacia la rama homónima en GitHub
+    console.log(`📤 Empujando cambios a la rama [${currentBranch}] de GitHub...`);
+    execSync(`git push origin HEAD:${currentBranch}`, { stdio: 'inherit' });
 
-    console.log(`\n✅ ¡Publicación exitosa! Sistema actualizado a v${newVersion} en GitHub [rama: local]\n`);
+    console.log(`\n✅ ¡Publicación exitosa! Sistema actualizado a v${newVersion} en GitHub [rama: ${currentBranch}]\n`);
 
 } catch (error) {
     console.error('\n❌ Hubo un error durante el proceso:', error.message);
