@@ -185,6 +185,7 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.DjangoModelPermissions]
     filterset_fields = {
         'establecimiento': ['exact'],
+        'establecimiento__tipo__area_gestion': ['exact'],
         'servicio': ['exact'],
         'fecha_pago': ['exact', 'gte', 'lte'],
         'recepcion_conforme': ['exact', 'isnull'],

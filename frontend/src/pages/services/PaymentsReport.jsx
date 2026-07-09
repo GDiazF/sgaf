@@ -47,7 +47,15 @@ const PaymentsReport = () => {
 
             if (startDate) params.fecha_pago__gte = startDate;
             if (endDate) params.fecha_pago__lte = endDate;
-            if (selectedEstablishment) params.establecimiento = selectedEstablishment;
+            if (selectedEstablishment) {
+                if (selectedEstablishment === 'JARDINES') {
+                    params.establecimiento__tipo__area_gestion = 'JARDIN';
+                } else if (selectedEstablishment === 'COLEGIOS') {
+                    params.establecimiento__tipo__area_gestion = 'ESTABLECIMIENTO';
+                } else {
+                    params.establecimiento = selectedEstablishment;
+                }
+            }
             if (selectedProvider) params.servicio__proveedor = selectedProvider;
             if (search) params.search = search;
 
@@ -92,11 +100,19 @@ const PaymentsReport = () => {
         setErrorMessage('');
         try {
             const params = {
-                fecha_inicio: startDate,
-                fecha_fin: endDate,
-                establecimiento: selectedEstablishment,
                 servicio__proveedor: selectedProvider
             };
+            if (startDate) params.fecha_pago__gte = startDate;
+            if (endDate) params.fecha_pago__lte = endDate;
+            if (selectedEstablishment) {
+                if (selectedEstablishment === 'JARDINES') {
+                    params.establecimiento__tipo__area_gestion = 'JARDIN';
+                } else if (selectedEstablishment === 'COLEGIOS') {
+                    params.establecimiento__tipo__area_gestion = 'ESTABLECIMIENTO';
+                } else {
+                    params.establecimiento = selectedEstablishment;
+                }
+            }
             if (debouncedSearchTerm) params.search = debouncedSearchTerm;
             const response = await api.get('registros-pagos/export_excel/', {
                 params,
@@ -198,7 +214,9 @@ const PaymentsReport = () => {
                             onChange={(e) => { setSelectedEstablishment(e.target.value); setCurrentPage(1); }}
                             className={`${SELECT_FILTER} w-full min-w-0`}
                         >
-                            <option value="">TODOS LOS JARDINES</option>
+                            <option value="">TODOS</option>
+                            <option value="JARDINES">TODOS LOS JARDINES</option>
+                            <option value="COLEGIOS">TODOS LOS COLEGIOS</option>
                             {establishments.map(e => <option key={e.id} value={e.id}>{e.nombre.toUpperCase()}</option>)}
                         </select>
                     </div>
