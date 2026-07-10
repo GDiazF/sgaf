@@ -264,7 +264,7 @@ const Assets = () => {
                                         <tr key={asset.id} className="hover:bg-slate-50/50 transition-colors group">
                                             <td className="p-3 pl-8">
                                                 <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-250">
-                                                    {asset.tipo}
+                                                    {asset.tipo_nombre || asset.tipo}
                                                 </span>
                                             </td>
                                             <td className="p-3 pl-4">

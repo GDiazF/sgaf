@@ -41,7 +41,7 @@ class Activo(models.Model):
     ubicacion = models.CharField("Ubicación Física", max_length=100, blank=True, help_text="Donde se guarda físicamente")
     
     def __str__(self):
-        return f"[{self.get_tipo_display()}] {self.nombre} - {self.establecimiento.nombre}"
+        return f"[{self.tipo}] {self.nombre} - {self.establecimiento.nombre}"
 
 class Prestamo(models.Model):
     activo = models.ForeignKey(Activo, on_delete=models.CASCADE, related_name="prestamos")
