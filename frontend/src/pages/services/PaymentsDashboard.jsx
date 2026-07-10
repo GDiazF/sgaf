@@ -839,17 +839,17 @@ const PaymentsDashboard = () => {
                                 )}
                                 <button
                                     onClick={() => handleDownloadRC(item, 'ESTANDAR')}
-                                    disabled={!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA'}
+                                    disabled={!item.recepcion_conforme}
                                     className={`flex items-center justify-center gap-2 h-10 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-sm active:scale-95 transition-all
-                                        ${(!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA') ? 'bg-slate-50 text-slate-300' : 'bg-blue-50 text-blue-700'}`}
+                                        ${!item.recepcion_conforme ? 'bg-slate-50 text-slate-300' : 'bg-blue-50 text-blue-700'}`}
                                 >
                                     <FileText className="w-3.5 h-3.5" /> STD
                                 </button>
                                 <button
                                     onClick={() => handleDownloadRC(item, 'PAGO')}
-                                    disabled={!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA'}
+                                    disabled={!item.recepcion_conforme}
                                     className={`flex items-center justify-center gap-2 h-10 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-sm active:scale-95 transition-all
-                                        ${(!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA') ? 'bg-slate-50 text-slate-300' : 'bg-blue-50 text-blue-700'}`}
+                                        ${!item.recepcion_conforme ? 'bg-slate-50 text-slate-300' : 'bg-blue-50 text-blue-700'}`}
                                 >
                                     <Download className="w-3.5 h-3.5" /> PAGO
                                 </button>
@@ -1014,10 +1014,10 @@ const PaymentsDashboard = () => {
                                                 ) : null
                                             )}
 
-                                            <button onClick={() => handleDownloadRC(item, 'ESTANDAR')} disabled={!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA'} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-10" title="RC Monto JUNJI">
+                                            <button onClick={() => handleDownloadRC(item, 'ESTANDAR')} disabled={!item.recepcion_conforme} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-10" title="RC Monto JUNJI">
                                                 <FileText className="w-3.5 h-3.5" />
                                             </button>
-                                            <button onClick={() => handleDownloadRC(item, 'PAGO')} disabled={!item.recepcion_conforme || item.recepcion_conforme_estado === 'HISTORICA'} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-10" title="RC Pago">
+                                            <button onClick={() => handleDownloadRC(item, 'PAGO')} disabled={!item.recepcion_conforme} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-10" title="RC Pago">
                                                 <Download className="w-3.5 h-3.5" />
                                             </button>
                                             {can('servicios.change_registropago') && (
