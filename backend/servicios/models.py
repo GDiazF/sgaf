@@ -64,6 +64,7 @@ class RecepcionConforme(models.Model):
         ('EMITIDA', 'Emitida'),
         ('COMPLETADA', 'Completada (Firmada)'),
         ('ANULADA', 'Anulada'),
+        ('HISTORICA', 'Histórica'),
     ]
     TIPO_CHOICES = [
         ('ESTANDAR', 'Estándar (Resumen por Servicio)'),

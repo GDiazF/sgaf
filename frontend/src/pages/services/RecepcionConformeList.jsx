@@ -56,8 +56,12 @@ const RecepcionConformeList = () => {
                 page_size: pageSize,
                 search: search,
                 ordering: order,
-                estado: statusFilter !== 'all' ? statusFilter : undefined
             };
+            if (statusFilter === 'all') {
+                params.estado__in = 'EMITIDA,COMPLETADA,ANULADA';
+            } else {
+                params.estado = statusFilter;
+            }
             const [rcRes, grpRes] = await Promise.all([
                 api.get('recepciones-conformes/', { params }),
                 api.get('grupos/', { params: { page_size: 1000 } })
@@ -319,7 +323,8 @@ const RecepcionConformeList = () => {
                         { id: 'all', label: 'TODO' },
                         { id: 'EMITIDA', label: 'PENDIENTES' },
                         { id: 'COMPLETADA', label: 'COMPLETADAS' },
-                        { id: 'ANULADA', label: 'ANULADAS' }
+                        { id: 'ANULADA', label: 'ANULADAS' },
+                        { id: 'HISTORICA', label: 'HISTÓRICAS' }
                     ].map((tab) => (
                         <button
                             key={tab.id}

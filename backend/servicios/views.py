@@ -762,9 +762,50 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
 class RecepcionConformeViewSet(viewsets.ModelViewSet):
     queryset = RecepcionConforme.objects.all().order_by('-fecha_emision', '-id')
     serializer_class = RecepcionConformeSerializer
-    filterset_fields = ['proveedor', 'estado']
+    filterset_fields = {
+        'proveedor': ['exact'],
+        'estado': ['exact', 'in'],
+    }
     ordering_fields = ['fecha_emision', 'folio', 'proveedor__nombre', 'id']
     search_fields = ['folio', 'proveedor__nombre']
+
+    @action(detail=False, methods=['post'])
+    def create_historical(self, request):
+        from django.db import transaction
+        from .models import HistorialRecepcionConforme
+        
+        proveedor_id = request.data.get('proveedor')
+        registros_ids = request.data.get('registros_ids', [])
+        
+        if not proveedor_id or not registros_ids:
+            return Response({'error': 'Proveedor y registros_ids son requeridos.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            with transaction.atomic():
+                # 1. Create RecepcionConforme
+                rc = RecepcionConforme.objects.create(
+                    proveedor_id=proveedor_id,
+                    estado='HISTORICA',
+                    observaciones='Recepción conforme histórica cargada por el sistema.'
+                )
+                
+                # 2. Update payments
+                RegistroPago.objects.filter(id__in=registros_ids).update(recepcion_conforme=rc)
+                
+                # 3. Log history
+                user = request.user.username if request.user else 'Sistema'
+                HistorialRecepcionConforme.objects.create(
+                    recepcion_conforme=rc,
+                    accion='CREACION_HISTORICA',
+                    detalle=f"Recepción Conforme Histórica creada para {len(registros_ids)} pagos.",
+                    usuario=user
+                )
+                
+            serializer = self.get_serializer(rc)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['get'])
     def generate_pdf(self, request, pk=None):

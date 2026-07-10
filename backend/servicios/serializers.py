@@ -42,6 +42,7 @@ class RegistroPagoSerializer(serializers.ModelSerializer):
     servicio_numero_servicio = serializers.ReadOnlyField(source='servicio.numero_servicio', default='')
     servicio_unidad_medida = serializers.ReadOnlyField(source='servicio.unidad_medida', default='')
     recepcion_conforme_folio = serializers.ReadOnlyField(source='recepcion_conforme.folio', default=None)
+    recepcion_conforme_estado = serializers.ReadOnlyField(source='recepcion_conforme.estado', default=None)
 
     class Meta:
         model = RegistroPago
