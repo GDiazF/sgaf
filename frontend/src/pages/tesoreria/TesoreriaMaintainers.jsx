@@ -1,360 +1,381 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import api from '../../api'
+import { usePermission } from '../../hooks/usePermission'
+import { useNotify } from '../../hooks/useNotify'
 import {
-    Settings, Plus, Trash2, Edit2, Check, X,
-    Loader2, Landmark, CreditCard, Code,
-    ChevronRight, Save, Info
-} from 'lucide-react';
-import api from '../../api';
-import { usePermission } from '../../hooks/usePermission';
-import {
-    TITLE_ICON_BOX, ICON_BOX_XS, BTN_BLUE_SM, LOADER_SPIN, TAB_ACTIVE, TAB_INACTIVE,
-    BTN_EDIT_MOBILE, BTN_ICON_EDIT, INPUT_MODAL, BTN_MODAL_SAVE, BTN_SECONDARY,
-    MODAL_SHELL, MODAL_BACKDROP_LAYER, MODAL_PANEL,
-} from './tesoreriaUi';
+  DataTable,
+  Modal,
+  ConfirmModal,
+  Button,
+  Field,
+  Input,
+  Badge,
+  Icon,
+  useFormOverlay,
+  formatApiFormError,
+} from '@slep/ui'
 
-const MaintainerTable = ({ title, icon: Icon, endpoint, fields, description, permissionModel }) => {
-    const { can } = usePermission();
-    const [data, setData] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [editingId, setEditingId] = useState(null);
-    const [editForm, setEditForm] = useState({});
-    const [isModalOpen, setIsModalOpen] = useState(false);
+export const CONFIG_TABS = [
+  {
+    id: 'bancos',
+    label: 'Bancos',
+    title: 'Mapeo de bancos',
+    description: 'Nombres en archivos → códigos bancarios',
+    endpoint: 'remuneraciones/mapeo-bancos/',
+    permissionModel: 'mapeobanco',
+    fields: [
+      { name: 'nombre', label: 'Nombre en archivo' },
+      { name: 'codigo', label: 'Código banco' },
+    ],
+  },
+  {
+    id: 'medios',
+    label: 'Medios de pago',
+    title: 'Medios de pago',
+    description: 'Glosas → códigos internos',
+    endpoint: 'remuneraciones/mapeo-medios-pago/',
+    permissionModel: 'mapeomediospago',
+    fields: [
+      { name: 'nombre', label: 'Glosa medio' },
+      { name: 'codigo', label: 'Código medio' },
+    ],
+  },
+  {
+    id: 'directos',
+    label: 'Cód. directos',
+    title: 'Bancos directos',
+    description: 'Segmentos → códigos de 11 dígitos',
+    endpoint: 'remuneraciones/mapeo-bancos-directos/',
+    permissionModel: 'mapeobancosdirectos',
+    fields: [
+      { name: 'segmento', label: 'Segmento' },
+      { name: 'codigo_completo', label: 'Código completo' },
+    ],
+  },
+  {
+    id: 'valevista',
+    label: 'Vale Vista',
+    title: 'Configuración Vale Vista',
+    description: 'Parámetros para archivos de retiro',
+    endpoint: 'remuneraciones/vale-vista-config/',
+    permissionModel: 'valevistaconfig',
+    fields: [
+      { name: 'clave', label: 'Parámetro' },
+      { name: 'valor', label: 'Valor' },
+      { name: 'descripcion', label: 'Descripción' },
+    ],
+  },
+]
 
-    // Dynamic Permission Checks
-    const canAdd = can(`remuneraciones.add_${permissionModel}`);
-    const canChange = can(`remuneraciones.change_${permissionModel}`);
-    const canDelete = can(`remuneraciones.delete_${permissionModel}`);
+const MaintainerPanel = ({ tab, isNarrow }) => {
+  const { can } = usePermission()
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editingId, setEditingId] = useState(null)
+  const [editForm, setEditForm] = useState({})
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [savedOk, setSavedOk] = useState(false)
+  const { notify } = useNotify()
+  const overlay = useFormOverlay()
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            const res = await api.get(endpoint);
-            setData(Array.isArray(res.data) ? res.data : (res.data.results || []));
-        } catch (err) {
-            console.error("Error al cargar datos.");
-        } finally {
-            setLoading(false);
+  const canAdd = can(`remuneraciones.add_${tab.permissionModel}`)
+  const canChange = can(`remuneraciones.change_${tab.permissionModel}`)
+  const canDelete = can(`remuneraciones.delete_${tab.permissionModel}`)
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await api.get(tab.endpoint)
+      setData(Array.isArray(res.data) ? res.data : res.data.results || [])
+    } catch (err) {
+      console.error(err)
+      setData([])
+      notify({ variant: 'danger', text: 'Error al cargar registros.' })
+    } finally {
+      setLoading(false)
+    }
+  }, [tab.endpoint])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  const closeModal = () => {
+    if (overlay.busy) return
+    overlay.reset()
+    setIsModalOpen(false)
+    setEditingId(null)
+    setEditForm({})
+    setSavedOk(false)
+  }
+
+  const startAdd = () => {
+    const initial = {}
+    tab.fields.forEach((f) => {
+      initial[f.name] = ''
+    })
+    setEditingId(null)
+    setEditForm(initial)
+    setSavedOk(false)
+    overlay.reset()
+    setIsModalOpen(true)
+  }
+
+  const startEdit = (item) => {
+    setEditingId(item.id)
+    const form = {}
+    tab.fields.forEach((f) => {
+      form[f.name] = item[f.name] ?? ''
+    })
+    setEditForm(form)
+    setSavedOk(false)
+    overlay.reset()
+    setIsModalOpen(true)
+  }
+
+  const handleOverlayDismiss = () => {
+    if (overlay.status === 'success') {
+      overlay.reset()
+      setIsModalOpen(false)
+      setEditingId(null)
+      setEditForm({})
+      if (savedOk) fetchData()
+      setSavedOk(false)
+      return
+    }
+    overlay.dismiss()
+  }
+
+  const handleSave = async (e) => {
+    e.preventDefault()
+    try {
+      await overlay.run(
+        async () => {
+          if (editingId) {
+            await api.put(`${tab.endpoint}${editingId}/`, editForm)
+          } else {
+            await api.post(tab.endpoint, editForm)
+          }
+          setSavedOk(true)
+        },
+        {
+          successDescription: editingId ? 'Registro actualizado.' : 'Registro creado.',
+          formatError: (err) => formatApiFormError(err, 'Error al guardar el registro.'),
+        },
+      )
+    } catch {
+      // FormOverlay
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`${tab.endpoint}${deleteTarget.id}/`)
+      setDeleteTarget(null)
+      notify({ variant: 'success', text: 'Registro eliminado.' })
+      await fetchData()
+    } catch (err) {
+      console.error(err)
+      notify({ variant: 'danger', text: 'Error al eliminar.' })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const columns = useMemo(() => {
+    const cols = tab.fields.map((f, index) => ({
+      key: f.name,
+      header: f.label,
+      className: index === 0 ? 'col--primary' : 'col--secondary',
+      cardRole: index === 0 ? 'title' : index === 1 ? 'subtitle' : 'field',
+      priority: index < 2 ? 1 : 3,
+      render: (item) => item[f.name] || '—',
+    }))
+
+    if (canChange || canDelete) {
+      cols.push({
+        key: 'actions',
+        header: 'Acciones',
+        className: 'col--actions',
+        render: (item) => (
+          <div className="data-table__actions" onClick={(e) => e.stopPropagation()}>
+            {canChange ? (
+              <Button variant="ghost" size="sm" title="Editar" onClick={() => startEdit(item)}>
+                <Icon name="edit" size="sm" />
+              </Button>
+            ) : null}
+            {canDelete ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Eliminar"
+                onClick={() =>
+                  setDeleteTarget({
+                    id: item.id,
+                    label: item[tab.fields[0]?.name] || `#${item.id}`,
+                  })
+                }
+              >
+                <Icon name="trash" size="sm" />
+              </Button>
+            ) : null}
+          </div>
+        ),
+      })
+    }
+
+    return cols
+  }, [tab.fields, canChange, canDelete])
+
+  return (
+    <>
+      <DataTable
+        columns={columns}
+        rows={data}
+        loading={loading}
+        totalCount={data.length}
+        emptyTitle="Sin registros"
+        emptyDescription={tab.description}
+        emptyAction={
+          canAdd ? (
+            <Button variant="primary" size="sm" onClick={startAdd}>
+              <Icon name="plus" size="sm" /> Nuevo registro
+            </Button>
+          ) : null
         }
-    };
-
-    useEffect(() => {
-        fetchData();
-    }, [endpoint]);
-
-    const handleSave = async (e) => {
-        e.preventDefault();
-        setSaving(true);
-        try {
-            if (editingId) {
-                await api.put(`${endpoint}${editingId}/`, editForm);
-            } else {
-                await api.post(endpoint, editForm);
-            }
-            setIsModalOpen(false);
-            setEditingId(null);
-            setEditForm({});
-            fetchData();
-        } catch (err) {
-            alert("Error al guardar: " + JSON.stringify(err.response?.data || err.message));
-        } finally {
-            setSaving(false);
+        fillViewport={!isNarrow}
+        showFooter={false}
+        toolbar={
+          <div
+            className="table-toolbar__left"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-3)',
+              width: '100%',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <span className="table-toolbar__title">{tab.title}</span>
+              <Badge variant="neutral">{data.length}</Badge>
+            </div>
+            {canAdd ? (
+              <Button variant="primary" size="sm" onClick={startAdd}>
+                <Icon name="plus" size="sm" /> Nuevo
+              </Button>
+            ) : null}
+          </div>
         }
-    };
+        mobileCardActions={(item) => ({
+          primary: canChange
+            ? { label: 'Editar', onClick: () => startEdit(item) }
+            : undefined,
+          secondary: canDelete
+            ? {
+                label: 'Eliminar',
+                onClick: () =>
+                  setDeleteTarget({
+                    id: item.id,
+                    label: item[tab.fields[0]?.name] || `#${item.id}`,
+                  }),
+              }
+            : undefined,
+        })}
+      />
 
-    const handleDelete = async (id) => {
-        if (!window.confirm("¿Estás seguro de eliminar este registro?")) return;
-        try {
-            await api.delete(`${endpoint}${id}/`);
-            fetchData();
-        } catch (err) {
-            alert("Error al eliminar.");
+      <Modal
+        open={isModalOpen}
+        onClose={closeModal}
+        title={editingId ? 'Editar registro' : 'Nuevo registro'}
+        subheader={tab.title}
+        {...overlay.modalProps}
+        onOverlayDismiss={handleOverlayDismiss}
+        footer={
+          <>
+            <Button variant="quiet" onClick={closeModal} disabled={overlay.busy}>
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              form={`tm-form-${tab.id}`}
+              loading={overlay.busy}
+              disabled={overlay.busy || overlay.active}
+            >
+              {overlay.busy ? 'Guardando…' : editingId ? 'Guardar' : 'Crear'}
+            </Button>
+          </>
         }
-    };
+      >
+        <form
+          id={`tm-form-${tab.id}`}
+          onSubmit={handleSave}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}
+        >
+          {tab.fields.map((f) => (
+            <Field key={f.name} label={f.label} htmlFor={`tm-${tab.id}-${f.name}`} required>
+              <Input
+                id={`tm-${tab.id}-${f.name}`}
+                value={editForm[f.name] || ''}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, [f.name]: e.target.value }))
+                }
+                placeholder={f.label}
+                required
+              />
+            </Field>
+          ))}
+        </form>
+      </Modal>
 
-    const startEdit = (item) => {
-        setEditingId(item.id);
-        setEditForm({ ...item });
-        setIsModalOpen(true);
-    };
+      <ConfirmModal
+        open={!!deleteTarget}
+        onClose={() => {
+          if (!deleting) setDeleteTarget(null)
+        }}
+        onConfirm={confirmDelete}
+        title="Eliminar registro"
+        description={`¿Eliminar ${deleteTarget?.label || 'este registro'}? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        danger
+      />
+    </>
+  )
+}
 
-    const startAdd = () => {
-        setEditingId(null);
-        const initialForm = {};
-        fields.forEach(f => initialForm[f.name] = '');
-        setEditForm(initialForm);
-        setIsModalOpen(true);
-    };
+/** Sub-pestañas de mapeos (sin PageHeader propio). */
+export function TesoreriaConfigSection({ isNarrow }) {
+  const [activeTab, setActiveTab] = useState('bancos')
+  const current = CONFIG_TABS.find((t) => t.id === activeTab) || CONFIG_TABS[0]
 
-    if (loading) return (
-        <div className="flex flex-col items-center justify-center p-8 bg-white rounded-2xl border border-slate-100 shadow-sm animate-pulse h-48">
-            <Loader2 className={`${LOADER_SPIN} w-6 h-6 mb-3`} />
-            <p className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Sincronizando registros...</p>
-        </div>
-    );
+  return (
+    <>
+      <div className="tabs">
+        <ul className="tabs__list" role="tablist" aria-label="Mantenedores tesorería">
+          {CONFIG_TABS.map((tab) => (
+            <li key={tab.id}>
+              <button
+                type="button"
+                role="tab"
+                className={`tabs__btn${activeTab === tab.id ? ' is-active' : ''}`}
+                aria-selected={activeTab === tab.id}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
 
-    return (
-        <div className="space-y-3.5 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                <div className="p-4 border-b border-slate-100 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className={ICON_BOX_XS}>
-                            <Icon className="w-4.5 h-4.5" />
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-slate-800 text-[13px] uppercase tracking-tight leading-none mb-1">{title}</h3>
-                            <p className="text-[9px] text-slate-450 font-bold uppercase tracking-wide truncate max-w-[250px] md:max-w-none">{description}</p>
-                        </div>
-                    </div>
-                    {canAdd && (
-                        <button
-                            onClick={startAdd}
-                            className={BTN_BLUE_SM}
-                        >
-                            <Plus className="w-3.5 h-3.5" /> Nuevo Registro
-                        </button>
-                    )}
-                </div>
-
-                {/* VISTA MOBILE (Cards) - Más compactas */}
-                <div className="md:hidden divide-y divide-slate-150 max-h-[350px] overflow-y-auto custom-scrollbar">
-                    {data.map(item => (
-                        <div key={item.id} className="p-3.5 space-y-2 active:bg-slate-50/50 transition-colors">
-                            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                                {fields.map(f => (
-                                    <div key={f.name}>
-                                        <p className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{f.label}</p>
-                                        <p className="text-xs font-bold text-slate-700 truncate">{item[f.name]}</p>
-                                    </div>
-                                ))}
-                            </div>
-                            {(canChange || canDelete) && (
-                                <div className="flex gap-2 pt-1">
-                                    {canChange && (
-                                        <button
-                                            onClick={() => startEdit(item)}
-                                            className={BTN_EDIT_MOBILE}
-                                        >
-                                            <Edit2 className="w-3 h-3" /> Editar
-                                        </button>
-                                    )}
-                                    {canDelete && (
-                                        <button
-                                            onClick={() => handleDelete(item.id)}
-                                            className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase tracking-widest active:scale-95"
-                                        >
-                                            <Trash2 className="w-3 h-3" /> Borrar
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-
-                {/* VISTA DESKTOP (Table) - Fuentes reducidas y padding optimizado */}
-                <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full text-left border-collapse table-fixed">
-                        <thead>
-                            <tr className="bg-slate-50/50">
-                                {fields.map(f => (
-                                    <th key={f.name} className="px-4 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">{f.label}</th>
-                                ))}
-                                <th className="px-4 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right w-28">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                            {data.map(item => (
-                                <tr key={item.id} className="hover:bg-slate-50/40 transition-colors group">
-                                    {fields.map(f => (
-                                        <td key={f.name} className="px-4 py-2">
-                                            <span className="text-xs font-bold text-slate-600 truncate block">{item[f.name]}</span>
-                                        </td>
-                                    ))}
-                                    <td className="px-4 py-2 text-right">
-                                        <div className="flex justify-end gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                                            {canChange && (
-                                                <button type="button" onClick={() => startEdit(item)} className={BTN_ICON_EDIT}><Edit2 className="w-3.5 h-3.5" /></button>
-                                            )}
-                                            {canDelete && (
-                                                <button onClick={() => handleDelete(item.id)} className="w-7 h-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg flex items-center justify-center transition-all active:scale-90"><Trash2 className="w-3.5 h-3.5" /></button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {data.length === 0 && (
-                    <div className="p-10 text-center flex flex-col items-center">
-                        <Info className="w-5 h-5 text-slate-300 mb-2" />
-                        <p className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Sin registros cargados</p>
-                    </div>
-                )}
-            </div>
-
-            {/* MODAL EDIT / ADD (Responsive: Floating Card on Mobile) */}
-            {isModalOpen && createPortal(
-                <div className={MODAL_SHELL}>
-                    <div className={MODAL_BACKDROP_LAYER} onClick={() => setIsModalOpen(false)} aria-hidden />
-                    <div className={MODAL_PANEL} onClick={(e) => e.stopPropagation()}>
-                        <div className="px-6 pt-[26px] pb-4 border-b border-slate-100 flex justify-between items-center bg-white flex-shrink-0">
-                            <div>
-                                <h3 className="font-bold text-slate-800 text-sm uppercase tracking-tight">{editingId ? 'Editar Registro' : 'Nuevo Registro'}</h3>
-                                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-0.5">Parámetros del Sistema</p>
-                            </div>
-                            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-650 hover:bg-slate-50 p-2 rounded-xl transition-colors active:scale-90">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleSave} className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
-                            {fields.map(f => (
-                                <div key={f.name} className="space-y-1.5 flex flex-col">
-                                    <label className="text-[8px] font-black text-slate-450 uppercase tracking-[0.15em] ml-1 select-none">{f.label}</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        className={INPUT_MODAL}
-                                        value={editForm[f.name] || ''}
-                                        onChange={e => setEditForm({ ...editForm, [f.name]: e.target.value })}
-                                        placeholder={`INGRESAR ${f.label.toUpperCase()}...`}
-                                    />
-                                </div>
-                            ))}
-                            <div className="pt-2 flex gap-3 shrink-0">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsModalOpen(false)}
-                                    className="flex-1 h-9 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-700 border border-slate-200/60 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={saving}
-                                    className={BTN_MODAL_SAVE}
-                                >
-                                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                                    {editingId ? 'Guardar' : 'Crear'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>,
-                document.body
-            )}
-        </div>
-    );
-};
-
-const TesoreriaMaintainers = () => {
-    const [activeTab, setActiveTab] = useState('bancos');
-
-    const tabs = [
-        { id: 'bancos', label: 'Bancos', icon: Landmark },
-        { id: 'medios', label: 'Medios Pago', icon: CreditCard },
-        { id: 'directos', label: 'Cod. Directos', icon: Code },
-        { id: 'valevista', label: 'Vale Vista', icon: Settings },
-    ];
-
-    return (
-        <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden">
-            {/* Header */}
-            <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-end gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
-                <div className="flex items-center gap-3">
-                    <div className={TITLE_ICON_BOX}>
-                        <Settings className="w-4 h-4" />
-                    </div>
-                    <div>
-                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase select-none">Tesorería</h2>
-                        <div className="flex items-center gap-2 mt-1.5">
-                            <p className="text-[10px] md:text-xs font-medium text-slate-500 uppercase ml-0 select-none">Configuración, Mapeos y Parámetros del Sistema</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Tab Bar Navigation */}
-            <div className="shrink-0 flex items-center bg-white p-1 rounded-2xl border border-slate-200 shadow-sm overflow-x-auto no-scrollbar scroll-smooth">
-                <div className="flex min-w-max md:min-w-0">
-                    {tabs.map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 whitespace-nowrap active:scale-95 ${activeTab === tab.id ? TAB_ACTIVE : TAB_INACTIVE}`}
-                        >
-                            <tab.icon className="w-3.5 h-3.5" />
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* Scrolling Tab Content (Zero-Scroll Container) */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar pb-6 pr-1">
-                {activeTab === 'bancos' && (
-                    <MaintainerTable
-                        title="Mapeo de Bancos"
-                        endpoint="remuneraciones/mapeo-bancos/"
-                        icon={Landmark}
-                        description="Nombres en archivos a códigos bancarios."
-                        permissionModel="mapeobanco"
-                        fields={[
-                            { name: 'nombre', label: 'Nombre en Archivo' },
-                            { name: 'codigo', label: 'Código Banco' }
-                        ]}
-                    />
-                )}
-
-                {activeTab === 'medios' && (
-                    <MaintainerTable
-                        title="Medios de Pago"
-                        endpoint="remuneraciones/mapeo-medios-pago/"
-                        icon={CreditCard}
-                        description="Glosas a códigos internos."
-                        permissionModel="mapeomediospago"
-                        fields={[
-                            { name: 'nombre', label: 'Glosa Medio' },
-                            { name: 'codigo', label: 'Código Medio' }
-                        ]}
-                    />
-                )}
-
-                {activeTab === 'directos' && (
-                    <MaintainerTable
-                        title="Bancos Directos"
-                        endpoint="remuneraciones/mapeo-bancos-directos/"
-                        icon={Code}
-                        description="Segmentos a códigos de 11 dígitos."
-                        permissionModel="mapeobancosdirectos"
-                        fields={[
-                            { name: 'segmento', label: 'Segmento' },
-                            { name: 'codigo_completo', label: 'Cód. Completo' }
-                        ]}
-                    />
-                )}
-
-                {activeTab === 'valevista' && (
-                    <MaintainerTable
-                        title="Configuración Vale Vista"
-                        endpoint="remuneraciones/vale-vista-config/"
-                        icon={Settings}
-                        description="Parámetros para archivos de retiro."
-                        permissionModel="valevistaconfig"
-                        fields={[
-                            { name: 'clave', label: 'Parámetro' },
-                            { name: 'valor', label: 'Valor' },
-                            { name: 'descripcion', label: 'Descripción' }
-                        ]}
-                    />
-                )}
-            </div>
-        </div>
-    );
-};
-
-export default TesoreriaMaintainers;
+      <div className="tabs__panel is-active tesoreria-config-subpanel" role="tabpanel">
+        <MaintainerPanel key={current.id} tab={current} isNarrow={isNarrow} />
+      </div>
+    </>
+  )
+}

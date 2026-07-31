@@ -1,404 +1,407 @@
-import React, { useState, useEffect } from 'react';
-import BaseModal from '../common/BaseModal';
-import { Building2, Info } from 'lucide-react';
-import DateInput from '../common/DateInput';
-import SearchableSelect from '../common/SearchableSelect';
-import MultiSearchableSelect from '../common/MultiSearchableSelect';
-import FormInput from '../common/FormInput';
-import FormSelect from '../common/FormSelect';
-import MonthInput from '../common/MonthInput';
+import React, { useState, useEffect } from 'react'
+import SearchableSelect from '../common/SearchableSelect'
+import MultiSearchableSelect from '../common/MultiSearchableSelect'
+import {
+  Modal,
+  Button,
+  Field,
+  Input,
+  Select,
+  Textarea,
+  Alert,
+  CurrencyInput,
+  useFormOverlay,
+  formatApiFormError,
+} from '@slep/ui'
 
-const ACQ_INPUT_CLASS =
-    'no-global !w-full !h-10 !min-h-10 !text-[10px] !font-bold !bg-white !border !border-slate-200 !px-3 !py-0 !rounded-xl !outline-none focus:!border-blue-500 uppercase !transition-all !shadow-sm placeholder:!text-slate-300';
+const AdquisicionModal = ({
+  open,
+  onClose,
+  onSave,
+  editingId,
+  initialData,
+  lookups = {},
+}) => {
+  const {
+    establishments = [],
+    providers = [],
+    deliveryTypes = [],
+    establishmentTypes = [],
+    groups = [],
+  } = lookups
 
-const ACQ_READONLY_INPUT_CLASS =
-    `${ACQ_INPUT_CLASS} !bg-slate-50 !font-mono !opacity-60 !cursor-not-allowed`;
+  const [formData, setFormData] = useState(initialData || {})
+  const overlay = useFormOverlay()
 
-const ACQ_TOTAL_INPUT_CLASS =
-    `${ACQ_INPUT_CLASS} !bg-blue-50/50 !border-blue-200 !text-blue-700 !font-black !text-center focus:!bg-white`;
+  useEffect(() => {
+    if (!open) return
+    overlay.reset()
+    setFormData({
+      ...initialData,
+      periodo: initialData?.periodo ? String(initialData.periodo).substring(0, 7) : '',
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset solo al abrir
+  }, [open, initialData])
 
-const ACQ_SELECT_CLASS =
-    "no-global !w-full !h-10 !min-h-10 !text-[10px] !font-black uppercase tracking-widest !px-3 !py-0 !rounded-xl !border !border-slate-200 !outline-none cursor-pointer appearance-none !bg-white !text-slate-700 focus:!border-blue-500 !shadow-sm bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M7%209l3%203%203-3%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1rem_1rem] bg-[right_0.5rem_center] bg-no-repeat";
+  const handleBulkSelect = (type) => {
+    let selectedIds = []
+    if (type === 'ALL') {
+      selectedIds = establishments.map((e) => e.id)
+    } else if (type === 'CLEAR') {
+      selectedIds = []
+    } else {
+      const typesInArea = (establishmentTypes || [])
+        .filter((t) => t.area_gestion === type)
+        .map((t) => t.id)
+      selectedIds = establishments
+        .filter((e) => typesInArea.includes(e.tipo))
+        .map((e) => e.id)
+    }
+    setFormData((prev) => ({ ...prev, establecimientos: selectedIds }))
+  }
 
-const ACQ_LABEL_CLASS =
-    '!block !text-[10px] !font-black !text-slate-500 !uppercase !tracking-widest !mb-1.5 !ml-1';
+  const getSmartGlosa = () => {
+    if (!formData.establecimientos?.length) return ''
+    const count = formData.establecimientos.length
+    if (count === establishments.length && count > 5) {
+      return '\n- TOTALIDAD DE ESTABLECIMIENTOS'
+    }
 
-const BULK_BUTTON_CLASS =
-    'h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent bg-slate-100 text-slate-600 hover:bg-slate-200';
+    const selectedSet = new Set(formData.establecimientos)
+    const areaTotals = {}
+    const areaCounts = {}
+    ;(establishmentTypes || []).forEach((t) => {
+      const area = t.area_gestion || 'ESTABLECIMIENTO'
+      areaTotals[area] =
+        (areaTotals[area] || 0) + establishments.filter((e) => e.tipo === t.id).length
+      areaCounts[area] =
+        (areaCounts[area] || 0) +
+        establishments.filter((e) => e.tipo === t.id && selectedSet.has(e.id)).length
+    })
 
-const SectionHeader = ({ children }) => (
-    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2">
-        {children}
-    </h4>
-);
+    if (count > 5) {
+      if (
+        areaCounts.ESTABLECIMIENTO === areaTotals.ESTABLECIMIENTO &&
+        count === areaCounts.ESTABLECIMIENTO
+      ) {
+        return '\n- TOTALIDAD DE ESTABLECIMIENTOS (ESCUELAS/LICEOS)'
+      }
+      if (areaCounts.JARDIN === areaTotals.JARDIN && count === areaCounts.JARDIN) {
+        return '\n- TOTALIDAD DE JARDINES INFANTILES VTF'
+      }
+      if (areaCounts.OFICINA === areaTotals.OFICINA && count === areaCounts.OFICINA) {
+        return '\n- OFICINA CENTRAL ADM.'
+      }
+    }
 
-const AdquisicionModal = ({ isOpen, onClose, onSave, editingId, initialData, lookups }) => {
-    const [formData, setFormData] = useState(initialData);
-    const { establishments, providers, deliveryTypes, establishmentTypes } = lookups;
+    const names = formData.establecimientos
+      .map((id) => establishments.find((e) => e.id === id)?.nombre)
+      .filter(Boolean)
+    return names.length > 0 ? `\n- ${names.join('\n- ')}` : ''
+  }
 
-    useEffect(() => {
-        if (isOpen) {
-            setFormData({
-                ...initialData,
-                periodo: initialData?.periodo ? initialData.periodo.substring(0, 7) : ''
-            });
-        }
-    }, [isOpen, initialData]);
+  const periodoLabel = (() => {
+    if (!formData.periodo) return ''
+    const [year, month] = formData.periodo.split('-')
+    const date = new Date(year, month - 1, 1)
+    return ` - ${date.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' }).toUpperCase()}`
+  })()
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
+  const selectedGroup = groups.find(
+    (g) => g.id.toString() === formData.grupo_firmante?.toString(),
+  )
 
-    const handleSelectChange = (name, value) => {
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const finalData = { ...formData }
+    if (finalData.periodo && finalData.periodo.length === 7) {
+      finalData.periodo = `${finalData.periodo}-01`
+    } else if (!finalData.periodo) {
+      finalData.periodo = null
+    }
+    if (!finalData.establecimientos) finalData.establecimientos = []
 
-    const handleFormSave = () => {
-        // Prepare data for backend: periodo must be a full date (YYYY-MM-DD) or null
-        const finalData = { ...formData };
-        if (finalData.periodo && finalData.periodo.length === 7) {
-            finalData.periodo = `${finalData.periodo}-01`;
-        } else if (!finalData.periodo) {
-            finalData.periodo = null;
-        }
+    try {
+      await overlay.run(
+        async () => {
+          await onSave(finalData)
+        },
+        {
+          successDescription: editingId ? 'Factura actualizada.' : 'Factura registrada.',
+          formatError: formatApiFormError,
+        },
+      )
+    } catch {
+      // El error se muestra en FormOverlay
+    }
+  }
 
-        // Ensure establecimientos is at least an empty array if empty
-        if (!finalData.establecimientos) {
-            finalData.establecimientos = [];
-        }
+  const handleOverlayDismiss = () => {
+    if (overlay.status === 'success') {
+      overlay.reset()
+      onClose({ saved: true })
+      return
+    }
+    overlay.dismiss()
+  }
 
-        onSave(finalData);
-    };
+  const handleClose = () => {
+    if (overlay.busy) return
+    overlay.reset()
+    onClose()
+  }
 
-    const handleBulkSelect = (type) => {
-        let selectedIds = [];
-        if (type === 'ALL') {
-            selectedIds = establishments.map(e => e.id);
-        } else if (type === 'CLEAR') {
-            selectedIds = [];
-        } else {
-            const typesInArea = (establishmentTypes || [])
-                .filter(t => t.area_gestion === type)
-                .map(t => t.id);
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      size="lg"
+      title={editingId ? 'Editar factura de adquisición' : 'Registrar adquisición directa'}
+      subheader="Compra sin número de servicio asociado"
+      {...overlay.modalProps}
+      onOverlayDismiss={handleOverlayDismiss}
+      footer={
+        <>
+          <Button variant="ghost" type="button" onClick={handleClose} disabled={overlay.busy}>
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            type="submit"
+            form="adq-form"
+            loading={overlay.busy}
+            disabled={overlay.busy || overlay.active}
+          >
+            {editingId ? 'Actualizar' : 'Guardar'}
+          </Button>
+        </>
+      }
+    >
+      <form id="adq-form" className="crud-form" onSubmit={handleSubmit}>
+        <p className="contracts-section-title">1. Identificación</p>
+        <div className="form-grid">
+          <Field label="Folio RC" htmlFor="adq-folio">
+            <Input id="adq-folio" value={formData.folio || ''} readOnly placeholder="Automático…" />
+          </Field>
+          <Field label="Nº CDP" required htmlFor="adq-cdp">
+            <Input
+              id="adq-cdp"
+              required
+              value={formData.cdp || ''}
+              onChange={(e) => setFormData({ ...formData, cdp: e.target.value })}
+              placeholder="Certificado…"
+            />
+          </Field>
+          <Field label="Nº Factura" htmlFor="adq-fac">
+            <Input
+              id="adq-fac"
+              value={formData.nro_factura || ''}
+              onChange={(e) => setFormData({ ...formData, nro_factura: e.target.value })}
+            />
+          </Field>
+          <Field label="Nº Orden de compra" htmlFor="adq-oc">
+            <Input
+              id="adq-oc"
+              value={formData.nro_oc || ''}
+              onChange={(e) => setFormData({ ...formData, nro_oc: e.target.value })}
+              placeholder="Opcional…"
+            />
+          </Field>
+        </div>
 
-            selectedIds = establishments
-                .filter(e => typesInArea.includes(e.tipo))
-                .map(e => e.id);
-        }
-        setFormData(prev => ({ ...prev, establecimientos: selectedIds }));
-    };
+        <p className="contracts-section-title">2. Proveedor y destino</p>
+        <div className="form-grid">
+          <div className="field field--full">
+            <SearchableSelect
+              label="Proveedor / Emisor"
+              required
+              options={providers.map((p) => ({
+                value: p.id,
+                label: `${p.nombre}${p.rut ? ` (RUT: ${p.rut})` : ''}`,
+              }))}
+              value={formData.proveedor}
+              onChange={(val) => setFormData({ ...formData, proveedor: val })}
+              placeholder="Seleccione proveedor…"
+            />
+          </div>
+          <div className="field field--full">
+            <MultiSearchableSelect
+              label="Establecimientos de destino"
+              options={establishments.map((e) => ({ value: e.id, label: e.nombre }))}
+              value={formData.establecimientos || []}
+              onChange={(val) => setFormData({ ...formData, establecimientos: val })}
+              placeholder="Seleccione uno o muchos…"
+            />
+          </div>
+        </div>
+        <div className="contracts-bulk">
+          <Button type="button" variant="outline" size="sm" onClick={() => handleBulkSelect('ALL')}>
+            Todos
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleBulkSelect('ESTABLECIMIENTO')}
+          >
+            Establecimientos
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleBulkSelect('JARDIN')}
+          >
+            Jardines VTF
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleBulkSelect('OFICINA')}
+          >
+            Oficina Central
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => handleBulkSelect('CLEAR')}>
+            Limpiar
+          </Button>
+        </div>
 
-    const getSmartGlosa = () => {
-        if (!formData.establecimientos || formData.establecimientos.length === 0) return "";
+        <p className="contracts-section-title">3. Cronología</p>
+        <div className="form-grid form-grid--3">
+          <Field label="Fecha recepción" required htmlFor="adq-fr">
+            <Input
+              id="adq-fr"
+              type="date"
+              required
+              value={formData.fecha_recepcion || ''}
+              onChange={(e) =>
+                setFormData({ ...formData, fecha_recepcion: e.target.value })
+              }
+            />
+          </Field>
+          <Field label="Periodo de cobro" htmlFor="adq-periodo">
+            <Input
+              id="adq-periodo"
+              type="month"
+              value={formData.periodo || ''}
+              onChange={(e) => setFormData({ ...formData, periodo: e.target.value })}
+            />
+          </Field>
+          <Field label="Tipo de entrega" required htmlFor="adq-te">
+            <Select
+              id="adq-te"
+              required
+              value={formData.tipo_entrega || ''}
+              onChange={(e) => setFormData({ ...formData, tipo_entrega: e.target.value })}
+            >
+              <option value="">Seleccione…</option>
+              {deliveryTypes.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
 
-        const count = formData.establecimientos.length;
+        <p className="contracts-section-title">4. Finanzas</p>
+        <div className="form-grid">
+          <Field label="Concepto / glosa" required htmlFor="adq-desc" className="field--full">
+            <Textarea
+              id="adq-desc"
+              required
+              rows={2}
+              value={formData.descripcion || ''}
+              onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+              placeholder="Ej: Servicios de transporte, compra de equipos…"
+            />
+          </Field>
+          <div className="field field--full">
+            <Alert variant="info" title="Vista previa glosa (PDF)">
+              <pre className="contracts-glosa-preview">
+                {(formData.descripcion || '') + periodoLabel + getSmartGlosa()}
+              </pre>
+            </Alert>
+          </div>
+        </div>
+        <div className="form-grid form-grid--3">
+          <Field label="Monto neto" required htmlFor="adq-neto">
+            <CurrencyInput
+              id="adq-neto"
+              required
+              value={formData.total_neto ?? ''}
+              onChange={(val) => setFormData({ ...formData, total_neto: val })}
+            />
+          </Field>
+          <Field label="IVA" required htmlFor="adq-iva">
+            <CurrencyInput
+              id="adq-iva"
+              required
+              placeholder="0"
+              value={formData.iva ?? ''}
+              onChange={(val) => setFormData({ ...formData, iva: val })}
+            />
+          </Field>
+          <Field label="Total a pagar" required htmlFor="adq-total">
+            <CurrencyInput
+              id="adq-total"
+              required
+              placeholder="0"
+              value={formData.total_pagar ?? ''}
+              onChange={(val) => setFormData({ ...formData, total_pagar: val })}
+            />
+          </Field>
+        </div>
 
-        // If all are selected, use summary
-        if (count === establishments.length && count > 5) {
-            return "\n- TOTALIDAD DE ESTABLECIMIENTOS";
-        }
+        <p className="contracts-section-title">5. Firmante</p>
+        <div className="form-grid">
+          <Field label="Grupo de firmantes" htmlFor="adq-grp">
+            <Select
+              id="adq-grp"
+              value={formData.grupo_firmante || ''}
+              onChange={(e) => {
+                const gid = e.target.value
+                const grp = groups.find((g) => g.id.toString() === gid)
+                setFormData((prev) => ({
+                  ...prev,
+                  grupo_firmante: gid,
+                  firmante: grp ? grp.jefe || '' : '',
+                }))
+              }}
+            >
+              <option value="">Seleccione grupo…</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Funcionario firmante" htmlFor="adq-firm">
+            <Select
+              id="adq-firm"
+              value={formData.firmante || ''}
+              disabled={!formData.grupo_firmante}
+              onChange={(e) => setFormData({ ...formData, firmante: e.target.value })}
+            >
+              <option value="">Seleccione funcionario…</option>
+              {(selectedGroup?.miembros_detalle || []).map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nombre}
+                  {m.id === selectedGroup?.jefe ? ' (Jefe)' : ''}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
 
-        const selectedSet = new Set(formData.establecimientos);
-        const areaTotals = {};
-        const areaCounts = {};
+        <Alert variant="info">
+          Ingrese el monto neto e IVA. El total se usa en el documento de recepción conforme.
+        </Alert>
+      </form>
+    </Modal>
+  )
+}
 
-        (establishmentTypes || []).forEach(t => {
-            const area = t.area_gestion || 'ESTABLECIMIENTO';
-            areaTotals[area] = (areaTotals[area] || 0) + establishments.filter(e => e.tipo === t.id).length;
-            areaCounts[area] = (areaCounts[area] || 0) + establishments.filter(e => e.tipo === t.id && selectedSet.has(e.id)).length;
-        });
-
-        // Summary labels for full areas if more than 5
-        if (count > 5) {
-            if (areaCounts['ESTABLECIMIENTO'] === areaTotals['ESTABLECIMIENTO'] && count === areaCounts['ESTABLECIMIENTO'])
-                return "\n- TOTALIDAD DE ESTABLECIMIENTOS (ESCUELAS/LICEOS)";
-            if (areaCounts['JARDIN'] === areaTotals['JARDIN'] && count === areaCounts['JARDIN'])
-                return "\n- TOTALIDAD DE JARDINES INFANTILES VTF";
-            if (areaCounts['OFICINA'] === areaTotals['OFICINA'] && count === areaCounts['OFICINA'])
-                return "\n- OFICINA CENTRAL ADM.";
-        }
-
-        // Default to vertical list
-        const names = formData.establecimientos
-            .map(id => establishments.find(e => e.id === id)?.nombre)
-            .filter(Boolean);
-
-        return names.length > 0 ? "\n- " + names.join('\n- ') : "";
-    };
-
-
-    return (
-        <BaseModal
-            isOpen={isOpen}
-            onClose={onClose}
-            onSave={handleFormSave}
-            title={editingId ? 'Editar Factura de Adquisición' : 'Registrar Adquisición Directa'}
-            subtitle="Complete los detalles de la compra sin número de servicio asociado"
-            maxWidth="max-w-3xl"
-            saveLabel={editingId ? 'Actualizar Factura' : 'Guardar Factura'}
-        >
-            <div className="space-y-6">
-                {/* Section: Identificación del Documento */}
-                <div className="space-y-4">
-                    <SectionHeader>Identificación del Documento</SectionHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2">
-                        <FormInput
-                            label="Folio RC"
-                            name="folio"
-                            placeholder="Automático..."
-                            value={formData.folio}
-                            readOnly
-                            labelClassName={ACQ_LABEL_CLASS}
-                            inputClassName={ACQ_READONLY_INPUT_CLASS}
-                        />
-                        <FormInput
-                            label="Nº CDP"
-                            name="cdp"
-                            required
-                            placeholder="Certificado..."
-                            value={formData.cdp}
-                            onChange={handleChange}
-                            labelClassName={ACQ_LABEL_CLASS}
-                            inputClassName={ACQ_INPUT_CLASS}
-                        />
-                        <FormInput
-                            label="Nº Factura"
-                            name="nro_factura"
-                            placeholder="Folio..."
-                            value={formData.nro_factura}
-                            onChange={handleChange}
-                            labelClassName={ACQ_LABEL_CLASS}
-                            inputClassName={ACQ_INPUT_CLASS}
-                        />
-                        <FormInput
-                            label="Nº Orden de Compra"
-                            name="nro_oc"
-                            placeholder="Opcional..."
-                            value={formData.nro_oc}
-                            onChange={handleChange}
-                            labelClassName={ACQ_LABEL_CLASS}
-                            inputClassName={ACQ_INPUT_CLASS}
-                        />
-                    </div>
-                </div>
-
-                {/* Section: Actores Involucrados */}
-                <div className="space-y-4">
-                    <SectionHeader>Proveedor y Establecimientos</SectionHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2">
-                        <SearchableSelect
-                            label="Proveedor / Emisor"
-                            icon={Building2}
-                            options={providers.map(p => ({ value: p.id, label: `${p.nombre} (RUT: ${p.rut})` }))}
-                            value={formData.proveedor}
-                            onChange={(val) => handleSelectChange('proveedor', val)}
-                            placeholder="Seleccione proveedor..."
-                            required
-                        />
-                        <div className="space-y-2">
-                            <MultiSearchableSelect
-                                label="Establecimientos de Destino"
-                                icon={Building2}
-                                options={establishments.map(e => ({ value: e.id, label: e.nombre }))}
-                                value={formData.establecimientos || []}
-                                onChange={(val) => handleSelectChange('establecimientos', val)}
-                                placeholder="Seleccione uno o muchos..."
-                            />
-                            <div className="flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => handleBulkSelect('ALL')}
-                                    className={BULK_BUTTON_CLASS}
-                                >
-                                    Todos
-                                </button>
-
-                                {[
-                                    { key: 'ESTABLECIMIENTO', label: 'Establecimientos' },
-                                    { key: 'JARDIN', label: 'Jardines VTF' },
-                                    { key: 'OFICINA', label: 'Oficina Central' }
-                                ].map(area => (
-                                    <button
-                                        key={area.key}
-                                        type="button"
-                                        onClick={() => handleBulkSelect(area.key)}
-                                        className={BULK_BUTTON_CLASS}
-                                    >
-                                        {area.label}
-                                    </button>
-                                ))}
-
-                                <button
-                                    type="button"
-                                    onClick={() => handleBulkSelect('CLEAR')}
-                                    className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all border border-transparent text-rose-600 hover:bg-rose-50"
-                                >
-                                    Limpiar
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Section: Tiempos y Entrega */}
-                <div className="space-y-4">
-                    <SectionHeader>Cronología y Entrega</SectionHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 pt-2">
-                        <div className="space-y-2">
-                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
-                                Fecha Recepción
-                            </label>
-                            <DateInput
-                                value={formData.fecha_recepcion}
-                                onChange={(val) => handleSelectChange('fecha_recepcion', val)}
-                                required
-                            />
-                        </div>
-                        <MonthInput
-                            label="Periodo de Cobro"
-                            name="periodo"
-                            value={formData.periodo || ''}
-                            onChange={(val) => handleSelectChange('periodo', val)}
-                        />
-                        <FormSelect
-                            label="Tipo de Entrega"
-                            name="tipo_entrega"
-                            value={formData.tipo_entrega}
-                            onChange={handleChange}
-                            required
-                            placeholder="Seleccione..."
-                            options={deliveryTypes.map(t => ({ value: t.id, label: t.nombre }))}
-                            labelClassName={ACQ_LABEL_CLASS}
-                            inputClassName={ACQ_SELECT_CLASS}
-                        />
-                    </div>
-                </div>
-
-                {/* Section: Detalle y Costos */}
-                <div className="space-y-4">
-                    <SectionHeader>Contenido y Finanzas</SectionHeader>
-                    <div className="space-y-4 pt-2">
-                        <div className="space-y-3">
-                            <FormInput
-                                label="Concepto / Glosa Base"
-                                name="descripcion"
-                                value={formData.descripcion || ''}
-                                onChange={handleChange}
-                                required
-                                placeholder="Ej: Servicios de transporte, Compra de computadores..."
-                                labelClassName={ACQ_LABEL_CLASS}
-                                inputClassName={ACQ_INPUT_CLASS}
-                            />
-
-                            {/* Preview of the final combined description */}
-                            <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Vista Previa Glosa Final (PDF)</span>
-                                <p className="text-[11px] text-slate-600 font-bold leading-tight italic whitespace-pre-line">
-                                    {formData.descripcion || ''}
-                                    {formData.periodo && (() => {
-                                        const [year, month] = formData.periodo.split('-');
-                                        const date = new Date(year, month - 1, 1);
-                                        return ` - ${date.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' }).toUpperCase()}`;
-                                    })()}
-                                    {getSmartGlosa()}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormInput
-                                    type="number"
-                                    label="Monto Neto ($)"
-                                    name="total_neto"
-                                    value={formData.total_neto}
-                                    onChange={handleChange}
-                                    required
-                                    placeholder="0"
-                                    labelClassName={ACQ_LABEL_CLASS}
-                                    inputClassName={ACQ_INPUT_CLASS}
-                                />
-                                <FormInput
-                                    type="number"
-                                    label="IVA ($)"
-                                    name="iva"
-                                    value={formData.iva}
-                                    onChange={handleChange}
-                                    required
-                                    placeholder="0"
-                                    labelClassName={ACQ_LABEL_CLASS}
-                                    inputClassName={ACQ_INPUT_CLASS}
-                                />
-                            </div>
-                            <div className="flex justify-center">
-                                <div className="w-full md:w-1/2">
-                                    <FormInput
-                                        type="number"
-                                        label="Total a Pagar"
-                                        name="total_pagar"
-                                        value={formData.total_pagar}
-                                        onChange={handleChange}
-                                        required
-                                        placeholder="0"
-                                        inputClassName={ACQ_TOTAL_INPUT_CLASS}
-                                        labelClassName={`${ACQ_LABEL_CLASS} !text-blue-600 !text-center !ml-0`}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Section: Aprobación */}
-                <div className="space-y-4">
-                    <SectionHeader>Firmante de la RC</SectionHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-2">
-                        <FormSelect
-                            label="Grupo de Firmantes"
-                            name="grupo_firmante"
-                            value={formData.grupo_firmante || ''}
-                            onChange={(e) => {
-                                const gid = e.target.value;
-                                const grp = lookups.groups?.find(g => g.id.toString() === gid);
-                                setFormData(prev => ({
-                                    ...prev,
-                                    grupo_firmante: gid,
-                                    firmante: grp ? (grp.jefe || '') : ''
-                                }));
-                            }}
-                            placeholder="Seleccione grupo..."
-                            options={lookups.groups?.map(g => ({ value: g.id, label: g.nombre }))}
-                            inputClassName={ACQ_SELECT_CLASS}
-                            labelClassName={ACQ_LABEL_CLASS}
-                        />
-                        <FormSelect
-                            label="Funcionario Firmante"
-                            name="firmante"
-                            value={formData.firmante || ''}
-                            onChange={handleChange}
-                            disabled={!formData.grupo_firmante}
-                            placeholder="Seleccione funcionario..."
-                            options={lookups.groups?.find(g => g.id.toString() === formData.grupo_firmante?.toString())?.miembros_detalle?.map(m => ({
-                                value: m.id,
-                                label: `${m.nombre} ${m.id === lookups.groups?.find(g => g.id.toString() === formData.grupo_firmante.toString())?.jefe ? '(Jefe)' : ''}`
-                            })) || []}
-                            inputClassName={ACQ_SELECT_CLASS}
-                            labelClassName={ACQ_LABEL_CLASS}
-                        />
-                    </div>
-                </div>
-
-                {/* Warning Box */}
-                <div className="p-3 bg-blue-50/50 rounded-2xl border border-blue-100/50 flex gap-3">
-                    <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-                    <p className="text-[10px] text-blue-700/70 leading-relaxed font-bold uppercase tracking-tight">
-                        Nota: Ingrese el monto neto e IVA. El sistema calculará automáticamente para el documento si el CDP es válido.
-                    </p>
-                </div>
-            </div>
-        </BaseModal>
-    );
-};
-
-export default AdquisicionModal;
+export default AdquisicionModal

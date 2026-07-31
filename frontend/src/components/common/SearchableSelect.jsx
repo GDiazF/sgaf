@@ -1,150 +1,197 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Search, ChevronDown, Check, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useRef, useEffect, useLayoutEffect, useId, useCallback } from 'react'
+import { createPortal } from 'react-dom'
+import { Field, Input, Icon } from '@slep/ui'
 
-const MotionDiv = motion.div;
+const MENU_GAP = 4
+const MENU_MAX_H = 280
+
+function computeMenuStyle(triggerEl) {
+  if (!triggerEl) return null
+  const rect = triggerEl.getBoundingClientRect()
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const edge = 8
+  const width = Math.min(rect.width, vw - edge * 2)
+  const spaceBelow = vh - rect.bottom - edge
+  const spaceAbove = rect.top - edge
+  const openUp = spaceBelow < 160 && spaceAbove > spaceBelow
+  const maxHeight = Math.min(
+    MENU_MAX_H,
+    Math.max(120, openUp ? spaceAbove - MENU_GAP : spaceBelow - MENU_GAP),
+  )
+
+  let left = rect.left
+  if (left + width > vw - edge) left = Math.max(edge, vw - edge - width)
+  if (left < edge) left = edge
+
+  return {
+    position: 'fixed',
+    left: `${Math.round(left)}px`,
+    width: `${Math.round(width)}px`,
+    maxHeight: `${Math.round(maxHeight)}px`,
+    ...(openUp
+      ? { bottom: `${Math.round(vh - rect.top + MENU_GAP)}px`, top: 'auto' }
+      : { top: `${Math.round(rect.bottom + MENU_GAP)}px`, bottom: 'auto' }),
+  }
+}
 
 const SearchableSelect = ({
-    label,
-    options = [],
-    value,
-    onChange,
-    placeholder = "Seleccione una opción...",
-    icon: Icon,
-    required = false,
-    className = "",
-    disabled = false
+  label,
+  options = [],
+  value,
+  onChange,
+  placeholder = 'Seleccione una opción…',
+  required = false,
+  className = '',
+  disabled = false,
 }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [searchTerm, setSearchTerm] = useState("");
-    const containerRef = useRef(null);
-    const inputRef = useRef(null);
+  const [isOpen, setIsOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [menuStyle, setMenuStyle] = useState(null)
+  const containerRef = useRef(null)
+  const menuRef = useRef(null)
+  const inputRef = useRef(null)
+  const autoId = useId()
+  const triggerId = `combo-${autoId}`
 
-    // Get current label
-    const selectedOption = options.find(opt => String(opt.value) === String(value));
-    const displayValue = selectedOption ? selectedOption.label : "";
+  const selectedOption = options.find((opt) => String(opt.value) === String(value))
+  const displayValue = selectedOption ? selectedOption.label : ''
 
-    // Filter options
-    const filteredOptions = options.filter(opt =>
-        opt.label.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+  const filteredOptions = options.filter((opt) =>
+    opt.label.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
-    // Handle click outside
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (containerRef.current && !containerRef.current.contains(event.target)) {
-                setIsOpen(false);
-                setSearchTerm("");
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+  const close = useCallback(() => {
+    setIsOpen(false)
+    setSearchTerm('')
+    setMenuStyle(null)
+  }, [])
 
-    // Focus input when opening
-    useEffect(() => {
-        if (isOpen && inputRef.current) {
-            inputRef.current.focus();
-        }
-    }, [isOpen]);
+  const positionMenu = useCallback(() => {
+    const trigger = containerRef.current?.querySelector('.combo__trigger')
+    setMenuStyle(computeMenuStyle(trigger))
+  }, [])
 
-    const handleSelect = (optionValue) => {
-        if (disabled) return;
-        onChange(optionValue);
-        setIsOpen(false);
-        setSearchTerm("");
-    };
+  useLayoutEffect(() => {
+    if (!isOpen) return undefined
+    positionMenu()
+    const onReposition = () => positionMenu()
+    window.addEventListener('resize', onReposition)
+    window.addEventListener('scroll', onReposition, true)
+    return () => {
+      window.removeEventListener('resize', onReposition)
+      window.removeEventListener('scroll', onReposition, true)
+    }
+  }, [isOpen, positionMenu])
 
-    return (
-        <div className={`relative w-full min-w-0 ${className}`} ref={containerRef}>
-            {label && (
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
-                    <span>{label}</span> {required && <span className="text-rose-500">*</span>}
-                </label>
-            )}
+  useEffect(() => {
+    if (!isOpen) return undefined
+    const handleClickOutside = (event) => {
+      const inTrigger = containerRef.current?.contains(event.target)
+      const inMenu = menuRef.current?.contains(event.target)
+      if (!inTrigger && !inMenu) close()
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isOpen, close])
 
-            {/* Selection Button */}
-            <button
-                type="button"
-                disabled={disabled}
-                onClick={() => !disabled && setIsOpen(!isOpen)}
-                className={`no-global w-full min-w-0 box-border flex items-center justify-between ${Icon ? 'pl-10' : 'px-3'} pr-3 h-10 border rounded-xl outline-none transition-all shadow-sm text-[10px] font-black uppercase tracking-wider select-none relative ${
-                    disabled
-                        ? 'border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed'
-                        : isOpen 
-                        ? 'border-blue-500 bg-white ring-4 ring-blue-500/5' 
-                        : 'border-slate-200 bg-white hover:border-slate-350'
-                } ${!disabled && (!displayValue ? 'text-slate-300' : 'text-slate-700')}`}
-            >
-                {Icon && (
-                    <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 shrink-0 pointer-events-none" />
-                )}
-                <span className="truncate min-w-0">
-                    {displayValue || placeholder}
-                </span>
-                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 shrink-0 ml-2 ${isOpen ? 'rotate-180 text-blue-500' : ''}`} />
-            </button>
+  useEffect(() => {
+    if (isOpen && inputRef.current) inputRef.current.focus()
+  }, [isOpen])
 
-            {/* Dropdown Menu */}
-            <AnimatePresence>
-                {isOpen && (
-                    <MotionDiv
-                        initial={{ opacity: 0, y: -8, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                        transition={{ duration: 0.12 }}
-                        className="absolute left-0 right-0 mt-1.5 w-full max-w-full bg-white border border-slate-200 rounded-xl shadow-xl z-[999] overflow-hidden flex flex-col min-w-0"
+  const handleSelect = (optionValue) => {
+    if (disabled) return
+    onChange(optionValue)
+    close()
+  }
+
+  const menu =
+    isOpen && menuStyle
+      ? createPortal(
+          <div
+            ref={menuRef}
+            className="combo__menu combo__menu--portal"
+            role="listbox"
+            style={menuStyle}
+          >
+            <div className="combo__search">
+              <div className="input-wrap">
+                <Icon name="search" className="input-wrap__icon" size="sm" />
+                <Input
+                  ref={inputRef}
+                  type="search"
+                  className="no-global"
+                  placeholder="Buscar…"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                />
+              </div>
+            </div>
+
+            <div className="combo__options" onWheel={(e) => e.stopPropagation()}>
+              {filteredOptions.length > 0 ? (
+                filteredOptions.map((opt) => {
+                  const isSelected = String(opt.value) === String(value)
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      disabled={opt.disabled}
+                      onClick={() => handleSelect(opt.value)}
+                      className={`combo__option${isSelected ? ' is-selected' : ''}`}
                     >
-                        {/* Search Input */}
-                        <div className="p-2 border-b border-slate-100 bg-slate-50/50">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                                <input
-                                    ref={inputRef}
-                                    type="text"
-                                    className="no-global w-full pl-9 pr-4 h-9 text-[10px] font-bold bg-white border border-slate-200 rounded-lg outline-none focus:border-blue-500 uppercase transition-all shadow-sm placeholder:text-slate-300"
-                                    placeholder="BUSCAR..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                                />
-                            </div>
-                        </div>
+                      <span className="combo__option-label">{opt.label}</span>
+                      {isSelected ? <Icon name="check" size="sm" /> : null}
+                    </button>
+                  )
+                })
+              ) : (
+                <div className="combo__empty">No se encontraron resultados</div>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )
+      : null
 
-                        {/* Options List */}
-                        <div
-                            className="max-h-48 overflow-y-auto custom-scrollbar flex-grow py-1"
-                            onWheel={(e) => e.stopPropagation()}
-                        >
-                            {filteredOptions.length > 0 ? (
-                                filteredOptions.map((opt) => (
-                                    <button
-                                        key={opt.value}
-                                        type="button"
-                                        onClick={() => handleSelect(opt.value)}
-                                        className={`w-full min-w-0 text-left px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-between transition-colors hover:bg-slate-50/80 ${
-                                            String(opt.value) === String(value) 
-                                                ? 'bg-blue-50/50 text-blue-600' 
-                                                : 'text-slate-600'
-                                        }`}
-                                    >
-                                        <span className="truncate min-w-0">{opt.label}</span>
-                                        {String(opt.value) === String(value) && (
-                                            <Check className="w-3.5 h-3.5 text-blue-600 stroke-[3px] shrink-0 ml-2" />
-                                        )}
-                                    </button>
-                                ))
-                            ) : (
-                                <div className="px-4 py-6 text-center text-slate-400 text-[10px] font-bold uppercase tracking-widest italic">
-                                    No se encontraron resultados
-                                </div>
-                            )}
-                        </div>
-                    </MotionDiv>
-                )}
-            </AnimatePresence>
-        </div>
-    );
-};
+  const control = (
+    <div className="combo" ref={containerRef}>
+      <button
+        id={triggerId}
+        type="button"
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        onClick={() => {
+          if (disabled) return
+          if (isOpen) close()
+          else setIsOpen(true)
+        }}
+        className={`combo__trigger${isOpen ? ' is-open' : ''}${
+          !displayValue ? ' is-placeholder' : ''
+        }`}
+      >
+        <span className="combo__trigger-text">{displayValue || placeholder}</span>
+        <span className="combo__trigger-actions">
+          <Icon name="chevron" className="icon--chevron" size="sm" />
+        </span>
+      </button>
+      {menu}
+    </div>
+  )
 
-export default SearchableSelect;
+  if (!label) {
+    return <div className={className}>{control}</div>
+  }
+
+  return (
+    <Field label={label} required={required} htmlFor={triggerId} className={className}>
+      {control}
+    </Field>
+  )
+}
+
+export default SearchableSelect

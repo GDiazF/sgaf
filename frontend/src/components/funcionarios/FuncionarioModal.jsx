@@ -1,386 +1,396 @@
-import React, { useState, useEffect } from 'react';
-import { User, AlertCircle, Users } from 'lucide-react';
-import api from '../../api';
-import { validateRut, formatRut } from '../../utils/rutValidator';
-import BaseModal from '../common/BaseModal';
+import React, { useState, useEffect } from 'react'
+import api from '../../api'
+import { validateRut, formatRut } from '../../utils/rutValidator'
+import {
+  Modal,
+  Button,
+  Field,
+  Input,
+  Select,
+  Switch,
+  Badge,
+  EmptyState,
+  useFormOverlay,
+  formatApiFormError,
+} from '@slep/ui'
 
-const FuncionarioModal = ({ isOpen, onClose, onSave, funcionarioId = null }) => {
-    const [loading, setLoading] = useState(false);
-    const [errors, setErrors] = useState({});
+const emptyForm = () => ({
+  rut: '',
+  nombre_funcionario: '',
+  anexo: '',
+  subdireccion: '',
+  departamento: '',
+  unidad: '',
+  cargo: '',
+  estado: true,
+  grupos: [],
+})
 
-    // Options for selects
-    const [subdirecciones, setSubdirecciones] = useState([]);
-    const [departamentos, setDepartamentos] = useState([]);
-    const [unidades, setUnidades] = useState([]);
-    const [grupos, setGrupos] = useState([]);
+const FuncionarioModal = ({ isOpen, onClose, funcionarioId = null }) => {
+  const [errors, setErrors] = useState({})
+  const [subdirecciones, setSubdirecciones] = useState([])
+  const [departamentos, setDepartamentos] = useState([])
+  const [unidades, setUnidades] = useState([])
+  const [grupos, setGrupos] = useState([])
+  const [formData, setFormData] = useState(emptyForm())
+  const overlay = useFormOverlay()
 
-    // Form data
-    const [formData, setFormData] = useState({
-        rut: '',
-        nombre_funcionario: '',
-        anexo: '',
-        subdireccion: '',
-        departamento: '',
-        unidad: '',
-        cargo: '',
-        estado: true,
-        grupos: []
-    });
+  useEffect(() => {
+    if (!isOpen) return
+    overlay.reset()
+    fetchSubdirecciones()
+    fetchGrupos()
+    if (funcionarioId) {
+      fetchFuncionario()
+    } else {
+      setFormData(emptyForm())
+      setErrors({})
+      setDepartamentos([])
+      setUnidades([])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset solo al abrir
+  }, [isOpen, funcionarioId])
 
-    useEffect(() => {
-        if (isOpen) {
-            fetchSubdirecciones();
-            fetchGrupos();
-            if (funcionarioId) {
-                fetchFuncionario();
-            } else {
+  const fetchSubdirecciones = async () => {
+    try {
+      const response = await api.get('subdirecciones/')
+      setSubdirecciones(
+        Array.isArray(response.data) ? response.data : response.data.results || [],
+      )
+    } catch (error) {
+      console.error('Error fetching subdirecciones:', error)
+    }
+  }
+
+  const fetchGrupos = async () => {
+    try {
+      const response = await api.get('grupos/', { params: { page_size: 1000 } })
+      setGrupos(Array.isArray(response.data) ? response.data : response.data.results || [])
+    } catch (error) {
+      console.error('Error fetching grupos:', error)
+    }
+  }
+
+  const fetchFuncionario = async () => {
+    try {
+      const response = await api.get(`funcionarios/${funcionarioId}/`)
+      setFormData({
+        ...emptyForm(),
+        ...response.data,
+        grupos: response.data.grupos || [],
+      })
+      if (response.data.subdireccion) {
+        await fetchDepartamentos(response.data.subdireccion)
+      }
+      if (response.data.departamento) {
+        await fetchUnidades(response.data.departamento)
+      }
+    } catch (error) {
+      console.error('Error fetching funcionario:', error)
+    }
+  }
+
+  const fetchDepartamentos = async (subdireccionId) => {
+    try {
+      const response = await api.get(`departamentos/?subdireccion=${subdireccionId}`)
+      setDepartamentos(
+        Array.isArray(response.data) ? response.data : response.data.results || [],
+      )
+    } catch (error) {
+      console.error('Error fetching departamentos:', error)
+    }
+  }
+
+  const fetchUnidades = async (departamentoId) => {
+    try {
+      const response = await api.get(`unidades/?departamento=${departamentoId}`)
+      setUnidades(Array.isArray(response.data) ? response.data : response.data.results || [])
+    } catch (error) {
+      console.error('Error fetching unidades:', error)
+    }
+  }
+
+  const handleSubdireccionChange = async (e) => {
+    const subdireccionId = e.target.value
+    setFormData({
+      ...formData,
+      subdireccion: subdireccionId,
+      departamento: '',
+      unidad: '',
+    })
+    setDepartamentos([])
+    setUnidades([])
+    if (subdireccionId) await fetchDepartamentos(subdireccionId)
+  }
+
+  const handleDepartamentoChange = async (e) => {
+    const departamentoId = e.target.value
+    setFormData({
+      ...formData,
+      departamento: departamentoId,
+      unidad: '',
+    })
+    setUnidades([])
+    if (departamentoId) await fetchUnidades(departamentoId)
+  }
+
+  const handleRutChange = (e) => {
+    const formatted = formatRut(e.target.value)
+    setFormData({ ...formData, rut: formatted })
+    if (formatted.length >= 3) {
+      const validation = validateRut(formatted)
+      if (!validation.valid) {
+        setErrors((prev) => ({ ...prev, rut: validation.error }))
+      } else {
+        setErrors((prev) => {
+          const next = { ...prev }
+          delete next.rut
+          return next
+        })
+      }
+    }
+  }
+
+  const handleGrupoToggle = (grupoId) => {
+    const current = [...formData.grupos]
+    const index = current.indexOf(grupoId)
+    if (index === -1) current.push(grupoId)
+    else current.splice(index, 1)
+    setFormData({ ...formData, grupos: current })
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setErrors({})
+
+    const rutValidation = validateRut(formData.rut)
+    if (!rutValidation.valid) {
+      setErrors({ rut: rutValidation.error })
+      return
+    }
+
+    try {
+      await overlay.run(
+        async () => {
+          const dataToSend = {
+            ...formData,
+            subdireccion: formData.subdireccion || null,
+            departamento: formData.departamento || null,
+            unidad: formData.unidad || null,
+            grupos: formData.grupos,
+          }
+          if (funcionarioId) {
+            await api.put(`funcionarios/${funcionarioId}/`, dataToSend)
+          } else {
+            await api.post('funcionarios/', dataToSend)
+          }
+        },
+        {
+          successDescription: funcionarioId
+            ? 'Funcionario actualizado.'
+            : 'Funcionario creado.',
+          formatError: (err) => formatApiFormError(err),
+        },
+      )
+    } catch {
+      // El error se muestra en FormOverlay
+    }
+  }
+
+  const handleOverlayDismiss = () => {
+    if (overlay.status === 'success') {
+      overlay.reset()
+      onClose({ saved: true })
+      return
+    }
+    overlay.dismiss()
+  }
+
+  const handleClose = () => {
+    if (overlay.busy) return
+    overlay.reset()
+    onClose()
+  }
+
+  return (
+    <Modal
+      open={isOpen}
+      onClose={handleClose}
+      size="lg"
+      title={funcionarioId ? 'Editar funcionario' : 'Nuevo funcionario'}
+      subheader="Información del personal del SLEP"
+      {...overlay.modalProps}
+      onOverlayDismiss={handleOverlayDismiss}
+      footer={
+        <>
+          <Button variant="ghost" type="button" onClick={handleClose} disabled={overlay.busy}>
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            type="submit"
+            form="funcionario-form"
+            loading={overlay.busy}
+            disabled={overlay.busy || overlay.active}
+          >
+            {funcionarioId ? 'Guardar cambios' : 'Crear funcionario'}
+          </Button>
+        </>
+      }
+    >
+      <form id="funcionario-form" className="crud-form" onSubmit={handleSubmit} noValidate>
+        <div className="form-grid">
+          <Field
+            label="RUT"
+            required
+            htmlFor="func-rut"
+            error={errors.rut ? String(Array.isArray(errors.rut) ? errors.rut[0] : errors.rut) : undefined}
+          >
+            <Input
+              id="func-rut"
+              required
+              value={formData.rut}
+              onChange={handleRutChange}
+              placeholder="12.345.678-9"
+              className={errors.rut ? 'input--error' : undefined}
+            />
+          </Field>
+
+          <Field label="Nombre completo" required htmlFor="func-nombre">
+            <Input
+              id="func-nombre"
+              required
+              value={formData.nombre_funcionario}
+              onChange={(e) =>
                 setFormData({
-                    rut: '',
-                    nombre_funcionario: '',
-                    anexo: '',
-                    subdireccion: '',
-                    departamento: '',
-                    unidad: '',
-                    cargo: '',
-                    estado: true,
-                    grupos: []
-                });
-                setErrors({});
+                  ...formData,
+                  nombre_funcionario: e.target.value.toUpperCase(),
+                })
+              }
+              placeholder="EJ: JUAN PÉREZ"
+            />
+          </Field>
+
+          <Field label="Subdirección" htmlFor="func-subdireccion">
+            <Select
+              id="func-subdireccion"
+              value={formData.subdireccion || ''}
+              onChange={handleSubdireccionChange}
+            >
+              <option value="">Seleccionar…</option>
+              {subdirecciones.map((sub) => (
+                <option key={sub.id} value={sub.id}>
+                  {sub.nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="Departamento" htmlFor="func-depto">
+            <Select
+              id="func-depto"
+              value={formData.departamento || ''}
+              onChange={handleDepartamentoChange}
+              disabled={!formData.subdireccion}
+            >
+              <option value="">Seleccionar…</option>
+              {departamentos.map((dept) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="Unidad" htmlFor="func-unidad">
+            <Select
+              id="func-unidad"
+              value={formData.unidad || ''}
+              onChange={(e) => setFormData({ ...formData, unidad: e.target.value })}
+              disabled={!formData.departamento}
+            >
+              <option value="">Seleccionar…</option>
+              {unidades.map((unid) => (
+                <option key={unid.id} value={unid.id}>
+                  {unid.nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="Cargo" htmlFor="func-cargo">
+            <Input
+              id="func-cargo"
+              value={formData.cargo || ''}
+              onChange={(e) =>
+                setFormData({ ...formData, cargo: e.target.value.toUpperCase() })
+              }
+              placeholder="EJ: PROFESIONAL"
+            />
+          </Field>
+
+          <Field
+            label="Anexo"
+            htmlFor="func-anexo"
+            hint={
+              formData.anexo
+                ? `Número público: 227263${formData.anexo}`
+                : 'Número público: sin anexo'
             }
-        }
-    }, [isOpen, funcionarioId]);
+          >
+            <Input
+              id="func-anexo"
+              value={formData.anexo || ''}
+              onChange={(e) => setFormData({ ...formData, anexo: e.target.value })}
+              placeholder="123"
+            />
+          </Field>
 
-    const fetchSubdirecciones = async () => {
-        try {
-            const response = await api.get('subdirecciones/');
-            const data = Array.isArray(response.data) ? response.data : (response.data.results || []);
-            setSubdirecciones(data);
-        } catch (error) {
-            console.error('Error fetching subdirecciones:', error);
-        }
-    };
+          <div className="field field--full">
+            <Switch
+              id="func-estado"
+              label="Funcionario activo"
+              checked={!!formData.estado}
+              onChange={(e) => setFormData({ ...formData, estado: e.target.checked })}
+            />
+          </div>
 
-    const fetchGrupos = async () => {
-        try {
-            const response = await api.get('grupos/', { params: { page_size: 1000 } });
-            const data = Array.isArray(response.data) ? response.data : (response.data.results || []);
-            setGrupos(data);
-        } catch (error) {
-            console.error('Error fetching grupos:', error);
-        }
-    };
+          <div className="field field--full">
+            <span className="field__label">Asignación de grupos</span>
+            {grupos.length === 0 ? (
+              <EmptyState title="Sin grupos" description="No hay grupos disponibles." />
+            ) : (
+              <ul className="func-grupos">
+                {grupos.map((grupo) => {
+                  const checked = formData.grupos.includes(grupo.id)
+                  return (
+                    <li key={grupo.id}>
+                      <label
+                        className={`func-grupos__item${checked ? ' is-selected' : ''}`}
+                        htmlFor={`grupo-${grupo.id}`}
+                      >
+                        <input
+                          id={`grupo-${grupo.id}`}
+                          type="checkbox"
+                          className="no-global"
+                          checked={checked}
+                          onChange={() => handleGrupoToggle(grupo.id)}
+                        />
+                        <span>{grupo.nombre}</span>
+                        {grupo.jefe === formData.id ? (
+                          <Badge variant="warning">Jefe</Badge>
+                        ) : null}
+                      </label>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+      </form>
+    </Modal>
+  )
+}
 
-    const fetchFuncionario = async () => {
-        try {
-            const response = await api.get(`funcionarios/${funcionarioId}/`);
-            setFormData({
-                ...response.data,
-                grupos: response.data.grupos || []
-            });
-
-            // Load departments and units if they exist
-            if (response.data.subdireccion) {
-                await fetchDepartamentos(response.data.subdireccion);
-            }
-            if (response.data.departamento) {
-                await fetchUnidades(response.data.departamento);
-            }
-        } catch (error) {
-            console.error('Error fetching funcionario:', error);
-        }
-    };
-
-    const fetchDepartamentos = async (subdireccionId) => {
-        try {
-            const response = await api.get(`departamentos/?subdireccion=${subdireccionId}`);
-            const data = Array.isArray(response.data) ? response.data : (response.data.results || []);
-            setDepartamentos(data);
-        } catch (error) {
-            console.error('Error fetching departamentos:', error);
-        }
-    };
-
-    const fetchUnidades = async (departamentoId) => {
-        try {
-            const response = await api.get(`unidades/?departamento=${departamentoId}`);
-            const data = Array.isArray(response.data) ? response.data : (response.data.results || []);
-            setUnidades(data);
-        } catch (error) {
-            console.error('Error fetching unidades:', error);
-        }
-    };
-
-    const handleSubdireccionChange = async (e) => {
-        const subdireccionId = e.target.value;
-        setFormData({
-            ...formData,
-            subdireccion: subdireccionId,
-            departamento: '',
-            unidad: ''
-        });
-        setDepartamentos([]);
-        setUnidades([]);
-
-        if (subdireccionId) {
-            await fetchDepartamentos(subdireccionId);
-        }
-    };
-
-    const handleDepartamentoChange = async (e) => {
-        const departamentoId = e.target.value;
-        setFormData({
-            ...formData,
-            departamento: departamentoId,
-            unidad: ''
-        });
-        setUnidades([]);
-
-        if (departamentoId) {
-            await fetchUnidades(departamentoId);
-        }
-    };
-
-    const handleRutChange = (e) => {
-        const value = e.target.value;
-        const formatted = formatRut(value);
-        setFormData({ ...formData, rut: formatted });
-
-        if (formatted.length >= 3) {
-            const validation = validateRut(formatted);
-            if (!validation.valid) {
-                setErrors(prev => ({ ...prev, rut: validation.error }));
-            } else {
-                setErrors(prev => {
-                    const newErrors = { ...prev };
-                    delete newErrors.rut;
-                    return newErrors;
-                });
-            }
-        }
-    };
-
-    const handleGrupoToggle = (grupoId) => {
-        const currentGrupos = [...formData.grupos];
-        const index = currentGrupos.indexOf(grupoId);
-        if (index === -1) {
-            currentGrupos.push(grupoId);
-        } else {
-            currentGrupos.splice(index, 1);
-        }
-        setFormData({ ...formData, grupos: currentGrupos });
-    };
-
-    const handleSubmit = async () => {
-        setLoading(true);
-        setErrors({});
-
-        const rutValidation = validateRut(formData.rut);
-        if (!rutValidation.valid) {
-            setErrors({ rut: rutValidation.error });
-            setLoading(false);
-            return;
-        }
-
-        try {
-            const dataToSend = {
-                ...formData,
-                subdireccion: formData.subdireccion || null,
-                departamento: formData.departamento || null,
-                unidad: formData.unidad || null,
-                grupos: formData.grupos
-            };
-
-            if (funcionarioId) {
-                await api.put(`funcionarios/${funcionarioId}/`, dataToSend);
-            } else {
-                await api.post('funcionarios/', dataToSend);
-            }
-            onSave();
-            onClose();
-        } catch (error) {
-            console.error('Error saving:', error);
-            if (error.response?.data) {
-                setErrors(error.response.data);
-            } else {
-                alert('Error al guardar el funcionario');
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <BaseModal
-            isOpen={isOpen}
-            onClose={onClose}
-            onSave={handleSubmit}
-            title={funcionarioId ? 'Editar Funcionario' : 'Nuevo Funcionario'}
-            subtitle="Completa la información del personal del SLEP"
-            icon={User}
-            loading={loading}
-            maxWidth="max-w-4xl"
-            saveLabel={funcionarioId ? 'Guardar Cambios' : 'Crear Funcionario'}
-        >
-            <div className="space-y-6">
-                {/* Personal Information */}
-                <div>
-                    <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Información Personal</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-sm font-semibold text-slate-700 ml-1">RUT</label>
-                            <input
-                                type="text"
-                                value={formData.rut}
-                                onChange={handleRutChange}
-                                placeholder="12345678-9"
-                                className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-2xl focus:ring-4 focus:ring-blue-100 transition-all outline-none ${errors.rut ? 'border-red-200' : 'border-slate-100 focus:border-blue-500'}`}
-                                required
-                            />
-                            {errors.rut && (
-                                <p className="text-red-500 text-xs mt-1 ml-1 flex items-center gap-1 font-medium">
-                                    <AlertCircle className="w-3 h-3" />
-                                    {errors.rut}
-                                </p>
-                            )}
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-sm font-semibold text-slate-700 ml-1">Nombre Completo</label>
-                            <input
-                                type="text"
-                                value={formData.nombre_funcionario}
-                                onChange={(e) => setFormData({ ...formData, nombre_funcionario: e.target.value.toUpperCase() })}
-                                className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none"
-                                placeholder="EJ: JUAN PÉREZ"
-                                required
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Organizational Location */}
-                <div>
-                    <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Ubicación Organizacional</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-sm font-semibold text-slate-700 ml-1">Subdirección</label>
-                            <select
-                                value={formData.subdireccion || ''}
-                                onChange={handleSubdireccionChange}
-                                className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none appearance-none"
-                            >
-                                <option value="">Seleccionar...</option>
-                                {subdirecciones.map(sub => (
-                                    <option key={sub.id} value={sub.id}>{sub.nombre}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-sm font-semibold text-slate-700 ml-1">Departamento</label>
-                            <select
-                                value={formData.departamento || ''}
-                                onChange={handleDepartamentoChange}
-                                disabled={!formData.subdireccion}
-                                className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none appearance-none disabled:opacity-50 disabled:bg-slate-100"
-                            >
-                                <option value="">Seleccionar...</option>
-                                {departamentos.map(dept => (
-                                    <option key={dept.id} value={dept.id}>{dept.nombre}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-sm font-semibold text-slate-700 ml-1">Unidad</label>
-                            <select
-                                value={formData.unidad || ''}
-                                onChange={(e) => setFormData({ ...formData, unidad: e.target.value })}
-                                disabled={!formData.departamento}
-                                className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none appearance-none disabled:opacity-50 disabled:bg-slate-100"
-                            >
-                                <option value="">Seleccionar...</option>
-                                {unidades.map(unid => (
-                                    <option key={unid.id} value={unid.id}>{unid.nombre}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Labor Information & Groups */}
-                <div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-4">
-                            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Información Laboral</h4>
-                            <div className="space-y-1">
-                                <label className="text-sm font-semibold text-slate-700 ml-1">Cargo</label>
-                                <input
-                                    type="text"
-                                    value={formData.cargo}
-                                    onChange={(e) => setFormData({ ...formData, cargo: e.target.value.toUpperCase() })}
-                                    placeholder="EJ: PROFESIONAL"
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-sm font-semibold text-slate-700 ml-1">Anexo</label>
-                                <input
-                                    type="text"
-                                    value={formData.anexo}
-                                    onChange={(e) => setFormData({ ...formData, anexo: e.target.value })}
-                                    placeholder="123"
-                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none"
-                                />
-                                <p className="text-xs text-slate-400 ml-2 italic">
-                                    Número público: {formData.anexo ? `227263${formData.anexo}` : 'Sin anexo'}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border-2 border-slate-100">
-                                <input
-                                    type="checkbox"
-                                    id="estado"
-                                    checked={formData.estado}
-                                    onChange={(e) => setFormData({ ...formData, estado: e.target.checked })}
-                                    className="w-5 h-5 text-blue-600 rounded-lg focus:ring-blue-500"
-                                />
-                                <label htmlFor="estado" className="text-sm font-bold text-slate-700">Funcionario Activo</label>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                <Users className="w-4 h-4" />
-                                Asignación de Grupos
-                            </h4>
-                            <div className="bg-slate-50 p-4 rounded-3xl border-2 border-slate-100 space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-                                {grupos.map(grupo => (
-                                    <div
-                                        key={grupo.id}
-                                        className={`flex items-center gap-3 p-3 rounded-xl transition-all ${formData.grupos.includes(grupo.id) ? 'bg-blue-50 border-blue-100' : 'hover:bg-white'}`}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            id={`grupo-${grupo.id}`}
-                                            checked={formData.grupos.includes(grupo.id)}
-                                            onChange={() => handleGrupoToggle(grupo.id)}
-                                            className="w-5 h-5 text-blue-600 rounded-lg focus:ring-blue-500"
-                                        />
-                                        <label htmlFor={`grupo-${grupo.id}`} className="text-sm font-semibold text-slate-700 flex-grow cursor-pointer">
-                                            {grupo.nombre}
-                                            {grupo.jefe === formData.id && (
-                                                <span className="ml-2 text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-tight">Jefe</span>
-                                            )}
-                                        </label>
-                                    </div>
-                                ))}
-                                {grupos.length === 0 && (
-                                    <p className="text-sm text-slate-400 italic text-center py-4">No hay grupos disponibles</p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </BaseModal>
-    );
-};
-
-export default FuncionarioModal;
+export default FuncionarioModal

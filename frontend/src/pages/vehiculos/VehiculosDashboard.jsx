@@ -1,1216 +1,1314 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Truck, Fuel, DollarSign, Activity, TrendingUp, Plus, ChevronRight, X, Save, Download, Calculator, Car, Trash2, Pencil, Sigma, Settings, AlertCircle } from 'lucide-react';
-import api from '../../api';
-import VehiculoDetalle from './VehiculoDetalle';
-import TipoDocumentoMantenedor from './TipoDocumentoMantenedor';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
-import { usePermission } from '../../hooks/usePermission';
-import { BTN_PRIMARY, BTN_SECONDARY, INPUT_FORM, PAGE_LAYOUT, SELECT_FILTER, TITLE_ICON_BOX } from '../funcionarios/shared/funcionariosUi';
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import api from '../../api'
+import VehiculoDetalle from './VehiculoDetalle'
+import TipoDocumentoMantenedor from './TipoDocumentoMantenedor'
+import { usePermission } from '../../hooks/usePermission'
+import { useNotify } from '../../hooks/useNotify'
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  Legend,
+} from 'recharts'
+import {
+  PageHeader,
+  FiltersBar,
+  DataTable,
+  Badge,
+  Button,
+  Field,
+  Input,
+  Select,
+  Modal,
+  ConfirmModal,
+  MetricStrip,
+  Card,
+  Icon,
+  KmInput,
+  useFormOverlay,
+  formatApiFormError,
+} from '@slep/ui'
 
-const BTN_EXCEL = 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 h-10 min-h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all inline-flex items-center justify-center gap-2 shrink-0 active:scale-95 border border-emerald-100 leading-none box-border';
-const BTN_ICON_EDIT = 'p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors';
-const BTN_ICON_DELETE = 'p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors';
-const FLOTA_INPUT = `${INPUT_FORM} !h-10 min-h-10 !text-[10px] box-border leading-none`;
-const MotionDiv = motion.div;
-const MotionButton = motion.button;
+const YEARS = [2024, 2025, 2026, 2027]
+
+const formatCurrency = (amount) =>
+  new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    maximumFractionDigits: 0,
+  }).format(amount || 0)
+
+const ChartTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="vehiculos-chart-tooltip">
+      <strong>{label}</strong>
+      {payload.map((entry, index) => (
+        <p key={index} style={{ color: entry.color }}>
+          {entry.name}:{' '}
+          {String(entry.name || '').includes('Gasto') ||
+          String(entry.name || '').includes('Bencina') ||
+          String(entry.name || '').includes('Peajes') ||
+          String(entry.name || '').includes('Seguros')
+            ? formatCurrency(entry.value)
+            : entry.value}
+        </p>
+      ))}
+    </div>
+  )
+}
 
 const VehiculosDashboard = () => {
-    const [, setStats] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [year, setYear] = useState(new Date().getFullYear());
-    const [registros, setRegistros] = useState([]);
-    const [flota, setFlota] = useState([]);
-    const [viewMode, setViewMode] = useState('individual'); // 'individual' or 'general'
-    const [selectedVehiculoFilter, setSelectedVehiculoFilter] = useState('all'); // 'all' or vehicle ID string/number
-    const [selectedVehicles, setSelectedVehicles] = useState([]); // Array of IDs for filtering/export
-    const [feedback, setFeedback] = useState(null);
-    const [pendingDelete, setPendingDelete] = useState(null);
-    const { can } = usePermission();
-    const location = useLocation();
+  const { can } = usePermission()
+  const location = useLocation()
+  const navigate = useNavigate()
 
-    // Modal State
-    const [isModalOpen, setModalOpen] = useState(false);
-    const [isFlotaModalOpen, setFlotaModalOpen] = useState(false);
-    const [isExportModalOpen, setExportModalOpen] = useState(false);
-    const [editingRecord, setEditingRecord] = useState(null);
-    const [isTipoMantenedorOpen, setIsTipoMantenedorOpen] = useState(false);
-    const [selectedVehiculoForDetail, setSelectedVehiculoForDetail] = useState(null);
-    const [formData, setFormData] = useState({
-        anio: new Date().getFullYear(),
-        mes: new Date().getMonth() + 1,
-        vehiculo: '',
-        kilometros_recorridos: '',
-        km_inicial: '',
-        km_final: '',
-        gasto_bencina: '',
-        gasto_peajes: '',
-        gasto_seguros: ''
-    });
+  const activeTab = location.pathname.includes('/flota') ? 'flota' : 'registros'
 
-    // Flota Form State
-    const [flotaFormData, setFlotaFormData] = useState({ marca: '', modelo: '', patente: '' });
-    const [submitting, setSubmitting] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const [loading, setLoading] = useState(true)
+  const [year, setYear] = useState(new Date().getFullYear())
+  const [registros, setRegistros] = useState([])
+  const [flota, setFlota] = useState([])
+  const [viewMode, setViewMode] = useState('individual')
+  const [selectedVehiculoFilter, setSelectedVehiculoFilter] = useState('all')
+  const [selectedVehicles, setSelectedVehicles] = useState([])
+  const { notify } = useNotify()
+  const registroOverlay = useFormOverlay()
+  const flotaOverlay = useFormOverlay()
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-    // Aggregator Sub-Modal State
-    const [isAggregatorOpen, setAggregatorOpen] = useState(false);
-    const [aggregatorField, setAggregatorField] = useState(null); // 'gasto_bencina', etc.
-    const [aggregatorValue, setAggregatorValue] = useState('');
-    const [history, setHistory] = useState({
-        gasto_bencina: [],
-        gasto_peajes: [],
-        gasto_seguros: []
-    });
+  const [isModalOpen, setModalOpen] = useState(false)
+  const [isExportModalOpen, setExportModalOpen] = useState(false)
+  const [editingRecord, setEditingRecord] = useState(null)
+  const [isTipoMantenedorOpen, setIsTipoMantenedorOpen] = useState(false)
+  const [isFlotaModalOpen, setFlotaModalOpen] = useState(false)
+  const [selectedVehiculoForDetail, setSelectedVehiculoForDetail] = useState(null)
 
-    useEffect(() => {
-        const handleResize = () => setWindowWidth(window.innerWidth);
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
+  const [formData, setFormData] = useState({
+    anio: new Date().getFullYear(),
+    mes: new Date().getMonth() + 1,
+    vehiculo: '',
+    kilometros_recorridos: '',
+    km_inicial: '',
+    km_final: '',
+    gasto_bencina: '',
+    gasto_peajes: '',
+    gasto_seguros: '',
+  })
+  const [flotaFormData, setFlotaFormData] = useState({
+    marca: '',
+    modelo: '',
+    patente: '',
+  })
+  const [isAggregatorOpen, setAggregatorOpen] = useState(false)
+  const [aggregatorField, setAggregatorField] = useState(null)
+  const [aggregatorValue, setAggregatorValue] = useState('')
+  const [history, setHistory] = useState({
+    gasto_bencina: [],
+    gasto_peajes: [],
+    gasto_seguros: [],
+  })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(12)
+  const [isNarrow, setIsNarrow] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches,
+  )
 
-    useEffect(() => {
-        fetchData();
-    // fetchData intentionally refreshes annual vehicle data for the selected year.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [year]);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023px)')
+    const sync = () => setIsNarrow(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
 
-    useEffect(() => {
-        if (location.pathname === '/vehiculos/flota') {
-            setFlotaModalOpen(true);
-        }
-    }, [location.pathname]);
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true)
+      const flotaRes = await api.get('vehiculos/flota/')
+      setFlota(flotaRes.data.results || flotaRes.data)
 
+      const params = { anio: year }
+      const listRes = await api.get('vehiculos/registros/', { params })
+      setRegistros(listRes.data.results || listRes.data)
+    } catch (error) {
+      console.error('Error fetching vehicle data:', error)
+      notify({ variant: 'danger', text: 'Error al cargar datos de vehículos.' })
+    } finally {
+      setLoading(false)
+    }
+  }, [year])
 
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
-    const fetchData = async () => {
-        try {
-            // Fetch Flota
-            const flotaRes = await api.get('vehiculos/flota/');
-            setFlota(flotaRes.data.results || flotaRes.data);
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [viewMode, selectedVehiculoFilter, year, pageSize])
 
-            const params = { anio: year };
-            const statsRes = await api.get(`vehiculos/registros/estadisticas_anuales/`, { params });
-            const listRes = await api.get(`vehiculos/registros/`, { params });
+  const setTab = (tab) => {
+    navigate(tab === 'flota' ? '/vehiculos/flota' : '/vehiculos')
+  }
 
-            setStats(statsRes.data);
-            setRegistros(listRes.data.results || listRes.data);
-        } catch (error) {
-            console.error("Error fetching vehicle data:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    const val = value === '' ? '' : parseInt(value, 10)
+    setFormData((prev) => ({ ...prev, [name]: val }))
+  }
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        const val = value === '' ? '' : parseInt(value, 10);
+  const handleKmChange = (name, raw) => {
+    const val = raw === '' ? '' : parseInt(raw, 10)
+    setFormData((prev) => {
+      const nextData = { ...prev, [name]: val }
+      const kIni = name === 'km_inicial' ? val : prev.km_inicial
+      const kFin = name === 'km_final' ? val : prev.km_final
+      if (typeof kIni === 'number' && typeof kFin === 'number') {
+        nextData.kilometros_recorridos = kFin - kIni
+      } else {
+        nextData.kilometros_recorridos = ''
+      }
+      return nextData
+    })
+  }
 
-        setFormData(prev => {
-            const nextData = {
-                ...prev,
-                [name]: val
-            };
+  const handleAddAmount = (name) => {
+    setAggregatorField(name)
+    setAggregatorValue('')
+    setAggregatorOpen(true)
+  }
 
-            // Cálculo automático: se dispara si cambia km_inicial o km_final
-            if (name === 'km_inicial' || name === 'km_final') {
-                const kIni = name === 'km_inicial' ? val : prev.km_inicial;
-                const kFin = name === 'km_final' ? val : prev.km_final;
+  const confirmAddition = () => {
+    const value = parseInt(aggregatorValue, 10)
+    if (isNaN(value) || value <= 0) return
+    setFormData((prev) => ({
+      ...prev,
+      [aggregatorField]: (parseInt(prev[aggregatorField], 10) || 0) + value,
+    }))
+    setHistory((prev) => ({
+      ...prev,
+      [aggregatorField]: [...prev[aggregatorField], value],
+    }))
+    setAggregatorOpen(false)
+  }
 
-                // Solo calculamos si ambos campos tienen un valor numérico
-                if (typeof kIni === 'number' && typeof kFin === 'number') {
-                    nextData.kilometros_recorridos = kFin - kIni;
-                } else {
-                    nextData.kilometros_recorridos = '';
-                }
-            }
+  const removeAddition = (field, index) => {
+    const valToRemove = history[field][index]
+    setHistory((prev) => ({
+      ...prev,
+      [field]: prev[field].filter((_, i) => i !== index),
+    }))
+    setFormData((prev) => ({
+      ...prev,
+      [field]: Math.max(0, (parseInt(prev[field], 10) || 0) - valToRemove),
+    }))
+  }
 
-            return nextData;
-        });
-    };
+  const closeRegistroModal = () => {
+    if (registroOverlay.busy) return
+    registroOverlay.reset()
+    setModalOpen(false)
+  }
 
+  const handleRegistroOverlayDismiss = () => {
+    if (registroOverlay.status === 'success') {
+      registroOverlay.reset()
+      setModalOpen(false)
+      fetchData()
+      return
+    }
+    registroOverlay.dismiss()
+  }
 
+  const closeFlotaModal = () => {
+    if (flotaOverlay.busy) return
+    flotaOverlay.reset()
+    setFlotaModalOpen(false)
+  }
 
-    const handleAddAmount = (name) => {
-        setAggregatorField(name);
-        setAggregatorValue('');
-        setAggregatorOpen(true);
-    };
+  const handleFlotaOverlayDismiss = () => {
+    if (flotaOverlay.status === 'success') {
+      flotaOverlay.reset()
+      setFlotaFormData({ marca: '', modelo: '', patente: '' })
+      setFlotaModalOpen(false)
+      fetchData()
+      return
+    }
+    flotaOverlay.dismiss()
+  }
 
-    const confirmAddition = () => {
-        const value = parseInt(aggregatorValue);
-        if (isNaN(value) || value <= 0) return;
+  const handleOpenCreateModal = () => {
+    registroOverlay.reset()
+    setEditingRecord(null)
+    setFormData({
+      anio: year,
+      mes:
+        registros.length > 0
+          ? (registros[registros.length - 1].mes % 12) + 1
+          : new Date().getMonth() + 1,
+      vehiculo: flota.length > 0 ? flota[0].id : '',
+      kilometros_recorridos: '',
+      km_inicial: '',
+      km_final: '',
+      gasto_bencina: '',
+      gasto_peajes: '',
+      gasto_seguros: '',
+    })
+    setHistory({ gasto_bencina: [], gasto_peajes: [], gasto_seguros: [] })
+    setModalOpen(true)
+  }
 
-        setFormData(prev => ({
-            ...prev,
-            [aggregatorField]: (parseInt(prev[aggregatorField]) || 0) + value
-        }));
+  const handleOpenEditModal = (registro) => {
+    registroOverlay.reset()
+    setEditingRecord(registro)
+    setFormData({
+      anio: registro.anio,
+      mes: registro.mes,
+      vehiculo: registro.vehiculo,
+      kilometros_recorridos: registro.kilometros_recorridos,
+      km_inicial: '',
+      km_final: '',
+      gasto_bencina: registro.gasto_bencina,
+      gasto_peajes: registro.gasto_peajes,
+      gasto_seguros: registro.gasto_seguros,
+    })
+    setHistory({
+      gasto_bencina: registro.gasto_bencina > 0 ? [registro.gasto_bencina] : [],
+      gasto_peajes: registro.gasto_peajes > 0 ? [registro.gasto_peajes] : [],
+      gasto_seguros: registro.gasto_seguros > 0 ? [registro.gasto_seguros] : [],
+    })
+    setModalOpen(true)
+  }
 
-        setHistory(prev => ({
-            ...prev,
-            [aggregatorField]: [...prev[aggregatorField], value]
-        }));
+  const handleSubmit = async (e) => {
+    e?.preventDefault?.()
+    const restData = { ...formData }
+    delete restData.km_inicial
+    delete restData.km_final
+    const payload = {
+      ...restData,
+      kilometros_recorridos:
+        formData.kilometros_recorridos === '' ? 0 : formData.kilometros_recorridos,
+      gasto_bencina: formData.gasto_bencina === '' ? 0 : formData.gasto_bencina,
+      gasto_peajes: formData.gasto_peajes === '' ? 0 : formData.gasto_peajes,
+      gasto_seguros: formData.gasto_seguros === '' ? 0 : formData.gasto_seguros,
+      numero_vehiculos: formData.numero_vehiculos || 0,
+    }
+    try {
+      await registroOverlay.run(
+        async () => {
+          if (editingRecord) {
+            await api.put(`vehiculos/registros/${editingRecord.id}/`, payload)
+          } else {
+            await api.post('vehiculos/registros/', payload)
+          }
+        },
+        {
+          successDescription: editingRecord ? 'Registro actualizado.' : 'Registro guardado.',
+          formatError: (err) =>
+            formatApiFormError(
+              err,
+              'Error al guardar. Verifique los datos o si ya existe un registro para este período.',
+            ),
+        },
+      )
+    } catch {
+      // El error se muestra en FormOverlay
+    }
+  }
 
-        setAggregatorOpen(false);
-    };
+  const confirmDelete = async () => {
+    if (!pendingDelete) return
+    setIsDeleting(true)
+    try {
+      if (pendingDelete.type === 'registro') {
+        await api.delete(`vehiculos/registros/${pendingDelete.id}/`)
+      } else {
+        await api.delete(`vehiculos/flota/${pendingDelete.id}/`)
+      }
+      setPendingDelete(null)
+      notify({ variant: 'success', text: 'Eliminado correctamente.' })
+      await fetchData()
+    } catch (error) {
+      console.error('Error deleting:', error)
+      notify({
+        variant: 'danger',
+        text:
+          pendingDelete.type === 'registro'
+            ? 'Error al eliminar el registro.'
+            : 'Error al eliminar el vehículo.',
+      })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
-    const removeAddition = (field, index) => {
-        const valToRemove = history[field][index];
-        setHistory(prev => ({
-            ...prev,
-            [field]: prev[field].filter((_, i) => i !== index)
-        }));
-        setFormData(prev => ({
-            ...prev,
-            [field]: Math.max(0, (parseInt(prev[field]) || 0) - valToRemove)
-        }));
-    };
+  const handleSaveFlota = async (e) => {
+    e?.preventDefault?.()
+    try {
+      await flotaOverlay.run(
+        async () => {
+          await api.post('vehiculos/flota/', flotaFormData)
+        },
+        {
+          successDescription: 'Vehículo agregado a la flota.',
+          formatError: (err) => formatApiFormError(err, 'Error al guardar el vehículo.'),
+        },
+      )
+    } catch {
+      // El error se muestra en FormOverlay
+    }
+  }
 
-    const handleOpenCreateModal = () => {
-        setEditingRecord(null);
-        setFormData({
-            anio: year,
-            mes: registros.length > 0 ? (registros[registros.length - 1].mes % 12) + 1 : new Date().getMonth() + 1,
-            vehiculo: flota.length > 0 ? flota[0].id : '',
-            kilometros_recorridos: '',
-            km_inicial: '',
-            km_final: '',
-            gasto_bencina: '',
-            gasto_peajes: '',
-            gasto_seguros: ''
-        });
-        setHistory({
-            gasto_bencina: [],
-            gasto_peajes: [],
-            gasto_seguros: []
-        });
-        setModalOpen(true);
-    };
+  const handleUpdateVehiculoInList = (updatedVehiculo) => {
+    setFlota((prev) =>
+      prev.map((v) => (v.id === updatedVehiculo.id ? updatedVehiculo : v)),
+    )
+    setSelectedVehiculoForDetail(updatedVehiculo)
+  }
 
-    const handleOpenEditModal = (registro) => {
-        setEditingRecord(registro);
-        setFormData({
-            anio: registro.anio,
-            mes: registro.mes,
-            vehiculo: registro.vehiculo,
-            kilometros_recorridos: registro.kilometros_recorridos,
-            km_inicial: '',
-            km_final: '',
-            gasto_bencina: registro.gasto_bencina,
-            gasto_peajes: registro.gasto_peajes,
-            gasto_seguros: registro.gasto_seguros
-        });
-        setHistory({
-            gasto_bencina: registro.gasto_bencina > 0 ? [registro.gasto_bencina] : [],
-            gasto_peajes: registro.gasto_peajes > 0 ? [registro.gasto_peajes] : [],
-            gasto_seguros: registro.gasto_seguros > 0 ? [registro.gasto_seguros] : []
-        });
-        setModalOpen(true);
-    };
+  const handleExportExcel = async (shouldSum = false) => {
+    try {
+      const searchParams = new URLSearchParams()
+      searchParams.append('anio', year)
+      searchParams.append('sumar', shouldSum)
+      selectedVehicles.forEach((id) => searchParams.append('vehiculos[]', id))
+      const response = await api.get(
+        `vehiculos/registros/exportar_excel/?${searchParams.toString()}`,
+        { responseType: 'blob' },
+      )
+      const blob = new Blob([response.data], {
+        type: 'text/csv;charset=utf-8-sig',
+      })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', 'reporte_flota.csv')
+      document.body.appendChild(link)
+      link.click()
+      link.parentNode.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      setExportModalOpen(false)
+    } catch (error) {
+      console.error('Error exporting csv:', error)
+      notify({ variant: 'danger', text: 'Error al descargar el CSV.' })
+    }
+  }
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setSubmitting(true);
-
-        const restData = { ...formData };
-        delete restData.km_inicial;
-        delete restData.km_final;
-        const payload = {
-            ...restData,
-            kilometros_recorridos: formData.kilometros_recorridos === '' ? 0 : formData.kilometros_recorridos,
-            gasto_bencina: formData.gasto_bencina === '' ? 0 : formData.gasto_bencina,
-            gasto_peajes: formData.gasto_peajes === '' ? 0 : formData.gasto_peajes,
-            gasto_seguros: formData.gasto_seguros === '' ? 0 : formData.gasto_seguros,
-            numero_vehiculos: formData.numero_vehiculos || 0
-        };
-
-        try {
-            if (editingRecord) {
-                await api.put(`vehiculos/registros/${editingRecord.id}/`, payload);
-            } else {
-                await api.post('vehiculos/registros/', payload);
-            }
-            setModalOpen(false);
-            fetchData();
-        } catch (error) {
-            console.error("Error saving record:", error);
-            setFeedback({ type: 'error', text: 'Error al guardar el registro. Verifique los datos o si ya existe un registro para este período.' });
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleDelete = async (id, mesNombre) => {
-        setPendingDelete({ type: 'registro', id, label: `registro de ${mesNombre}` });
-    };
-
-    const confirmDelete = async () => {
-        if (!pendingDelete) return;
-        setIsDeleting(true);
-        try {
-            if (pendingDelete.type === 'registro') {
-                await api.delete(`vehiculos/registros/${pendingDelete.id}/`);
-            } else {
-                await api.delete(`vehiculos/flota/${pendingDelete.id}/`);
-            }
-            setPendingDelete(null);
-            fetchData();
-        } catch (error) {
-            console.error("Error deleting vehicle data:", error);
-            setFeedback({ type: 'error', text: pendingDelete.type === 'registro' ? 'Error al intentar eliminar el registro.' : 'Error al eliminar el vehículo de la flota.' });
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
-    const handleSaveFlota = async (e) => {
-        e.preventDefault();
-        setSubmitting(true);
-        try {
-            await api.post('vehiculos/flota/', flotaFormData);
-            setFlotaFormData({ marca: '', modelo: '', patente: '' });
-            fetchData();
-        } catch (error) {
-            console.error("Error saving flota:", error);
-            setFeedback({ type: 'error', text: 'Error al guardar el vehículo en la flota.' });
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleDeleteFlota = async (id) => {
-        setPendingDelete({ type: 'flota', id, label: 'vehículo de la flota' });
-    };
-
-    const handleUpdateVehiculoInList = (updatedVehiculo) => {
-        setFlota(prev => prev.map(v => v.id === updatedVehiculo.id ? updatedVehiculo : v));
-        setSelectedVehiculoForDetail(updatedVehiculo);
-    };
-
-    const handleExportExcel = async (shouldSum = false) => {
-        try {
-            const params = { anio: year, sumar: shouldSum };
-            // DRF QueryParams for list of IDs
-            selectedVehicles.forEach(id => {
-                params['vehiculos[]'] = params['vehiculos[]'] || [];
-                params['vehiculos[]'].push(id);
-            });
-
-            // Note: Use URLSearchParams for correct array encoding in GET
-            const searchParams = new URLSearchParams();
-            searchParams.append('anio', year);
-            searchParams.append('sumar', shouldSum);
-            selectedVehicles.forEach(id => searchParams.append('vehiculos[]', id));
-
-            const response = await api.get(`vehiculos/registros/exportar_excel/?${searchParams.toString()}`, {
-                responseType: 'blob',
-            });
-            const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8-sig' });
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `reporte_flota.csv`);
-            document.body.appendChild(link);
-            link.click();
-            link.parentNode.removeChild(link);
-            window.URL.revokeObjectURL(url);
-            setExportModalOpen(false);
-        } catch (error) {
-            console.error("Error exporting csv:", error);
-            setFeedback({ type: 'error', text: 'Error al descargar el archivo CSV.' });
-        }
-    };
-
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-CL', {
-            style: 'currency',
-            currency: 'CLP',
-            maximumFractionDigits: 0
-        }).format(amount);
-    };
-
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.1 }
-        }
-    };
-
-    const itemVariants = {
-        hidden: { y: 20, opacity: 0 },
-        visible: {
-            y: 0,
-            opacity: 1,
-            transition: { type: 'spring', stiffness: 100 }
-        }
-    };
-
-    const CustomTooltip = ({ active, payload, label }) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl border border-slate-700">
-                    <p className="text-sm font-bold mb-1">{label}</p>
-                    {payload.map((entry, index) => (
-                        <p key={index} className="text-xs" style={{ color: entry.color }}>
-                            {entry.name}: {entry.name.includes('Gasto') ? formatCurrency(entry.value) : entry.value}
-                        </p>
-                    ))}
-                </div>
-            );
-        }
-        return null;
-    };
-
-    if (loading) return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div></div>;
-
-    const summedRegistros = Object.values(registros.reduce((acc, curr) => {
-        const key = `${curr.anio}-${curr.mes}`;
+  const displayRegistros = useMemo(() => {
+    const summed = Object.values(
+      registros.reduce((acc, curr) => {
+        const key = `${curr.anio}-${curr.mes}`
         if (!acc[key]) {
-            acc[key] = {
-                ...curr,
-                id: `sum-${key}`,
-                kilometros_recorridos: 0,
-                gasto_bencina: 0,
-                gasto_peajes: 0,
-                gasto_seguros: 0,
-                vehiculo_detalle: { display_name: 'RESUMEN MENSUAL (SUMA)', patente: 'FLOTA' }
-            };
+          acc[key] = {
+            ...curr,
+            id: `sum-${key}`,
+            kilometros_recorridos: 0,
+            gasto_bencina: 0,
+            gasto_peajes: 0,
+            gasto_seguros: 0,
+            vehiculo_detalle: {
+              display_name: 'Resumen mensual (suma)',
+              patente: 'FLOTA',
+            },
+            isSummary: true,
+          }
         }
-        acc[key].kilometros_recorridos += curr.kilometros_recorridos;
-        acc[key].gasto_bencina += curr.gasto_bencina;
-        acc[key].gasto_peajes += curr.gasto_peajes;
-        acc[key].gasto_seguros += curr.gasto_seguros;
-        return acc;
-    }, {})).sort((a, b) => a.mes - b.mes);
+        acc[key].kilometros_recorridos += curr.kilometros_recorridos
+        acc[key].gasto_bencina += curr.gasto_bencina
+        acc[key].gasto_peajes += curr.gasto_peajes
+        acc[key].gasto_seguros += curr.gasto_seguros
+        return acc
+      }, {}),
+    ).sort((a, b) => a.mes - b.mes)
 
-    const filteredIndividualRegistros = selectedVehiculoFilter === 'all'
-        ? registros
-        : registros.filter(r => r.vehiculo === parseInt(selectedVehiculoFilter, 10));
+    if (viewMode === 'general') return summed
+    if (selectedVehiculoFilter === 'all') return registros
+    return registros.filter(
+      (r) => r.vehiculo === parseInt(selectedVehiculoFilter, 10),
+    )
+  }, [registros, viewMode, selectedVehiculoFilter])
 
-    const displayRegistros = viewMode === 'general' ? summedRegistros : filteredIndividualRegistros;
+  const dynamicStats = useMemo(
+    () =>
+      displayRegistros.reduce(
+        (acc, curr) => {
+          acc.bencina += curr.gasto_bencina || 0
+          acc.kms += curr.kilometros_recorridos || 0
+          acc.seguros += curr.gasto_seguros || 0
+          acc.peajes += curr.gasto_peajes || 0
+          return acc
+        },
+        { bencina: 0, kms: 0, seguros: 0, peajes: 0 },
+      ),
+    [displayRegistros],
+  )
 
-    const dynamicStats = displayRegistros.reduce((acc, curr) => {
-        acc.bencina += curr.gasto_bencina || 0;
-        acc.kms += curr.kilometros_recorridos || 0;
-        acc.seguros += curr.gasto_seguros || 0;
-        acc.peajes += curr.gasto_peajes || 0;
-        return acc;
-    }, { bencina: 0, kms: 0, seguros: 0, peajes: 0 });
-
-    const chartData = displayRegistros.map(r => ({
-        mes: viewMode === 'general' ? r.mes_nombre : `${r.mes_nombre} (${r.vehiculo_detalle?.patente})`,
+  const chartData = useMemo(
+    () =>
+      displayRegistros.map((r) => ({
+        mes:
+          viewMode === 'general'
+            ? r.mes_nombre
+            : `${r.mes_nombre} (${r.vehiculo_detalle?.patente || ''})`,
         gasto_bencina: r.gasto_bencina,
         gasto_peajes: r.gasto_peajes,
         gasto_seguros: r.gasto_seguros,
-        kilometros: r.kilometros_recorridos
-    }));
+        kilometros: r.kilometros_recorridos,
+      })),
+    [displayRegistros, viewMode],
+  )
 
-    const commonOverlays = (
-        <>
-            <AnimatePresence>
-                {feedback && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 20 }}
-                        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[10001] bg-rose-50 text-rose-600 text-[10px] font-bold uppercase p-3 rounded-xl border border-rose-100 flex gap-2 items-center shadow-xl"
-                    >
-                        <AlertCircle className="w-4 h-4 shrink-0" />
-                        {feedback.text}
-                        <button type="button" onClick={() => setFeedback(null)} className="p-1 hover:bg-rose-100 rounded-lg">
-                            <X className="w-3.5 h-3.5" />
-                        </button>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+  const pageRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return displayRegistros.slice(start, start + pageSize)
+  }, [displayRegistros, currentPage, pageSize])
 
-            <AnimatePresence>
-                {pendingDelete && (
-                    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-                            onClick={() => setPendingDelete(null)}
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.96, y: 12 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.96, y: 12 }}
-                            className="relative z-10 bg-white rounded-2xl shadow-2xl overflow-hidden max-w-md w-full border border-slate-200"
-                        >
-                            <div className="bg-slate-50 border-b border-slate-100 p-4">
-                                <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Confirmación</p>
-                                <h3 className="text-sm font-bold text-slate-800 tracking-tight uppercase">Eliminar {pendingDelete.type === 'registro' ? 'Registro' : 'Vehículo'}</h3>
-                            </div>
-                            <div className="p-5">
-                                <p className="text-xs font-medium text-slate-700 uppercase leading-relaxed">
-                                    ¿Está seguro que desea eliminar el {pendingDelete.label}? Esta acción no se puede deshacer.
-                                </p>
-                            </div>
-                            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                                <button type="button" onClick={() => setPendingDelete(null)} className={BTN_SECONDARY}>
-                                    Cancelar
-                                </button>
-                                <button type="button" onClick={confirmDelete} disabled={isDeleting} className="bg-rose-600 hover:bg-rose-700 text-white h-10 min-h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-rose-900/20 inline-flex items-center justify-center gap-2 shrink-0 active:scale-95 leading-none box-border disabled:opacity-50">
-                                    <Trash2 className="w-4 h-4" />
-                                    Eliminar
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-        </>
-    );
+  const metrics = [
+    { label: 'Combustible', value: formatCurrency(dynamicStats.bencina) },
+    { label: 'Kilometraje', value: `${dynamicStats.kms.toLocaleString()} km` },
+    { label: 'Seguros', value: formatCurrency(dynamicStats.seguros) },
+    { label: 'Peajes', value: formatCurrency(dynamicStats.peajes) },
+  ]
 
-    if (location.pathname === '/vehiculos/flota') {
-        return (
-            <motion.div
-                className={PAGE_LAYOUT}
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
+  const vistaSelectValue =
+    viewMode === 'general' ? 'general' : selectedVehiculoFilter
+
+  const columns = useMemo(
+    () => [
+      {
+        key: 'periodo',
+        header: 'Mes / Vehículo',
+        className: 'col--primary',
+        cardRole: 'title',
+        priority: 1,
+        render: (item) => item.mes_nombre || '—',
+      },
+      {
+        key: 'vehiculo',
+        header: 'Vehículo',
+        className: 'col--secondary',
+        cardRole: 'subtitle',
+        priority: 2,
+        render: (item) =>
+          item.vehiculo_detalle?.display_name ||
+          item.vehiculo_detalle?.patente ||
+          '—',
+      },
+      {
+        key: 'kms',
+        header: 'KMS',
+        cardRole: 'field',
+        priority: 3,
+        render: (item) =>
+          `${(item.kilometros_recorridos || 0).toLocaleString()} km`,
+      },
+      {
+        key: 'total',
+        header: 'Total gastos',
+        className: 'col--status',
+        cardRole: 'status',
+        priority: 1,
+        render: (item) => (
+          <Badge variant="accent">
+            {formatCurrency(
+              (item.gasto_bencina || 0) +
+                (item.gasto_peajes || 0) +
+                (item.gasto_seguros || 0),
+            )}
+          </Badge>
+        ),
+      },
+      {
+        key: 'detalle',
+        header: 'Detalle',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 4,
+        render: (item) => (
+          <span className="vehiculos-gasto-detalle">
+            <span title="Combustible">{formatCurrency(item.gasto_bencina)}</span>
+            <span title="Peajes">{formatCurrency(item.gasto_peajes)}</span>
+            <span title="Seguros">{formatCurrency(item.gasto_seguros)}</span>
+          </span>
+        ),
+      },
+      {
+        key: 'actions',
+        header: 'Acciones',
+        className: 'col--actions',
+        render: (item) => {
+          if (viewMode !== 'individual' || item.isSummary) return null
+          return (
+            <div
+              className="data-table__actions"
+              onClick={(e) => e.stopPropagation()}
             >
-                {/* Header Flota */}
-                <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-end gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <div className={TITLE_ICON_BOX}>
-                                <Truck className="w-5 h-5" />
-                            </div>
-                            <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase">
-                                GESTIÓN DE FLOTA VEHICULAR
-                            </h2>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1.5">
-                            <p className="text-[10px] md:text-xs font-medium text-slate-500 uppercase">Control Técnico y Documental de Activos</p>
-                            <button 
-                                onClick={() => setIsTipoMantenedorOpen(true)}
-                                className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all"
-                            >
-                                <Settings className="w-3 h-3" /> Configurar Tipos
-                            </button>
-                        </div>
-                    </div>
-                    <form onSubmit={handleSaveFlota} className="grid grid-cols-1 sm:grid-cols-[repeat(3,minmax(8.5rem,1fr))_auto] items-stretch gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200 w-full lg:w-auto shadow-sm">
-                        <input placeholder="MARCA" className={FLOTA_INPUT} value={flotaFormData.marca} onChange={e => setFlotaFormData({ ...flotaFormData, marca: e.target.value })} required />
-                        <input placeholder="MODELO" className={FLOTA_INPUT} value={flotaFormData.modelo} onChange={e => setFlotaFormData({ ...flotaFormData, modelo: e.target.value })} required />
-                        <input placeholder="PATENTE" className={FLOTA_INPUT} value={flotaFormData.patente} onChange={e => setFlotaFormData({ ...flotaFormData, patente: e.target.value.toUpperCase() })} required />
-                        <button type="submit" disabled={submitting} className={BTN_PRIMARY}>
-                            <Plus className="w-4 h-4" /> Agregar
-                        </button>
-                    </form>
-                </div>
+              {can('vehiculos.change_registromensual') ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Editar"
+                  onClick={() => handleOpenEditModal(item)}
+                >
+                  <Icon name="edit" size="sm" />
+                </Button>
+              ) : null}
+              {can('vehiculos.delete_registromensual') ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Eliminar"
+                  onClick={() =>
+                    setPendingDelete({
+                      type: 'registro',
+                      id: item.id,
+                      label: `registro de ${item.mes_nombre}`,
+                    })
+                  }
+                >
+                  <Icon name="trash" size="sm" />
+                </Button>
+              ) : null}
+            </div>
+          )
+        },
+      },
+    ],
+    [viewMode, can],
+  )
 
-                {/* Grid de Vehículos */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar pb-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {flota.map(v => {
-                            const hasDocuments = v.documentos?.length > 0;
-                            return (
-                                <motion.div 
-                                    key={v.id} 
-                                    variants={itemVariants}
-                                    whileHover={{ y: -4, shadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)' }}
-                                    className="bg-white rounded-2xl shadow-sm border border-slate-200 group transition-all relative overflow-hidden flex flex-col cursor-pointer h-full"
-                                    onClick={() => setSelectedVehiculoForDetail(v)}
-                                >
-                                    {/* Hero Image Section */}
-                                    <div className="relative h-44 overflow-hidden">
-                                        {v.imagen ? (
-                                            <img src={v.imagen} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={v.patente} />
-                                        ) : (
-                                            <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center">
-                                                <Car className="w-12 h-12 text-slate-200" />
-                                            </div>
-                                        )}
-                                        
-                                        {/* Glassmorphism Plate Label */}
-                                        <div className="absolute top-4 left-4">
-                                            <div className="bg-white/70 backdrop-blur-md border border-white/40 px-3 py-1.5 rounded-xl shadow-lg">
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-900">{v.patente}</span>
-                                            </div>
-                                        </div>
+  const gastoFields = [
+    { key: 'gasto_bencina', label: 'Combustible' },
+    { key: 'gasto_peajes', label: 'Peajes / TAG' },
+    { key: 'gasto_seguros', label: 'Seguros / Otros' },
+  ]
 
-                                        {/* Delete Button Overlay */}
-                                        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all">
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteFlota(v.id); }}
-                                                className="w-9 h-9 bg-rose-500/20 hover:bg-rose-500 backdrop-blur-md text-white rounded-xl flex items-center justify-center transition-all"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
+  return (
+    <div
+      className="page"
+      data-od-id="vehiculos-page"
+      {...(!isNarrow ? { 'data-fill-viewport': true } : {})}
+    >
+      <PageHeader
+        icon="car"
+        title="Vehículos"
+        description={
+          activeTab === 'flota'
+            ? 'Control técnico y documental de la flota'
+            : `Control de gastos y kilometraje · ${year}`
+        }
+        breadcrumbs={[{ label: 'Operaciones' }, { label: 'Vehículos' }]}
+        linkComponent={Link}
+        split
+        actions={
+          activeTab === 'registros' ? (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setExportModalOpen(true)}
+              >
+                <Icon name="download" size="sm" /> Exportar
+              </Button>
+              {can('vehiculos.add_registromensual') ? (
+                <Button variant="primary" size="sm" onClick={handleOpenCreateModal}>
+                  <Icon name="plus" size="sm" /> Nuevo registro
+                </Button>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsTipoMantenedorOpen(true)}
+              >
+                <Icon name="procedimientos" size="sm" /> Configurar tipos
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  flotaOverlay.reset()
+                  setFlotaModalOpen(true)
+                }}
+              >
+                <Icon name="plus" size="sm" /> Agregar vehículo
+              </Button>
+            </>
+          )
+        }
+      />
 
-                                    {/* Body Content */}
-                                    <div className="p-5 flex-1 flex flex-col">
-                                        <div className="mb-4">
-                                            <h3 className="text-sm font-bold text-slate-800 tracking-tight leading-tight group-hover:text-blue-600 transition-colors uppercase line-clamp-1">
-                                                {v.marca} {v.modelo}
-                                            </h3>
-                                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
-                                                <Fuel className="w-3 h-3 text-blue-400" /> {v.tipo_combustible || 'Sin definir'}
-                                            </p>
-                                        </div>
+      
 
-                                        <div className="mt-auto space-y-3">
-                                            <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
-                                                <span className="text-slate-400">Documentación</span>
-                                                <span className={hasDocuments ? 'text-emerald-500' : 'text-slate-300'}>
-                                                    {v.documentos?.length || 0} Archivos
-                                                </span>
-                                            </div>
-                                            <div className="h-2 bg-slate-50 rounded-full overflow-hidden shadow-inner">
-                                                <motion.div 
-                                                    initial={{ width: 0 }}
-                                                    animate={{ width: `${Math.min(100, (v.documentos?.length || 0) * 20)}%` }}
-                                                    className={`h-full rounded-full ${hasDocuments ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-slate-200'}`}
-                                                />
-                                            </div>
-                                            <div className="flex items-center justify-between border-t border-slate-50 pt-4 mt-2">
-                                                <div className="flex items-center gap-1 text-blue-600 font-black text-[9px] uppercase tracking-widest group-hover:translate-x-1 transition-transform">
-                                                    Ver Ficha <ChevronRight className="w-3.5 h-3.5" />
-                                                </div>
-                                                {v.anio && (
-                                                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Año {v.anio}</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-                </div>
+      <div className="tabs">
+        <ul className="tabs__list" role="tablist" aria-label="Secciones de vehículos">
+          <li>
+            <button
+              type="button"
+              role="tab"
+              className={`tabs__btn${activeTab === 'registros' ? ' is-active' : ''}`}
+              aria-selected={activeTab === 'registros'}
+              onClick={() => setTab('registros')}
+            >
+              Registros
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              role="tab"
+              className={`tabs__btn${activeTab === 'flota' ? ' is-active' : ''}`}
+              aria-selected={activeTab === 'flota'}
+              onClick={() => setTab('flota')}
+            >
+              Flota
+            </button>
+          </li>
+        </ul>
+      </div>
 
-                <AnimatePresence>
-                    {selectedVehiculoForDetail && (
-                        <VehiculoDetalle 
-                            vehiculo={selectedVehiculoForDetail} 
-                            onClose={() => setSelectedVehiculoForDetail(null)}
-                            onUpdate={handleUpdateVehiculoInList}
+      <div
+        className="tabs__panel is-active vehiculos-tab-panel"
+        role="tabpanel"
+      >
+        {activeTab === 'registros' ? (
+          <>
+            <MetricStrip items={metrics} />
+
+            <FiltersBar
+              onClear={() => {
+                setViewMode('individual')
+                setSelectedVehiculoFilter('all')
+                setYear(new Date().getFullYear())
+                setCurrentPage(1)
+              }}
+              activeCount={
+                (viewMode === 'general' || selectedVehiculoFilter !== 'all'
+                  ? 1
+                  : 0) + (year !== new Date().getFullYear() ? 1 : 0)
+              }
+              advanced={
+                <Field label="Año" htmlFor="veh-anio">
+                  <Select
+                    id="veh-anio"
+                    value={year}
+                    onChange={(e) => setYear(parseInt(e.target.value, 10))}
+                  >
+                    {YEARS.map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              }
+            >
+              <Field label="Vista / vehículo" htmlFor="veh-vista">
+                <Select
+                  id="veh-vista"
+                  value={vistaSelectValue}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (val === 'general') {
+                      setViewMode('general')
+                      setSelectedVehiculoFilter('all')
+                    } else {
+                      setViewMode('individual')
+                      setSelectedVehiculoFilter(val)
+                    }
+                  }}
+                >
+                  <option value="general">General (flota completa)</option>
+                  <option value="all">Todos (detallado)</option>
+                  {flota.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.patente} — {v.marca} {v.modelo}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </FiltersBar>
+
+            <div className="vehiculos-main">
+              <div className="vehiculos-charts">
+                <Card className="vehiculos-charts__card">
+                  <h3>Gasto mensual</h3>
+                  <div className="vehiculos-charts__body">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData}>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          vertical={false}
+                          stroke="var(--border)"
                         />
-                    )}
-                </AnimatePresence>
+                        <XAxis
+                          dataKey="mes"
+                          tick={{ fontSize: 10, fill: 'var(--muted)' }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 10, fill: 'var(--muted)' }}
+                          axisLine={false}
+                          tickLine={false}
+                          tickFormatter={(v) => `$${v / 1000}k`}
+                        />
+                        <Tooltip content={<ChartTooltip />} />
+                        <Legend wrapperStyle={{ fontSize: 10 }} />
+                        <Bar
+                          dataKey="gasto_bencina"
+                          name="Bencina"
+                          fill="#fbbf24"
+                          stackId="a"
+                        />
+                        <Bar
+                          dataKey="gasto_peajes"
+                          name="Peajes"
+                          fill="var(--primary)"
+                          stackId="a"
+                        />
+                        <Bar
+                          dataKey="gasto_seguros"
+                          name="Seguros"
+                          fill="var(--success, #10b981)"
+                          stackId="a"
+                          radius={[2, 2, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Card>
+                <Card className="vehiculos-charts__card">
+                  <h3>Kilometraje</h3>
+                  <div className="vehiculos-charts__body">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={chartData}>
+                        <defs>
+                          <linearGradient id="colorKmsVeh" x1="0" y1="0" x2="0" y2="1">
+                            <stop
+                              offset="5%"
+                              stopColor="var(--primary)"
+                              stopOpacity={0.2}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="var(--primary)"
+                              stopOpacity={0}
+                            />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          vertical={false}
+                          stroke="var(--border)"
+                        />
+                        <XAxis
+                          dataKey="mes"
+                          tick={{ fontSize: 10, fill: 'var(--muted)' }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 10, fill: 'var(--muted)' }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip content={<ChartTooltip />} />
+                        <Area
+                          type="monotone"
+                          dataKey="kilometros"
+                          name="Kms"
+                          stroke="var(--primary)"
+                          fill="url(#colorKmsVeh)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Card>
+              </div>
 
-                <TipoDocumentoMantenedor 
-                    isOpen={isTipoMantenedorOpen}
-                    onClose={() => setIsTipoMantenedorOpen(false)}
+              <div className="vehiculos-table">
+                <DataTable
+                  columns={columns}
+                  rows={pageRows}
+                  loading={loading}
+                  totalCount={displayRegistros.length}
+                  emptyTitle="Sin registros"
+                  emptyDescription="No hay registros para el año y filtros actuales."
+                  emptyAction={
+                    can('vehiculos.add_registromensual') ? (
+                      <Button variant="primary" size="sm" onClick={handleOpenCreateModal}>
+                        <Icon name="plus" size="sm" /> Nuevo registro
+                      </Button>
+                    ) : null
+                  }
+                  fillViewport={!isNarrow}
+                  page={currentPage}
+                  pageSize={pageSize}
+                  pageSizeId="veh-registros-page-size"
+                  pageSizeOptions={[12, 24, 50]}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(n) => {
+                    setPageSize(n)
+                    setCurrentPage(1)
+                  }}
+                  mobileCardActions={(item) => {
+                    if (viewMode !== 'individual' || item.isSummary) return undefined
+                    return {
+                      primary: can('vehiculos.change_registromensual')
+                        ? {
+                            label: 'Editar',
+                            onClick: () => handleOpenEditModal(item),
+                          }
+                        : undefined,
+                      secondary: can('vehiculos.delete_registromensual')
+                        ? {
+                            label: 'Eliminar',
+                            onClick: () =>
+                              setPendingDelete({
+                                type: 'registro',
+                                id: item.id,
+                                label: `registro de ${item.mes_nombre}`,
+                              }),
+                          }
+                        : undefined,
+                    }
+                  }}
+                  toolbar={
+                    <div className="table-toolbar__left">
+                      <span className="table-toolbar__title">Registros {year}</span>
+                      <Badge variant="neutral">{displayRegistros.length}</Badge>
+                      <Badge variant="accent">
+                        {viewMode === 'general' ? 'Sumado' : 'Detallado'}
+                      </Badge>
+                    </div>
+                  }
                 />
-                {commonOverlays}
-            </motion.div>
-        );
-    }
-
-    return (
-        <motion.div
-            className={PAGE_LAYOUT}
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-        >
-            {/* Header */}
-            <div className="shrink-0 flex flex-col gap-3.5 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
-                <div className="space-y-0.5">
-                    <div className="flex items-center gap-3">
-                        <div className={TITLE_ICON_BOX}>
-                            <Truck className="w-5 h-5" />
-                        </div>
-                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase">GESTIÓN DE FLOTA</h2>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1.5">
-                        <p className="text-[10px] md:text-xs font-medium text-slate-500 uppercase">Control Vehicular {year}</p>
-                        <span className="text-[9px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold border border-blue-100 uppercase tracking-widest">
-                            Vista: {viewMode === 'individual' ? 'Por Vehículo' : 'General (Sumado)'}
-                        </span>
-                    </div>
-                </div>
-                
-                {/* Filtros agrupados en línea bajo el título */}
-                <div className="flex flex-wrap items-center gap-2.5 w-full">
-                    <select
-                        value={viewMode === 'general' ? 'general' : selectedVehiculoFilter}
-                        onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === 'general') {
-                                setViewMode('general');
-                                setSelectedVehiculoFilter('all');
-                            } else {
-                                setViewMode('individual');
-                                setSelectedVehiculoFilter(val);
-                            }
-                        }}
-                        className={`${SELECT_FILTER} w-full sm:w-64 shrink-0`}
-                    >
-                        <option value="general">GENERAL (FLOTA COMPLETA)</option>
-                        <option value="all">TODOS LOS VEHÍCULOS (DETALLADO)</option>
-                        <optgroup label="FILTRAR POR VEHÍCULO">
-                            {flota.map(v => (
-                                <option key={v.id} value={v.id}>
-                                    {v.patente} - {v.marca} {v.modelo}
-                                </option>
-                            ))}
-                        </optgroup>
-                    </select>
-
-                    <select
-                        value={year}
-                        onChange={(e) => setYear(parseInt(e.target.value))}
-                        className={`${SELECT_FILTER} w-full sm:w-28 shrink-0`}
-                    >
-                        {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
-
-                    <button
-                        onClick={() => setExportModalOpen(true)}
-                        className={BTN_EXCEL}
-                    >
-                        <Download className="w-3.5 h-3.5 text-emerald-600" />
-                        Exportar
-                    </button>
-
-                    {can('vehiculos.add_registromensual') && (
-                        <button
-                            onClick={handleOpenCreateModal}
-                            className={`${BTN_PRIMARY} ml-auto`}
-                        >
-                            <Plus className="w-4 h-4" /> NUEVO REGISTRO
-                        </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="vehiculos-flota-grid">
+            {loading ? (
+              <p className="vehiculos-flota-empty">Cargando flota…</p>
+            ) : flota.length === 0 ? (
+              <div className="vehiculos-flota-empty">
+                <p>No hay vehículos registrados.</p>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    flotaOverlay.reset()
+                    setFlotaModalOpen(true)
+                  }}
+                >
+                  <Icon name="plus" size="sm" /> Agregar vehículo
+                </Button>
+              </div>
+            ) : (
+              flota.map((v) => (
+                <article
+                  key={v.id}
+                  className="vehiculos-flota-card"
+                  onClick={() => setSelectedVehiculoForDetail(v)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') setSelectedVehiculoForDetail(v)
+                  }}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="vehiculos-flota-card__media">
+                    {v.imagen ? (
+                      <img src={v.imagen} alt={v.patente} />
+                    ) : (
+                      <Icon name="rutas" size={28} />
                     )}
-                </div>
-            </div>
-
-            {/* KPI Cards - Estándar Rule 16 */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <motion.div variants={itemVariants} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 transition-all hover:shadow-md group">
-                    <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        <Fuel className="w-5 h-5" />
+                    <Badge variant="neutral">{v.patente}</Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="vehiculos-flota-card__delete"
+                      title="Eliminar"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setPendingDelete({
+                          type: 'flota',
+                          id: v.id,
+                          label: 'vehículo de la flota',
+                        })
+                      }}
+                    >
+                      <Icon name="trash" size="sm" />
+                    </Button>
+                  </div>
+                  <div className="vehiculos-flota-card__body">
+                    <h3>
+                      {v.marca} {v.modelo}
+                    </h3>
+                    <p>{v.tipo_combustible || 'Combustible sin definir'}</p>
+                    <div className="vehiculos-flota-card__meta">
+                      <span>{v.documentos?.length || 0} documentos</span>
+                      {v.anio ? <span>Año {v.anio}</span> : <span>Ver ficha</span>}
                     </div>
-                    <div>
-                        <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest line-clamp-1">COMBUSTIBLE</h3>
-                        <p className="text-lg font-black text-slate-800 leading-none mt-1">{formatCurrency(dynamicStats.bencina)}</p>
-                    </div>
-                </motion.div>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+        )}
+      </div>
 
-                <motion.div variants={itemVariants} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 transition-all hover:shadow-md group">
-                    <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        <Activity className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest line-clamp-1">KILOMETRAJE</h3>
-                        <p className="text-lg font-black text-slate-800 leading-none mt-1">{dynamicStats.kms.toLocaleString()} <span className="text-[10px] font-bold text-slate-400">km</span></p>
-                    </div>
-                </motion.div>
+      <Modal
+        open={isFlotaModalOpen}
+        onClose={closeFlotaModal}
+        title="Agregar vehículo"
+        {...flotaOverlay.modalProps}
+        onOverlayDismiss={handleFlotaOverlayDismiss}
+        footer={
+          <>
+            <Button
+              variant="quiet"
+              onClick={closeFlotaModal}
+              disabled={flotaOverlay.busy}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSaveFlota}
+              loading={flotaOverlay.busy}
+              disabled={flotaOverlay.busy || flotaOverlay.active}
+            >
+              Agregar
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleSaveFlota} className="crud-form">
+          <div className="form-grid">
+            <Field label="Marca" htmlFor="flota-marca" required>
+              <Input
+                id="flota-marca"
+                required
+                placeholder="Ej: Toyota"
+                value={flotaFormData.marca}
+                onChange={(e) =>
+                  setFlotaFormData({
+                    ...flotaFormData,
+                    marca: e.target.value,
+                  })
+                }
+              />
+            </Field>
+            <Field label="Modelo" htmlFor="flota-modelo" required>
+              <Input
+                id="flota-modelo"
+                required
+                placeholder="Ej: Hilux"
+                value={flotaFormData.modelo}
+                onChange={(e) =>
+                  setFlotaFormData({
+                    ...flotaFormData,
+                    modelo: e.target.value,
+                  })
+                }
+              />
+            </Field>
+            <Field label="Patente" htmlFor="flota-patente" required>
+              <Input
+                id="flota-patente"
+                required
+                placeholder="ABCD12"
+                value={flotaFormData.patente}
+                onChange={(e) =>
+                  setFlotaFormData({
+                    ...flotaFormData,
+                    patente: e.target.value.toUpperCase(),
+                  })
+                }
+              />
+            </Field>
+          </div>
+        </form>
+      </Modal>
 
-                <motion.div variants={itemVariants} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 transition-all hover:shadow-md group">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        <Sigma className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest line-clamp-1">SEGUROS</h3>
-                        <p className="text-lg font-black text-slate-800 leading-none mt-1">{formatCurrency(dynamicStats.seguros)}</p>
-                    </div>
-                </motion.div>
+      <Modal
+        open={isModalOpen}
+        onClose={closeRegistroModal}
+        title={editingRecord ? 'Editar registro' : 'Nuevo registro'}
+        size="lg"
+        subheader={`Vehículos · ${year}`}
+        {...registroOverlay.modalProps}
+        onOverlayDismiss={handleRegistroOverlayDismiss}
+        footer={
+          <>
+            <Button
+              variant="quiet"
+              onClick={closeRegistroModal}
+              disabled={registroOverlay.busy}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSubmit}
+              loading={registroOverlay.busy}
+              disabled={registroOverlay.busy || registroOverlay.active}
+            >
+              {editingRecord ? 'Actualizar' : 'Confirmar'}
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleSubmit} className="crud-form">
+          <div className="form-grid">
+            <Field label="Año fiscal" htmlFor="reg-anio">
+              <Input
+                id="reg-anio"
+                name="anio"
+                type="number"
+                value={formData.anio}
+                onChange={handleInputChange}
+                disabled={!!editingRecord}
+                required
+              />
+            </Field>
+            <Field label="Mes" htmlFor="reg-mes">
+              <Select
+                id="reg-mes"
+                name="mes"
+                value={formData.mes}
+                onChange={handleInputChange}
+                disabled={!!editingRecord}
+              >
+                {Array.from({ length: 12 }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>
+                    {new Date(0, i).toLocaleString('es-ES', { month: 'long' })}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Vehículo" htmlFor="reg-veh" required>
+              <Select
+                id="reg-veh"
+                name="vehiculo"
+                value={formData.vehiculo}
+                onChange={handleInputChange}
+                required
+                disabled={!!editingRecord}
+              >
+                <option value="">Seleccionar…</option>
+                {flota.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.marca} {v.modelo} ({v.patente})
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
 
-                <motion.div variants={itemVariants} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 transition-all hover:shadow-md group">
-                    <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        <DollarSign className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest line-clamp-1">PEAJES</h3>
-                        <p className="text-lg font-black text-slate-800 leading-none mt-1">{formatCurrency(dynamicStats.peajes)}</p>
-                    </div>
-                </motion.div>
-            </div>
+          <div className="form-grid">
+            <Field label="Km inicial" htmlFor="reg-kmi">
+              <KmInput
+                id="reg-kmi"
+                name="km_inicial"
+                value={formData.km_inicial === '' ? '' : String(formData.km_inicial)}
+                onChange={(val) => handleKmChange('km_inicial', val)}
+                placeholder="10.500"
+              />
+            </Field>
+            <Field label="Km final" htmlFor="reg-kmf">
+              <KmInput
+                id="reg-kmf"
+                name="km_final"
+                value={formData.km_final === '' ? '' : String(formData.km_final)}
+                onChange={(val) => handleKmChange('km_final', val)}
+                placeholder="11.000"
+              />
+            </Field>
+            <Field label="Odómetro mensual" htmlFor="reg-kms">
+              <KmInput
+                id="reg-kms"
+                name="kilometros_recorridos"
+                value={
+                  formData.kilometros_recorridos === ''
+                    ? ''
+                    : String(formData.kilometros_recorridos)
+                }
+                readOnly
+              />
+            </Field>
+          </div>
 
-            {/* Main Content Area - Balanced 50/50 Split on Large Screens */}
-            <div className="grid grid-cols-12 gap-4 flex-1 lg:min-h-0 lg:overflow-hidden mb-1">
-                {/* Left: Charts */}
-                <div className="col-span-12 lg:col-span-6 flex flex-col gap-4 lg:min-h-0">
-                    <motion.div variants={itemVariants} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex-1 min-h-[300px] lg:min-h-0 overflow-hidden flex flex-col">
-                        <h3 className="text-xs font-bold text-slate-800 mb-1 flex items-center gap-2 leading-none">
-                            <Activity className="w-4 h-4 text-blue-500" />
-                            Gasto Mensual
-                        </h3>
-                        <div className="flex-1 w-full min-h-0">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                    <XAxis
-                                        dataKey="mes"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: '#64748b', fontSize: 10 }}
-                                        tickFormatter={(val) => windowWidth < 1280 ? val.substring(0, 3) : val}
-                                    />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} tickFormatter={(value) => `$${value / 1000}k`} />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Legend iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
-                                    <Bar dataKey="gasto_bencina" name="Bencina" fill="#fbbf24" radius={[4, 4, 0, 0]} stackId="a" />
-                                    <Bar dataKey="gasto_peajes" name="Peajes" fill="#3b82f6" radius={[4, 4, 0, 0]} stackId="a" />
-                                    <Bar dataKey="gasto_seguros" name="Seguros" fill="#10b981" radius={[4, 4, 0, 0]} stackId="a" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </motion.div>
-
-                    <motion.div variants={itemVariants} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex-1 min-h-[300px] lg:min-h-0 overflow-hidden flex flex-col">
-                        <h3 className="text-xs font-bold text-slate-800 mb-1 flex items-center gap-2 leading-none">
-                            <TrendingUp className="w-4 h-4 text-blue-500" />
-                            Kilometraje
-                        </h3>
-                        <div className="flex-1 w-full min-h-0">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 0 }}>
-                                    <defs>
-                                        <linearGradient id="colorKms" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
-                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                    <XAxis
-                                        dataKey="mes"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: '#64748b', fontSize: 10 }}
-                                        tickFormatter={(val) => windowWidth < 1280 ? val.substring(0, 3) : val}
-                                    />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Area type="monotone" dataKey="kilometros" name="Kms" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorKms)" />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </motion.div>
-                </div>
-
-                {/* Right: Table */}
-                <div className="col-span-12 lg:col-span-6 flex flex-col min-h-[500px] lg:min-h-0 pb-1">
-                    <motion.div variants={itemVariants} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex-1 min-h-[500px] lg:min-h-0 flex flex-col">
-                        <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex justify-between items-center whitespace-nowrap">
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">REGISTROS {year}</h3>
-                            <span className="text-[9px] font-black text-slate-400 bg-white px-2 py-0.5 rounded-md border border-slate-200 uppercase tracking-widest">{displayRegistros.length} FILAS</span>
-                        </div>
-                        <div className="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar scroll-smooth bg-white">
-                            <div className="min-w-[700px] lg:min-w-0">
-                                <table className="w-full text-left border-collapse table-fixed">
-                                    <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 shadow-sm">
-                                        <tr>
-                                            <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-r border-slate-100 w-[20%]">Mes / Vehículo</th>
-                                            <th className="px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-r border-slate-100 text-right w-[20%]">KMS</th>
-                                            <th className="px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-r border-slate-100 text-right w-[50%]">Gasto Detallado</th>
-                                            <th className="px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-[10%]">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {displayRegistros.map((registro) => {
-                                            return (
-                                                <tr key={registro.id} className="hover:bg-slate-50/80 transition-all duration-200 group">
-                                                    <td className="px-4 py-3 border-r border-slate-50 border-b border-slate-100">
-                                                        <div className="flex flex-col">
-                                                            <span className="text-[11px] font-medium text-slate-700 uppercase tracking-tight">{registro.mes_nombre}</span>
-                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{registro.vehiculo_detalle?.display_name || registro.vehiculo_detalle?.patente}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-3 border-r border-slate-50 border-b border-slate-100 text-right text-[11px] font-medium text-slate-600 uppercase tabular-nums tracking-tighter">
-                                                        {registro.kilometros_recorridos.toLocaleString()} KM
-                                                    </td>
-                                                    <td className="px-3 py-3 border-r border-slate-50 border-b border-slate-100 text-right tabular-nums">
-                                                        <div className="flex flex-col items-end gap-1">
-                                                            <div className="flex flex-wrap justify-end gap-x-4 text-[12px] font-medium tracking-tight leading-none">
-                                                                <span className="text-amber-600 font-mono" title="Bencina">{formatCurrency(registro.gasto_bencina)}</span>
-                                                                <span className="text-blue-600 font-mono" title="Peajes">{formatCurrency(registro.gasto_peajes)}</span>
-                                                                <span className="text-emerald-600 font-mono" title="Seguros">{formatCurrency(registro.gasto_seguros)}</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-2 text-[14px] font-bold text-slate-900 border-t border-slate-100 pt-1 mt-0.5 leading-none">
-                                                                <span className="text-[9px] text-slate-400 uppercase tracking-widest">Total:</span>
-                                                                {formatCurrency(registro.gasto_bencina + registro.gasto_peajes + registro.gasto_seguros)}
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-3 border-b border-slate-100 text-center align-middle">
-                                                        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            {viewMode === 'individual' && can('vehiculos.change_registromensual') && (
-                                                                <button onClick={() => handleOpenEditModal(registro)} className={BTN_ICON_EDIT}><Pencil className="w-3.5 h-3.5" /></button>
-                                                            )}
-                                                            {viewMode === 'individual' && can('vehiculos.delete_registromensual') && (
-                                                                <button onClick={() => handleDelete(registro.id, registro.mes_nombre)} disabled={isDeleting} className={BTN_ICON_DELETE}><Trash2 className="w-3.5 h-3.5" /></button>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </motion.div>
-                </div>
-            </div>
-
-            {/* Modal - Unchanged */}
-            <AnimatePresence>
-                {isModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto" onClick={() => setModalOpen(false)}>
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-white/20"
-                            onClick={(e) => e.stopPropagation()}
+          <div className="form-grid">
+            {gastoFields.map(({ key, label }) => (
+              <Field key={key} label={label} htmlFor={`reg-${key}`}>
+                <div className="vehiculos-gasto-field">
+                  <Button
+                    type="button"
+                    variant="quiet"
+                    size="sm"
+                    onClick={() => handleAddAmount(key)}
+                  >
+                    <Icon name="plus" size="sm" /> Sumar
+                  </Button>
+                  {history[key].length > 0 ? (
+                    <div className="vehiculos-gasto-chips">
+                      {history[key].map((val, idx) => (
+                        <button
+                          key={`${key}-${idx}`}
+                          type="button"
+                          className="vehiculos-gasto-chip"
+                          onClick={() => removeAddition(key, idx)}
+                          title="Quitar monto"
                         >
-                            <div className="bg-slate-50 border-b border-slate-100 p-5 flex justify-between items-center">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
-                                        {editingRecord ? <Pencil className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                                    </div>
-                                    <div>
-                                        <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">
-                                            {editingRecord ? 'Editar Registro' : 'Nuevo Registro'}
-                                        </h2>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">VehículosSLEP • {year}</p>
-                                    </div>
-                                </div>
-                                <button onClick={() => setModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors"><X className="w-4 h-4" /></button>
-                            </div>
-
-                            <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Año Fiscal</label>
-                                        <input
-                                            name="anio"
-                                            type="number"
-                                            value={formData.anio}
-                                            onChange={handleInputChange}
-                                            className="w-full !h-10 text-[10px] font-bold !bg-white !border !border-slate-200 px-3 !rounded-xl outline-none focus:border-blue-500 uppercase transition-all shadow-sm placeholder:text-slate-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                            required
-                                            disabled={!!editingRecord}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Mes de Operación</label>
-                                        <select
-                                            name="mes"
-                                            value={formData.mes}
-                                            onChange={handleInputChange}
-                                            className="w-full !h-10 text-[10px] font-bold bg-white border border-slate-200 px-3 rounded-xl outline-none focus:border-blue-500 uppercase transition-all shadow-sm cursor-pointer"
-                                            disabled={!!editingRecord}
-                                        >
-                                            {Array.from({ length: 12 }, (_, i) => (
-                                                <option key={i + 1} value={i + 1}>{new Date(0, i).toLocaleString('es-ES', { month: 'long' })}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1 flex items-center gap-1.5"><Car className="w-3.5 h-3.5 text-slate-400" /> Vehículo</label>
-                                        <select
-                                            name="vehiculo"
-                                            value={formData.vehiculo}
-                                            onChange={handleInputChange}
-                                            className="w-full !h-10 text-[10px] font-bold bg-white border border-slate-200 text-slate-700 px-3 rounded-xl outline-none focus:border-blue-500 uppercase transition-all shadow-sm cursor-pointer"
-                                            required
-                                            disabled={!!editingRecord}
-                                        >
-                                            <option value="">Seleccionar Vehículo...</option>
-                                            {flota.map(v => (
-                                                <option key={v.id} value={v.id}>{v.marca} {v.modelo} ({v.patente})</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-5 animate-in fade-in duration-500">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div>
-                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Km Inicial del mes</label>
-                                            <input
-                                                name="km_inicial"
-                                                type="number"
-                                                value={formData.km_inicial}
-                                                onChange={handleInputChange}
-                                                className="w-full !h-10 text-[10px] font-bold !bg-white !border !border-slate-200 px-3 !rounded-xl outline-none focus:border-blue-500 uppercase transition-all shadow-sm placeholder:text-slate-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                placeholder="Ej: 10500"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Km Final del mes</label>
-                                            <input
-                                                name="km_final"
-                                                type="number"
-                                                value={formData.km_final}
-                                                onChange={handleInputChange}
-                                                className="w-full !h-10 text-[10px] font-bold !bg-white !border !border-slate-200 px-3 !rounded-xl outline-none focus:border-blue-500 uppercase transition-all shadow-sm placeholder:text-slate-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                placeholder="Ej: 11000"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Odómetro Mensual</label>
-                                            <div className="relative">
-                                                <input
-                                                    name="kilometros_recorridos"
-                                                    value={formData.kilometros_recorridos}
-                                                    onChange={handleInputChange}
-                                                    className="w-full !h-10 text-[10px] font-bold bg-slate-50 border border-slate-200 px-3 rounded-xl outline-none transition-all shadow-sm placeholder:text-slate-300 pr-10 cursor-not-allowed"
-                                                    placeholder="0"
-                                                    readOnly
-                                                />
-                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400">KM</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        {['gasto_bencina', 'gasto_peajes', 'gasto_seguros'].map((field) => {
-                                            const colors = {
-                                                gasto_bencina: { text: 'text-slate-600', bg: 'bg-slate-100', border: 'border-slate-200', bgLight: 'bg-slate-50/50', icon: 'text-slate-400', btn: 'bg-slate-600', label: 'Combustible' },
-                                                gasto_peajes: { text: 'text-slate-600', bg: 'bg-slate-100', border: 'border-slate-200', bgLight: 'bg-slate-50/50', icon: 'text-slate-400', btn: 'bg-slate-600', label: 'Peajes / TAG' },
-                                                gasto_seguros: { text: 'text-slate-600', bg: 'bg-slate-100', border: 'border-slate-200', bgLight: 'bg-slate-50/50', icon: 'text-slate-400', btn: 'bg-slate-600', label: 'Seguros / Otros' }
-                                            };
-                                            const c = colors[field];
-                                            return (
-                                                <div key={field} className="space-y-1.5">
-                                                    <div className="flex justify-between items-center px-1">
-                                                        <label className={`text-[10px] font-black ${c.text} uppercase tracking-widest leading-none`}>{c.label}</label>
-                                                        <button type="button" onClick={() => handleAddAmount(field)} className={`text-[8px] font-bold ${c.bg} ${c.text} px-2 py-0.5 rounded hover:${c.btn} hover:text-white transition-all flex items-center gap-1`}>
-                                                            <Plus className="w-2.5 h-2.5" /> SUMAR
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Historial de adiciones */}
-                                                    <div className="flex flex-wrap gap-1 min-h-[1.2rem] px-1 overflow-hidden">
-                                                        {history[field].map((val, idx) => (
-                                                            <motion.button
-                                                                type="button"
-                                                                initial={{ scale: 0.5, opacity: 0 }}
-                                                                animate={{ scale: 1, opacity: 1 }}
-                                                                whileHover={{ scale: 1.05, opacity: 0.8 }}
-                                                                key={`${field}-${idx}`}
-                                                                onClick={() => removeAddition(field, idx)}
-                                                                className={`text-[8px] font-bold ${c.bg} ${c.text} px-1.5 py-0.5 rounded border ${c.border} cursor-pointer hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex items-center gap-1 group/chip`}
-                                                                title="Haga clic para eliminar este monto"
-                                                            >
-                                                                +{val.toLocaleString()}
-                                                                <X className="w-2 h-2 opacity-0 group-hover/chip:opacity-100" />
-                                                            </motion.button>
-                                                        ))}
-                                                    </div>
-
-                                                    <div className="relative">
-                                                        <input
-                                                            name={field}
-                                                            type="number"
-                                                            value={formData[field]}
-                                                            onChange={handleInputChange}
-                                                            placeholder="0"
-                                                            className="w-full !h-10 text-[10px] font-bold !bg-white !border !border-slate-200 pl-10 pr-3 !rounded-xl outline-none focus:border-blue-500 transition-all shadow-sm placeholder:text-slate-355 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                        />
-                                                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 pointer-events-none">$</span>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
-                                    <button type="button" onClick={() => setModalOpen(false)} className={BTN_SECONDARY}>Cancelar</button>
-                                    <button type="submit" disabled={submitting} className={BTN_PRIMARY}>
-                                        {submitting ? <div className="w-3 h-3 border-2 border-white/30 border-t-white animate-spin rounded-full"></div> : (editingRecord ? 'Actualizar Registro' : 'Confirmar Registro')}
-                                    </button>
-                                </div>
-                            </form>
-                        </motion.div>
+                          +{val.toLocaleString()}
+                        </button>
+                      ))}
                     </div>
-                )}
-            </AnimatePresence>
-            {/* Aggregator Sub-Modal */}
-            <AnimatePresence>
-                {isAggregatorOpen && (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md" onClick={() => setAggregatorOpen(false)}>
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-white/20"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div className="bg-slate-50 border-b border-slate-100 p-4 flex justify-between items-center">
-                                <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                                    <Calculator className="w-4 h-4 text-slate-400" />
-                                    Sumar Monto
-                                </h3>
-                                <button onClick={() => setAggregatorOpen(false)} className="p-1.5 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors"><X className="w-4 h-4" /></button>
-                            </div>
-                            <div className="p-6 space-y-5 text-center">
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-black text-slate-450 uppercase tracking-widest">Agregando a {aggregatorField?.replace('gasto_', '').toUpperCase()}</p>
-                                    <div className="text-xs font-bold text-slate-400 flex justify-center gap-2">
-                                        Subtotal: <span className="text-slate-900">{formatCurrency(formData[aggregatorField] || 0)}</span>
-                                    </div>
-                                </div>
-                                <div className="flex items-center justify-center gap-3 bg-slate-50 rounded-xl p-4 border border-slate-200">
-                                    <span className="text-3xl font-black text-slate-300">$</span>
-                                    <input
-                                        autoFocus
-                                        value={aggregatorValue}
-                                        onChange={(e) => setAggregatorValue(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && confirmAddition()}
-                                        placeholder="0"
-                                        className="w-full text-left text-3xl font-black text-slate-900 outline-none placeholder-slate-200 bg-transparent uppercase"
-                                    />
-                                </div>
-                                <div className="pt-3 flex justify-end gap-3 border-t border-slate-100">
-                                    <button onClick={() => setAggregatorOpen(false)} className={BTN_SECONDARY}>Cancelar</button>
-                                    <button onClick={confirmAddition} className={BTN_PRIMARY}>Sumar</button>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+                  ) : null}
+                  <Input
+                    id={`reg-${key}`}
+                    name={key}
+                    type="number"
+                    value={formData[key]}
+                    onChange={handleInputChange}
+                    placeholder="0"
+                  />
+                </div>
+              </Field>
+            ))}
+          </div>
+        </form>
+      </Modal>
 
-            {/* Flota Modal */}
-            <AnimatePresence>
-                {isFlotaModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={() => setFlotaModalOpen(false)}>
-                        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                            <div className="bg-slate-50 border-b border-slate-100 p-5 flex justify-between items-center">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
-                                        <Car className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Mantenedor de Flota</h3>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">Gestionar Activos</p>
-                                    </div>
-                                </div>
-                                <button onClick={() => setFlotaModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors"><X className="w-4 h-4" /></button>
-                            </div>
-                            <div className="p-6">
-                                <form onSubmit={handleSaveFlota} className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200/60">
-                                    <input placeholder="MARCA" className={FLOTA_INPUT} value={flotaFormData.marca} onChange={e => setFlotaFormData({ ...flotaFormData, marca: e.target.value })} required />
-                                    <input placeholder="MODELO" className={FLOTA_INPUT} value={flotaFormData.modelo} onChange={e => setFlotaFormData({ ...flotaFormData, modelo: e.target.value })} required />
-                                    <input placeholder="PATENTE" className={FLOTA_INPUT} value={flotaFormData.patente} onChange={e => setFlotaFormData({ ...flotaFormData, patente: e.target.value.toUpperCase() })} required />
-                                    <button type="submit" disabled={submitting} className={`${BTN_PRIMARY} col-span-3`}>Agregar Vehículo</button>
-                                </form>
-                                <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 scrollbar-thin">
-                                    {flota.map(v => (
-                                        <div key={v.id} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl hover:border-blue-500 hover:bg-white transition-all group cursor-pointer" onClick={() => setSelectedVehiculoForDetail(v)}>
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                                                    <Car className="w-5 h-5" />
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-slate-800 text-sm">{v.marca} {v.modelo}</p>
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{v.patente}</p>
-                                                        {v.documentos?.length > 0 && (
-                                                            <span className="text-[8px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md font-black border border-emerald-100 uppercase">DOCS</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <button className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all bg-blue-50 px-3 py-1.5 rounded-xl">
-                                                    Controlar <ChevronRight className="w-3 h-3" />
-                                                </button>
-                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteFlota(v.id); }} className="text-slate-300 hover:text-red-500 transition-colors p-2"><Trash2 className="w-4 h-4" /></button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+      <Modal
+        open={isAggregatorOpen}
+        onClose={() => setAggregatorOpen(false)}
+        title="Sumar monto"
+        size="sm"
+        footer={
+          <>
+            <Button variant="quiet" onClick={() => setAggregatorOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="primary" onClick={confirmAddition}>
+              Sumar
+            </Button>
+          </>
+        }
+      >
+        <Field
+          label={`Agregar a ${(aggregatorField || '').replace('gasto_', '')}`}
+          htmlFor="agg-val"
+        >
+          <Input
+            id="agg-val"
+            autoFocus
+            type="number"
+            value={aggregatorValue}
+            onChange={(e) => setAggregatorValue(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && confirmAddition()}
+            placeholder="0"
+          />
+        </Field>
+        <p className="field__hint">
+          Subtotal actual: {formatCurrency(formData[aggregatorField] || 0)}
+        </p>
+      </Modal>
 
-                            <AnimatePresence>
-                                {selectedVehiculoForDetail && (
-                                    <VehiculoDetalle 
-                                        vehiculo={selectedVehiculoForDetail} 
-                                        onClose={() => setSelectedVehiculoForDetail(null)}
-                                        onUpdate={handleUpdateVehiculoInList}
-                                    />
-                                )}
-                            </AnimatePresence>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+      <Modal
+        open={isExportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        title="Exportar reporte"
+        subheader="Seleccione vehículos y formato"
+        footer={
+          <Button variant="quiet" onClick={() => setExportModalOpen(false)}>
+            Cerrar
+          </Button>
+        }
+      >
+        <div className="vehiculos-export">
+          <button
+            type="button"
+            className={`vehiculos-export__option${
+              selectedVehicles.length === 0 ? ' is-active' : ''
+            }`}
+            onClick={() => setSelectedVehicles([])}
+          >
+            Todos los vehículos
+          </button>
+          {flota.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              className={`vehiculos-export__option${
+                selectedVehicles.includes(v.id) ? ' is-active' : ''
+              }`}
+              onClick={() => {
+                setSelectedVehicles((prev) =>
+                  prev.includes(v.id)
+                    ? prev.filter((i) => i !== v.id)
+                    : [...prev, v.id],
+                )
+              }}
+            >
+              {v.marca} {v.modelo}
+              <span>{v.patente}</span>
+            </button>
+          ))}
+          <div className="vehiculos-export__actions">
+            <Button variant="secondary" onClick={() => handleExportExcel(false)}>
+              Detallado
+            </Button>
+            <Button variant="primary" onClick={() => handleExportExcel(true)}>
+              Sumado
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
-            {/* Custom Export Modal */}
-            <AnimatePresence>
-                {isExportModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={() => setExportModalOpen(false)}>
-                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                            <div className="p-6 border-b border-slate-100">
-                                <h3 className="text-xl font-black text-slate-800">Exportar Reporte</h3>
-                                <p className="text-xs text-slate-400">Seleccione los vehículos y el formato de salida.</p>
-                            </div>
-                            <div className="p-6 space-y-6">
-                                <div className="space-y-3">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Selección de Flota</label>
-                                    <div className="max-h-[200px] overflow-y-auto space-y-2 pr-2 scrollbar-thin">
-                                        <div
-                                            key="all"
-                                            className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center gap-3 ${selectedVehicles.length === 0 ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-100'}`}
-                                            onClick={() => setSelectedVehicles([])}
-                                        >
-                                            <div className={`w-4 h-4 rounded-full border-2 ${selectedVehicles.length === 0 ? 'border-blue-600 bg-blue-600' : 'border-slate-300'}`} />
-                                            <span className="text-sm font-bold">Todos los Vehículos</span>
-                                        </div>
-                                        {flota.map(v => (
-                                            <div
-                                                key={v.id}
-                                                className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center gap-3 ${selectedVehicles.includes(v.id) ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-100'}`}
-                                                onClick={() => {
-                                                    if (selectedVehicles.includes(v.id)) {
-                                                        setSelectedVehicles(selectedVehicles.filter(i => i !== v.id));
-                                                    } else {
-                                                        setSelectedVehicles([...selectedVehicles, v.id]);
-                                                    }
-                                                }}
-                                            >
-                                                <div className={`w-4 h-4 rounded-full border-2 ${selectedVehicles.includes(v.id) ? 'border-blue-600 bg-blue-600' : 'border-slate-300'}`} />
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-bold">{v.marca} {v.modelo}</span>
-                                                    <span className="text-[9px] text-slate-400">{v.patente}</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+      <ConfirmModal
+        open={!!pendingDelete}
+        onClose={() => {
+          if (!isDeleting) setPendingDelete(null)
+        }}
+        onConfirm={confirmDelete}
+        title={
+          pendingDelete?.type === 'registro'
+            ? 'Eliminar registro'
+            : 'Eliminar vehículo'
+        }
+        description={`¿Eliminar el ${pendingDelete?.label || ''}? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        danger
+      />
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <button
-                                        onClick={() => handleExportExcel(false)}
-                                        className="flex flex-col items-center justify-center p-4 bg-slate-50 border-2 border-slate-100 rounded-3xl hover:border-blue-500 transition-all group gap-2"
-                                    >
-                                        <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform"><Activity className="text-slate-400 group-hover:text-blue-600" /></div>
-                                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">Detallado</span>
-                                    </button>
-                                    <button
-                                        onClick={() => handleExportExcel(true)}
-                                        className="flex flex-col items-center justify-center p-4 bg-slate-50 border-2 border-slate-100 rounded-3xl hover:border-emerald-500 transition-all group gap-2"
-                                    >
-                                        <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform"><Plus className="text-slate-400 group-hover:text-emerald-600" /></div>
-                                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">Sumado</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-            {commonOverlays}
-        </motion.div >
-    );
-};
+      {selectedVehiculoForDetail ? (
+        <VehiculoDetalle
+          vehiculo={selectedVehiculoForDetail}
+          onClose={() => setSelectedVehiculoForDetail(null)}
+          onUpdate={handleUpdateVehiculoInList}
+        />
+      ) : null}
 
-export default VehiculosDashboard;
+      <TipoDocumentoMantenedor
+        isOpen={isTipoMantenedorOpen}
+        onClose={() => setIsTipoMantenedorOpen(false)}
+      />
+    </div>
+  )
+}
+
+export default VehiculosDashboard

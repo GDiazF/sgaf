@@ -1,624 +1,572 @@
-import React, { useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
-import api from '../../api';
+import React, { useState, useEffect, useMemo } from 'react'
+import * as XLSX from 'xlsx'
+import api from '../../api'
+import { usePermission } from '../../hooks/usePermission'
+import useDebouncedValue from '../../hooks/useDebouncedValue'
+import { useNotify } from '../../hooks/useNotify'
+import EstablishmentModal from '../../components/establishments/EstablishmentModal'
+import EstablishmentPhonesModal from '../../components/establishments/EstablishmentPhonesModal'
+import EstablishmentCardsView from '../../components/establishments/EstablishmentCardsView'
+import EstablishmentMapModal from '../../components/establishments/EstablishmentMapModal'
+import EstablishmentDetailModal from '../../components/establishments/EstablishmentDetailModal'
 import {
-    Building, Building2, Search, Plus, Edit3, Trash2, Phone, FileDown, Layout, MapPin,
-    UserCircle2, FilterX, Loader2,
-} from 'lucide-react';
-import { usePermission } from '../../hooks/usePermission';
-import useDebouncedValue from '../../hooks/useDebouncedValue';
-import Pagination from '../../components/common/Pagination';
-import SortableHeader from '../../components/common/SortableHeader';
-import EstablishmentModal from '../../components/establishments/EstablishmentModal';
-import EstablishmentPhonesModal from '../../components/establishments/EstablishmentPhonesModal';
-import EstablishmentCardsView from '../../components/establishments/EstablishmentCardsView';
-import EstablishmentMapModal from '../../components/establishments/EstablishmentMapModal';
-import EstablishmentDetailModal from '../../components/establishments/EstablishmentDetailModal';
-import { TableLoading, TableEmpty } from '../funcionarios/shared/FuncionariosTableStates';
-import {
-    PAGE_LAYOUT, TABLE_PANEL, THEAD_TR, TH, TD, TD_MAIN,
-    BTN_SECONDARY, BTN_ICON_EDIT, BTN_ICON_DELETE, statusBadgeClass,
-} from '../funcionarios/shared/funcionariosUi';
-import { BTN_BLUE, BTN_EXCEL, INPUT_FILTER, SELECT_FILTER, TYPE_BADGE, TITLE_ICON_BOX } from './establishmentsUi';
-
-const EstablishmentMobileCard = ({
-    item, canChange, canDelete, onDetail, onPhones, onMap, onEdit, onDelete, onToggleStatus,
-}) => {
-    const StatusControl = canChange ? 'button' : 'span';
-    return (
-    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col gap-3 hover:border-blue-200/60 transition-all">
-        <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden shrink-0">
-                {item.logo ? (
-                    <img src={item.logo} alt="" className="w-full h-full object-contain p-1" />
-                ) : (
-                    <Building2 className="w-5 h-5 text-slate-300" />
-                )}
-            </div>
-            <div className="min-w-0 flex-1">
-                <button
-                    type="button"
-                    onClick={() => onDetail(item)}
-                    className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter line-clamp-2 text-left hover:text-blue-600 transition-colors"
-                >
-                    {item.nombre}
-                </button>
-                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mt-1">
-                    {item.tipo_nombre} · RBD {item.rbd}
-                </p>
-                <StatusControl
-                    type={canChange ? 'button' : undefined}
-                    onClick={canChange ? () => onToggleStatus(item.id, item.activo) : undefined}
-                    className={`${statusBadgeClass(item.activo)} mt-2 ${!canChange ? 'cursor-default' : ''}`}
-                >
-                    {item.activo ? 'Activo' : 'Inactivo'}
-                </StatusControl>
-            </div>
-        </div>
-        <div className="space-y-1.5 text-[10px] font-medium text-slate-500 uppercase tracking-tighter">
-            <p className="flex items-center gap-2 truncate">
-                <UserCircle2 className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                {item.director || 'Sin director/a'}
-            </p>
-            <p className="flex items-center gap-2 truncate">
-                <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                {item.direccion || 'Sin dirección'}
-            </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-1 pt-2 border-t border-slate-100">
-            <button type="button" onClick={() => onPhones(item)} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Teléfonos">
-                <Phone className="w-3.5 h-3.5" />
-            </button>
-            <button type="button" onClick={() => onMap(item)} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Mapa">
-                <MapPin className="w-3.5 h-3.5" />
-            </button>
-            {canChange && (
-                <button type="button" onClick={() => onEdit(item)} className={BTN_ICON_EDIT} title="Editar">
-                    <Edit3 className="w-3.5 h-3.5" />
-                </button>
-            )}
-            {canDelete && (
-                <button type="button" onClick={() => onDelete(item.id)} className={BTN_ICON_DELETE} title="Eliminar">
-                    <Trash2 className="w-3.5 h-3.5" />
-                </button>
-            )}
-        </div>
-    </div>
-    );
-};
+  PageHeader,
+  FiltersBar,
+  DataTable,
+  Badge,
+  Button,
+  IconButton,
+  Field,
+  Input,
+  Select,
+  Icon,
+  ConfirmModal,
+} from '@slep/ui'
+import { Link } from 'react-router-dom'
 
 const Establishments = () => {
-    const { can } = usePermission();
-    const canAdd = can('establecimientos.add_establecimiento');
-    const canChange = can('establecimientos.change_establecimiento');
-    const canDelete = can('establecimientos.delete_establecimiento');
+  const { can } = usePermission()
+  const { notify } = useNotify()
+  const canAdd = can('establecimientos.add_establecimiento')
+  const canChange = can('establecimientos.change_establecimiento')
+  const canDelete = can('establecimientos.delete_establecimiento')
 
-    const [establishments, setEstablishments] = useState([]);
-    const [establishmentTypes, setEstablishmentTypes] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [loadingDirectory, setLoadingDirectory] = useState(false);
-    const [showForm, setShowForm] = useState(false);
-    const [isPhonesModalOpen, setIsPhonesModalOpen] = useState(false);
-    const [selectedEstForPhones, setSelectedEstForPhones] = useState(null);
-    const [allEstablishments, setAllEstablishments] = useState([]);
+  const [establishments, setEstablishments] = useState([])
+  const [establishmentTypes, setEstablishmentTypes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadingDirectory, setLoadingDirectory] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [isPhonesModalOpen, setIsPhonesModalOpen] = useState(false)
+  const [selectedEstForPhones, setSelectedEstForPhones] = useState(null)
+  const [allEstablishments, setAllEstablishments] = useState([])
 
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [totalCount, setTotalCount] = useState(0);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [ordering, setOrdering] = useState('nombre');
-    const [pageSize, setPageSize] = useState(10);
-    const debouncedSearchQuery = useDebouncedValue(searchQuery);
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [ordering, setOrdering] = useState('nombre')
+  const [pageSize, setPageSize] = useState(10)
+  const debouncedSearchQuery = useDebouncedValue(searchQuery)
 
-    const [editingId, setEditingId] = useState(null);
-    const [isCardsViewOpen, setIsCardsViewOpen] = useState(false);
-    const [isMapModalOpen, setIsMapModalOpen] = useState(false);
-    const [selectedEstForMap, setSelectedEstForMap] = useState(null);
-    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-    const [selectedEstForDetail, setSelectedEstForDetail] = useState(null);
-    const [filterType, setFilterType] = useState('');
+  const [editingId, setEditingId] = useState(null)
+  const [isCardsViewOpen, setIsCardsViewOpen] = useState(false)
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false)
+  const [selectedEstForMap, setSelectedEstForMap] = useState(null)
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  const [selectedEstForDetail, setSelectedEstForDetail] = useState(null)
+  const [filterType, setFilterType] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
-    const [formData, setFormData] = useState({
-        rbd: '',
-        nombre: '',
-        tipo: '',
-        director: '',
-        direccion: '',
-        email: '',
-        url_web: '',
-        latitud: '',
-        longitud: '',
-        activo: true,
-    });
+  const [formData, setFormData] = useState({
+    rbd: '',
+    nombre: '',
+    tipo: '',
+    director: '',
+    direccion: '',
+    email: '',
+    url_web: '',
+    latitud: '',
+    longitud: '',
+    activo: true,
+  })
 
-    const fetchData = async (page = 1, search = '', type = '', order = ordering) => {
-        setLoading(true);
+  const fetchData = async (page = 1, search = '', type = '', order = ordering) => {
+    setLoading(true)
+    try {
+      const params = {
+        page,
+        page_size: pageSize,
+        search,
+        ...(type && { tipo: type }),
+        ordering: order,
+      }
+      const response = await api.get('establecimientos/', { params })
+      setEstablishments(response.data.results || [])
+      setTotalCount(response.data.count || 0)
+    } catch (error) {
+      console.error('Error fetching establishments:', error)
+      setEstablishments([])
+      notify({ variant: 'danger', text: 'Error al cargar establecimientos.' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchTypes = async () => {
+    try {
+      const response = await api.get('tipos-establecimiento/')
+      setEstablishmentTypes(response.data.results || response.data)
+      if ((response.data.results || response.data).length > 0) {
+        setFormData((prev) => ({ ...prev, tipo: (response.data.results || response.data)[0].id }))
+      }
+    } catch (error) {
+      console.error('Error fetching types:', error)
+    }
+  }
+
+  const fetchAllForDirectory = () => {
+    if (allEstablishments.length === 0) {
+      const loadData = async () => {
+        setLoadingDirectory(true)
         try {
-            const params = {
-                page,
-                page_size: pageSize,
-                search,
-                ...(type && { tipo: type }),
-                ordering: order,
-            };
-            const response = await api.get('establecimientos/', { params });
-            setEstablishments(response.data.results || []);
-            setTotalCount(response.data.count || 0);
-            setTotalPages(Math.ceil((response.data.count || 0) / pageSize));
+          const response = await api.get('establecimientos/', { params: { page_size: 1000 } })
+          setAllEstablishments(response.data.results || response.data)
+          setIsCardsViewOpen(true)
         } catch (error) {
-            console.error('Error fetching establishments:', error);
-            setEstablishments([]);
+          console.error('Error fetching all establishments:', error)
+          notify({ variant: 'danger', text: 'Error al cargar el directorio completo.' })
         } finally {
-            setLoading(false);
+          setLoadingDirectory(false)
         }
-    };
+      }
+      loadData()
+    } else {
+      setIsCardsViewOpen(true)
+    }
+  }
 
-    const fetchTypes = async () => {
-        try {
-            const response = await api.get('tipos-establecimiento/');
-            setEstablishmentTypes(response.data.results || response.data);
-            if ((response.data.results || response.data).length > 0) {
-                setFormData(prev => ({ ...prev, tipo: (response.data.results || response.data)[0].id }));
-            }
-        } catch (error) {
-            console.error('Error fetching types:', error);
+  useEffect(() => {
+    fetchTypes()
+    const loadAllData = async () => {
+      try {
+        const response = await api.get('establecimientos/', { params: { page_size: 1000 } })
+        setAllEstablishments(response.data.results || response.data)
+      } catch (error) {
+        console.error('Error fetching all establishments for map:', error)
+      }
+    }
+    loadAllData()
+  }, [])
+
+  useEffect(() => {
+    fetchData(currentPage, debouncedSearchQuery, filterType, ordering)
+  }, [currentPage, debouncedSearchQuery, filterType, ordering, pageSize])
+
+  const handleSearch = (query) => {
+    setSearchQuery(query)
+    setCurrentPage(1)
+  }
+
+  const handleFilterChange = (e) => {
+    setFilterType(e.target.value)
+    setCurrentPage(1)
+  }
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setFilterType('')
+    setCurrentPage(1)
+  }
+
+  const handlePageChange = (page) => setCurrentPage(page)
+
+  const handleSort = (newOrdering) => {
+    setOrdering(newOrdering)
+    setCurrentPage(1)
+  }
+
+  const handleEdit = (item) => {
+    setFormData(item)
+    setEditingId(item.id)
+    setShowForm(true)
+  }
+
+  const handleOpenPhones = (item) => {
+    setSelectedEstForPhones(item)
+    setIsPhonesModalOpen(true)
+  }
+
+  const handleOpenMap = (item) => {
+    setSelectedEstForMap(item || null)
+    setIsMapModalOpen(true)
+  }
+
+  const handleOpenDetail = (item) => {
+    setSelectedEstForDetail(item)
+    setIsDetailModalOpen(true)
+  }
+
+  const handleExportExcel = () => {
+    if (allEstablishments.length === 0) {
+      notify({ variant: 'warning', text: 'No hay datos para exportar.' })
+      return
+    }
+    try {
+      const exportData = allEstablishments.map((est) => ({
+        RBD: est.rbd,
+        Nombre: est.nombre,
+        Tipo: est.tipo_nombre,
+        'Director/a': est.director || 'No asignado',
+        Email: est.email || 'Sin email',
+        Dirección: est.direccion || 'Sin dirección',
+        Teléfonos: (est.telefonos || []).map((t) => t.numero).join(', '),
+        Latitud: est.latitud || '',
+        Longitud: est.longitud || '',
+        Estado: est.activo ? 'Activo' : 'Inactivo',
+      }))
+      const ws = XLSX.utils.json_to_sheet(exportData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Establecimientos')
+      XLSX.writeFile(wb, `Establecimientos_SLEP_${new Date().getFullYear()}.xlsx`)
+      notify({ variant: 'success', text: 'Excel exportado correctamente.' })
+    } catch (error) {
+      console.error(error)
+      notify({ variant: 'danger', text: 'Error al exportar el Excel.' })
+    }
+  }
+
+  const handleNew = () => {
+    setFormData({
+      rbd: '',
+      nombre: '',
+      tipo: establishmentTypes.length > 0 ? establishmentTypes[0].id : '',
+      director: '',
+      direccion: '',
+      email: '',
+      url_web: '',
+      latitud: '',
+      longitud: '',
+      activo: true,
+    })
+    setEditingId(null)
+    setShowForm(true)
+  }
+
+  const handleDelete = (item) => {
+    setDeleteTarget(item)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`establecimientos/${deleteTarget.id}/`)
+      setDeleteTarget(null)
+      notify({ variant: 'success', text: 'Establecimiento eliminado.' })
+      await fetchData(currentPage, debouncedSearchQuery, filterType, ordering)
+    } catch (error) {
+      console.error(error)
+      notify({ variant: 'danger', text: 'Error al eliminar el establecimiento.' })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const handleStatusToggle = async (id, currentStatus) => {
+    try {
+      await api.patch(`establecimientos/${id}/`, { activo: !currentStatus })
+      notify({
+        variant: 'success',
+        text: currentStatus ? 'Establecimiento marcado como inactivo.' : 'Establecimiento marcado como activo.',
+      })
+      fetchData(currentPage, searchQuery, filterType, ordering)
+    } catch (error) {
+      console.error(error)
+      notify({ variant: 'danger', text: 'Error al actualizar el estado.' })
+    }
+  }
+
+  const handleSave = async (dataToSubmit) => {
+    const formDataToSend = new FormData()
+    Object.keys(dataToSubmit).forEach((key) => {
+      const value = dataToSubmit[key]
+      if (key === 'logo') {
+        if (value instanceof File) formDataToSend.append(key, value)
+      } else if (['latitud', 'longitud', 'rbd'].includes(key)) {
+        if (value !== '' && value !== null && value !== undefined) {
+          formDataToSend.append(key, value)
         }
-    };
+      } else if (key !== 'telefonos' && key !== 'telefonos_detalle') {
+        formDataToSend.append(key, value === null ? '' : value)
+      }
+    })
 
-    const fetchAllForDirectory = () => {
-        if (allEstablishments.length === 0) {
-            const loadData = async () => {
-                setLoadingDirectory(true);
-                try {
-                    const response = await api.get('establecimientos/', { params: { page_size: 1000 } });
-                    setAllEstablishments(response.data.results || response.data);
-                    setIsCardsViewOpen(true);
-                } catch (error) {
-                    console.error('Error fetching all establishments:', error);
-                    alert('Error al cargar el directorio completo.');
-                } finally {
-                    setLoadingDirectory(false);
-                }
-            };
-            loadData();
-        } else {
-            setIsCardsViewOpen(true);
+    try {
+      if (editingId) {
+        await api.patch(`establecimientos/${editingId}/`, formDataToSend, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+      } else {
+        await api.post('establecimientos/', formDataToSend, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+      }
+    } catch (error) {
+      console.error('Error saving establishment:', error.response?.data || error)
+      throw error
+    }
+  }
+
+  const handleFormClose = (result) => {
+    setShowForm(false)
+    if (result?.saved) {
+      fetchData(currentPage, searchQuery, filterType, ordering)
+    }
+  }
+
+  const filteredData = establishments
+  const sortKey = ordering.replace(/^-/, '')
+
+  const columns = useMemo(
+    () => [
+      {
+        key: 'activo',
+        header: 'Estado',
+        className: 'col--status',
+        cardRole: 'status',
+        priority: 1,
+        render: (item) =>
+          canChange ? (
+            <button
+              type="button"
+              className="badge-toggle"
+              aria-label={item.activo ? 'Marcar inactivo' : 'Marcar activo'}
+              onClick={() => handleStatusToggle(item.id, item.activo)}
+            >
+              <Badge variant={item.activo ? 'success' : 'neutral'} dot>
+                {item.activo ? 'Activo' : 'Inactivo'}
+              </Badge>
+            </button>
+          ) : (
+            <Badge variant={item.activo ? 'success' : 'neutral'} dot>
+              {item.activo ? 'Activo' : 'Inactivo'}
+            </Badge>
+          ),
+      },
+      {
+        key: 'rbd',
+        header: 'RBD',
+        className: 'col--secondary mono',
+        sortable: true,
+        cardRole: 'subtitle',
+        priority: 1,
+        render: (item) => <span className="mono">{item.rbd}</span>,
+      },
+      {
+        key: 'nombre',
+        header: 'Nombre',
+        className: 'col--primary',
+        sortable: true,
+        cardRole: 'title',
+        priority: 1,
+        render: (item) => (
+          <button
+            type="button"
+            className="table-link est-name-cell"
+            onClick={() => handleOpenDetail(item)}
+          >
+            {item.logo ? (
+              <img src={item.logo} alt="" className="avatar avatar--sm est-name-cell__logo" />
+            ) : (
+              <span className="avatar avatar--sm est-name-cell__logo" aria-hidden>
+                <Icon name="establecimientos" size={14} />
+              </span>
+            )}
+            <span className="est-name-cell__label">{item.nombre}</span>
+          </button>
+        ),
+      },
+      {
+        key: 'tipo_nombre',
+        header: 'Tipo',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 2,
+        render: (item) => <Badge variant="accent">{item.tipo_nombre}</Badge>,
+      },
+      {
+        key: 'director',
+        header: 'Director',
+        sortable: true,
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 2,
+        render: (item) => item.director || '—',
+      },
+      {
+        key: 'actions',
+        header: 'Acciones',
+        className: 'col--actions',
+        render: (item) => (
+          <div className="data-table__actions">
+            <IconButton aria-label="Teléfonos" onClick={() => handleOpenPhones(item)}>
+              <Icon name="telefonos" size="sm" />
+            </IconButton>
+            <IconButton aria-label="Mapa" onClick={() => handleOpenMap(item)}>
+              <Icon name="establecimientos" size="sm" />
+            </IconButton>
+            {canChange ? (
+              <Button variant="outline" size="sm" onClick={() => handleEdit(item)}>
+                Editar
+              </Button>
+            ) : null}
+            {canDelete ? (
+              <Button variant="danger" size="sm" onClick={() => handleDelete(item)}>
+                Eliminar
+              </Button>
+            ) : null}
+          </div>
+        ),
+      },
+    ],
+    [canChange, canDelete],
+  )
+
+  return (
+    <div className="page" data-od-id="establecimientos-page">
+      <PageHeader
+        icon="establecimientos"
+        title="Establecimientos"
+        description="Gestión institucional de escuelas, liceos y jardines"
+        breadcrumbs={[{ label: 'Inicio', to: '/' }, { label: 'Establecimientos' }]}
+        linkComponent={Link}
+        split
+        actions={
+          <>
+            <Button variant="secondary" size="sm" onClick={fetchAllForDirectory} disabled={loadingDirectory}>
+              Directorio
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleOpenMap(null)}>
+              Mapa
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleExportExcel}>
+              <Icon name="download" size="sm" /> Excel
+            </Button>
+            {canAdd ? (
+              <Button variant="primary" size="sm" onClick={handleNew}>
+                <Icon name="plus" size="sm" /> Nuevo
+              </Button>
+            ) : null}
+          </>
         }
-    };
+      />
 
-    useEffect(() => {
-        fetchTypes();
-        const loadAllData = async () => {
-            try {
-                const response = await api.get('establecimientos/', { params: { page_size: 1000 } });
-                setAllEstablishments(response.data.results || response.data);
-            } catch (error) {
-                console.error('Error fetching all establishments for map:', error);
-            }
-        };
-        loadAllData();
-    }, []);
-
-    useEffect(() => {
-        fetchData(currentPage, debouncedSearchQuery, filterType, ordering);
-    }, [currentPage, debouncedSearchQuery, filterType, ordering, pageSize]);
-
-    const handleSearch = (query) => {
-        setSearchQuery(query);
-        setCurrentPage(1);
-    };
-
-    const handleFilterChange = (e) => {
-        setFilterType(e.target.value);
-        setCurrentPage(1);
-    };
-
-    const clearFilters = () => {
-        setSearchQuery('');
-        setFilterType('');
-        setCurrentPage(1);
-    };
-
-    const handlePageChange = (page) => setCurrentPage(page);
-
-    const handleSort = (newOrdering) => {
-        setOrdering(newOrdering);
-        setCurrentPage(1);
-    };
-
-    const handleEdit = (item) => {
-        setFormData(item);
-        setEditingId(item.id);
-        setShowForm(true);
-    };
-
-    const handleOpenPhones = (item) => {
-        setSelectedEstForPhones(item);
-        setIsPhonesModalOpen(true);
-    };
-
-    const handleOpenMap = (item) => {
-        setSelectedEstForMap(item || null);
-        setIsMapModalOpen(true);
-    };
-
-    const handleOpenDetail = (item) => {
-        setSelectedEstForDetail(item);
-        setIsDetailModalOpen(true);
-    };
-
-    const handleExportExcel = () => {
-        if (allEstablishments.length === 0) {
-            alert('No hay datos para exportar.');
-            return;
+      <FiltersBar
+        onSearch={() => setCurrentPage(1)}
+        onClear={clearFilters}
+        advanced={
+          <Field label="Tipo" htmlFor="est-tipo">
+            <Select id="est-tipo" value={filterType} onChange={handleFilterChange}>
+              <option value="">Todos los tipos</option>
+              {establishmentTypes.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
         }
-        const exportData = allEstablishments.map(est => ({
-            RBD: est.rbd,
-            Nombre: est.nombre,
-            Tipo: est.tipo_nombre,
-            'Director/a': est.director || 'No asignado',
-            Email: est.email || 'Sin email',
-            Dirección: est.direccion || 'Sin dirección',
-            Teléfonos: (est.telefonos || []).map(t => t.numero).join(', '),
-            Latitud: est.latitud || '',
-            Longitud: est.longitud || '',
-            Estado: est.activo ? 'Activo' : 'Inactivo',
-        }));
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Establecimientos');
-        XLSX.writeFile(wb, `Establecimientos_SLEP_${new Date().getFullYear()}.xlsx`);
-    };
-
-    const handleNew = () => {
-        setFormData({
-            rbd: '',
-            nombre: '',
-            tipo: establishmentTypes.length > 0 ? establishmentTypes[0].id : '',
-            director: '',
-            direccion: '',
-            email: '',
-            url_web: '',
-            latitud: '',
-            longitud: '',
-            activo: true,
-        });
-        setEditingId(null);
-        setShowForm(true);
-    };
-
-    const handleDelete = async (id) => {
-        if (!window.confirm('¿Seguro que desea eliminar este establecimiento?')) return;
-        try {
-            await api.delete(`establecimientos/${id}/`);
-            fetchData(currentPage, searchQuery, filterType, ordering);
-        } catch (error) {
-            console.error(error);
-            alert('Error al eliminar.');
-        }
-    };
-
-    const handleStatusToggle = async (id, currentStatus) => {
-        try {
-            await api.patch(`establecimientos/${id}/`, { activo: !currentStatus });
-            fetchData(currentPage, searchQuery, filterType, ordering);
-        } catch (error) {
-            console.error(error);
-            alert('Error al actualizar estado.');
-        }
-    };
-
-    const handleSave = async (dataToSubmit) => {
-        try {
-            const formDataToSend = new FormData();
-            Object.keys(dataToSubmit).forEach(key => {
-                const value = dataToSubmit[key];
-                if (key === 'logo') {
-                    if (value instanceof File) formDataToSend.append(key, value);
-                } else if (['latitud', 'longitud', 'rbd'].includes(key)) {
-                    if (value !== '' && value !== null && value !== undefined) {
-                        formDataToSend.append(key, value);
-                    }
-                } else if (key !== 'telefonos' && key !== 'telefonos_detalle') {
-                    formDataToSend.append(key, value === null ? '' : value);
-                }
-            });
-
-            if (editingId) {
-                await api.patch(`establecimientos/${editingId}/`, formDataToSend, {
-                    headers: { 'Content-Type': 'multipart/form-data' },
-                });
-            } else {
-                await api.post('establecimientos/', formDataToSend, {
-                    headers: { 'Content-Type': 'multipart/form-data' },
-                });
-            }
-            setShowForm(false);
-            fetchData(currentPage, searchQuery, filterType, ordering);
-        } catch (error) {
-            console.error('Error saving establishment:', error.response?.data || error);
-            const errorMsg = error.response?.data
-                ? Object.entries(error.response.data).map(([k, v]) => `${k}: ${v}`).join('\n')
-                : 'Error al guardar.';
-            alert('Error al guardar:\n' + errorMsg);
-        }
-    };
-
-    const filteredData = establishments;
-    const sortTh = `${TH} cursor-pointer hover:bg-slate-100/80 transition-colors`;
-
-    return (
-        <div className={PAGE_LAYOUT}>
-            <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
-                <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={TITLE_ICON_BOX}>
-                        <Building className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase">
-                            Establecimientos
-                        </h2>
-                        <p className="text-[10px] md:text-xs font-medium text-slate-500 mt-1.5">
-                            Gestión institucional de escuelas, liceos y jardines
-                        </p>
-                    </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                    <button
-                        type="button"
-                        onClick={fetchAllForDirectory}
-                        disabled={loadingDirectory}
-                        className={BTN_SECONDARY}
-                    >
-                        {loadingDirectory ? <Loader2 className="w-4 h-4 animate-spin" /> : <Layout className="w-4 h-4 shrink-0" />}
-                        Directorio
-                    </button>
-                    <button type="button" onClick={() => handleOpenMap(null)} className={BTN_SECONDARY}>
-                        <MapPin className="w-4 h-4 shrink-0" />
-                        Mapa
-                    </button>
-                    <button type="button" onClick={handleExportExcel} className={BTN_EXCEL}>
-                        <FileDown className="w-4 h-4 shrink-0" />
-                        Excel
-                    </button>
-                    {canAdd && (
-                        <button type="button" onClick={handleNew} className={BTN_BLUE}>
-                            <Plus className="w-4 h-4 shrink-0" />
-                            Nuevo
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            <EstablishmentModal
-                isOpen={showForm}
-                onClose={() => setShowForm(false)}
-                onSave={handleSave}
-                editingId={editingId}
-                initialData={formData}
-                establishmentTypes={establishmentTypes}
+      >
+        <Field label="Buscar" htmlFor="est-q">
+          <div className="input-wrap">
+            <Icon name="search" className="input-wrap__icon" size="sm" />
+            <Input
+              id="est-q"
+              type="search"
+              placeholder="Nombre o RBD…"
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
             />
+          </div>
+        </Field>
+      </FiltersBar>
 
-            <EstablishmentPhonesModal
-                isOpen={isPhonesModalOpen}
-                onClose={() => {
-                    setIsPhonesModalOpen(false);
-                    fetchData(currentPage, searchQuery, filterType, ordering);
-                }}
-                establishment={selectedEstForPhones}
-            />
+      <DataTable
+        columns={columns}
+        rows={filteredData}
+        loading={loading}
+        totalCount={totalCount}
+        emptyTitle="Sin establecimientos"
+        emptyDescription="No hay registros con los filtros actuales."
+        emptyAction={
+          <Button variant="quiet" onClick={clearFilters}>
+            Limpiar filtros
+          </Button>
+        }
+        page={currentPage}
+        pageSize={pageSize}
+        pageSizeId="est-page-size"
+        onPageChange={handlePageChange}
+        onPageSizeChange={(n) => {
+          setPageSize(n)
+          setCurrentPage(1)
+        }}
+        sortKey={sortKey}
+        onSort={(key) => {
+          const next = ordering === key ? `-${key}` : ordering === `-${key}` ? key : key
+          handleSort(next)
+        }}
+        mobileCardActions={(item) => ({
+          primary: {
+            label: 'Ver detalle',
+            onClick: () => handleOpenDetail(item),
+          },
+          secondary: canChange
+            ? {
+                label: 'Editar',
+                onClick: () => handleEdit(item),
+              }
+            : undefined,
+        })}
+        toolbar={
+          <div className="table-toolbar__left">
+            <span className="table-toolbar__title">Listado</span>
+            <Badge variant="neutral">{totalCount} registros</Badge>
+          </div>
+        }
+      />
 
-            <EstablishmentCardsView
-                isOpen={isCardsViewOpen}
-                onClose={() => setIsCardsViewOpen(false)}
-                data={allEstablishments}
-                establishmentTypes={establishmentTypes}
-            />
+      <EstablishmentModal
+        isOpen={showForm}
+        onClose={handleFormClose}
+        onSave={handleSave}
+        editingId={editingId}
+        initialData={formData}
+        establishmentTypes={establishmentTypes}
+      />
+      <EstablishmentPhonesModal
+        isOpen={isPhonesModalOpen}
+        onClose={() => {
+          setIsPhonesModalOpen(false)
+          fetchData(currentPage, searchQuery, filterType, ordering)
+        }}
+        establishment={selectedEstForPhones}
+      />
+      <EstablishmentCardsView
+        isOpen={isCardsViewOpen}
+        onClose={() => setIsCardsViewOpen(false)}
+        data={allEstablishments}
+        establishmentTypes={establishmentTypes}
+      />
+      <EstablishmentMapModal
+        isOpen={isMapModalOpen}
+        onClose={() => setIsMapModalOpen(false)}
+        establishment={selectedEstForMap}
+        allEstablishments={allEstablishments}
+      />
+      <EstablishmentDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        establishment={selectedEstForDetail}
+      />
+      <ConfirmModal
+        open={Boolean(deleteTarget)}
+        onClose={() => {
+          if (!deleting) setDeleteTarget(null)
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Eliminar establecimiento"
+        description={
+          deleteTarget
+            ? `¿Eliminar «${deleteTarget.nombre}» (RBD ${deleteTarget.rbd})? Esta acción no se puede deshacer.`
+            : '¿Eliminar este establecimiento?'
+        }
+        confirmLabel={deleting ? 'Eliminando…' : 'Eliminar'}
+        cancelLabel="Cancelar"
+        danger
+      />
+    </div>
+  )
+}
 
-            <EstablishmentMapModal
-                isOpen={isMapModalOpen}
-                onClose={() => setIsMapModalOpen(false)}
-                establishment={selectedEstForMap}
-                allEstablishments={allEstablishments}
-            />
-
-            <EstablishmentDetailModal
-                isOpen={isDetailModalOpen}
-                onClose={() => setIsDetailModalOpen(false)}
-                establishment={selectedEstForDetail}
-                allEstablishments={allEstablishments}
-            />
-
-            <div className={TABLE_PANEL}>
-                <div className="shrink-0 flex flex-col lg:flex-row items-stretch lg:items-center gap-3 p-3 bg-slate-50 border-b border-slate-200">
-                    <div className="relative flex-1 min-w-0">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                        <input
-                            type="text"
-                            placeholder="Buscar establecimiento..."
-                            value={searchQuery}
-                            onChange={(e) => handleSearch(e.target.value)}
-                            className={INPUT_FILTER}
-                        />
-                    </div>
-                    <select
-                        value={filterType}
-                        onChange={handleFilterChange}
-                        className={`${SELECT_FILTER} w-full lg:w-52`}
-                    >
-                        <option value="">Todos los tipos</option>
-                        {establishmentTypes.map(t => (
-                            <option key={t.id} value={t.id}>{t.nombre}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={pageSize}
-                        onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                        className={`${SELECT_FILTER} w-full lg:w-28`}
-                        title="Registros por página"
-                    >
-                        <option value={10}>10 / pág.</option>
-                        <option value={20}>20 / pág.</option>
-                        <option value={50}>50 / pág.</option>
-                        <option value={100}>100 / pág.</option>
-                    </select>
-                    <button
-                        type="button"
-                        onClick={clearFilters}
-                        className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors shrink-0 self-center"
-                        title="Limpiar filtros"
-                    >
-                        <FilterX className="w-4 h-4" />
-                    </button>
-                </div>
-
-                <div className="overflow-auto flex-1 bg-white custom-scrollbar min-h-0">
-                    {loading ? (
-                        <TableLoading />
-                    ) : filteredData.length === 0 ? (
-                        <TableEmpty />
-                    ) : (
-                        <>
-                            <div className="lg:hidden p-3 flex flex-col gap-3">
-                                {filteredData.map(item => (
-                                    <EstablishmentMobileCard
-                                        key={item.id}
-                                        item={item}
-                                        canChange={canChange}
-                                        canDelete={canDelete}
-                                        onDetail={handleOpenDetail}
-                                        onPhones={handleOpenPhones}
-                                        onMap={handleOpenMap}
-                                        onEdit={handleEdit}
-                                        onDelete={handleDelete}
-                                        onToggleStatus={handleStatusToggle}
-                                    />
-                                ))}
-                            </div>
-
-                            <div className="hidden lg:block overflow-auto custom-scrollbar">
-                                <table className="w-full text-left border-collapse border-spacing-0">
-                                    <thead className="sticky top-0 z-10">
-                                        <tr className={THEAD_TR}>
-                                            <th className={`${TH} text-center w-28`}>Estado</th>
-                                            <SortableHeader
-                                                label="RBD"
-                                                sortKey="rbd"
-                                                currentOrdering={ordering}
-                                                onSort={handleSort}
-                                                className={sortTh}
-                                            />
-                                            <SortableHeader
-                                                label="Nombre"
-                                                sortKey="nombre"
-                                                currentOrdering={ordering}
-                                                onSort={handleSort}
-                                                className={sortTh}
-                                            />
-                                            <th className={TH}>Tipo</th>
-                                            <SortableHeader
-                                                label="Director"
-                                                sortKey="director"
-                                                currentOrdering={ordering}
-                                                onSort={handleSort}
-                                                className={sortTh}
-                                            />
-                                            <th className={`${TH} text-center border-r-0`}>Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {filteredData.map(item => (
-                                            <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                <td className={TD}>
-                                                    {canChange ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleStatusToggle(item.id, item.activo)}
-                                                            className={statusBadgeClass(item.activo)}
-                                                        >
-                                                            {item.activo ? 'Activo' : 'Inactivo'}
-                                                        </button>
-                                                    ) : (
-                                                        <span className={`${statusBadgeClass(item.activo)} cursor-default`}>
-                                                            {item.activo ? 'Activo' : 'Inactivo'}
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className={`${TD} font-mono normal-case`}>{item.rbd}</td>
-                                                <td className={TD_MAIN}>
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden shrink-0">
-                                                            {item.logo ? (
-                                                                <img src={item.logo} alt="" className="w-full h-full object-contain p-1" />
-                                                            ) : (
-                                                                <Building2 className="w-4 h-4 text-slate-300" />
-                                                            )}
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleOpenDetail(item)}
-                                                            className="text-left hover:text-blue-600 transition-colors line-clamp-1"
-                                                        >
-                                                            {item.nombre}
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                                <td className={TD}>
-                                                    <span className={TYPE_BADGE}>{item.tipo_nombre}</span>
-                                                </td>
-                                                <td className={`${TD} normal-case`}>{item.director || '—'}</td>
-                                                <td className="px-4 py-3 align-middle text-center">
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleOpenPhones(item)}
-                                                            className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                                                            title="Teléfonos"
-                                                        >
-                                                            <Phone className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleOpenMap(item)}
-                                                            className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                                                            title="Mapa"
-                                                        >
-                                                            <MapPin className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        {canChange && (
-                                                            <button type="button" onClick={() => handleEdit(item)} className={BTN_ICON_EDIT} title="Editar">
-                                                                <Edit3 className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        )}
-                                                        {canDelete && (
-                                                            <button type="button" onClick={() => handleDelete(item.id)} className={BTN_ICON_DELETE} title="Eliminar">
-                                                                <Trash2 className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </>
-                    )}
-                </div>
-
-                {!loading && filteredData.length > 0 && totalPages > 1 && (
-                    <div className="p-3 bg-slate-50 border-t border-slate-200 shrink-0">
-                        <Pagination
-                            currentPage={currentPage}
-                            totalPages={totalPages}
-                            onPageChange={handlePageChange}
-                            totalCount={totalCount}
-                        />
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-
-export default Establishments;
+export default Establishments

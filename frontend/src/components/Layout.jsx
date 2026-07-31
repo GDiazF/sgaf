@@ -1,1288 +1,708 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { AlertTriangle, Key, KeyRound, Users, Home, ClipboardList, ChevronDown, ChevronRight, Menu, Building, LogOut, DollarSign, FileText, Phone, Printer, Truck, Cog, Activity, Shield, ShieldCheck, ShieldAlert, ShoppingCart, Calendar, FileStack, MonitorSmartphone, Chrome, Box, Globe, UserCircle2, Settings, History, Info, Bell, Trash2, Check, X, TrendingUp, Heart, Mail, HelpCircle, MessageSquare, RefreshCw } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { useAuth } from '../context/AuthContext';
-import { usePermission } from '../hooks/usePermission';
-import api from '../api';
-import UserProfileModal from './auth/UserProfileModal';
-import AboutModal from './common/AboutModal';
-import { APP_VERSION } from '../version';
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import {
+  AppShell,
+  NavItem,
+  NavAccordion,
+  Topbar,
+  NotificationBell,
+  Button,
+  Modal,
+  Icon,
+  Dropdown,
+  DropdownMenu,
+  DropdownItem,
+  DropdownDivider,
+  Avatar,
+  useAppShell,
+} from '@slep/ui'
+import { useAuth } from '../context/AuthContext'
+import { usePermission } from '../hooks/usePermission'
+import api from '../api'
+import UserProfileModal from './auth/UserProfileModal'
+import AboutModal from './common/AboutModal'
+import { APP_VERSION } from '../version'
+
+/** Rutas hermanas bajo /contracts que no deben marcar "Contratos" como activo. */
+const CONTRACTS_SIBLING = new Set(['servicios', 'ruta', 'periodo'])
+
+function isContractsNavActive({ pathname }) {
+  if (pathname === '/contracts') return true
+  if (!pathname.startsWith('/contracts/')) return false
+  const segment = pathname.split('/')[2]
+  return Boolean(segment) && !CONTRACTS_SIBLING.has(segment)
+}
+
+function ShellTopbar({
+  notifications,
+  user,
+  userMenu,
+}) {
+  const shell = useAppShell()
+  return (
+    <Topbar
+      onOpenDrawer={() => shell?.setDrawerOpen?.((open) => !open)}
+      drawerOpen={!!shell?.drawerOpen}
+      notifications={notifications}
+      user={user}
+      userMenu={userMenu}
+    />
+  )
+}
 
 const Layout = () => {
-    const navigate = useNavigate();
-    const toDateStr = d => {
-        if (!(d instanceof Date)) d = new Date(d);
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-    const location = useLocation();
-    const { user, logout, checkUserStatus } = useAuth();
-    const { can, hasRole } = usePermission();
-    const [sidebarOpen, setSidebarOpen] = useState(true); // Desktop: Collapsed/Expanded
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // Mobile: Open/Closed
-    const [activeMainGroup, setActiveMainGroup] = useState(null); // 'ssgg', 'tesoreria', 'mp'
-    const [activeSubMenu, setActiveSubMenu] = useState(null); // 'services' or 'loans'
-    const [isProfileOpen, setIsProfileOpen] = useState(false); // Header profile dropdown
-    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-    const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
-    const [isOnline, setIsOnline] = useState(true); // Backend status
-    const [pendingReservas, setPendingReservas] = useState([]);
-    const [notifications, setNotifications] = useState([]);
-    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-    const profileRef = useRef(null);
-    const notificationsRef = useRef(null);
-    const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-    const [acceptLoading, setAcceptLoading] = useState(false);
-    const [termsAcceptedCheckbox, setTermsAcceptedCheckbox] = useState(false);
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { user, logout, checkUserStatus } = useAuth()
+  const { can } = usePermission()
 
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
+  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false)
+  const [isOnline, setIsOnline] = useState(true)
+  const [pendingReservas, setPendingReservas] = useState([])
+  const [notifications, setNotifications] = useState([])
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [acceptLoading, setAcceptLoading] = useState(false)
+  const [termsAcceptedCheckbox, setTermsAcceptedCheckbox] = useState(false)
+  const profileRef = useRef(null)
+  const notificationsRef = useRef(null)
 
-    const isActive = (path) => location.pathname === path;
+  const displayName =
+    user?.funcionario_data?.nombre_funcionario || user?.username || 'Usuario'
+  const roleLabel = user?.is_superuser
+    ? 'Super Administrador'
+    : user?.groups?.[0] || 'Usuario Sistema'
 
-    // Track window resize for responsive sidebar
-    useEffect(() => {
-        const handleResize = () => {
-            const width = window.innerWidth;
-            setWindowWidth(width);
-            // Si la resolución es menor o igual a 1366px hide sidebar by default
-            if (width <= 1366) {
-                setSidebarOpen(false);
-            } else {
-                setSidebarOpen(true);
-            }
-        };
-
-        window.addEventListener('resize', handleResize);
-        // Initial setup
-        handleResize();
-
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    // Auto-expand submenus based on path
-    useEffect(() => {
-        const path = location.pathname;
-
-        // Reset if at root
-        if (path === '/') return;
-
-        // SSGG Group
-        const ssggPaths = [
-            '/services', '/contracts', '/telecomunicaciones', '/vehiculos', 
-            '/personal-ti', '/insights', 
-            '/keys', '/loans', '/history'
-        ];
-        
-        if (ssggPaths.some(p => path.startsWith(p))) {
-            setActiveMainGroup('ssgg');
-            if (path.startsWith('/contracts')) setActiveSubMenu('contratos');
-            else if (path.startsWith('/services')) setActiveSubMenu('services');
-            else if (path.startsWith('/vehiculos')) setActiveSubMenu('vehiculos');
-            else if (path.startsWith('/loans') || path.startsWith('/keys') || path.startsWith('/history')) setActiveSubMenu('loans');
-        } 
-        else if (path.startsWith('/tesoreria')) {
-            setActiveMainGroup('tesoreria');
-        } 
-        else if (path.startsWith('/orden-compra') || path.startsWith('/licitaciones')) {
-            setActiveMainGroup('mp');
-        } 
-        else if (path.startsWith('/bienestar')) {
-            setActiveMainGroup('bienestar');
-        }
-
-        setMobileMenuOpen(false);
-        if (location.state?.setup_mfa) {
-            setIsProfileModalOpen(true);
-        }
-        if (windowWidth <= 1366) {
-            setSidebarOpen(false);
-        }
-    }, [location.pathname, location.state, windowWidth]);
-
-    // Block scroll when mobile menu is open
-    useEffect(() => {
-        if (mobileMenuOpen) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = 'unset';
-        }
-        return () => {
-            document.body.style.overflow = 'unset';
-        };
-    }, [mobileMenuOpen]);
-
-    // Handle clicks outside profile dropdown or notifications
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (profileRef.current && !profileRef.current.contains(event.target)) {
-                setIsProfileOpen(false);
-            }
-            if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
-                setIsNotificationsOpen(false);
-            }
-        };
-        if (isProfileOpen || isNotificationsOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        } else {
-            document.removeEventListener('mousedown', handleClickOutside);
-        }
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isProfileOpen, isNotificationsOpen]);
-
-    // Update document title based on route
     useEffect(() => {
         const routeTitles = {
-            '/': 'Dashboard',
+      '/': 'Inicio',
             '/establishments': 'Establecimientos',
             '/funcionarios': 'Funcionarios',
-            '/reservas-externas': 'Reservas Externas',
-            '/contracts': 'Compras',
-            '/services/providers': 'Proveedores',
-            '/services/adquisiciones': 'Factura sin OC',
-            '/services': 'Gestión de Rutas',
-            '/services/payments': 'Pagos de Contratos',
-            '/services/reporte-consumos': 'Reporte Consumos',
-            '/services/rc': 'Recepciones de Contratos',
-            '/services/cdp': 'CDPs',
-            '/telecomunicaciones': 'Teléfonos',
-            '/impresoras': 'Impresoras',
-            '/vehiculos': 'Vehículos',
-            '/loans': 'Panel de Activos',
-            '/keys': 'Inventario Activos',
-            '/tesoreria': 'Tesorería',
-            '/orden-compra': 'Visor OC',
-            '/licitaciones': 'Visor Licitaciones',
             '/reservas': 'Reservas',
-            '/personal-ti': 'Personal TI',
+      '/tickets': 'Mesa de Ayuda',
             '/procedimientos': 'Procedimientos',
-            '/admin/audit-log': 'Auditoría de Sistema',
-            '/admin/personalizacion/login/backgrounds': 'Personalización'
-        };
+      '/ciberseguridad': 'Ciberseguridad',
+      '/mercado-publico': 'Mercado Público',
+      '/tesoreria': 'Remuneraciones',
+      '/bienestar': 'Bienestar',
+    }
+    const baseTitle = 'SGAF - SLEP Iquique'
+    const pageTitle = routeTitles[location.pathname] || ''
+    document.title = pageTitle ? `${pageTitle} | ${baseTitle}` : baseTitle
+  }, [location.pathname])
 
-        const baseTitle = 'SGAF - SLEP Iquique';
-        const pageTitle = routeTitles[location.pathname] || '';
-        document.title = pageTitle ? `${pageTitle} | ${baseTitle}` : baseTitle;
-    }, [location.pathname]);
+  useEffect(() => {
+    if (location.state?.setup_mfa) setIsProfileModalOpen(true)
+  }, [location.state])
 
-    // Check pending reservations for notifications
     useEffect(() => {
-        const canApprove = user?.is_superuser || (user?.user_permissions && user.user_permissions.includes('solicitudes_reservas.change_solicitudreserva'));
-        if (!canApprove) return;
+    const canApprove =
+      user?.is_superuser ||
+      user?.user_permissions?.includes('solicitudes_reservas.change_solicitudreserva')
+    if (!canApprove) return undefined
 
         const fetchPending = async () => {
             try {
-                const res = await api.get('reservas/solicitudes/', { params: { estado: 'PENDIENTE' } });
-                setPendingReservas(res.data.results || res.data || []);
-            } catch (error) {
-                console.warn('Error fetching pending reservations for notifications');
-            }
-        };
-
-        fetchPending();
-        const interval = setInterval(fetchPending, 60000); // Check every minute
-
-        // Listen for manual refreshes (e.g. from ReservasDashboard)
-        const handleRefresh = () => fetchPending();
-        window.addEventListener('refresh-notifications', handleRefresh);
-
+        const res = await api.get('reservas/solicitudes/', { params: { estado: 'PENDIENTE' } })
+        setPendingReservas(res.data.results || res.data || [])
+      } catch {
+        /* ignore */
+      }
+    }
+    fetchPending()
+    const interval = setInterval(fetchPending, 60000)
+    const handleRefresh = () => fetchPending()
+    window.addEventListener('refresh-notifications', handleRefresh)
         return () => {
-            clearInterval(interval);
-            window.removeEventListener('refresh-notifications', handleRefresh);
-        };
-    }, [user]);
-    
-    // Check general notifications
+      clearInterval(interval)
+      window.removeEventListener('refresh-notifications', handleRefresh)
+    }
+  }, [user])
+
     useEffect(() => {
-        if (!user) return;
-        
+    if (!user) return undefined
         const fetchNotifications = async () => {
             try {
-                const res = await api.get('notificaciones/');
-                let fetchedNotifs = res.data.results || res.data || [];
-                
-                // Si el usuario ya está en la página del ticket, marcamos esas notificaciones como leídas automáticamente
-                const currentPath = location.pathname;
-                const matchNotifs = fetchedNotifs.filter(n => !n.leida && n.link === currentPath);
-                
-                if (matchNotifs.length > 0) {
-                    await Promise.all(matchNotifs.map(n => api.post(`notificaciones/${n.id}/marcar_leida/`)));
-                    // Actualizamos localmente para no esperar al siguiente fetch
-                    fetchedNotifs = fetchedNotifs.map(n => n.link === currentPath ? {...n, leida: true} : n);
-                }
-                
-                setNotifications(fetchedNotifs);
-            } catch (error) {
-                console.warn('Error fetching general notifications');
-            }
-        };
+        const res = await api.get('notificaciones/')
+        let fetched = res.data.results || res.data || []
+        const match = fetched.filter((n) => !n.leida && n.link === location.pathname)
+        if (match.length) {
+          await Promise.all(match.map((n) => api.post(`notificaciones/${n.id}/marcar_leida/`)))
+          fetched = fetched.map((n) =>
+            n.link === location.pathname ? { ...n, leida: true } : n,
+          )
+        }
+        setNotifications(fetched)
+      } catch {
+        /* ignore */
+      }
+    }
+    fetchNotifications()
+    const interval = setInterval(fetchNotifications, 30000)
+    return () => clearInterval(interval)
+  }, [user, location.pathname])
 
-        fetchNotifications();
-        const interval = setInterval(fetchNotifications, 30000); // Check every 30s
-        return () => clearInterval(interval);
-    }, [user, location.pathname]);
-
-    // Check backend status
     useEffect(() => {
         const checkStatus = async () => {
             try {
-                // Hacemos una petición simple al endpoint de establecimientos que ya está configurado
-                // 'api' ya inyecta el token automáticamente si existe
-                await api.get('establecimientos/', {
-                    params: { limit: 1 }, // Minimizar carga
-                    timeout: 5000
-                });
-                setIsOnline(true);
+        await api.get('establecimientos/', { params: { limit: 1 }, timeout: 5000 })
+        setIsOnline(true)
             } catch (error) {
-                // Si el error es 401 sigue estando "En Línea" (el servidor respondió)
-                // Si el error es de red o timeout, está "Fuera de Línea"
-                if (error.response) {
-                    setIsOnline(true); // El servidor respondió (aunque sea con error de auth)
-                } else {
-                    setIsOnline(false); // No hubo respuesta del servidor
+        setIsOnline(Boolean(error.response))
+      }
+    }
+    checkStatus()
+    const interval = setInterval(checkStatus, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    const onClick = (event) => {
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setIsProfileOpen(false)
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        setIsNotificationsOpen(false)
+      }
+    }
+    if (isProfileOpen || isNotificationsOpen) {
+      document.addEventListener('mousedown', onClick)
+    }
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [isProfileOpen, isNotificationsOpen])
+
+  // Tablet/móvil: anclar panel a la campana (posición fixed + backdrop)
+  useEffect(() => {
+    const isCompact = () => window.matchMedia('(max-width: 1023px)').matches
+    const trigger = notificationsRef.current?.querySelector('[data-notif-trigger]')
+    const panel = trigger?.querySelector('.notif-panel')
+    const btn = trigger?.querySelector('[data-notif-btn]')
+
+    const clearPosition = () => {
+      if (!panel) return
+      panel.style.top = ''
+      panel.style.left = ''
+      panel.style.right = ''
+      panel.style.bottom = ''
+      panel.style.width = ''
+      panel.style.maxWidth = ''
+      panel.style.maxHeight = ''
+    }
+
+    const positionPanel = () => {
+      if (!trigger || !panel || !btn || !isCompact()) {
+        clearPosition()
+        return
+      }
+      const rect = btn.getBoundingClientRect()
+      const gap = 8
+      const edge = 12
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      const panelWidth = Math.min(360, vw - edge * 2)
+      const preferredHeight = Math.min(vh * 0.65, 440)
+
+      let top = rect.bottom + gap
+      let left = rect.right - panelWidth
+      if (left < edge) left = edge
+      if (left + panelWidth > vw - edge) left = Math.max(edge, vw - edge - panelWidth)
+
+      const spaceBelow = vh - rect.bottom - gap - edge
+      const spaceAbove = rect.top - gap - edge
+      if (spaceBelow < 200 && spaceAbove > spaceBelow) {
+        const height = Math.min(preferredHeight, spaceAbove)
+        top = Math.max(edge, rect.top - gap - height)
+        panel.style.maxHeight = `${height}px`
+      } else {
+        panel.style.maxHeight = `${Math.min(preferredHeight, Math.max(180, spaceBelow))}px`
+      }
+
+      panel.style.top = `${Math.round(top)}px`
+      panel.style.left = `${Math.round(left)}px`
+      panel.style.right = 'auto'
+      panel.style.bottom = 'auto'
+      panel.style.width = `${Math.round(panelWidth)}px`
+    }
+
+    if (!isNotificationsOpen) {
+      document.body.classList.remove('is-notif-open')
+      clearPosition()
+      return undefined
+    }
+
+    if (isCompact()) {
+      document.body.classList.add('is-notif-open')
+      requestAnimationFrame(positionPanel)
+      window.addEventListener('resize', positionPanel)
+      window.addEventListener('scroll', positionPanel, true)
+      return () => {
+        document.body.classList.remove('is-notif-open')
+        clearPosition()
+        window.removeEventListener('resize', positionPanel)
+        window.removeEventListener('scroll', positionPanel, true)
+      }
+    }
+
+    document.body.classList.remove('is-notif-open')
+    clearPosition()
+    return undefined
+  }, [isNotificationsOpen])
+
+  const unreadCount = useMemo(
+    () =>
+      (notifications.filter((n) => !n.leida).length || 0) +
+      (pendingReservas.length || 0),
+    [notifications, pendingReservas],
+  )
+
+  const showSsgg =
+    can('contratos.view_contrato') ||
+    can('contratos.view_rutatransporte') ||
+    can('servicios.view_proveedor') ||
+    can('servicios.view_facturaadquisicion') ||
+    can('servicios.view_servicio') ||
+    can('servicios.view_registropago') ||
+    can('servicios.view_recepcionconforme') ||
+    can('servicios.view_cdp')
+
+  const showOperaciones =
+    can('funcionarios.view_funcionario') ||
+    can('vehiculos.view_registromensual') ||
+    can('servicios.view_servicio') ||
+    can('prestamo_llaves.view_prestamo') ||
+    can('prestamo_llaves.view_activo')
+
+  const showSoporteTi =
+    can('personal_ti.view_personalti') ||
+    can('insights.view_dashboardmetric') ||
+    can('core.view_breachreport') ||
+    can('core.view_ciberseguridadplan') ||
+    can('core.view_ciberseguridadcapacitacion')
+
+  const showTesoreria = can('remuneraciones.view_remuneracion')
+  const showMp = can('orden_compra.view_ordencompramp') || can('licitaciones.view_licitacionmp')
+  const showEjecutivos =
+    can('ejecutivos.add_gestionestablecimiento') ||
+    can('ejecutivos.view_gestionestablecimiento') ||
+    user?.is_superuser
+  const showBienestar = can('bienestar.view_beneficio')
+
+  return (
+    <>
+      <div
+        className="notif-backdrop"
+        hidden={!isNotificationsOpen}
+        aria-hidden={!isNotificationsOpen}
+        onClick={() => setIsNotificationsOpen(false)}
+      />
+      {user && user.acepto_terminos === false && (
+        <Modal
+          open
+          onClose={() => {}}
+          title="Tratamiento y Protección de Datos Personales"
+          footer={
+            <Button
+              variant="primary"
+              disabled={!termsAcceptedCheckbox || acceptLoading}
+              onClick={async () => {
+                setAcceptLoading(true)
+                try {
+                  await api.post('auth/me/aceptar-terminos/')
+                  await checkUserStatus()
+                } catch (err) {
+                  console.error(err)
+                } finally {
+                  setAcceptLoading(false)
                 }
-            }
-        };
-
-        checkStatus();
-        const interval = setInterval(checkStatus, 30000); // Check every 30s
-        return () => clearInterval(interval);
-    }, []);
-
-    return (
-        <div className="h-screen bg-slate-50 flex font-sans text-slate-800 overflow-hidden">
-            {user && user.acepto_terminos === false && (
-                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col p-6 shadow-2xl text-left">
-                        {/* Title */}
-                        <div className="flex items-center gap-3 border-b border-slate-100 pb-3 flex-shrink-0">
-                            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                                <ShieldCheck className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Tratamiento y Protección de sus Datos Personales</h2>
-                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Servicio Local de Educación Pública (SLEP) Iquique</p>
-                            </div>
-                        </div>
-
-                        {/* Policy Content */}
-                        <div className="flex-1 overflow-y-auto my-4 pr-1 space-y-4 text-xs text-slate-600 font-medium">
-                            <p className="bg-blue-50/50 border border-blue-100 text-blue-700 p-3.5 rounded-2xl leading-relaxed">
-                                <strong>IMPORTANTE:</strong> En conformidad a la <strong>Ley N° 21.719</strong> sobre Protección de Datos Personales en Chile (Diario Oficial, 13-Dic-2024), requerimos informarle de manera transparente sobre el uso de su información en el sistema SGAF antes de iniciar su sesión.
-                            </p>
-
-                            <div>
-                                <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-wider mb-1">1. Finalidad y Licitud del Tratamiento</h3>
-                                <p className="leading-relaxed">
-                                    El SLEP Iquique, en su calidad de órgano de la Administración del Estado, recopila y procesa sus datos personales (RUT, nombre completo, cargo, anexo telefónico, correo institucional) exclusivamente para el cumplimiento de sus funciones legales y administrativas (ej: gestión de reservas, control de activos y préstamos de llaves). Su información no será comunicada ni cedida a terceros no autorizados.
-                                </p>
-                            </div>
-
-                            <div>
-                                <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-wider mb-1">2. Sus Derechos ARCO y Bloqueo Temporal</h3>
-                                <p className="leading-relaxed">
-                                    Usted goza plenamente de los derechos de Acceso, Rectificación, Supresión, Oposición y Portabilidad. Asimismo, tiene derecho a solicitar el <strong>Bloqueo Temporal (Art. 8° ter)</strong> de sus datos mientras se tramita una rectificación o supresión. Puede ejercerlos en cualquier momento ingresando a la sección "Mis Datos" de su perfil.
-                                </p>
-                            </div>
-
-                            <div>
-                                <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-wider mb-1">3. Vía de Reclamación</h3>
-                                <p className="leading-relaxed">
-                                    Si estima que el SLEP Iquique ha infringido sus derechos, puede interponer un reclamo de tutela ante la <strong>Agencia de Protección de Datos Personales (APDP)</strong> de conformidad al Artículo 41° de la ley.
-                                </p>
-                            </div>
-
-                            <p className="border-t border-slate-100 pt-3 text-[10px] text-slate-400 italic">
-                                Para conocer en detalle las medidas de seguridad adoptadas (como el cifrado simétrico robusto de sus claves y MFA), puede leer la Política de Privacidad completa ingresando al pie de página del sistema.
-                            </p>
-                        </div>
-
-                        {/* Acceptance Checkbox */}
-                        <div className="border-t border-slate-100 pt-4 flex flex-col gap-4 flex-shrink-0">
-                            <label className="flex items-start gap-3 cursor-pointer p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/50 transition-colors border border-slate-200">
+              }}
+            >
+              {acceptLoading ? 'Guardando…' : 'Entendido, Aceptar y Continuar'}
+            </Button>
+          }
+        >
+          <p style={{ marginBottom: 12 }}>
+            En conformidad a la Ley N° 21.719, informamos el tratamiento de datos personales en SGAF
+            antes de continuar.
+          </p>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                                 <input
                                     type="checkbox"
-                                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 mt-0.5"
                                     checked={termsAcceptedCheckbox}
                                     onChange={(e) => setTermsAcceptedCheckbox(e.target.checked)}
                                 />
-                                <div className="text-left">
-                                    <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider block">Declaro estar informado</span>
-                                    <span className="text-[9px] text-slate-400 font-bold leading-normal block mt-0.5">Confirmo que he leído y comprendo cómo se tratan mis datos y las medidas de seguridad del SGAF en cumplimiento con la Ley N° 21.719.</span>
-                                </div>
+            <span>Declaro estar informado sobre el tratamiento de mis datos.</span>
                             </label>
+        </Modal>
+      )}
 
-                            <button
-                                onClick={async () => {
-                                    setAcceptLoading(true);
-                                    try {
-                                        await api.post('auth/me/aceptar-terminos/');
-                                        await checkUserStatus();
-                                    } catch (err) {
-                                        console.error("Error al aceptar términos:", err);
-                                    } finally {
-                                        setAcceptLoading(false);
-                                    }
-                                }}
-                                disabled={!termsAcceptedCheckbox || acceptLoading}
-                                className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs uppercase font-black tracking-widest transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-                            >
-                                {acceptLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Entendido, Aceptar y Continuar"}
-                            </button>
-                        </div>
+      <AppShell
+        brand={{
+          dept: 'SGAF',
+          sub: 'SLEP Iquique',
+          logoSrc: '/assets/logo-gear.svg',
+        }}
+        footer={
+          <div style={{ fontSize: 11, color: 'var(--sidebar-muted)' }}>
+            <div>{isOnline ? 'En línea' : 'Sincronizando'} · v{APP_VERSION}</div>
+            <a href="/legal" target="_blank" rel="noreferrer">
+              Marco Legal
+            </a>
+          </div>
+        }
+        topbar={
+          <ShellTopbar
+            notifications={
+              <div ref={notificationsRef} className="topbar__notifications">
+                <NotificationBell
+                  count={unreadCount}
+                  open={isNotificationsOpen}
+                  onToggle={() => setIsNotificationsOpen((v) => !v)}
+                >
+                  <div className="notif-panel__header">
+                    <span className="notif-panel__title">Notificaciones</span>
+                    <div className="notif-panel__header-actions">
+                      <button
+                        type="button"
+                        className="notif-panel__close"
+                        aria-label="Cerrar notificaciones"
+                        onClick={() => setIsNotificationsOpen(false)}
+                      >
+                        <Icon name="close" size={16} />
+                      </button>
                     </div>
-                </div>
-            )}
-            {/* Mobile Overlay */}
-            <AnimatePresence>
-                {mobileMenuOpen && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[60] md:hidden"
-                    />
-                )}
-            </AnimatePresence>
-
-            {/* Sidebar */}
-            <motion.aside
-                initial={false}
-                animate={{
-                    width: sidebarOpen || mobileMenuOpen ? '16rem' : '0',
-                    x: mobileMenuOpen || (sidebarOpen && windowWidth >= 768) ? 0 : (windowWidth < 768 ? '-16rem' : 0),
-                    opacity: sidebarOpen || mobileMenuOpen || windowWidth >= 768 ? 1 : 0
-                }}
-                transition={{
-                    type: 'spring',
-                    stiffness: 260,
-                    damping: 24,
-                    mass: 0.8
-                }}
-                className={`
-                    fixed md:relative inset-y-0 left-0 z-[100] md:z-40 bg-slate-900 text-slate-200 flex flex-col shadow-2xl overflow-hidden h-full
-                    ${!mobileMenuOpen && windowWidth < 768 ? '-translate-x-full' : ''}
-                `}
-            >
-                <div className={`p-4 flex items-center justify-center ${windowWidth <= 1366 ? 'h-20' : 'h-28'} overflow-hidden`}>
-                    <motion.div
-                        initial={false}
-                        animate={{
-                            opacity: sidebarOpen || mobileMenuOpen ? 1 : 0,
-                            scale: sidebarOpen || mobileMenuOpen ? 1 : 0.8,
-                            y: sidebarOpen || mobileMenuOpen ? 0 : -10
-                        }}
-                        transition={{ duration: 0.3 }}
-                        className="flex flex-col items-center w-[200px]"
-                    >
-                        <div className="w-48 h-20 flex items-center justify-center">
-                            <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
-                        </div>
-                    </motion.div>
-                </div>
-
-                <nav className="flex-1 px-3 space-y-1 py-1 overflow-y-auto overflow-x-hidden sidebar-scrollbar">
-                    {/* Section: BASE (Outside SSGG) */}
-                    <Link
-                        to="/"
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                    >
-                        <Home className="w-5 h-5 flex-shrink-0" />
-                        <motion.span
-                            initial={false}
-                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                            className="font-medium whitespace-nowrap"
-                        >
-                            Dashboard
-                        </motion.span>
-                    </Link>
-
-                    <Link
-                        to="/tickets"
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${location.pathname.startsWith('/tickets') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                    >
-                        <HelpCircle className="w-5 h-5 flex-shrink-0" />
-                        <motion.span
-                            initial={false}
-                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                            className="font-medium whitespace-nowrap"
-                        >
-                            Mesa de Ayuda
-                        </motion.span>
-                    </Link>
-
-                    {can('establecimientos.view_establecimiento') && (
-                        <Link
-                            to="/establishments"
-                            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/establishments') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                        >
-                            <Building className="w-5 h-5 flex-shrink-0" />
-                            <motion.span
-                                initial={false}
-                                animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                                className="font-medium whitespace-nowrap"
-                            >
-                                Establecimientos
-                            </motion.span>
-                        </Link>
-                    )}
-
-                    {can('funcionarios.view_funcionario') && (
-                        <Link
-                            to="/funcionarios"
-                            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/funcionarios') || isActive('/funcionarios/list') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                        >
-                            <Users className="w-5 h-5 flex-shrink-0" />
-                            <motion.span
-                                initial={false}
-                                animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                                className="font-medium whitespace-nowrap"
-                            >
-                                Funcionarios
-                            </motion.span>
-                        </Link>
-                    )}
-
-
-
-                    {(can('solicitudes_reservas.view_solicitudreserva') || can('solicitudes_reservas.can_view_calendar')) && (
-                        <Link
-                            to="/reservas"
-                            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/reservas') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                        >
-                            <Calendar className="w-5 h-5 flex-shrink-0" />
-                            <motion.span
-                                initial={false}
-                                animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                                className="font-medium whitespace-nowrap"
-                            >
-                                Reservas
-                            </motion.span>
-                        </Link>
-                    )}
-
-                    <Link
-                        to="/procedimientos"
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/procedimientos') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                    >
-                        <FileStack className="w-5 h-5 flex-shrink-0" />
-                        <motion.span
-                            initial={false}
-                            animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                            className="font-medium whitespace-nowrap"
-                        >
-                            Procedimientos
-                        </motion.span>
-                    </Link>
-
-                    {(can('establecimientos.view_establecimiento') || can('funcionarios.view_funcionario')) && (
-                        <div className="py-2 px-4">
-                            <div className="border-t border-slate-700/50" />
-                        </div>
-                    )}
-
-
-                    {/* Ciberseguridad */}
-                    {(can('core.view_breachreport') || can('core.view_ciberseguridadplan') || can('core.view_ciberseguridadcapacitacion')) && (
-                        <Link
-                            to="/ciberseguridad"
-                            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group text-sm ${isActive('/ciberseguridad') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                        >
-                            <ShieldCheck className="w-5 h-5 flex-shrink-0" />
-                            <motion.span
-                                initial={false}
-                                animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                                className="font-medium whitespace-nowrap"
-                            >
-                                Ciberseguridad
-                            </motion.span>
-                        </Link>
-                    )}
-
-                    {/* Main SSGG Submenu */}
-                    {(can('contratos.view_contrato') || can('servicios.view_proveedor') || can('servicios.view_facturaadquisicion') || can('prestamo_llaves.view_prestamo') || can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('servicios.view_servicio') || can('servicios.view_registropago') || can('servicios.view_recepcionconforme') || can('servicios.view_cdp')) && (
-                        <div>
+                  </div>
+                  {!pendingReservas.length && !notifications.length ? (
+                    <p className="notif-panel__empty">Sin notificaciones</p>
+                  ) : (
+                    <ul className="notif-panel__list">
+                      {pendingReservas.map((res) => {
+                        const start = new Date(res.fecha_inicio)
+                        const dateKey = Number.isNaN(start.getTime())
+                          ? ''
+                          : `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`
+                        const dateLabel = Number.isNaN(start.getTime())
+                          ? ''
+                          : start.toLocaleDateString('es-CL', {
+                              weekday: 'short',
+                              day: 'numeric',
+                              month: 'short',
+                            })
+                        const timeLabel = Number.isNaN(start.getTime())
+                          ? ''
+                          : start.toLocaleTimeString('es-CL', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false,
+                            })
+                        const desc = [
+                          res.nombre_funcionario || 'Solicitante',
+                          timeLabel,
+                          res.recurso_nombre,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')
+                        return (
+                          <li key={`res-${res.id}`}>
                             <button
-                                onClick={() => {
-                                    setActiveMainGroup(activeMainGroup === 'ssgg' ? null : 'ssgg');
-                                    setActiveSubMenu(null);
-                                }}
-                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'ssgg' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
+                              type="button"
+                              className="notif-panel__item is-unread"
+                              onClick={() => {
+                                setIsNotificationsOpen(false)
+                                navigate(
+                                  dateKey
+                                    ? `/reservas?date=${dateKey}&highlight=${res.id}`
+                                    : `/reservas?highlight=${res.id}`,
+                                )
+                              }}
                             >
-                                <div className="flex items-center gap-3">
-                                    <Cog className="w-5 h-5 flex-shrink-0" />
-                                    <motion.span
-                                        initial={false}
-                                        animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                                        className="font-medium whitespace-nowrap"
-                                    >
-                                        SSGG
-                                    </motion.span>
+                              <span className="notif-panel__item-body">
+                                <div className="notif-panel__item-title">
+                                  Reserva: {res.titulo || 'Sin título'}
                                 </div>
-                                <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
-                                    {activeMainGroup === 'ssgg' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                                </motion.div>
+                                <div className="notif-panel__item-desc">{desc}</div>
+                              </span>
+                              {dateLabel ? (
+                                <span className="notif-panel__item-time">{dateLabel}</span>
+                              ) : null}
                             </button>
-
-                            <AnimatePresence>
-                                {activeMainGroup === 'ssgg' && (sidebarOpen || mobileMenuOpen) && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: "auto", opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        className="overflow-hidden space-y-3 mt-2 pl-2 border-l border-slate-700/50 ml-6"
-                                    >
-                                        {/* Section: FINANZAS */}
-                                        {(can('contratos.view_contrato') || can('servicios.view_proveedor') || can('servicios.view_facturaadquisicion') || can('servicios.view_servicio') || can('servicios.view_registropago') || can('servicios.view_recepcionconforme') || can('servicios.view_cdp')) && (
-                                            <div className="space-y-0.5">
-                                                <div className="px-4 mb-1">
-                                                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Finanzas</span>
-                                                </div>
-                                                {can('contratos.view_contrato') && (
-                                                    <div>
-                                                        <button 
-                                                            onClick={() => setActiveSubMenu(activeSubMenu === 'contratos' ? null : 'contratos')} 
-                                                            className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'contratos' || isActive('/contracts') || isActive('/contracts/servicios') ? 'text-blue-400' : ''}`}
-                                                        >
-                                                            <div className="flex items-center gap-3">
-                                                                <FileText className="w-4 h-4 flex-shrink-0" />
-                                                                <span className="font-medium whitespace-nowrap">Compras</span>
-                                                            </div>
-                                                            {activeSubMenu === 'contratos' ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                                                        </button>
-                                                        {activeSubMenu === 'contratos' && (
-                                                            <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
-                                                                <Link to="/contracts" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/contracts') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
-                                                                    Contratos
-                                                                </Link>
-                                                                {can('contratos.view_rutatransporte') && (
-                                                                    <Link to="/contracts/servicios" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/contracts/servicios') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
-                                                                        Gestión de Rutas
-                                                                    </Link>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                                {can('servicios.view_proveedor') && (
-                                                    <Link to="/services/providers" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/services/providers') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                                                        <Users className="w-4 h-4 flex-shrink-0" />
-                                                        <span className="font-medium whitespace-nowrap">Proveedores</span>
-                                                    </Link>
-                                                )}
-                                                {can('servicios.view_facturaadquisicion') && (
-                                                    <Link to="/services/adquisiciones" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/services/adquisiciones') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                                                        <DollarSign className="w-4 h-4 flex-shrink-0" />
-                                                        <span className="font-medium whitespace-nowrap">Factura sin OC</span>
-                                                    </Link>
-                                                )}
-                                                {/* Servicios Submenu */}
-                                                {(can('servicios.view_servicio') || can('servicios.view_registropago') || can('servicios.view_recepcionconforme') || can('servicios.view_cdp')) && (
-                                                    <div>
-                                                        <button onClick={() => setActiveSubMenu(activeSubMenu === 'services' ? null : 'services')} className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'services' || (isActive('/services') || isActive('/services/payments') || isActive('/services/rc') || isActive('/services/cdp')) ? 'text-blue-400' : ''}`}>
-                                                            <div className="flex items-center gap-3">
-                                                                <ClipboardList className="w-4 h-4 flex-shrink-0" />
-                                                                <span className="font-medium whitespace-nowrap">Servicios Básicos</span>
-                                                            </div>
-                                                            {activeSubMenu === 'services' ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                                                        </button>
-                                                        {activeSubMenu === 'services' && (
-                                                            <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
-                                                                {can('servicios.view_servicio') && <Link to="/services" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Panel Operativo</Link>}
-                                                                {can('servicios.view_registropago') && (
-                                                                    <Link to="/services/payments" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/payments') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Pagos</Link>
-                                                                )}
-                                                                {can('servicios.view_recepcionconforme') && <Link to="/services/rc" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/rc') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Recepciones</Link>}
-                                                                {can('servicios.view_cdp') && <Link to="/services/cdp" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/cdp') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>CDPs</Link>}
-                                                                {can('servicios.view_registropago') && (
-                                                                    <Link to="/services/reporte-consumos" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/services/reporte-consumos') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>Reporte Consumos</Link>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* Section: RECURSOS */}
-                                        {(can('servicios.view_servicio') || can('impresoras.view_printer') || can('vehiculos.view_registromensual') || can('personal_ti.view_personalti') || can('insights.view_dashboardmetric')) && (
-                                            <div className="space-y-0.5 pt-2">
-                                                <div className="px-4 mb-1">
-                                                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Recursos</span>
-                                                </div>
-                                                {can('servicios.view_servicio') && (
-                                                    <Link to="/telecomunicaciones" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/telecomunicaciones') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                                                        <Phone className="w-4 h-4 flex-shrink-0" />
-                                                        <span className="font-medium whitespace-nowrap">Teléfonos</span>
-                                                    </Link>
-                                                )}
-
-                                                {can('vehiculos.view_registromensual') && (
-                                                    <div>
-                                                        <button 
-                                                            onClick={() => setActiveSubMenu(activeSubMenu === 'vehiculos' ? null : 'vehiculos')} 
-                                                            className={`w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeSubMenu === 'vehiculos' || (isActive('/vehiculos') || isActive('/vehiculos/flota')) ? 'text-blue-400' : ''}`}
-                                                        >
-                                                            <div className="flex items-center gap-3">
-                                                                <Truck className="w-4 h-4 flex-shrink-0" />
-                                                                <span className="font-medium whitespace-nowrap">Vehículos</span>
-                                                            </div>
-                                                            {activeSubMenu === 'vehiculos' ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                                                        </button>
-                                                        {activeSubMenu === 'vehiculos' && (
-                                                            <div className="pl-6 mt-1 space-y-1 border-l border-slate-700/30 ml-2">
-                                                                <Link to="/vehiculos" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/vehiculos') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
-                                                                    Control Gastos
-                                                                </Link>
-                                                                <Link to="/vehiculos/flota" className={`flex items-center gap-3 px-4 py-1.5 rounded-lg text-xs transition-colors ${isActive('/vehiculos/flota') ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-white'}`}>
-                                                                    Gestión Flota
-                                                                </Link>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-
-                                                {can('personal_ti.view_personalti') && (
-                                                    <Link to="/personal-ti" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/personal-ti') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                                                        <MonitorSmartphone className="w-4 h-4 flex-shrink-0" />
-                                                        <span className="font-medium whitespace-nowrap">Personal TI</span>
-                                                    </Link>
-                                                )}
-
-                                                {can('insights.view_dashboardmetric') && (
-                                                    <Link to="/insights" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/insights') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                                                        <TrendingUp className="w-4 h-4 flex-shrink-0" />
-                                                        <span className="font-medium whitespace-nowrap">Indicadores</span>
-                                                    </Link>
-                                                )}
-
-
-
-
-
-
-
-
-                                                {(can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo')) && (
-                                                    <Link
-                                                        to={can('prestamo_llaves.view_prestamo') ? "/loans" : "/keys"}
-                                                        className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/loans') || isActive('/loans/new') || isActive('/history') || isActive('/keys') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                                                    >
-                                                        <Box className="w-4 h-4 flex-shrink-0" />
-                                                        <span className="font-medium whitespace-nowrap">Préstamos</span>
-                                                    </Link>
-                                                )}
-                                            </div>
-                                        )}
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                    )}
-
-                    <div className="py-2 px-4">
-                        <div className="border-t border-slate-700/50" />
-                    </div>
-
-                    {/* Tesorería Submenu */}
-                    {can('remuneraciones.view_remuneracion') && (
-                        <div>
-                            <button
-                                onClick={() => {
-                                    setActiveMainGroup(activeMainGroup === 'tesoreria' ? null : 'tesoreria');
-                                    setActiveSubMenu(null);
-                                }}
-                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'tesoreria' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <DollarSign className="w-5 h-5 flex-shrink-0" />
-                                    <motion.span
-                                        initial={false}
-                                        animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                                        className="font-medium whitespace-nowrap"
-                                    >
-                                        Tesorería
-                                    </motion.span>
-                                </div>
-                                <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
-                                    {activeMainGroup === 'tesoreria' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                                </motion.div>
-                            </button>
-
-                            <AnimatePresence>
-                                {activeMainGroup === 'tesoreria' && (sidebarOpen || mobileMenuOpen) && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: "auto", opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        className="overflow-hidden space-y-3 mt-2 pl-2 border-l border-slate-700/50 ml-6"
-                                    >
-                                        <div className="space-y-0.5">
-                                            <Link
-                                                to="/tesoreria"
-                                                className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/tesoreria') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                                            >
-                                                <FileText className="w-4 h-4 flex-shrink-0" />
-                                                <span className="font-medium whitespace-nowrap">Remuneraciones</span>
-                                            </Link>
-                                            {can('remuneraciones.view_mapeobanco') && (
-                                                <Link
-                                                    to="/tesoreria/config"
-                                                    className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/tesoreria/config') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                                                >
-                                                    <Settings className="w-4 h-4 flex-shrink-0" />
-                                                    <span className="font-medium whitespace-nowrap">Configuración</span>
-                                                </Link>
-                                            )}
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                    )}
-
-                    <div className="py-2 px-4">
-                        <div className="border-t border-slate-700/50" />
-                    </div>
-
-                    {/* Comunicaciones Submenu */}
-                    {(can('establecimientos.view_establecimiento') || can('ejecutivos.add_gestionestablecimiento') || can('ejecutivos.view_gestionestablecimiento') || user?.is_superuser) && (
-                        <div>
-                            <button
-                                onClick={() => {
-                                    setActiveMainGroup(activeMainGroup === 'comunicaciones' ? null : 'comunicaciones');
-                                    setActiveSubMenu(null);
-                                }}
-                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'comunicaciones' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <MessageSquare className="w-5 h-5 flex-shrink-0" />
-                                    <motion.span
-                                        initial={false}
-                                        animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                                        className="font-medium whitespace-nowrap"
-                                    >
-                                        Comunicaciones
-                                    </motion.span>
-                                </div>
-                                <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
-                                    {activeMainGroup === 'comunicaciones' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                                </motion.div>
-                            </button>
-
-                            <AnimatePresence>
-                                {activeMainGroup === 'comunicaciones' && (sidebarOpen || mobileMenuOpen) && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: "auto", opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        className="overflow-hidden space-y-3 mt-2 pl-2 border-l border-slate-700/50 ml-6"
-                                    >
-                                        <div className="space-y-0.5">
-                                            {(can('ejecutivos.add_gestionestablecimiento') || can('ejecutivos.view_gestionestablecimiento') || user?.is_superuser) && (
-                                                <Link
-                                                    to="/comunicaciones/ejecutivos"
-                                                    className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/comunicaciones/ejecutivos') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                                                >
-                                                    <Users className="w-4 h-4 flex-shrink-0" />
-                                                    <span className="font-medium whitespace-nowrap">Ejecutivos</span>
-                                                </Link>
-                                            )}
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                    )}
-
-                    <div className="py-2 px-4">
-                        <div className="border-t border-slate-700/50" />
-                    </div>
-
-                    {/* Mercado Público Submenu */}
-                    {(can('orden_compra.view_ordencompramp') || can('licitaciones.view_licitacionmp')) && (
-                        <div>
-                            <button
-                                onClick={() => {
-                                    setActiveMainGroup(activeMainGroup === 'mp' ? null : 'mp');
-                                    setActiveSubMenu(null);
-                                }}
-                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'mp' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <ShoppingCart className="w-5 h-5 flex-shrink-0" />
-                                    <motion.span
-                                        initial={false}
-                                        animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                                        className="font-medium whitespace-nowrap"
-                                    >
-                                        Mercado Público
-                                    </motion.span>
-                                </div>
-                                <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
-                                    {activeMainGroup === 'mp' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                                </motion.div>
-                            </button>
-
-                            <AnimatePresence>
-                                {activeMainGroup === 'mp' && (sidebarOpen || mobileMenuOpen) && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: "auto", opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        className="overflow-hidden space-y-1 mt-2 pl-2 border-l border-slate-700/50 ml-6"
-                                    >
-                                        {can('orden_compra.view_ordencompramp') && (
-                                            <Link to="/orden-compra" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/orden-compra') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                                                <FileText className="w-4 h-4 flex-shrink-0" />
-                                                <span className="font-medium whitespace-nowrap">Visor OC</span>
-                                            </Link>
-                                        )}
-                                        {can('licitaciones.view_licitacionmp') && (
-                                            <Link to="/licitaciones" className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/licitaciones') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                                                <FileStack className="w-4 h-4 flex-shrink-0" />
-                                                <span className="font-medium whitespace-nowrap">Visor Licitaciones</span>
-                                            </Link>
-                                        )}
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                    )}
-
-                    <div className="py-2 px-4">
-                        <div className="border-t border-slate-700/50" />
-                    </div>
-
-                    {/* Grupo: Bienestar */}
-                    {can('bienestar.view_beneficio') && (
-                        <div>
-                            <button
-                                onClick={() => {
-                                    setActiveMainGroup(activeMainGroup === 'bienestar' ? null : 'bienestar');
-                                    setActiveSubMenu(null);
-                                }}
-                                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-sm ${activeMainGroup === 'bienestar' ? 'bg-slate-800/40 text-blue-400' : 'text-slate-300'}`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <Heart className="w-5 h-5 flex-shrink-0 fill-current" />
-                                    <motion.span
-                                        initial={false}
-                                        animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0, x: sidebarOpen || mobileMenuOpen ? 0 : -10 }}
-                                        className="font-medium whitespace-nowrap"
-                                    >
-                                        Bienestar
-                                    </motion.span>
-                                </div>
-                                <motion.div animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}>
-                                    {activeMainGroup === 'bienestar' ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                                </motion.div>
-                            </button>
-
-                            <AnimatePresence>
-                                {activeMainGroup === 'bienestar' && (sidebarOpen || mobileMenuOpen) && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: "auto", opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        className="overflow-hidden space-y-1 mt-2 pl-2 border-l border-slate-700/50 ml-6"
-                                    >
-                                        {can('bienestar.view_beneficio') && (
-                                            <Link
-                                                to="/bienestar/muro"
-                                                className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/bienestar/muro') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                                            >
-                                                <Globe className="w-4 h-4 flex-shrink-0" />
-                                                <span className="font-medium whitespace-nowrap">Beneficios</span>
-                                            </Link>
-                                        )}
-                                        {(can('bienestar.add_beneficio') || can('bienestar.change_beneficio')) && (
-                                            <Link
-                                                to="/bienestar"
-                                                className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-200 group text-sm ${isActive('/bienestar') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-                                            >
-                                                <Settings className="w-4 h-4 flex-shrink-0" />
-                                                <span className="font-medium whitespace-nowrap">Configuración</span>
-                                            </Link>
-                                        )}
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                    )}
-                </nav>
-
-                {/* Sidebar Footer: Server Status */}
-                < div className="mt-auto border-t border-slate-800/50 pt-4 mb-4" >
-                    <div className="flex items-center gap-3 px-4 py-2.5 w-full">
-                        <div className={`flex-shrink-0 p-1 rounded-lg transition-all duration-500 ${isOnline ? 'bg-emerald-500/10 text-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-red-500/10 text-red-500'}`}>
-                            <Activity className={`w-5 h-5 ${isOnline ? 'animate-[pulse_2s_infinite]' : ''}`} />
-                        </div>
-                        <motion.div
-                            initial={false}
-                            animate={{
-                                opacity: sidebarOpen || mobileMenuOpen ? 1 : 0,
-                                x: sidebarOpen || mobileMenuOpen ? 0 : -10
-                            }}
-                            className="overflow-hidden"
-                        >
-                            <span className={`text-[10px] font-bold uppercase tracking-[0.2em] whitespace-nowrap ${isOnline ? 'text-emerald-500' : 'text-red-500'}`}>
-                                {isOnline ? 'En Línea' : 'Sincronizando'}
-                            </span>
-                        </motion.div>
-                    </div>
-                    <motion.div
-                        initial={false}
-                        animate={{ opacity: sidebarOpen || mobileMenuOpen ? 1 : 0 }}
-                        className="px-4 mt-1 flex justify-between"
-                    >
-                        <span className="text-[10px] text-slate-600 font-medium">v{APP_VERSION}</span>
-                        <a href="/legal" target="_blank" rel="noreferrer" className="text-[10px] text-slate-600 hover:text-blue-400 font-medium hover:underline">Marco Legal</a>
-                    </motion.div>
-                </div >
-            </motion.aside >
-
-            {/* Main Content */}
-            < main className="flex-1 overflow-auto bg-slate-50 relative w-full" >
-                <header className="bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b border-slate-200 px-4 md:px-8 py-4 flex justify-between items-center gap-4">
-                    <div className="flex items-center gap-4 cursor-pointer">
-                        {/* Sidebar Toggle (Mobile & Desktop) */}
-                        <button
-                            onClick={() => {
-                                if (windowWidth >= 768) {
-                                    setSidebarOpen(!sidebarOpen);
-                                } else {
-                                    setMobileMenuOpen(true);
+                          </li>
+                        )
+                      })}
+                      {notifications.slice(0, 8).map((n) => (
+                        <li key={n.id}>
+                          <button
+                            type="button"
+                            className={`notif-panel__item${n.leida ? '' : ' is-unread'}`}
+                            onClick={async () => {
+                              if (!n.leida) {
+                                try {
+                                  await api.post(`notificaciones/${n.id}/marcar_leida/`)
+                                } catch {
+                                  /* ignore */
                                 }
+                              }
+                              setIsNotificationsOpen(false)
+                              if (n.link) navigate(n.link)
                             }}
-                            className="relative group p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all duration-300 md:ml-0 -ml-1"
-                        >
-                            <div className="w-5 h-5 flex flex-col justify-center items-center gap-1 text-slate-600">
-                                <motion.span
-                                    animate={{
-                                        width: (sidebarOpen || mobileMenuOpen) ? "100%" : "60%",
-                                        x: (sidebarOpen || mobileMenuOpen) ? 0 : -2
-                                    }}
-                                    className="h-0.5 bg-current rounded-full"
-                                />
-                                <motion.span
-                                    animate={{
-                                        width: "100%"
-                                    }}
-                                    className="h-0.5 bg-current rounded-full"
-                                />
-                                <motion.span
-                                    animate={{
-                                        width: (sidebarOpen || mobileMenuOpen) ? "100%" : "40%",
-                                        x: (sidebarOpen || mobileMenuOpen) ? 0 : -4
-                                    }}
-                                    className="h-0.5 bg-current rounded-full"
-                                />
-                            </div>
-                        </button>
-
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-lg md:text-xl font-bold text-slate-800">
-                                Sistema de Gestión
-                            </h1>
-                        </div>
+                          >
+                            <span className="notif-panel__item-body">
+                              <div className="notif-panel__item-title">
+                                {n.titulo || 'Notificación'}
+                              </div>
+                              {n.mensaje ? (
+                                <div className="notif-panel__item-desc">{n.mensaje}</div>
+                              ) : null}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </NotificationBell>
                     </div>
-
-                    <div className="flex items-center gap-4">
-                        {/* Profile Section */}
-                        <div className="relative flex items-center gap-3" ref={profileRef}>
-                            <div className="hidden md:flex flex-col items-end leading-tight">
-                                <span className="text-sm font-semibold text-slate-700">
-                                    {user?.funcionario_data?.nombre_funcionario || user?.username || 'Cargando...'}
-                                </span>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">
-                                    {user?.is_superuser ? 'Super Administrador' : (user?.groups?.[0] || 'Usuario Sistema')}
-                                </span>
-                            </div>
-
-                            <div className="relative">
-                                <button
-                                    onClick={() => setIsProfileOpen(!isProfileOpen)}
-                                    className="relative group transition-transform active:scale-95"
-                                >
-                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow overflow-hidden border-2 border-white">
-                                        {user?.avatar ? (
-                                            <img
-                                                src={user.avatar}
-                                                alt="Avatar"
-                                                className="w-full h-full object-cover"
-                                            />
-                                        ) : (
-                                            user?.username?.charAt(0).toUpperCase() || 'U'
-                                        )}
-                                    </div>
-                                </button>
-                                {/* Profile Dropdown Menu */}
-                                <AnimatePresence>
-                                    {isProfileOpen && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                            className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-50 overflow-hidden"
-                                        >
-                                            <div className="px-3 py-2 border-b border-slate-50 mb-1">
-                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cuenta</p>
-                                                <p className="text-sm font-bold text-slate-700 truncate">
-                                                    {user?.funcionario_data?.nombre_funcionario || user?.username}
-                                                </p>
-                                            </div>
-                                            <div className="py-1">
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        setIsProfileModalOpen(true);
-                                                    }}
-                                                    className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                >
-                                                    <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                        <UserCircle2 className="w-4 h-4" />
-                                                    </div>
-                                                    Mi Perfil
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        setIsAboutModalOpen(true);
-                                                    }}
-                                                    className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                >
-                                                    <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                        <Info className="w-4 h-4" />
-                                                    </div>
-                                                    Acerca del Sistema
-                                                </button>
-                                            </div>
-                                            {/* Sección: Administración */}
-                                            {(can('auth.view_group') || user?.is_superuser) && (
-                                                <div className="py-1 border-t border-slate-50">
-                                                    <Link
-                                                        to="/admin/roles"
-                                                        onClick={() => setIsProfileOpen(false)}
-                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                    >
-                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                            <Shield className="w-4 h-4" />
-                                                        </div>
-                                                        Roles y Permisos
-                                                    </Link>
-                                                    <Link
-                                                        to="/admin/users"
-                                                        onClick={() => setIsProfileOpen(false)}
-                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                    >
-                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                            <ShieldCheck className="w-4 h-4" />
-                                                        </div>
-                                                        Usuarios y Seguridad
-                                                    </Link>
-                                                    <Link
-                                                        to="/admin/audit-log"
-                                                        onClick={() => setIsProfileOpen(false)}
-                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                    >
-                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                            <History className="w-4 h-4" />
-                                                        </div>
-                                                        Auditoría de Sistema
-                                                    </Link>
-                                                    <Link
-                                                        to="/admin/arco"
-                                                        onClick={() => setIsProfileOpen(false)}
-                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                    >
-                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                            <ShieldAlert className="w-4 h-4" />
-                                                        </div>
-                                                        Derechos ARCO
-                                                    </Link>
-
-                                                    <Link
-                                                        to="/admin/personalizacion/login/backgrounds"
-                                                        onClick={() => setIsProfileOpen(false)}
-                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                    >
-                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                            <Settings className="w-4 h-4" />
-                                                        </div>
-                                                        Personalización
-                                                    </Link>
-                                                    <Link
-                                                        to="/admin/email-settings"
-                                                        onClick={() => setIsProfileOpen(false)}
-                                                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                                    >
-                                                        <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-blue-100 transition-colors">
-                                                            <Mail className="w-4 h-4" />
-                                                        </div>
-                                                        Configuración de Correo
-                                                    </Link>
-                                                </div>
-                                            )}
-                                            <button
-                                                onClick={() => {
-                                                    setIsProfileOpen(false);
-                                                    logout();
-                                                }}
-                                                className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 font-medium text-sm group"
-                                            >
-                                                <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-red-100 transition-colors">
-                                                    <LogOut className="w-4 h-4" />
-                                                </div>
-                                                Cerrar Sesión
-                                            </button>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
-                        </div>
-
-                        {/* Notifications Bell */}
-                        <div className="relative" ref={notificationsRef}>
-                            {(() => {
-                                const unreadNotifications = notifications.filter(n => !n.leida);
-                                const totalCount = pendingReservas.length + unreadNotifications.length;
-                                return (
-                                    <>
-                                        <button
-                                            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                                            className={`p-2.5 rounded-xl transition-all duration-300 relative group ${isNotificationsOpen ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                                        >
-                                            <Bell className={`w-5 h-5 ${totalCount > 0 && !isNotificationsOpen ? 'animate-[bounce_2s_infinite]' : ''}`} />
-                                            {totalCount > 0 && (
-                                                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 bg-rose-600 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white shadow-lg shadow-rose-500/40 animate-pulse-subtle">
-                                                    {totalCount}
-                                                </span>
-                                            )}
-                                        </button>
-
-                                        {/* Notifications Drawer */}
-                                        <AnimatePresence>
-                                            {isNotificationsOpen && (
-                                                <motion.div
-                                                    initial={{ opacity: 0, x: 20 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    exit={{ opacity: 0, x: 20 }}
-                                                    className="absolute right-0 mt-3 w-80 md:w-96 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-[60]"
-                                                >
-                                                    <div className="p-5 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
-                                                        <div className="flex items-center gap-2">
-                                                            <Bell className="w-4 h-4 text-blue-600" />
-                                                            <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Notificaciones</h3>
-                                                        </div>
-                                                        {totalCount > 0 && (
-                                                            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
-                                                                {totalCount} Pendientes
-                                                            </span>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="max-h-[70vh] overflow-y-auto p-2 space-y-1">
-                                                        {totalCount === 0 ? (
-                                                            <div className="p-10 text-center space-y-3">
-                                                                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto">
-                                                                    <Check className="w-6 h-6 text-slate-300" />
-                                                                </div>
-                                                                <p className="text-sm font-medium text-slate-400">Todo al día, no hay notificaciones.</p>
-                                                            </div>
-                                                        ) : (
-                                                            <>
-                                                                {/* General Notifications */}
-                                                                {unreadNotifications.map((notif) => (
-                                                                    <div 
-                                                                        key={`notif-${notif.id}`}
-                                                                        onClick={async () => {
-                                                                            try {
-                                                                                await api.post(`notificaciones/${notif.id}/marcar_leida/`);
-                                                                                setNotifications(notifications.map(n => n.id === notif.id ? {...n, leida: true} : n));
-                                                                                if (notif.link) navigate(notif.link);
-                                                                                setIsNotificationsOpen(false);
-                                                                            } catch (e) {}
-                                                                        }}
-                                                                        className="block p-3 rounded-2xl hover:bg-blue-50/50 transition-all border border-transparent hover:border-blue-100 group cursor-pointer"
-                                                                    >
-                                                                        <div className="flex gap-3">
-                                                                            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm bg-blue-600">
-                                                                                {notif.tipo === 'TICKET' ? <HelpCircle className="w-5 h-5" /> : <Info className="w-5 h-5" />}
-                                                                            </div>
-                                                                            <div className="min-w-0 flex-1">
-                                                                                <div className="flex justify-between items-start">
-                                                                                    <p className="text-xs font-black text-slate-800 uppercase tracking-tighter truncate">{notif.titulo}</p>
-                                                                                    <span className="text-[9px] font-bold text-slate-400">{new Date(notif.fecha_creacion).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-                                                                                </div>
-                                                                                <p className="text-[11px] font-medium text-slate-500 line-clamp-2 mt-0.5">{notif.mensaje}</p>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-
-                                                                {/* Reservations */}
-                                                                {pendingReservas.map((res) => (
-                                                                    <Link
-                                                                        key={`res-${res.id}`}
-                                                                        to={`/reservas?date=${toDateStr(res.fecha_inicio)}&highlight=${res.id}`}
-                                                                        onClick={() => setIsNotificationsOpen(false)}
-                                                                        className="block p-3 rounded-2xl hover:bg-blue-50/50 transition-all border border-transparent hover:border-blue-100 group"
-                                                                    >
-                                                                        <div className="flex gap-3">
-                                                                            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shrink-0 shadow-sm">
-                                                                                <Truck className="w-5 h-5" />
-                                                                            </div>
-                                                                            <div className="min-w-0 flex-1">
-                                                                                <div className="flex justify-between items-start">
-                                                                                    <p className="text-xs font-black text-slate-800 uppercase tracking-tighter truncate">Reserva: {res.titulo || 'Sin título'}</p>
-                                                                                    <span className="text-[9px] font-bold text-slate-400">{new Date(res.fecha_inicio).toLocaleDateString()}</span>
-                                                                                </div>
-                                                                                <p className="text-[11px] font-bold text-slate-500 truncate mt-0.5">Por: {res.nombre_funcionario}</p>
-                                                                            </div>
-                                                                        </div>
-                                                                    </Link>
-                                                                ))}
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
-                                    </>
-                                );
-                            })()}
-                        </div>
-                    </div>
-                </header>
-
-                <div className="p-4 md:px-4 md:pt-4 md:pb-8 w-full">
-                    <motion.div
-                        key={location.pathname}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.3, ease: "easeOut" }}
-                        className="w-full"
+            }
+            user={{ name: displayName, role: roleLabel, avatar: user?.avatar }}
+            userMenu={
+              <div ref={profileRef}>
+                <Dropdown open={isProfileOpen}>
+                  <button
+                    type="button"
+                    className="topbar__avatar-btn topbar__control"
+                    aria-label={`Cuenta de ${displayName}`}
+                    aria-expanded={isProfileOpen}
+                    onClick={() => setIsProfileOpen((v) => !v)}
+                  >
+                    <Avatar
+                      src={user?.avatar}
+                      name={displayName}
+                      size="sm"
+                    />
+                  </button>
+                  <DropdownMenu>
+                    <DropdownItem
+                      onClick={() => {
+                        setIsProfileOpen(false)
+                        setIsProfileModalOpen(true)
+                      }}
                     >
-                        <Outlet />
-                    </motion.div>
-                </div>
+                      <Icon name="user" size={16} />
+                      Mi perfil
+                    </DropdownItem>
+                    <DropdownItem
+                      onClick={() => {
+                        setIsProfileOpen(false)
+                        setIsAboutModalOpen(true)
+                      }}
+                    >
+                      <Icon name="info" size={16} />
+                      Acerca del sistema
+                    </DropdownItem>
+                    {(can('auth.view_group') || user?.is_superuser) && (
+                      <>
+                        <DropdownDivider />
+                        <DropdownItem as={Link} to="/admin/roles" onClick={() => setIsProfileOpen(false)}>
+                          <Icon name="shield" size={16} />
+                          Roles
+                        </DropdownItem>
+                        <DropdownItem as={Link} to="/admin/users" onClick={() => setIsProfileOpen(false)}>
+                          <Icon name="funcionarios" size={16} />
+                          Usuarios
+                        </DropdownItem>
+                        <DropdownItem as={Link} to="/admin/audit-log" onClick={() => setIsProfileOpen(false)}>
+                          <Icon name="activity" size={16} />
+                          Auditoría
+                        </DropdownItem>
+                        <DropdownItem as={Link} to="/admin/arco" onClick={() => setIsProfileOpen(false)}>
+                          <Icon name="lock" size={16} />
+                          ARCO
+                        </DropdownItem>
+                        <DropdownItem
+                          as={Link}
+                          to="/admin/personalizacion/login/backgrounds"
+                          onClick={() => setIsProfileOpen(false)}
+                        >
+                          <Icon name="design-system" size={16} />
+                          Personalización
+                        </DropdownItem>
+                        <DropdownItem
+                          as={Link}
+                          to="/admin/email-settings"
+                          onClick={() => setIsProfileOpen(false)}
+                        >
+                          <Icon name="message" size={16} />
+                          Email
+                        </DropdownItem>
+                      </>
+                    )}
+                    <DropdownDivider />
+                    <DropdownItem
+                      danger
+                      onClick={() => {
+                        setIsProfileOpen(false)
+                        logout()
+                        navigate('/login')
+                      }}
+                    >
+                      <Icon name="external" size={16} />
+                      Cerrar sesión
+                    </DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
+              </div>
+            }
+          />
+        }
+        nav={({ collapsed, closeDrawer, openAccordion, toggleAccordion }) => (
+          <>
+            <NavItem to="/" icon="home" label="Inicio" end onClick={closeDrawer} />
+            <NavItem to="/tickets" icon="help-circle" label="Mesa de Ayuda" onClick={closeDrawer} />
+            {can('establecimientos.view_establecimiento') && (
+              <NavItem to="/establishments" icon="establecimientos" label="Establecimientos" onClick={closeDrawer} />
+            )}
+            {(can('solicitudes_reservas.view_solicitudreserva') ||
+              can('solicitudes_reservas.can_view_calendar')) && (
+              <NavItem to="/reservas" icon="reservas" label="Reservas" onClick={closeDrawer} />
+            )}
+            <NavItem to="/procedimientos" icon="procedimientos" label="Procedimientos" onClick={closeDrawer} />
+
+            {showTesoreria && (
+              <NavItem to="/tesoreria" icon="banknote" label="Tesorería" end onClick={closeDrawer} />
+            )}
+
+            {showEjecutivos && (
+              <NavItem
+                to="/comunicaciones/ejecutivos"
+                icon="user-check"
+                label="Ejecutivos"
+                onClick={closeDrawer}
+              />
+            )}
+
+            {showMp && (
+              <NavItem
+                to="/mercado-publico"
+                icon="compras"
+                label="Mercado Público"
+                end
+                onClick={closeDrawer}
+              />
+            )}
+
+            {showBienestar && (
+              <NavItem to="/bienestar" icon="heart" label="Bienestar" end onClick={closeDrawer} />
+            )}
+
+            {showSsgg && (
+              <NavAccordion
+                id="ssgg"
+                label="SSGG"
+                icon="building"
+                open={openAccordion === 'ssgg'}
+                onToggle={toggleAccordion}
+                collapsed={collapsed}
+              >
+                {can('contratos.view_contrato') && (
+                  <NavItem
+                    to="/contracts"
+                    icon="contratos"
+                    label="Contratos"
+                    isActive={isContractsNavActive}
+                    onClick={closeDrawer}
+                  />
+                )}
+                {can('contratos.view_rutatransporte') && (
+                  <NavItem to="/contracts/servicios" icon="rutas" label="Gestión de Rutas" onClick={closeDrawer} />
+                )}
+                {can('servicios.view_proveedor') && (
+                  <NavItem to="/services/providers" icon="proveedores" label="Proveedores" onClick={closeDrawer} />
+                )}
+                {can('servicios.view_facturaadquisicion') && (
+                  <NavItem to="/services/adquisiciones" icon="receipt" label="Factura sin OC" onClick={closeDrawer} />
+                )}
+                {can('servicios.view_servicio') && (
+                  <NavItem to="/services" icon="servicios" label="Servicios" end onClick={closeDrawer} />
+                )}
+                {can('servicios.view_registropago') && (
+                  <NavItem to="/services/payments" icon="credit-card" label="Pagos" onClick={closeDrawer} />
+                )}
+                {can('servicios.view_recepcionconforme') && (
+                  <NavItem to="/services/rc" icon="clipboard-check" label="Recepciones" onClick={closeDrawer} />
+                )}
+                {can('servicios.view_cdp') && (
+                  <NavItem to="/services/cdp" icon="file-check" label="CDPs" onClick={closeDrawer} />
+                )}
+              </NavAccordion>
+            )}
+
+            {showOperaciones && (
+              <NavAccordion
+                id="operaciones"
+                label="Operaciones"
+                icon="wrench"
+                open={openAccordion === 'operaciones'}
+                onToggle={toggleAccordion}
+                collapsed={collapsed}
+              >
+                {can('funcionarios.view_funcionario') && (
+                  <NavItem to="/funcionarios" icon="funcionarios" label="Funcionarios" onClick={closeDrawer} />
+                )}
+                {can('vehiculos.view_registromensual') && (
+                  <NavItem to="/vehiculos" icon="car" label="Vehículos" onClick={closeDrawer} />
+                )}
+                {can('servicios.view_servicio') && (
+                  <NavItem to="/telecomunicaciones" icon="telefonos" label="Teléfonos" onClick={closeDrawer} />
+                )}
+                {(can('prestamo_llaves.view_prestamo') || can('prestamo_llaves.view_activo')) && (
+                  <NavItem
+                    to={can('prestamo_llaves.view_prestamo') ? '/loans' : '/keys'}
+                    icon="key"
+                    label="Préstamos"
+                    onClick={closeDrawer}
+                  />
+                )}
+              </NavAccordion>
+            )}
+
+            {showSoporteTi && (
+              <NavAccordion
+                id="soporte-ti"
+                label="Soporte TI"
+                icon="monitor"
+                open={openAccordion === 'soporte-ti'}
+                onToggle={toggleAccordion}
+                collapsed={collapsed}
+              >
+                {can('personal_ti.view_personalti') && (
+                  <NavItem to="/personal-ti" icon="user-cog" label="Personal TI" onClick={closeDrawer} />
+                )}
+                {(can('core.view_breachreport') ||
+                  can('core.view_ciberseguridadplan') ||
+                  can('core.view_ciberseguridadcapacitacion')) && (
+                  <NavItem to="/ciberseguridad" icon="shield" label="Ciberseguridad" onClick={closeDrawer} />
+                )}
+                {can('insights.view_dashboardmetric') && (
+                  <NavItem to="/insights" icon="chart-bar" label="Indicadores" onClick={closeDrawer} />
+                )}
+              </NavAccordion>
+            )}
+          </>
+        )}
+      >
+        <Outlet />
+      </AppShell>
 
                 <UserProfileModal
                     isOpen={isProfileModalOpen}
                     onClose={() => setIsProfileModalOpen(false)}
                 />
+      <AboutModal
+        isOpen={isAboutModalOpen}
+        onClose={() => setIsAboutModalOpen(false)}
+        version={APP_VERSION}
+      />
+    </>
+  )
+}
 
-                <AboutModal
-                    isOpen={isAboutModalOpen}
-                    onClose={() => setIsAboutModalOpen(false)}
-                    version={APP_VERSION}
-                />
-            </main >
-        </div >
-    );
-};
-
-export default Layout;
+export default Layout

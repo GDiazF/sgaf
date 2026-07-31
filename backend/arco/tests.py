@@ -145,6 +145,39 @@ class SolicitudARCOAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 2)
 
+    def test_admin_mine_filter_only_own(self):
+        """Con ?mine=1 el admin solo ve sus propias solicitudes (perfil), no las de gestión."""
+        admin_func = Funcionario.objects.create(
+            user=self.admin_user,
+            rut='99999999-9',
+            nombre_funcionario='Admin SLEP',
+            anexo='999',
+            cargo='Administrador',
+        )
+        SolicitudARCO.objects.create(
+            solicitante=self.funcionario,
+            tipo_derecho='RECTIFICACION',
+            campo='anexo',
+            valor_anterior='111',
+            valor_propuesto='120',
+            justificacion='De otro usuario',
+        )
+        SolicitudARCO.objects.create(
+            solicitante=admin_func,
+            tipo_derecho='PORTABILIDAD',
+            justificacion='Solicitud propia del admin',
+        )
+
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.get(self.list_url, {'mine': '1'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['solicitante_nombre'], 'Admin SLEP')
+
+        # Sin mine sigue viendo todas (gestión ARCO)
+        response_all = self.client.get(self.list_url)
+        self.assertEqual(response_all.data['count'], 2)
+
     def test_admin_approve_rectificacion(self):
         """El administrador puede aprobar la solicitud y los datos se actualizan."""
         solicitud = SolicitudARCO.objects.create(
@@ -279,81 +312,107 @@ class AuditLogTests(APITestCase):
     def test_funcionario_lifecycle_auditing(self):
         """El ciclo de vida del Funcionario se audita (CREACION, MODIFICACION, ELIMINACION)."""
         self.client.force_authenticate(user=self.user)
-        
-        # Creación
+        AuditLog.objects.all().delete()
+
         func = Funcionario.objects.create(
             rut='33333333-3',
             nombre_funcionario='Test Auditoria',
             anexo='333',
             cargo='Tester'
         )
-        
-        # Verificar log de creación
+
         log_create = AuditLog.objects.filter(model_name='Funcionario', action='CREACION').first()
         self.assertIsNotNone(log_create)
         self.assertIn('33333333-3', log_create.details)
+        self.assertIn('rut', log_create.changes)
+        self.assertEqual(log_create.changes['rut'][1], '33333333-3')
 
-    def test_funcionario_api_auditing(self):
-        """Los accesos de lectura (list, retrieve) y escritura vía API capturan al usuario autenticado."""
+        func.cargo = 'Tester Senior'
+        func.save()
+
+        log_update = AuditLog.objects.filter(model_name='Funcionario', action='MODIFICACION').first()
+        self.assertIsNotNone(log_update)
+        self.assertIn('cargo', log_update.changes)
+        self.assertEqual(log_update.changes['cargo'], ['Tester', 'Tester Senior'])
+
+        func_id = func.id
+        func.delete()
+
+        log_delete = AuditLog.objects.filter(
+            model_name='Funcionario', action='ELIMINACION', object_id=str(func_id)
+        ).first()
+        self.assertIsNotNone(log_delete)
+        self.assertIn('rut', log_delete.changes)
+        self.assertEqual(log_delete.changes['rut'][0], '33333333-3')
+        self.assertIsNone(log_delete.changes['rut'][1])
+
+    def test_reads_are_not_audited(self):
+        """Listado y detalle (GET) no generan registros de auditoría."""
         self.client.force_authenticate(user=self.user)
-        
-        # Limpiar logs previos
-        AuditLog.objects.all().delete()
-        
-        # Crear funcionario
+
         func = Funcionario.objects.create(
             rut='44444444-4',
             nombre_funcionario='API Auditoria',
             anexo='444',
             cargo='Tester API'
         )
-        
-        # Consultar listado (list)
+        AuditLog.objects.all().delete()
+
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        
-        log_list = AuditLog.objects.filter(model_name='Funcionario', action='ACCESO', details__icontains='Listado').first()
-        self.assertIsNotNone(log_list)
-        self.assertEqual(log_list.user, self.user)
-        
-        # Consultar detalle (retrieve)
+
         retrieve_url = reverse('funcionario-detail', kwargs={'pk': func.id})
         response = self.client.get(retrieve_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        
-        log_retrieve = AuditLog.objects.filter(model_name='Funcionario', action='ACCESO', details__icontains='Perfil').first()
-        self.assertIsNotNone(log_retrieve)
-        self.assertEqual(log_retrieve.user, self.user)
-        self.assertEqual(log_retrieve.object_id, str(func.id))
+
+        self.assertFalse(
+            AuditLog.objects.filter(model_name='Funcionario').exists()
+        )
+        self.assertFalse(
+            AuditLog.objects.filter(action='ACCESO').exists()
+        )
+
+    def test_audit_log_not_recursive(self):
+        """Crear/eliminar AuditLog no genera nuevos registros de auditoría."""
+        before = AuditLog.objects.count()
+        entry = AuditLog.objects.create(
+            user=self.user,
+            action='CREACION',
+            model_name='Manual',
+            object_id='1',
+            details='manual',
+            changes={'a': [None, 1]},
+        )
+        self.assertEqual(AuditLog.objects.count(), before + 1)
+        entry.delete()
+        self.assertEqual(AuditLog.objects.count(), before)
 
     def test_audit_log_api_endpoint(self):
         """El endpoint API de auditoría funciona, soporta paginación, filtros y restringe accesos no autorizados."""
         self.client.force_authenticate(user=self.user)
-        
-        # Generar un log
+
         AuditLog.objects.create(
             user=self.user,
             action='CREACION',
             model_name='Funcionario',
             object_id='99',
             details='Funcionario de prueba creado',
-            ip_address='127.0.0.1'
+            ip_address='127.0.0.1',
+            changes={'nombre': [None, 'Prueba']},
         )
-        
-        # Test 1: Admin accede y lista logs
+
         url = reverse('admin-audit-log-list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('results', response.data)
         self.assertGreaterEqual(len(response.data['results']), 1)
-        
-        # Validar serialización
+
         log_data = response.data['results'][0]
         self.assertIn('actor_name', log_data)
         self.assertIn('remote_addr', log_data)
         self.assertIn('content_type_name', log_data)
-        
-        # Test 2: Usuario regular no tiene acceso (recibe lista vacía para no-admins)
+        self.assertIn('changes', log_data)
+
         regular_user = User.objects.create_user(username='regular', password='password123')
         self.client.force_authenticate(user=regular_user)
         response = self.client.get(url)

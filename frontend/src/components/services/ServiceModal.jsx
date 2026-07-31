@@ -1,186 +1,208 @@
-import React, { useState, useEffect } from 'react';
-import BaseModal from '../common/BaseModal';
-import { Info } from 'lucide-react';
-import SearchableSelect from '../common/SearchableSelect';
+import React, { useState, useEffect } from 'react'
+import SearchableSelect from '../common/SearchableSelect'
+import { Modal, Button, Field, Input, Select, Alert, useFormOverlay, formatApiFormError } from '@slep/ui'
 
-const SERVICE_INPUT_CLASS =
-    'no-global w-full h-10 text-[10px] font-bold bg-white border border-slate-200 px-3 rounded-xl outline-none focus:border-blue-500 uppercase transition-all shadow-sm placeholder:text-slate-300';
-
-const SERVICE_INPUT_ICON_CLASS =
-    'no-global w-full pl-10 pr-3 h-10 text-[10px] font-bold bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 uppercase transition-all shadow-sm placeholder:text-slate-300';
-
-const SERVICE_SELECT_CLASS =
-    "no-global w-full text-[10px] font-black uppercase tracking-widest px-3 h-10 rounded-xl border border-slate-200 outline-none cursor-pointer appearance-none bg-white text-slate-700 focus:border-blue-500 shadow-sm bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M7%209l3%203%203-3%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1rem_1rem] bg-[right_0.5rem_center] bg-no-repeat";
-
-const SERVICE_LABEL_CLASS =
-    'block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1';
-
-const SectionHeader = ({ children }) => (
-    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2">
-        {children}
-    </h4>
-);
+const emptyForm = {
+  proveedor: '',
+  establecimiento: '',
+  numero_cliente: '',
+  numero_servicio: '',
+  tipo_documento: '',
+  unidad_medida: '',
+}
 
 const ServiceModal = ({
-    isOpen,
-    onClose,
-    onSave,
-    editingId,
-    initialData,
-    lookups: { providers, establishments, documentTypes }
+  open,
+  onClose,
+  onSave,
+  editingId,
+  initialData,
+  lookups: { providers = [], establishments = [], documentTypes = [] } = {},
 }) => {
-    const [formData, setFormData] = useState({
-        proveedor: '',
-        establecimiento: '',
-        numero_cliente: '',
-        numero_servicio: '',
-        tipo_documento: '',
-        unidad_medida: ''
-    });
+  const [formData, setFormData] = useState(emptyForm)
+  const overlay = useFormOverlay()
 
-    useEffect(() => {
-        if (initialData) {
-            setFormData({
-                proveedor: initialData.proveedor || '',
-                establecimiento: initialData.establecimiento || '',
-                numero_cliente: initialData.numero_cliente || '',
-                numero_servicio: initialData.numero_servicio || '',
-                tipo_documento: initialData.tipo_documento || '',
-                unidad_medida: initialData.unidad_medida || ''
-            });
-        }
-    }, [initialData]);
+  useEffect(() => {
+    if (!open) return
+    overlay.reset()
+    setFormData({
+      proveedor: initialData?.proveedor || '',
+      establecimiento: initialData?.establecimiento || '',
+      numero_cliente: initialData?.numero_cliente || '',
+      numero_servicio: initialData?.numero_servicio || '',
+      tipo_documento: initialData?.tipo_documento || '',
+      unidad_medida: initialData?.unidad_medida || '',
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset solo al abrir
+  }, [open, initialData])
 
-    const handleFormSave = () => {
-        onSave(formData);
-    };
+  const unidadSelectValue = ['', 'm3', 'kWh', 'Lts'].includes(formData.unidad_medida)
+    ? formData.unidad_medida
+    : 'custom'
 
-    return (
-        <BaseModal
-            isOpen={isOpen}
-            onClose={onClose}
-            onSave={handleFormSave}
-            title={editingId ? 'Editar Servicio' : 'Nuevo Alta de Servicio'}
-            subtitle="Vincule a un establecimiento con un proveedor y número de cliente"
-            maxWidth="max-w-3xl"
-            saveLabel={editingId ? 'Actualizar Servicio' : 'Activar Servicio'}
-        >
-            <div className="space-y-8">
-                {/* Core Linkage */}
-                <div className="space-y-4">
-                    <SectionHeader>Vinculación de Servicio</SectionHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <SearchableSelect
-                            label="Proveedor del Servicio"
-                            options={providers ? providers.map(p => ({ value: p.id, label: `${p.nombre} ${p.rut ? `(${p.rut})` : ''}` })) : []}
-                            value={formData.proveedor}
-                            onChange={val => setFormData({ ...formData, proveedor: val })}
-                            placeholder="Seleccione Proveedor..."
-                            required
-                        />
-                        <SearchableSelect
-                            label="Establecimiento Beneficiario"
-                            options={establishments ? establishments.map(e => ({ value: e.id, label: e.nombre })) : []}
-                            value={formData.establecimiento}
-                            onChange={val => setFormData({ ...formData, establecimiento: val })}
-                            placeholder="Seleccione Establecimiento..."
-                            required
-                        />
-                    </div>
-                </div>
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      await overlay.run(
+        async () => {
+          await onSave(formData)
+        },
+        {
+          successDescription: editingId ? 'Servicio actualizado.' : 'Servicio creado.',
+          formatError: formatApiFormError,
+        },
+      )
+    } catch {
+      // El error se muestra en FormOverlay
+    }
+  }
 
-                {/* Identification Codes */}
-                <div className="space-y-4">
-                    <SectionHeader>Códigos de Facturación</SectionHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <label className={SERVICE_LABEL_CLASS}>Nº Cliente / Cuenta</label>
-                            <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">#</span>
-                                <input
-                                    type="text"
-                                    required
-                                    placeholder="ID único de pago..."
-                                    className={SERVICE_INPUT_ICON_CLASS}
-                                    value={formData.numero_cliente}
-                                    onChange={e => setFormData({ ...formData, numero_cliente: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className={SERVICE_LABEL_CLASS}>Nº Medidor / Servicio</label>
-                            <input
-                                type="text"
-                                placeholder="Opcional..."
-                                className={SERVICE_INPUT_CLASS}
-                                value={formData.numero_servicio}
-                                onChange={e => setFormData({ ...formData, numero_servicio: e.target.value })}
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className={SERVICE_LABEL_CLASS}>Tipo de Documento</label>
-                            <select
-                                className={SERVICE_SELECT_CLASS}
-                                value={formData.tipo_documento}
-                                onChange={e => setFormData({ ...formData, tipo_documento: e.target.value })}
-                            >
-                                <option value="">Seleccione...</option>
-                                {documentTypes.map(d => (
-                                    <option key={d.value} value={d.value}>{d.label}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className={SERVICE_LABEL_CLASS}>Medición de Consumo</label>
-                            <select
-                                className={SERVICE_SELECT_CLASS}
-                                value={['', 'm3', 'kWh', 'Lts'].includes(formData.unidad_medida) ? formData.unidad_medida : 'custom'}
-                                onChange={e => {
-                                    const val = e.target.value;
-                                    if (val === 'custom') {
-                                        setFormData({ ...formData, unidad_medida: 'Otro' });
-                                    } else {
-                                        setFormData({ ...formData, unidad_medida: val });
-                                    }
-                                }}
-                            >
-                                <option value="">No registra consumo (Costo Fijo)</option>
-                                <option value="m3">m³ (Metros Cúbicos - Agua)</option>
-                                <option value="kWh">kWh (Kilovatios Hora - Electricidad)</option>
-                                <option value="Lts">Lts (Litros - Gas/Combustible)</option>
-                                <option value="custom">Otro (Ingresar unidad personalizada)...</option>
-                            </select>
-                        </div>
-                        {(!['', 'm3', 'kWh', 'Lts'].includes(formData.unidad_medida) || formData.unidad_medida === 'Otro') && (
-                            <div className="col-span-1 md:col-span-2 space-y-1.5 bg-slate-50 p-4 rounded-2xl border border-slate-100 mt-2">
-                                <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5 ml-1">Especifique la Unidad de Medida Personalizada</label>
-                                <input
-                                    name="unidad_medida"
-                                    required
-                                    placeholder="Ej: Balones, Galones, m3, etc..."
-                                    className={SERVICE_INPUT_CLASS}
-                                    value={formData.unidad_medida === 'Otro' ? '' : formData.unidad_medida}
-                                    onChange={e => setFormData({ ...formData, unidad_medida: e.target.value })}
-                                />
-                                <p className="text-[10px] text-slate-400 font-medium ml-1">
-                                    Esta unidad se mostrará en los reportes e ingresos de pagos mensuales para este servicio.
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                </div>
+  const handleOverlayDismiss = () => {
+    if (overlay.status === 'success') {
+      overlay.reset()
+      onClose({ saved: true })
+      return
+    }
+    overlay.dismiss()
+  }
 
+  const handleClose = () => {
+    if (overlay.busy) return
+    overlay.reset()
+    onClose()
+  }
 
-                {/* Helper */}
-                <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex gap-3">
-                    <Info className="w-5 h-5 text-blue-500 mt-0.5" />
-                    <p className="text-[10px] text-blue-700 leading-relaxed font-medium">
-                        El <strong>Número de Cliente</strong> es el identificador principal para las cargas masivas. Asegúrese de que coincida exactamente con lo que figura en la boleta del proveedor.
-                    </p>
-                </div>
-            </div>
-        </BaseModal>
-    );
-};
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      size="lg"
+      title={editingId ? 'Editar servicio' : 'Nuevo servicio'}
+      subheader="Vincule un establecimiento con proveedor y número de cliente"
+      {...overlay.modalProps}
+      onOverlayDismiss={handleOverlayDismiss}
+      footer={
+        <>
+          <Button variant="ghost" type="button" onClick={handleClose} disabled={overlay.busy}>
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            type="submit"
+            form="service-form"
+            loading={overlay.busy}
+            disabled={overlay.busy || overlay.active}
+          >
+            {editingId ? 'Actualizar' : 'Guardar'}
+          </Button>
+        </>
+      }
+    >
+      <form id="service-form" className="crud-form" onSubmit={handleSubmit}>
+        <p className="contracts-section-title">1. Vinculación</p>
+        <div className="form-grid">
+          <div className="field">
+            <SearchableSelect
+              label="Proveedor"
+              required
+              options={providers.map((p) => ({
+                value: p.id,
+                label: `${p.nombre}${p.rut ? ` (${p.rut})` : ''}`,
+              }))}
+              value={formData.proveedor}
+              onChange={(val) => setFormData({ ...formData, proveedor: val })}
+              placeholder="Seleccione proveedor…"
+            />
+          </div>
+          <div className="field">
+            <SearchableSelect
+              label="Establecimiento"
+              required
+              options={establishments.map((e) => ({ value: e.id, label: e.nombre }))}
+              value={formData.establecimiento}
+              onChange={(val) => setFormData({ ...formData, establecimiento: val })}
+              placeholder="Seleccione establecimiento…"
+            />
+          </div>
+        </div>
 
-export default ServiceModal;
+        <p className="contracts-section-title">2. Códigos de facturación</p>
+        <div className="form-grid">
+          <Field label="Nº Cliente / Cuenta" required htmlFor="svc-cliente">
+            <Input
+              id="svc-cliente"
+              required
+              placeholder="ID único de pago…"
+              value={formData.numero_cliente}
+              onChange={(e) => setFormData({ ...formData, numero_cliente: e.target.value })}
+            />
+          </Field>
+          <Field label="Nº Medidor / Servicio" htmlFor="svc-medidor">
+            <Input
+              id="svc-medidor"
+              placeholder="Opcional…"
+              value={formData.numero_servicio}
+              onChange={(e) => setFormData({ ...formData, numero_servicio: e.target.value })}
+            />
+          </Field>
+          <Field label="Tipo de documento" htmlFor="svc-doc">
+            <Select
+              id="svc-doc"
+              value={formData.tipo_documento}
+              onChange={(e) => setFormData({ ...formData, tipo_documento: e.target.value })}
+            >
+              <option value="">Seleccione…</option>
+              {documentTypes.map((d) => (
+                <option key={d.value} value={d.value}>
+                  {d.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Medición de consumo" htmlFor="svc-unidad">
+            <Select
+              id="svc-unidad"
+              value={unidadSelectValue}
+              onChange={(e) => {
+                const val = e.target.value
+                setFormData({
+                  ...formData,
+                  unidad_medida: val === 'custom' ? 'Otro' : val,
+                })
+              }}
+            >
+              <option value="">No registra consumo (costo fijo)</option>
+              <option value="m3">m³ (Agua)</option>
+              <option value="kWh">kWh (Electricidad)</option>
+              <option value="Lts">Lts (Gas / combustible)</option>
+              <option value="custom">Otro (personalizada)…</option>
+            </Select>
+          </Field>
+          {unidadSelectValue === 'custom' ? (
+            <Field
+              label="Unidad personalizada"
+              required
+              htmlFor="svc-unidad-custom"
+              className="field--full"
+            >
+              <Input
+                id="svc-unidad-custom"
+                required
+                placeholder="Ej: Balones, Galones…"
+                value={formData.unidad_medida === 'Otro' ? '' : formData.unidad_medida}
+                onChange={(e) => setFormData({ ...formData, unidad_medida: e.target.value })}
+              />
+            </Field>
+          ) : null}
+        </div>
+
+        <Alert variant="info">
+          El número de cliente es el identificador principal en cargas masivas. Debe coincidir con
+          la boleta del proveedor.
+        </Alert>
+      </form>
+    </Modal>
+  )
+}
+
+export default ServiceModal

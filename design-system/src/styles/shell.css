@@ -1,0 +1,67 @@
+/* Shell overrides — se importa al final para ganar a .avatar / .icon-btn de components.css */
+
+.topbar__right {
+  align-items: center;
+}
+
+.topbar__user--avatar-only .dropdown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.topbar__avatar-btn .avatar,
+.topbar__avatar-btn .avatar.avatar--sm {
+  width: var(--topbar-control-size);
+  height: var(--topbar-control-size);
+  min-width: var(--topbar-control-size);
+  min-height: var(--topbar-control-size);
+  font-size: 10px;
+}
+.topbar__avatar-btn img.avatar {
+  display: block;
+}
+.topbar__avatar-btn .avatar--initials {
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  text-align: center;
+}
+
+.topbar .notif-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  overflow: visible;
+  /* Solo el botón se achica; el panel no debe heredar el alto del control */
+}
+
+.topbar .notif-btn.icon-btn {
+  width: var(--topbar-control-size);
+  height: var(--topbar-control-size);
+  min-width: var(--topbar-control-size);
+  min-height: var(--topbar-control-size);
+}
+
+/* Panel desacoplado del --topbar-control-size del trigger */
+.topbar .notif-panel {
+  width: var(--notif-panel-width, 22.5rem);
+  min-width: min(var(--notif-panel-width, 22.5rem), calc(100vw - var(--space-8)));
+  max-width: calc(100vw - var(--space-8));
+  height: auto;
+  min-height: 0;
+  line-height: var(--leading-normal, 1.5);
+}
+
+.topbar .notif-btn .icon {
+  width: var(--topbar-control-icon);
+  height: var(--topbar-control-icon);
+}
+
+@media (max-width: 767px) {
+  .topbar__right {
+    --topbar-control-size: 2.25rem;
+  }
+}

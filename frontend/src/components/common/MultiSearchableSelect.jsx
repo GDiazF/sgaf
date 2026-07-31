@@ -1,195 +1,259 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Search, ChevronDown, Check, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useRef, useEffect, useLayoutEffect, useId, useCallback } from 'react'
+import { createPortal } from 'react-dom'
+import { Field, Input, Icon, Button } from '@slep/ui'
 
-/**
- * MultiSearchableSelect Component
- * Allows selecting multiple options using checkboxes in a searchable dropdown.
- */
+const MENU_GAP = 4
+const MENU_MAX_H = 320
+
+function computeMenuStyle(triggerEl) {
+  if (!triggerEl) return null
+  const rect = triggerEl.getBoundingClientRect()
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const edge = 8
+  const width = Math.min(rect.width, vw - edge * 2)
+  const spaceBelow = vh - rect.bottom - edge
+  const spaceAbove = rect.top - edge
+  const openUp = spaceBelow < 180 && spaceAbove > spaceBelow
+  const maxHeight = Math.min(
+    MENU_MAX_H,
+    Math.max(140, openUp ? spaceAbove - MENU_GAP : spaceBelow - MENU_GAP),
+  )
+
+  let left = rect.left
+  if (left + width > vw - edge) left = Math.max(edge, vw - edge - width)
+  if (left < edge) left = edge
+
+  return {
+    position: 'fixed',
+    left: `${Math.round(left)}px`,
+    width: `${Math.round(width)}px`,
+    maxHeight: `${Math.round(maxHeight)}px`,
+    ...(openUp
+      ? { bottom: `${Math.round(vh - rect.top + MENU_GAP)}px`, top: 'auto' }
+      : { top: `${Math.round(rect.bottom + MENU_GAP)}px`, bottom: 'auto' }),
+  }
+}
+
 const MultiSearchableSelect = ({
-    label,
-    options = [],
-    value = [], // Array of selected values
-    onChange,
-    placeholder = "Seleccione opciones...",
-    icon: Icon,
-    required = false,
-    className = ""
+  label,
+  options = [],
+  value = [],
+  onChange,
+  placeholder = 'Seleccione opciones…',
+  required = false,
+  className = '',
+  disabled = false,
 }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [searchTerm, setSearchTerm] = useState("");
-    const containerRef = useRef(null);
-    const inputRef = useRef(null);
+  const [isOpen, setIsOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [menuStyle, setMenuStyle] = useState(null)
+  const containerRef = useRef(null)
+  const menuRef = useRef(null)
+  const inputRef = useRef(null)
+  const autoId = useId()
+  const triggerId = `combo-multi-${autoId}`
 
-    // Filter options
-    const filteredOptions = options.filter(opt =>
-        opt.label.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+  const filteredOptions = options.filter((opt) =>
+    opt.label.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
-    // Handle click outside
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (containerRef.current && !containerRef.current.contains(event.target)) {
-                setIsOpen(false);
-                setSearchTerm("");
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+  const close = useCallback(() => {
+    setIsOpen(false)
+    setSearchTerm('')
+    setMenuStyle(null)
+  }, [])
 
-    // Focus input when opening
-    useEffect(() => {
-        if (isOpen && inputRef.current) {
-            inputRef.current.focus();
-        }
-    }, [isOpen]);
+  const positionMenu = useCallback(() => {
+    const trigger = containerRef.current?.querySelector('.combo__trigger')
+    setMenuStyle(computeMenuStyle(trigger))
+  }, [])
 
-    const handleToggleOption = (optionValue) => {
-        const option = options.find(o => o.value === optionValue);
-        if (option?.disabled) return;
+  useLayoutEffect(() => {
+    if (!isOpen) return undefined
+    positionMenu()
+    const onReposition = () => positionMenu()
+    window.addEventListener('resize', onReposition)
+    window.addEventListener('scroll', onReposition, true)
+    return () => {
+      window.removeEventListener('resize', onReposition)
+      window.removeEventListener('scroll', onReposition, true)
+    }
+  }, [isOpen, positionMenu])
 
-        const newValue = value.includes(optionValue)
-            ? value.filter(v => v !== optionValue)
-            : [...value, optionValue];
-        onChange(newValue);
-    };
+  useEffect(() => {
+    if (!isOpen) return undefined
+    const handleClickOutside = (event) => {
+      const inTrigger = containerRef.current?.contains(event.target)
+      const inMenu = menuRef.current?.contains(event.target)
+      if (!inTrigger && !inMenu) close()
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isOpen, close])
 
-    const handleRemoveAll = (e) => {
-        e.stopPropagation();
-        onChange([]);
-    };
+  useEffect(() => {
+    if (isOpen && inputRef.current) inputRef.current.focus()
+  }, [isOpen])
 
-    const selectedCount = value?.length || 0;
+  const handleToggleOption = (optionValue) => {
+    if (disabled) return
+    const option = options.find((o) => o.value === optionValue)
+    if (option?.disabled) return
 
-    return (
-        <div className={`form-container relative ${className}`} ref={containerRef}>
-            {label && (
-                <label className="form-label">
-                    {Icon && (
-                        React.isValidElement(Icon) ? (
-                            <span className="flex-shrink-0">{Icon}</span>
-                        ) : (
-                            <Icon className="w-2.5 h-2.5 text-blue-500" />
-                        )
-                    )}
-                    {label} {required && <span className="text-red-500">*</span>}
-                </label>
-            )}
+    const newValue = value.includes(optionValue)
+      ? value.filter((v) => v !== optionValue)
+      : [...value, optionValue]
+    onChange(newValue)
+  }
 
-            {/* Selection Button */}
-            <div
-                onClick={() => setIsOpen(!isOpen)}
-                className={`no-global w-full h-10 min-h-10 px-3 bg-white border border-slate-200 rounded-xl outline-none text-[10px] font-bold text-slate-700 shadow-sm flex items-center justify-between cursor-pointer transition-all ${isOpen ? 'ring-4 ring-blue-500/5 border-blue-500' : 'hover:border-slate-300'}`}
-            >
-                <div className="flex flex-wrap gap-1 items-center flex-1 min-w-0 pr-2">
-                    {selectedCount > 0 ? (
-                        <div className="flex items-center gap-1.5 overflow-hidden">
-                            <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shrink-0">
-                                {selectedCount}
-                            </span>
-                            <span className="text-slate-700 text-[10px] font-bold uppercase truncate">
-                                {selectedCount === 1
-                                    ? options.find(o => o.value === value[0])?.label
-                                    : `${selectedCount} seleccionados`}
-                            </span>
-                        </div>
-                    ) : (
-                        <span className="text-slate-400 text-[10px] font-bold uppercase">
-                            {placeholder}
-                        </span>
-                    )}
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                    {selectedCount > 0 && (
-                        <button
-                            type="button"
-                            onClick={handleRemoveAll}
-                            className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-rose-600 transition-colors"
-                        >
-                            <X className="w-3.5 h-3.5" />
-                        </button>
-                    )}
-                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-                </div>
+  const handleRemoveAll = (e) => {
+    e.stopPropagation()
+    if (disabled) return
+    onChange([])
+  }
+
+  const selectedCount = value?.length || 0
+  const selectedWord = selectedCount === 1 ? 'seleccionado' : 'seleccionados'
+  const selectedSummary =
+    selectedCount === 0
+      ? placeholder
+      : selectedCount === 1
+        ? options.find((o) => o.value === value[0])?.label || `1 ${selectedWord}`
+        : `${selectedCount} ${selectedWord}`
+
+  const menu =
+    isOpen && menuStyle
+      ? createPortal(
+          <div
+            ref={menuRef}
+            className="combo__menu combo__menu--portal"
+            role="listbox"
+            aria-multiselectable="true"
+            style={menuStyle}
+          >
+            <div className="combo__search">
+              <div className="input-wrap">
+                <Icon name="search" className="input-wrap__icon" size="sm" />
+                <Input
+                  ref={inputRef}
+                  type="search"
+                  className="no-global"
+                  placeholder="Buscar…"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                />
+              </div>
             </div>
 
-            {/* Dropdown Menu */}
-            <AnimatePresence>
-                {isOpen && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -10, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -10, scale: 0.98 }}
-                        transition={{ duration: 0.15 }}
-                        className="form-dropdown-container max-h-80"
+            <div className="combo__options" onWheel={(e) => e.stopPropagation()}>
+              {filteredOptions.length > 0 ? (
+                filteredOptions.map((opt) => {
+                  const isSelected = value.includes(opt.value)
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      disabled={opt.disabled}
+                      onClick={() => handleToggleOption(opt.value)}
+                      className={`combo__option${isSelected ? ' is-selected' : ''}`}
                     >
-                        {/* Search Input */}
-                        <div className="p-3 border-b border-slate-100 bg-slate-50/30">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                <input
-                                    ref={inputRef}
-                                    type="text"
-                                    className="no-global w-full pl-10 pr-4 h-10 bg-white border border-slate-200 rounded-xl outline-none text-[10px] font-bold text-slate-700 focus:border-blue-500 transition-all placeholder:text-slate-300"
-                                    placeholder="Buscar opciones..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    // Prevent form submission if in a form
-                                    onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                                />
-                            </div>
-                        </div>
+                      <span className="combo__option-check" aria-hidden="true">
+                        {isSelected ? <Icon name="check" size="sm" /> : null}
+                      </span>
+                      <span className="combo__option-label">{opt.label}</span>
+                    </button>
+                  )
+                })
+              ) : (
+                <div className="combo__empty">No se encontraron resultados</div>
+              )}
+            </div>
 
-                        {/* Options List */}
-                        <div className="overflow-y-auto custom-scrollbar flex-grow py-1">
-                            {filteredOptions.length > 0 ? (
-                                filteredOptions.map((opt) => {
-                                    const isSelected = value.includes(opt.value);
-                                    return (
-                                        <div
-                                            key={opt.value}
-                                            onClick={() => handleToggleOption(opt.value)}
-                                            className={`form-dropdown-option ${isSelected ? 'bg-blue-50/30' : ''} ${opt.disabled ? 'opacity-50 grayscale cursor-not-allowed pointer-events-none' : ''}`}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-blue-600 border-blue-600 shadow-lg shadow-blue-500/20' : 'border-slate-200 group-hover:border-blue-400 bg-white'} ${opt.disabled ? 'bg-slate-100 border-slate-200' : ''}`}>
-                                                    {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />}
-                                                </div>
-                                                <span className={`truncate ${isSelected ? 'text-blue-700 font-bold' : 'text-slate-600'}`}>
-                                                    {opt.label}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            ) : (
-                                <div className="px-4 py-8 text-center text-slate-400 text-sm italic">
-                                    No se encontraron resultados
-                                </div>
-                            )}
-                        </div>
+            {selectedCount > 0 ? (
+              <div className="combo__footer">
+                <span>
+                  {selectedCount} de {options.length} seleccionados
+                </span>
+                <Button type="button" variant="ghost" size="sm" onClick={close}>
+                  Listo
+                </Button>
+              </div>
+            ) : null}
+          </div>,
+          document.body,
+        )
+      : null
 
-                        {/* Footer Status */}
-                        {selectedCount > 0 && (
-                            <div className="p-2 border-t border-slate-100 bg-slate-50 flex justify-between items-center px-4">
-                                <span className="text-[10px] uppercase tracking-wider font-black text-slate-400">
-                                    {selectedCount} de {options.length} seleccionados
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsOpen(false)}
-                                    className="text-xs font-bold text-blue-600 hover:text-blue-700 p-1 px-2 hover:bg-blue-100/50 rounded-lg transition-colors"
-                                >
-                                    Listo
-                                </button>
-                            </div>
-                        )}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
-    );
-};
+  const control = (
+    <div className="combo" ref={containerRef}>
+      <div
+        id={triggerId}
+        role="combobox"
+        tabIndex={disabled ? -1 : 0}
+        aria-disabled={disabled || undefined}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-label={selectedSummary}
+        onClick={() => {
+          if (disabled) return
+          if (isOpen) close()
+          else setIsOpen(true)
+        }}
+        onKeyDown={(e) => {
+          if (disabled) return
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            if (isOpen) close()
+            else setIsOpen(true)
+          }
+        }}
+        className={`combo__trigger${isOpen ? ' is-open' : ''}${
+          selectedCount === 0 ? ' is-placeholder' : ''
+        }`}
+      >
+        <span className="combo__trigger-text">
+          {selectedCount > 0 ? (
+            <>
+              <span className="combo__count" aria-hidden="true">
+                {selectedCount}
+              </span>{' '}
+              {selectedWord}
+            </>
+          ) : (
+            placeholder
+          )}
+        </span>
+        <span className="combo__trigger-actions">
+          {selectedCount > 0 ? (
+            <button
+              type="button"
+              className="combo__clear"
+              aria-label="Limpiar selección"
+              onClick={handleRemoveAll}
+            >
+              <Icon name="close" size="sm" />
+            </button>
+          ) : null}
+          <Icon name="chevron" className="icon--chevron" size="sm" />
+        </span>
+      </div>
+      {menu}
+    </div>
+  )
 
-export default MultiSearchableSelect;
+  if (!label) {
+    return <div className={className}>{control}</div>
+  }
+
+  return (
+    <Field label={label} required={required} htmlFor={triggerId} className={className}>
+      {control}
+    </Field>
+  )
+}
+
+export default MultiSearchableSelect

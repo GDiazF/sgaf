@@ -1,94 +1,88 @@
-import React, { useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { motion } from 'framer-motion';
-import { Building2, BarChart3, Settings, LayoutList, MessageSquare } from 'lucide-react';
-import { usePermission } from '../../hooks/usePermission';
-import { TITLE_ICON_BOX, TAB_ACTIVE, TAB_INACTIVE } from './comunicacionesUi';
-import AdminAsignaciones from './AdminAsignaciones';
-import EjecutivoDashboard from './EjecutivosDashboard';
-import MonitoreoKPI from './MonitoreoKPI';
-import AdminGestionesGlobal from './AdminGestionesGlobal';
+import React, { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
+import { usePermission } from '../../hooks/usePermission'
+import { PageHeader } from '@slep/ui'
+import AdminAsignaciones from './AdminAsignaciones'
+import EjecutivoDashboard from './EjecutivosDashboard'
+import MonitoreoKPI from './MonitoreoKPI'
+import AdminGestionesGlobal from './AdminGestionesGlobal'
+
+const ADMIN_TABS = [
+  { id: 'kpi', label: 'Monitoreo KPI' },
+  { id: 'global', label: 'Todas las gestiones' },
+  { id: 'asignaciones', label: 'Asignaciones' },
+  { id: 'mis_establecimientos', label: 'Mis establecimientos' },
+]
 
 const EjecutivosMain = () => {
-    const { user } = useAuth();
-    const { can } = usePermission();
-    
-    // Determinamos el rol: si es superusuario o tiene el permiso de crear asignaciones, es Admin
-    const isAdmin = user?.is_superuser || can('ejecutivos.add_asignacionejecutivo') || user?.groups?.includes('Administrador Comunicaciones');
-    
-    const [activeTab, setActiveTab] = useState(isAdmin ? 'kpi' : 'mis_establecimientos');
+  const { user } = useAuth()
+  const { can } = usePermission()
 
-    return (
-        <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden">
-            <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-end gap-3 border-b border-slate-200/60 pb-3 px-1 lg:px-0">
-                <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={TITLE_ICON_BOX}>
-                        <MessageSquare className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase select-none">
-                            Comunicaciones
-                        </h2>
-                        <p className="text-[10px] md:text-xs font-medium text-slate-500 mt-1.5 uppercase select-none">
-                            Gestión y Seguimiento de Establecimientos
-                        </p>
-                    </div>
-                </div>
-            </div>
+  const isAdmin =
+    user?.is_superuser ||
+    can('ejecutivos.add_asignacionejecutivo') ||
+    user?.groups?.includes('Administrador Comunicaciones')
 
-            {/* Tab Bar Navigation */}
-            {isAdmin && (
-                <div className="shrink-0 flex items-center border-b border-slate-200 mb-3 overflow-x-auto no-scrollbar scroll-smooth">
-                    <div className="flex gap-6 min-w-max md:min-w-0">
-                        <button
-                            onClick={() => setActiveTab('kpi')}
-                            className={`pb-2 text-[10px] uppercase tracking-widest border-b-2 transition-all duration-200 whitespace-nowrap flex items-center gap-2 select-none ${activeTab === 'kpi' ? TAB_ACTIVE : TAB_INACTIVE}`}
-                        >
-                            <BarChart3 className="w-3.5 h-3.5" />
-                            Monitoreo KPI
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('global')}
-                            className={`pb-2 text-[10px] uppercase tracking-widest border-b-2 transition-all duration-200 whitespace-nowrap flex items-center gap-2 select-none ${activeTab === 'global' ? TAB_ACTIVE : TAB_INACTIVE}`}
-                        >
-                            <LayoutList className="w-3.5 h-3.5" />
-                            Todas las Gestiones
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('asignaciones')}
-                            className={`pb-2 text-[10px] uppercase tracking-widest border-b-2 transition-all duration-200 whitespace-nowrap flex items-center gap-2 select-none ${activeTab === 'asignaciones' ? TAB_ACTIVE : TAB_INACTIVE}`}
-                        >
-                            <Settings className="w-3.5 h-3.5" />
-                            Asignaciones
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('mis_establecimientos')}
-                            className={`pb-2 text-[10px] uppercase tracking-widest border-b-2 transition-all duration-200 whitespace-nowrap flex items-center gap-2 select-none ${activeTab === 'mis_establecimientos' ? TAB_ACTIVE : TAB_INACTIVE}`}
-                        >
-                            <Building2 className="w-3.5 h-3.5" />
-                            Mis Establecimientos
-                        </button>
-                    </div>
-                </div>
-            )}
+  const availableTabs = useMemo(
+    () => (isAdmin ? ADMIN_TABS : [{ id: 'mis_establecimientos', label: 'Mis establecimientos' }]),
+    [isAdmin],
+  )
 
-            {/* Scrolling View Container (Zero-Scroll Interno) */}
-            <div className="flex-1 min-h-0 overflow-hidden flex flex-col pb-4 pr-1">
-                <motion.div
-                    key={activeTab}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="flex-1 flex flex-col min-h-0 overflow-hidden"
+  const [activeTab, setActiveTab] = useState(
+    isAdmin ? 'kpi' : 'mis_establecimientos',
+  )
+
+  return (
+    <div className="page" data-od-id="comunicaciones-ejecutivos-page" data-fill-viewport>
+      <PageHeader
+        icon="user-check"
+        title="Ejecutivos de acompañamiento"
+        description="Gestión y seguimiento de establecimientos"
+        breadcrumbs={[
+          { label: 'Inicio', to: '/' },
+          { label: 'Ejecutivos de acompañamiento' },
+        ]}
+        linkComponent={Link}
+      />
+
+      {availableTabs.length > 1 ? (
+        <div className="tabs">
+          <ul className="tabs__list" role="tablist" aria-label="Secciones de ejecutivos de acompañamiento">
+            {availableTabs.map((tab) => (
+              <li key={tab.id}>
+                <button
+                  type="button"
+                  role="tab"
+                  id={`com-tab-${tab.id}`}
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={`com-panel-${tab.id}`}
+                  className={`tabs__btn${activeTab === tab.id ? ' is-active' : ''}`}
+                  onClick={() => setActiveTab(tab.id)}
                 >
-                    {isAdmin && activeTab === 'kpi' && <MonitoreoKPI />}
-                    {isAdmin && activeTab === 'global' && <AdminGestionesGlobal />}
-                    {isAdmin && activeTab === 'asignaciones' && <AdminAsignaciones />}
-                    {(!isAdmin || activeTab === 'mis_establecimientos') && <EjecutivoDashboard />}
-                </motion.div>
-            </div>
+                  {tab.label}
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
-    );
-};
+      ) : null}
 
-export default EjecutivosMain;
+      <div
+        id={`com-panel-${activeTab}`}
+        role="tabpanel"
+        aria-labelledby={`com-tab-${activeTab}`}
+        className="tabs__panel is-active comunicaciones-tab-panel"
+      >
+        {isAdmin && activeTab === 'kpi' ? <MonitoreoKPI /> : null}
+        {isAdmin && activeTab === 'global' ? <AdminGestionesGlobal /> : null}
+        {isAdmin && activeTab === 'asignaciones' ? <AdminAsignaciones /> : null}
+        {(!isAdmin || activeTab === 'mis_establecimientos') ? (
+          <EjecutivoDashboard />
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+export default EjecutivosMain

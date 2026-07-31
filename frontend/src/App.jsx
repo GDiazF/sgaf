@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { ToastProvider } from '@slep/ui';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -24,7 +25,6 @@ import ServiciosDashboard from './pages/contracts/ServiciosDashboard';
 import ServicioDetailPage from './pages/contracts/ServicioDetailPage';
 import RutaDetailPage from './pages/contracts/RutaDetailPage';
 // Funcionarios
-import FuncionariosDashboard from './pages/funcionarios/FuncionariosDashboard';
 import FuncionariosList from './pages/funcionarios/FuncionariosList';
 // import FuncionarioForm from './pages/funcionarios/FuncionarioForm';
 import Subdirecciones from './pages/funcionarios/Subdirecciones';
@@ -35,28 +35,22 @@ import AnexosDashboard from './pages/telecomunicaciones/AnexosDashboard';
 // Vehiculos
 import VehiculosDashboard from './pages/vehiculos/VehiculosDashboard';
 import RemuneracionesDashboard from './pages/tesoreria/Remuneraciones';
-import TesoreriaMaintainers from './pages/tesoreria/TesoreriaMaintainers';
-import LicitacionesDashboard from './pages/licitaciones/LicitacionesDashboard';
-import OCDashboard from './pages/orden_compra/OCDashboard';
+import MercadoPublicoDashboard from './pages/mercado_publico/MercadoPublicoDashboard';
 import ReservasDashboard from './pages/reservas/ReservasDashboard';
 import PublicReservas from './pages/reservas/PublicReservas';
 import PersonalTIDashboard from './pages/personal_ti/PersonalTIDashboard';
 import InsightsDashboard from './pages/insights/InsightsDashboard';
-import WelfareBoard from './pages/bienestar/WelfareBoard';
-import WelfareWall from './pages/bienestar/WelfareWall';
+import BienestarDashboard from './pages/bienestar/BienestarDashboard';
 
 import ProceduresDashboard from './pages/procedimientos/ProceduresDashboard';
 
 // Tickets
 import TicketsDashboard from './pages/tickets/TicketsDashboard';
-import TicketForm from './pages/tickets/TicketForm';
 import TicketDetail from './pages/tickets/TicketDetail';
-import CategoryManagement from './pages/tickets/CategoryManagement';
 
 // Comunicaciones
 import EjecutivosMain from './pages/comunicaciones/EjecutivosMain';
 import EstablecimientoGestion from './pages/comunicaciones/EstablecimientoGestion';
-
 
 import Login from './pages/Login';
 import ForgotPassword from './pages/auth/ForgotPassword';
@@ -87,12 +81,13 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
-          <h1 className="text-xl font-bold text-red-600 mb-2">Algo salió mal</h1>
-          <p className="text-sm text-slate-500 mb-4">{this.state.error?.toString()}</p>
+        <div className="app-boot-screen app-boot-screen--error">
+          <h1 className="app-boot-screen__title">Algo salió mal</h1>
+          <p className="app-boot-screen__desc">{this.state.error?.toString()}</p>
           <button
+            type="button"
+            className="btn btn--primary"
             onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
           >
             Recargar página
           </button>
@@ -109,7 +104,7 @@ const PrivateRoute = () => {
 
   console.log("[PrivateRoute] Rendering. Loading:", loading, "User:", user ? user.username : "null");
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50">Cargando...</div>;
+  if (loading) return <div className="app-boot-screen">Cargando…</div>;
 
   if (!user) {
     console.log("[PrivateRoute] No user, redirecting to login");
@@ -123,10 +118,11 @@ const PrivateRoute = () => {
 function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <BrowserRouter>
-          <SessionTimeoutManager />
-          <Routes>
+      <ToastProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <SessionTimeoutManager />
+            <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
@@ -186,8 +182,8 @@ function App() {
                 </Route>
                 {/* Funcionarios */}
                 <Route element={<ProtectedRoute permission="funcionarios.view_funcionario" />}>
-                  <Route path="funcionarios" element={<FuncionariosDashboard />} />
-                  <Route path="funcionarios/list" element={<FuncionariosList />} />
+                  <Route path="funcionarios" element={<FuncionariosList />} />
+                  <Route path="funcionarios/list" element={<Navigate to="/funcionarios" replace />} />
                   <Route path="funcionarios/subdirecciones" element={<Subdirecciones />} />
                   <Route path="funcionarios/departamentos" element={<Departamentos />} />
                   <Route path="funcionarios/unidades" element={<Unidades />} />
@@ -205,16 +201,26 @@ function App() {
                 {/* Tesorería */}
                 <Route element={<ProtectedRoute permission="remuneraciones.view_remuneracion" />}>
                   <Route path="tesoreria" element={<RemuneracionesDashboard />} />
-                </Route>
-                <Route element={<ProtectedRoute permission="remuneraciones.view_mapeobanco" />}>
-                  <Route path="tesoreria/config" element={<TesoreriaMaintainers />} />
+                  <Route path="tesoreria/config" element={<Navigate to="/tesoreria?tab=config" replace />} />
                 </Route>
                 {/* Otros */}
-                <Route element={<ProtectedRoute permission="licitaciones.view_licitacionmp" />}>
-                  <Route path="licitaciones" element={<LicitacionesDashboard />} />
-                </Route>
-                <Route element={<ProtectedRoute permission="orden_compra.view_ordencompramp" />}>
-                  <Route path="orden-compra" element={<OCDashboard />} />
+                {/* Mercado Público */}
+                <Route
+                  element={
+                    <ProtectedRoute
+                      permission={[
+                        'orden_compra.view_ordencompramp',
+                        'licitaciones.view_licitacionmp',
+                      ]}
+                    />
+                  }
+                >
+                  <Route path="mercado-publico" element={<MercadoPublicoDashboard />} />
+                  <Route path="orden-compra" element={<Navigate to="/mercado-publico?tab=oc" replace />} />
+                  <Route
+                    path="licitaciones"
+                    element={<Navigate to="/mercado-publico?tab=licitaciones" replace />}
+                  />
                 </Route>
                 <Route element={<ProtectedRoute permission={['solicitudes_reservas.view_solicitudreserva', 'solicitudes_reservas.can_view_calendar']} />}>
                   <Route path="reservas" element={<ReservasDashboard />} />
@@ -226,17 +232,22 @@ function App() {
                   <Route path="insights" element={<InsightsDashboard />} />
                 </Route>
                 <Route element={<ProtectedRoute permission="bienestar.view_beneficio" />}>
-                  <Route path="bienestar/muro" element={<div className="h-full w-full overflow-hidden"><WelfareWall /></div>} />
+                  <Route path="bienestar" element={<BienestarDashboard />} />
+                  <Route path="bienestar/muro" element={<Navigate to="/bienestar" replace />} />
                 </Route>
-                <Route element={<ProtectedRoute permission={['bienestar.add_beneficio', 'bienestar.change_beneficio']} />}>
-                  <Route path="bienestar" element={<WelfareBoard />} />
-                </Route>
+                <Route
+                  path="bienestar/config"
+                  element={<Navigate to="/bienestar?tab=config" replace />}
+                />
                 <Route path="procedimientos" element={<ProceduresDashboard />} />
                 
                 {/* Tickets / Mesa de Ayuda */}
                 <Route path="tickets" element={<TicketsDashboard />} />
-                <Route path="tickets/new" element={<TicketForm />} />
-                <Route path="tickets/categories" element={<CategoryManagement />} />
+                <Route path="tickets/new" element={<Navigate to="/tickets?nuevo=1" replace />} />
+                <Route
+                  path="tickets/categories"
+                  element={<Navigate to="/tickets?categorias=1" replace />}
+                />
                 <Route path="tickets/:id" element={<TicketDetail />} />
 
                 {/* Comunicaciones */}
@@ -263,6 +274,7 @@ function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
+      </ToastProvider>
     </ErrorBoundary>
   );
 }

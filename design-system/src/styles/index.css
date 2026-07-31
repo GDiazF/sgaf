@@ -1,0 +1,272 @@
+@import './tokens.css';
+@import './layout.css';
+@import './components.css';
+@import './shell.css';
+@import './login.css';
+@import './charts.css';
+@import './calendar.css';
+@import './motion.css';
+
+@tailwind utilities;
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Helpers used by React wrappers (not always present in OpenDesign CSS) */
+.input-with-action {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.input-with-action .input {
+  width: 100%;
+  padding-right: 2.5rem;
+}
+.input-action {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0.35rem;
+  display: inline-flex;
+}
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+.login-form__submit { width: 100%; }
+.page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+.select--sm {
+  height: var(--control-height-sm);
+  font-size: var(--text-sm);
+}
+.pagination {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.pagination__status {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+.table-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.table-toolbar {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.table-wrap { overflow-x: auto; }
+.table-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+.table-empty { padding: var(--space-8) var(--space-4); }
+/* Loading pattern (ported from login.css → product UI) */
+.btn.is-loading {
+  position: relative;
+  pointer-events: none;
+  color: transparent !important;
+}
+.btn.is-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--primary-fg);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: slep-btn-spin 0.7s linear infinite;
+}
+@keyframes slep-btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+.showcase-link-back {
+  display: inline-block;
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--primary-text);
+  text-decoration: none;
+}
+.showcase-link-back:hover { text-decoration: underline; }
+
+.showcase-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.ds-subsection__title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-heading);
+  margin: 0 0 var(--space-3);
+}
+
+/* Viewport frames: estilos canónicos viven en showcase.css — no duplicar aquí */
+
+.showcase-demo-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.system-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+.system-banner--success {
+  background: var(--success-subtle);
+  border-color: color-mix(in oklch, var(--success) 25%, transparent);
+}
+.system-banner--error {
+  background: var(--danger-subtle);
+  border-color: color-mix(in oklch, var(--danger) 25%, transparent);
+}
+.system-banner__title {
+  font-weight: var(--weight-heading);
+  margin-bottom: 2px;
+}
+
+.action-map {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.action-map th,
+.action-map td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+.action-map th {
+  background: var(--surface-raised);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--muted);
+}
+
+.record-list {
+  display: grid;
+  gap: var(--space-3);
+}
+.record-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+.record-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.record-card__title {
+  font-weight: var(--weight-heading);
+}
+.record-card__subtitle,
+.record-card__meta {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+.record-card__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.filters-empty {
+  padding: var(--space-6);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+}
+
+.tabs__list {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border);
+}
+.tabs__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.tabs__btn.is-active {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+  font-weight: var(--weight-heading);
+}
+
+.motion-stagger > * {
+  animation: slep-stagger-in var(--motion-duration-normal) var(--motion-ease-enter) both;
+}
+.motion-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.motion-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.motion-stagger > *:nth-child(4) { animation-delay: 120ms; }
+@keyframes slep-stagger-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-stagger > *,
+  .btn.is-loading::after {
+    animation: none !important;
+  }
+}

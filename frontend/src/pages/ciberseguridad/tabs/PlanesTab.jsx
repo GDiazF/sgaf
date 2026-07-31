@@ -1,159 +1,379 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, CheckCircle2, ShieldAlert, RefreshCw, X, Download } from 'lucide-react';
-import api from '../../../api';
+import React, { useState, useEffect, useMemo } from 'react'
+import api from '../../../api'
+import useDebouncedValue from '../../../hooks/useDebouncedValue'
+import { useNotify } from '../../../hooks/useNotify'
+import {
+  FiltersBar,
+  DataTable,
+  Badge,
+  Button,
+  Field,
+  Input,
+  Select,
+  Modal,
+  FileInput,
+  Switch,
+  Icon,
+  useFormOverlay,
+  formatApiFormError,
+} from '@slep/ui'
+
+const emptyForm = () => ({
+  titulo: '',
+  tipo: 'CONTINUIDAD',
+  documento: null,
+  fecha_aprobacion: '',
+  fecha_proxima_revision: '',
+  activo: true,
+})
+
+const TIPO_LABEL = {
+  CONTINUIDAD: 'Continuidad operativa',
+  RECUPERACION: 'Recuperación (DRP)',
+  RIESGOS: 'Gestión de riesgos',
+  OTRO: 'Otro',
+}
 
 const PlanesTab = ({ user }) => {
-    const [planes, setPlanes] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [showModal, setShowModal] = useState(false);
-    const [alertMsg, setAlertMsg] = useState({ type: '', text: '' });
+  const canAdd = user?.user_permissions?.includes('core.add_ciberseguridadplan')
 
-    const [formData, setFormData] = useState({
-        titulo: '',
-        tipo: 'CONTINUIDAD',
-        documento: null,
-        fecha_aprobacion: '',
-        fecha_proxima_revision: '',
-        activo: true
-    });
+  const [planes, setPlanes] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [search, setSearch] = useState('')
+  const [modalOpen, setModalOpen] = useState(false)
+  const [formData, setFormData] = useState(emptyForm())
+  const [savedOk, setSavedOk] = useState(false)
+  const overlay = useFormOverlay()
+  const { notify } = useNotify()
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
-    const fetchPlanes = async () => {
-        setLoading(true);
-        try {
-            const res = await api.get('ciberseguridad/planes/');
-            setPlanes(res.data.results || res.data || []);
-        } catch (err) {
-            showAlert('error', 'No se pudieron cargar los planes.');
-        } finally {
-            setLoading(false);
-        }
-    };
+  const debouncedSearch = useDebouncedValue(search)
 
-    useEffect(() => {
-        fetchPlanes();
-    }, []);
+  const fetchPlanes = async () => {
+    setLoading(true)
+    try {
+      const res = await api.get('ciberseguridad/planes/')
+      setPlanes(res.data.results || res.data || [])
+    } catch (err) {
+      notify({ variant: 'danger', text: 'No se pudieron cargar los planes.' })
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    const showAlert = (type, text) => {
-        setAlertMsg({ type, text });
-        setTimeout(() => setAlertMsg({ type: '', text: '' }), 5000);
-    };
+  useEffect(() => {
+    fetchPlanes()
+  }, [])
 
-    const handleFormSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        try {
-            const data = new FormData();
-            Object.keys(formData).forEach(key => {
-                if (formData[key] !== null) {
-                    data.append(key, formData[key]);
+  const filtered = useMemo(() => {
+    const q = debouncedSearch.toLowerCase()
+    if (!q) return planes
+    return planes.filter(
+      (p) =>
+        (p.titulo || '').toLowerCase().includes(q) ||
+        (TIPO_LABEL[p.tipo] || p.tipo || '').toLowerCase().includes(q),
+    )
+  }, [planes, debouncedSearch])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch])
+
+  const pageRows = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filtered.slice(start, start + pageSize)
+  }, [filtered, page, pageSize])
+
+  const openCreate = () => {
+    setFormData(emptyForm())
+    setSavedOk(false)
+    overlay.reset()
+    setModalOpen(true)
+  }
+
+  const closeModal = () => {
+    if (overlay.busy) return
+    overlay.reset()
+    setModalOpen(false)
+    setFormData(emptyForm())
+    setSavedOk(false)
+  }
+
+  const handleOverlayDismiss = () => {
+    if (overlay.status === 'success') {
+      overlay.reset()
+      setModalOpen(false)
+      setFormData(emptyForm())
+      if (savedOk) fetchPlanes()
+      setSavedOk(false)
+      return
+    }
+    overlay.dismiss()
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const data = new FormData()
+    Object.keys(formData).forEach((key) => {
+      if (formData[key] !== null && formData[key] !== '') data.append(key, formData[key])
+    })
+    try {
+      await overlay.run(
+        async () => {
+          await api.post('ciberseguridad/planes/', data, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          })
+          setSavedOk(true)
+        },
+        {
+          successDescription: 'Plan creado.',
+          formatError: (err) => formatApiFormError(err, 'No se pudo guardar el plan.'),
+        },
+      )
+    } catch {
+      // FormOverlay
+    }
+  }
+
+  const columns = useMemo(
+    () => [
+      {
+        key: 'titulo',
+        header: 'Plan',
+        className: 'col--primary',
+        cardRole: 'title',
+        priority: 1,
+      },
+      {
+        key: 'tipo',
+        header: 'Tipo',
+        className: 'col--secondary',
+        cardRole: 'subtitle',
+        priority: 1,
+        render: (item) => (
+          <Badge variant="accent">{TIPO_LABEL[item.tipo] || item.tipo}</Badge>
+        ),
+      },
+      {
+        key: 'activo',
+        header: 'Estado',
+        className: 'col--status',
+        cardRole: 'status',
+        priority: 1,
+        render: (item) => (
+          <Badge variant={item.activo ? 'success' : 'neutral'} dot>
+            {item.activo ? 'Vigente' : 'Inactivo'}
+          </Badge>
+        ),
+      },
+      {
+        key: 'fecha_aprobacion',
+        header: 'Aprobado',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 2,
+        render: (item) => item.fecha_aprobacion || '—',
+      },
+      {
+        key: 'fecha_proxima_revision',
+        header: 'Próx. revisión',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 2,
+        render: (item) => item.fecha_proxima_revision || 'No definida',
+      },
+      {
+        key: 'actions',
+        header: 'Acciones',
+        className: 'col--actions',
+        render: (item) =>
+          item.documento_url ? (
+            <div className="data-table__actions">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  window.open(item.documento_url, '_blank', 'noopener,noreferrer')
                 }
-            });
+              >
+                Descargar
+              </Button>
+            </div>
+          ) : (
+            '—'
+          ),
+      },
+    ],
+    [],
+  )
 
-            await api.post('ciberseguridad/planes/', data, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-            showAlert('success', 'Plan registrado exitosamente.');
-            setShowModal(false);
-            fetchPlanes();
-        } catch (err) {
-            showAlert('error', 'Error al guardar el plan.');
-        } finally {
-            setLoading(false);
+  return (
+    <div className="cyber-tab">
+      
+
+      <FiltersBar
+        onSearch={() => setPage(1)}
+        onClear={() => {
+          setSearch('')
+          setPage(1)
+        }}
+      >
+        <Field label="Buscar" htmlFor="planes-q">
+          <div className="input-wrap">
+            <Icon name="search" className="input-wrap__icon" size="sm" />
+            <Input
+              id="planes-q"
+              type="search"
+              placeholder="Buscar por título o tipo…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </Field>
+      </FiltersBar>
+
+      <DataTable
+        columns={columns}
+        rows={pageRows}
+        loading={loading}
+        totalCount={filtered.length}
+        emptyTitle="Sin planes"
+        emptyDescription="No hay planes con la búsqueda actual."
+        emptyAction={
+          canAdd ? (
+            <Button variant="primary" size="sm" onClick={openCreate}>
+              <Icon name="plus" size="sm" /> Registrar plan
+            </Button>
+          ) : undefined
         }
-    };
-
-    return (
-        <div className="p-6 space-y-6">
-            {alertMsg.text && (
-                <div className={`p-4 rounded-2xl flex gap-3 items-center border ${
-                    alertMsg.type === 'error' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
-                }`}>
-                    {alertMsg.type === 'error' ? <ShieldAlert className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
-                    <p className="text-xs font-bold">{alertMsg.text}</p>
-                </div>
-            )}
-
-            <div className="flex justify-end">
-                {user?.user_permissions?.includes('core.add_ciberseguridadplan') && (
-                    <button
-                        onClick={() => setShowModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md"
-                    >
-                        <Plus className="w-4 h-4" /> Registrar Plan
-                    </button>
-                )}
+        page={page}
+        pageSize={pageSize}
+        pageSizeId="planes-page-size"
+        onPageChange={setPage}
+        onPageSizeChange={(n) => {
+          setPageSize(n)
+          setPage(1)
+        }}
+        mobileCardActions={(item) =>
+          item.documento_url
+            ? {
+                primary: {
+                  label: 'Descargar',
+                  onClick: () =>
+                    window.open(item.documento_url, '_blank', 'noopener,noreferrer'),
+                },
+              }
+            : {}
+        }
+        toolbar={
+          <>
+            <div className="table-toolbar__left">
+              <span className="table-toolbar__title">Listado</span>
+              <Badge variant="neutral">{filtered.length}</Badge>
             </div>
+            {canAdd ? (
+              <div className="table-toolbar__right">
+                <Button variant="primary" size="sm" onClick={openCreate}>
+                  <Icon name="plus" size="sm" /> Registrar plan
+                </Button>
+              </div>
+            ) : null}
+          </>
+        }
+      />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {loading ? (
-                    <div className="col-span-full text-center text-slate-400 p-8"><RefreshCw className="w-6 h-6 animate-spin mx-auto" /></div>
-                ) : planes.length === 0 ? (
-                    <div className="col-span-full text-center text-slate-400 p-8 bg-white rounded-2xl border border-slate-200">No hay planes registrados.</div>
-                ) : (
-                    planes.map(plan => (
-                        <div key={plan.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
-                            <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">{plan.titulo}</h3>
-                            <div className="flex gap-2">
-                                <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 uppercase">{plan.tipo}</span>
-                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${plan.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100'}`}>
-                                    {plan.activo ? 'Vigente' : 'Inactivo'}
-                                </span>
-                            </div>
-                            <div className="text-[10px] text-slate-500 pt-2 border-t space-y-1">
-                                <div><span className="font-bold">Aprobado:</span> {plan.fecha_aprobacion}</div>
-                                <div><span className="font-bold">Próxima Revisión:</span> {plan.fecha_proxima_revision || 'No definida'}</div>
-                            </div>
-                            {plan.documento_url && (
-                                <a href={plan.documento_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full py-2 bg-slate-50 hover:bg-slate-100 text-indigo-600 rounded-lg text-[10px] font-black uppercase mt-2">
-                                    <Download className="w-3 h-3" /> Descargar Documento
-                                </a>
-                            )}
-                        </div>
-                    ))
-                )}
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        title="Registrar plan SGSI"
+        subheader="Documentación de continuidad y respuesta"
+        {...overlay.modalProps}
+        onOverlayDismiss={handleOverlayDismiss}
+        footer={
+          <>
+            <Button variant="ghost" type="button" onClick={closeModal} disabled={overlay.busy}>
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              form="planes-form"
+              loading={overlay.busy}
+              disabled={overlay.busy || overlay.active}
+            >
+              Guardar plan
+            </Button>
+          </>
+        }
+      >
+        <form id="planes-form" className="crud-form" onSubmit={handleSubmit}>
+          <div className="form-grid">
+            <Field label="Título" required htmlFor="plan-titulo" className="field--full">
+              <Input
+                id="plan-titulo"
+                required
+                value={formData.titulo}
+                onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+              />
+            </Field>
+            <Field label="Tipo de plan" htmlFor="plan-tipo" className="field--full">
+              <Select
+                id="plan-tipo"
+                value={formData.tipo}
+                onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+              >
+                <option value="CONTINUIDAD">Continuidad operativa</option>
+                <option value="RECUPERACION">Recuperación (DRP)</option>
+                <option value="RIESGOS">Gestión de riesgos</option>
+                <option value="OTRO">Otro</option>
+              </Select>
+            </Field>
+            <Field label="Fecha aprobación" required htmlFor="plan-fa">
+              <Input
+                id="plan-fa"
+                type="date"
+                required
+                value={formData.fecha_aprobacion}
+                onChange={(e) =>
+                  setFormData({ ...formData, fecha_aprobacion: e.target.value })
+                }
+              />
+            </Field>
+            <Field label="Próxima revisión" required htmlFor="plan-fr">
+              <Input
+                id="plan-fr"
+                type="date"
+                required
+                value={formData.fecha_proxima_revision}
+                onChange={(e) =>
+                  setFormData({ ...formData, fecha_proxima_revision: e.target.value })
+                }
+              />
+            </Field>
+            <Field label="Documento" htmlFor="plan-doc" className="field--full">
+              <FileInput
+                id="plan-doc"
+                label="Seleccionar archivo"
+                accept=".pdf,.doc,.docx"
+                onChange={(e) =>
+                  setFormData({ ...formData, documento: e.target.files?.[0] || null })
+                }
+              />
+            </Field>
+            <div className="field field--full">
+              <Switch
+                id="plan-activo"
+                label="Plan vigente"
+                checked={!!formData.activo}
+                onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
+              />
             </div>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  )
+}
 
-            {showModal && (
-                <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl w-full max-w-xl p-6 space-y-4 text-left">
-                        <div className="flex justify-between items-center border-b pb-3">
-                            <h3 className="text-xs font-black uppercase text-indigo-600">Registrar Plan SGSI</h3>
-                            <button onClick={() => setShowModal(false)} className="text-slate-400 hover:bg-slate-100 p-1 rounded-lg"><X className="w-5 h-5"/></button>
-                        </div>
-                        <form onSubmit={handleFormSubmit} className="space-y-4">
-                            <div>
-                                <label className="text-[9px] font-black uppercase text-slate-400">Título</label>
-                                <input required className="w-full mt-1 px-4 py-2 border rounded-xl text-xs" onChange={e => setFormData({...formData, titulo: e.target.value})} />
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-black uppercase text-slate-400">Tipo de Plan</label>
-                                <select className="w-full mt-1 px-4 py-2 border rounded-xl text-xs" value={formData.tipo} onChange={e => setFormData({...formData, tipo: e.target.value})}>
-                                    <option value="CONTINUIDAD">Continuidad Operativa</option>
-                                    <option value="INCIDENTES">Respuesta a Incidentes</option>
-                                    <option value="RECUPERACION">Recuperación (DRP)</option>
-                                    <option value="OTRO">Otro</option>
-                                </select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[9px] font-black uppercase text-slate-400">Fecha Aprobación</label>
-                                    <input type="date" required className="w-full mt-1 px-4 py-2 border rounded-xl text-xs" onChange={e => setFormData({...formData, fecha_aprobacion: e.target.value})} />
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-black uppercase text-slate-400">Próxima Revisión</label>
-                                    <input type="date" className="w-full mt-1 px-4 py-2 border rounded-xl text-xs" onChange={e => setFormData({...formData, fecha_proxima_revision: e.target.value})} />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-black uppercase text-slate-400">Documento PDF</label>
-                                <input type="file" accept=".pdf,.doc,.docx" className="w-full mt-1 text-xs" onChange={e => setFormData({...formData, documento: e.target.files[0]})} />
-                            </div>
-                            <button type="submit" disabled={loading} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs uppercase font-black">Guardar Plan</button>
-                        </form>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-export default PlanesTab;
+export default PlanesTab

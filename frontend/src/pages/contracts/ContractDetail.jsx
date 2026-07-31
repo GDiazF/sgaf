@@ -1,1095 +1,1416 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import api from '../../api';
-import ContractModal from '../../components/contracts/ContractModal';
-import ContractReceptionModal from '../../components/contracts/ContractReceptionModal';
-import FormInput from '../../components/common/FormInput';
+import React, { useState, useEffect, useMemo } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import api from '../../api'
+import ContractModal from '../../components/contracts/ContractModal'
+import ContractReceptionModal from '../../components/contracts/ContractReceptionModal'
+import ContratoServiciosTab from './ContratoServiciosTab'
+import DocumentViewerModal from '../../components/common/DocumentViewerModal'
+import { usePermission } from '../../hooks/usePermission'
+import useDebouncedValue from '../../hooks/useDebouncedValue'
+import { useNotify } from '../../hooks/useNotify'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import {
-    FileText, Building2, Clock, CheckCircle2, AlertCircle,
-    Download, Trash2, Plus, Hash, Info,
-    Users, TrendingUp, Activity, DollarSign, Pencil, X, ArrowLeft, Eye, History,
-    FileSearch, FolderSearch, ShoppingBag, ChevronRight, Truck
-} from 'lucide-react';
-import ContratoServiciosTab from './ContratoServiciosTab';
-import DocumentViewerModal from '../../components/common/DocumentViewerModal';
-import { usePermission } from '../../hooks/usePermission';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+  PageHeader,
+  ChartCard,
+  FiltersBar,
+  DataTable,
+  Badge,
+  Button,
+  Field,
+  Input,
+  FileInput,
+  Modal,
+  ConfirmModal,
+  DetailItem,
+  EmptyState,
+  Icon,
+  useFormOverlay,
+  formatApiFormError,
+} from '@slep/ui'
 
-const DOC_INPUT_CLASS =
-    'no-global !w-full !h-10 !min-h-10 !text-[10px] !font-bold !bg-white !border !border-slate-200 !px-3 !py-0 !rounded-xl !outline-none focus:!border-blue-500 uppercase !transition-all !shadow-sm placeholder:!text-slate-300';
+const TABS = [
+  { id: 'info', label: 'General' },
+  { id: 'providers', label: 'Proveedores' },
+  { id: 'servicios', label: 'Gestión' },
+  { id: 'receptions', label: 'Recepciones' },
+  { id: 'docs', label: 'Archivos' },
+  { id: 'history', label: 'Historial' },
+]
 
-const DOC_LABEL_CLASS =
-    '!block !text-[10px] !font-black !text-slate-500 !uppercase !tracking-widest !mb-1.5 !ml-1';
+const formatCurrency = (amount) =>
+  new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    maximumFractionDigits: 0,
+  }).format(amount || 0)
 
-const BTN_PRIMARY =
-    'bg-blue-600 hover:bg-blue-700 text-white h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20 flex items-center gap-2 shrink-0 active:scale-95';
+const formatDate = (value) => {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('es-CL')
+}
 
-const BTN_SECONDARY =
-    'bg-slate-100 hover:bg-slate-200 text-slate-600 h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shrink-0';
-
-const ModalPortal = ({ children }) => createPortal(children, document.body);
+const estadoVariant = (nombre) => {
+  const n = (nombre || '').toLowerCase()
+  if (n.includes('activo') || n.includes('vigente')) return 'success'
+  if (n.includes('pendiente')) return 'warning'
+  if (n.includes('caducado') || n.includes('anul')) return 'danger'
+  return 'neutral'
+}
 
 const ContractDetail = () => {
-    const { id } = useParams();
-    const navigate = useNavigate();
-    const { can } = usePermission();
-    const [contract, setContract] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [receptions, setReceptions] = useState([]);
-    const [history, setHistory] = useState([]);
-    const [activeTab, setActiveTab] = useState('info'); // 'info', 'docs', 'receptions', 'history'
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const { can } = usePermission()
 
-    // Modal controls
-    const [isEditModalOpen, setEditModalOpen] = useState(false);
-    const [isDocModalOpen, setDocModalOpen] = useState(false); // Renamed from showUploadModal
-    const [isReceptionModalOpen, setReceptionModalOpen] = useState(false); // Renamed from showAdquisicionModal
-    const [editingRC, setEditingRC] = useState(null);
-    const [sortConfig, setSortConfig] = useState({ key: 'periodo', direction: 'desc' });
+  const [contract, setContract] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [receptions, setReceptions] = useState([])
+  const [history, setHistory] = useState([])
+  const [activeTab, setActiveTab] = useState('info')
+  const { notify } = useNotify()
 
-    // Document Upload State
-    const [previewDoc, setPreviewDoc] = useState(null);
-    const [uploadFormData, setUploadFormData] = useState({
-        nombre: '',
-        archivo: null
-    });
+  const [isEditModalOpen, setEditModalOpen] = useState(false)
+  const [isDocModalOpen, setDocModalOpen] = useState(false)
+  const [isReceptionModalOpen, setReceptionModalOpen] = useState(false)
+  const [editingRC, setEditingRC] = useState(null)
+  const [previewDoc, setPreviewDoc] = useState(null)
+  const [deleteDocTarget, setDeleteDocTarget] = useState(null)
+  const [deleteRcTarget, setDeleteRcTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [uploadFormData, setUploadFormData] = useState({ nombre: '', archivo: null })
+  const docOverlay = useFormOverlay()
+  const [sortConfig, setSortConfig] = useState({ key: 'periodo', direction: 'desc' })
+  const [selectedProvider, setSelectedProvider] = useState(null)
+  const [historySearch, setHistorySearch] = useState('')
+  const [historySort, setHistorySort] = useState({ key: 'fecha', direction: 'desc' })
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyPageSize, setHistoryPageSize] = useState(25)
+  const debouncedHistorySearch = useDebouncedValue(historySearch)
 
-    // Recepciones State
-    const [lookups, setLookups] = useState({
-        establishments: [],
-        providers: [],
-        deliveryTypes: [],
-        groups: [],
-        establishmentTypes: [],
-        procesos: [],
-        estados: [],
-        categorias: [],
-        orientaciones: []
-    });
+  const [lookups, setLookups] = useState({
+    establishments: [],
+    establecimientos: [],
+    providers: [],
+    proveedores: [],
+    deliveryTypes: [],
+    groups: [],
+    establishmentTypes: [],
+    tiposEstablecimiento: [],
+    procesos: [],
+    estados: [],
+    categorias: [],
+    orientaciones: [],
+  })
 
-    const fetchLookups = async () => {
-        try {
-            const [estRes, provRes, delRes, grpRes, typRes, procRes, estsRes, catRes, oriRes] = await Promise.all([
-                api.get('establecimientos/', { params: { page_size: 1000, activo: true } }),
-                api.get('proveedores/', { params: { page_size: 1000 } }),
-                api.get('tipos-entrega/', { params: { page_size: 1000 } }),
-                api.get('grupos/', { params: { page_size: 1000 } }),
-                api.get('tipos-establecimiento/'),
-                api.get('contratos/procesos/'),
-                api.get('contratos/estados/'),
-                api.get('contratos/categorias/'),
-                api.get('contratos/orientaciones/')
-            ]);
-            setLookups({
-                establishments: estRes.data.results || estRes.data,
-                establecimientos: estRes.data.results || estRes.data,
-                providers: provRes.data.results || provRes.data,
-                proveedores: provRes.data.results || provRes.data,
-                deliveryTypes: delRes.data.results || delRes.data,
-                groups: grpRes.data.results || grpRes.data,
-                establishmentTypes: typRes.data.results || typRes.data,
-                tiposEstablecimiento: typRes.data.results || typRes.data,
-                procesos: procRes.data.results || procRes.data,
-                estados: estsRes.data.results || estsRes.data,
-                categorias: catRes.data.results || catRes.data,
-                orientaciones: oriRes.data.results || oriRes.data
-            });
-        } catch (error) {
-            console.error("Error fetching lookups:", error);
-        }
-    };
-
-    const fetchContract = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get(`contratos/contratos/${id}/`);
-            setContract(response.data);
-            setReceptions(response.data.recepciones || []);
-            setHistory(response.data.historial || []);
-        } catch (error) {
-            console.error("Error fetching contract:", error);
-            alert("Error al cargar el contrato.");
-            navigate('/contracts');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchContract();
-        fetchLookups();
-    }, [id]);
-
-    const handleFileUpload = async (e) => {
-        e.preventDefault();
-        const data = new FormData();
-        data.append('contrato', id);
-        data.append('nombre', uploadFormData.nombre);
-        data.append('archivo', uploadFormData.archivo);
-
-        try {
-            await api.post('contratos/documentos/', data, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-            setDocModalOpen(false);
-            setUploadFormData({ nombre: '', archivo: null });
-            fetchContract();
-        } catch (error) {
-            console.error(error);
-            alert("Error al subir documento.");
-        }
-    };
-
-    const handleDeleteDoc = async (docId) => {
-        if (!window.confirm("¿Seguro que desea eliminar este documento?")) return;
-        try {
-            await api.delete(`contratos/documentos/${docId}/`);
-            fetchContract();
-        } catch (error) {
-            console.error(error);
-            alert("Error al eliminar.");
-        }
-    };
-
-    const handleCreateReception = async (formData, isSplit = false) => {
-        try {
-            if (editingRC) {
-                await api.put(`facturas-adquisicion/${editingRC.id}/`, {
-                    ...formData,
-                    contrato: contract.id
-                });
-            } else {
-                if (isSplit && formData.establecimientos && formData.establecimientos.length > 1) {
-                    // Generar RCs individuales
-                    let currentFolio = formData.folio || "";
-
-                    for (const estId of formData.establecimientos) {
-                        const estName = lookups.establishments.find(e => e.id === estId)?.nombre || '';
-
-                        const singlePayload = {
-                            ...formData,
-                            establecimientos: [estId],
-                            contrato: contract.id,
-                            folio: currentFolio,
-                            descripcion: formData.descripcion + (estName ? `\n- ${estName}` : '')
-                        };
-
-                        await api.post('facturas-adquisicion/', singlePayload);
-
-                        // Increment folio if it ends with numbers
-                        if (currentFolio) {
-                            currentFolio = currentFolio.replace(/(\d+)(?!.*\d)/, (match) => {
-                                const num = parseInt(match, 10) + 1;
-                                return num.toString().padStart(match.length, '0');
-                            });
-                        }
-                    }
-                } else {
-                    // Flujo normal (una sola RC)
-                    await api.post('facturas-adquisicion/', {
-                        ...formData,
-                        contrato: contract.id
-                    });
-                }
-            }
-            setReceptionModalOpen(false);
-            setEditingRC(null);
-            fetchContract();
-        } catch (error) {
-            console.error(error);
-            alert("Error al procesar la recepción.");
-        }
-    };
-
-    const handleEditReception = (rc) => {
-        setEditingRC(rc);
-        setReceptionModalOpen(true);
-    };
-
-    const handleDeleteReception = async (rcId) => {
-        if (!window.confirm("¿Está seguro que desea eliminar (anular) esta recepción? El presupuesto se restaurará.")) return;
-        try {
-            await api.delete(`facturas-adquisicion/${rcId}/`);
-            fetchContract();
-        } catch (error) {
-            console.error(error);
-            alert("Error al eliminar la recepción.");
-        }
-    };
-
-    const handleDownloadPDF = async (rc) => {
-        try {
-            const response = await api.get(`facturas-adquisicion/${rc.id}/generate_pdf/`, {
-                responseType: 'blob'
-            });
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const oc = rc.nro_oc || contract.nro_oc;
-            const rawFilename = oc ? `RC ${oc}.pdf` : `RC ${rc.folio || rc.id}.pdf`;
-            const filename = rawFilename.replace(/[/\\?%*:|"<>]/g, '-');
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', filename);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-        } catch (error) {
-            console.error("Error downloading PDF:", error);
-            alert("Error al generar el PDF.");
-        }
-    };
-
-    const handleSort = (key) => {
-        let direction = 'desc';
-        if (sortConfig.key === key && sortConfig.direction === 'desc') {
-            direction = 'asc';
-        }
-        setSortConfig({ key, direction });
-    };
-
-    const sortedReceptions = [...receptions].sort((a, b) => {
-        if (!sortConfig.key) return 0;
-
-        let valA = a[sortConfig.key];
-        let valB = b[sortConfig.key];
-
-        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-    });
-
-    const SortIcon = ({ column }) => {
-        if (sortConfig.key !== column) return <TrendingUp className="w-2.5 h-2.5 opacity-20" />;
-        return sortConfig.direction === 'asc'
-            ? <TrendingUp className="w-2.5 h-2.5 text-blue-600 rotate-180 transition-transform" />
-            : <TrendingUp className="w-2.5 h-2.5 text-blue-600 transition-transform" />;
-    };
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center p-20">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            </div>
-        );
+  const fetchLookups = async () => {
+    try {
+      const [estRes, provRes, delRes, grpRes, typRes, procRes, estsRes, catRes, oriRes] =
+        await Promise.all([
+          api.get('establecimientos/', { params: { page_size: 1000, activo: true } }),
+          api.get('proveedores/', { params: { page_size: 1000 } }),
+          api.get('tipos-entrega/', { params: { page_size: 1000 } }),
+          api.get('grupos/', { params: { page_size: 1000 } }),
+          api.get('tipos-establecimiento/'),
+          api.get('contratos/procesos/'),
+          api.get('contratos/estados/'),
+          api.get('contratos/categorias/'),
+          api.get('contratos/orientaciones/'),
+        ])
+      const establishments = estRes.data.results || estRes.data
+      const providers = provRes.data.results || provRes.data
+      const types = typRes.data.results || typRes.data
+      setLookups({
+        establishments,
+        establecimientos: establishments,
+        providers,
+        proveedores: providers,
+        deliveryTypes: delRes.data.results || delRes.data,
+        groups: grpRes.data.results || grpRes.data,
+        establishmentTypes: types,
+        tiposEstablecimiento: types,
+        procesos: procRes.data.results || procRes.data,
+        estados: estsRes.data.results || estsRes.data,
+        categorias: catRes.data.results || catRes.data,
+        orientaciones: oriRes.data.results || oriRes.data,
+      })
+    } catch (error) {
+      console.error(error)
     }
+  }
 
-    if (!contract) return null;
+  const fetchContract = async () => {
+    try {
+      setLoading(true)
+      const response = await api.get(`contratos/contratos/${id}/`)
+      setContract(response.data)
+      setReceptions(response.data.recepciones || [])
+      setHistory(response.data.historial || [])
+    } catch (error) {
+      console.error(error)
+      notify({ variant: 'danger', text: 'Error al cargar el contrato.' })
+      navigate('/contracts')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-CL', {
-            style: 'currency',
-            currency: 'CLP',
-            maximumFractionDigits: 0
-        }).format(amount || 0);
-    };
+  useEffect(() => {
+    fetchContract()
+    fetchLookups()
+  }, [id])
 
-    const getStatusColor = (status) => {
-        switch (status?.toUpperCase()) {
-            case 'VIGENTE':
-            case 'ACTIVO':
-                return 'bg-emerald-50 text-emerald-700 border-emerald-100 shadow-sm shadow-emerald-500/5';
-            case 'FINALIZADO': return 'bg-slate-50 text-slate-700 border-slate-100';
-            case 'PENDIENTE': return 'bg-amber-50 text-amber-700 border-amber-100';
-            case 'CADUCADO': return 'bg-red-50 text-red-700 border-red-100';
-            default: return 'bg-slate-50 text-slate-700 border-slate-100';
+  useEffect(() => {
+    if (!isDocModalOpen) return
+    docOverlay.reset()
+    setUploadFormData({ nombre: '', archivo: null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset solo al abrir
+  }, [isDocModalOpen])
+
+  const editFormData = useMemo(() => {
+    if (!contract) return null
+    return {
+      codigo_mercado_publico: contract.codigo_mercado_publico,
+      descripcion: contract.descripcion,
+      proceso: contract.proceso,
+      estado: contract.estado,
+      categoria: contract.categoria,
+      orientacion: contract.orientacion || '',
+      proveedor: contract.proveedor || '',
+      fecha_adjudicacion: contract.fecha_adjudicacion,
+      fecha_inicio: contract.fecha_inicio,
+      fecha_termino: contract.fecha_termino,
+      tipo_oc: contract.tipo_oc || 'UNICA',
+      nro_oc: contract.nro_oc || '',
+      cdp: contract.cdp || '',
+      proveedores_asociados: contract.proveedores_asociados || [],
+      establecimientos: contract.establecimientos || [],
+    }
+  }, [contract])
+
+  const handleEditSave = async (dataToSubmit) => {
+    const finalData = { ...dataToSubmit }
+    if (finalData.orientacion === '') delete finalData.orientacion
+    try {
+      await api.put(`contratos/contratos/${contract.id}/`, finalData)
+    } catch (error) {
+      console.error(error)
+      throw error
+    }
+  }
+
+  const handleEditClose = (result) => {
+    setEditModalOpen(false)
+    if (result?.saved) fetchContract()
+  }
+
+  const handleFileUpload = async () => {
+    const data = new FormData()
+    data.append('contrato', id)
+    data.append('nombre', uploadFormData.nombre)
+    data.append('archivo', uploadFormData.archivo)
+    await api.post('contratos/documentos/', data, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  }
+
+  const handleDocSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      await docOverlay.run(handleFileUpload, {
+        successDescription: 'Documento adjuntado.',
+        formatError: (err) => formatApiFormError(err, 'Error al subir documento.'),
+      })
+    } catch {
+      // FormOverlay
+    }
+  }
+
+  const handleDocOverlayDismiss = () => {
+    if (docOverlay.status === 'success') {
+      docOverlay.reset()
+      setDocModalOpen(false)
+      setUploadFormData({ nombre: '', archivo: null })
+      fetchContract()
+      return
+    }
+    docOverlay.dismiss()
+  }
+
+  const handleDocClose = () => {
+    if (docOverlay.busy) return
+    docOverlay.reset()
+    setDocModalOpen(false)
+  }
+
+  const confirmDeleteDoc = async () => {
+    if (!deleteDocTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`contratos/documentos/${deleteDocTarget.id}/`)
+      setDeleteDocTarget(null)
+      notify({ variant: 'success', text: 'Documento eliminado.' })
+      await fetchContract()
+    } catch (error) {
+      console.error(error)
+      notify({ variant: 'danger', text: 'Error al eliminar el documento.' })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const handleCreateReception = async (formData, isSplit = false) => {
+    if (editingRC) {
+      await api.put(`facturas-adquisicion/${editingRC.id}/`, {
+        ...formData,
+        contrato: contract.id,
+      })
+    } else if (isSplit && formData.establecimientos?.length > 1) {
+      let currentFolio = formData.folio || ''
+      for (const estId of formData.establecimientos) {
+        const estName =
+          lookups.establishments.find((e) => e.id === estId)?.nombre || ''
+        await api.post('facturas-adquisicion/', {
+          ...formData,
+          establecimientos: [estId],
+          contrato: contract.id,
+          folio: currentFolio,
+          descripcion: formData.descripcion + (estName ? `\n- ${estName}` : ''),
+        })
+        if (currentFolio) {
+          currentFolio = currentFolio.replace(/(\d+)(?!.*\d)/, (match) => {
+            const num = parseInt(match, 10) + 1
+            return num.toString().padStart(match.length, '0')
+          })
         }
-    };
+      }
+    } else {
+      await api.post('facturas-adquisicion/', {
+        ...formData,
+        contrato: contract.id,
+      })
+    }
+  }
 
-    const executionPercentage = contract?.monto_total > 0
-        ? Math.min(Math.round((contract.monto_ejecutado / contract.monto_total) * 100), 100)
-        : 0;
+  const handleReceptionClose = (result) => {
+    setReceptionModalOpen(false)
+    setEditingRC(null)
+    if (result?.saved) fetchContract()
+  }
 
-    const calculateTimeExecution = () => {
-        if (!contract?.fecha_inicio || (!contract?.fecha_termino && !contract?.plazo_meses)) {
-            return { percentage: 0, monthsLeft: 0 };
-        }
+  const confirmDeleteRc = async () => {
+    if (!deleteRcTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`facturas-adquisicion/${deleteRcTarget.id}/`)
+      setDeleteRcTarget(null)
+      notify({ variant: 'success', text: 'Recepción anulada.' })
+      await fetchContract()
+    } catch (error) {
+      console.error(error)
+      notify({ variant: 'danger', text: 'Error al eliminar la recepción.' })
+    } finally {
+      setDeleting(false)
+    }
+  }
 
-        const start = new Date(contract.fecha_inicio);
-        let end;
+  const handleDownloadPDF = async (rc) => {
+    try {
+      const response = await api.get(`facturas-adquisicion/${rc.id}/generate_pdf/`, {
+        responseType: 'blob',
+      })
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const oc = rc.nro_oc || contract.nro_oc
+      const rawFilename = oc ? `RC ${oc}.pdf` : `RC ${rc.folio || rc.id}.pdf`
+      const filename = rawFilename.replace(/[/\\?%*:|"<>]/g, '-')
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', filename)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } catch (error) {
+      console.error(error)
+      notify({ variant: 'danger', text: 'Error al generar el PDF.' })
+    }
+  }
 
-        if (contract.fecha_termino) {
-            end = new Date(contract.fecha_termino);
-        } else {
-            end = new Date(start);
-            end.setMonth(start.getMonth() + contract.plazo_meses);
-        }
+  const sortedReceptions = useMemo(() => {
+    const list = [...receptions]
+    if (!sortConfig.key) return list
+    return list.sort((a, b) => {
+      const valA = a[sortConfig.key]
+      const valB = b[sortConfig.key]
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [receptions, sortConfig])
 
-        const now = new Date();
-        const totalDuration = end.getTime() - start.getTime();
+  const filteredHistory = useMemo(() => {
+    const q = debouncedHistorySearch.toLowerCase().trim()
+    let rows = history || []
+    if (q) {
+      rows = rows.filter(
+        (log) =>
+          (log.accion || '').toLowerCase().includes(q) ||
+          (log.detalle || '').toLowerCase().includes(q) ||
+          (log.usuario || '').toLowerCase().includes(q),
+      )
+    }
+    const { key, direction } = historySort
+    const sorted = [...rows].sort((a, b) => {
+      let valA = a[key]
+      let valB = b[key]
+      if (key === 'fecha') {
+        valA = new Date(a.fecha).getTime()
+        valB = new Date(b.fecha).getTime()
+      } else {
+        valA = (valA || '').toString().toLowerCase()
+        valB = (valB || '').toString().toLowerCase()
+      }
+      if (valA < valB) return direction === 'asc' ? -1 : 1
+      if (valA > valB) return direction === 'asc' ? 1 : -1
+      return 0
+    })
+    return sorted
+  }, [history, debouncedHistorySearch, historySort])
 
-        if (totalDuration <= 0) return { percentage: 100, monthsLeft: 0 };
+  useEffect(() => {
+    setHistoryPage(1)
+  }, [debouncedHistorySearch, historySort])
 
-        const elapsed = now.getTime() - start.getTime();
-        const percentage = Math.max(0, Math.min(Math.round((elapsed / totalDuration) * 100), 100));
+  const historyPageRows = useMemo(() => {
+    const start = (historyPage - 1) * historyPageSize
+    return filteredHistory.slice(start, start + historyPageSize)
+  }, [filteredHistory, historyPage, historyPageSize])
 
-        const diffTime = end.getTime() - now.getTime();
-        const monthsLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30.44)));
+  const handleSortReceptions = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc',
+    }))
+  }
 
-        return { percentage, monthsLeft };
-    };
+  const handleHistorySort = (key) => {
+    setHistorySort((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc',
+    }))
+  }
 
-    const { percentage: timePercentage, monthsLeft } = calculateTimeExecution();
-
+  if (loading) {
     return (
-        <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden">
-            {/* Header & Tabs Area */}
-            <div className="shrink-0 space-y-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => navigate('/contracts')}
-                            className="p-2 hover:bg-white rounded-xl transition-colors text-slate-400 hover:text-blue-600 shadow-sm border border-transparent hover:border-slate-100"
-                        >
-                            <ArrowLeft className="w-5 h-5" />
-                        </button>
-                        <div>
-                            <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
-                                <Link to="/contracts" className="hover:text-blue-600">Contratos</Link>
-                                <ChevronRight className="w-3 h-3" />
-                                <span className="text-blue-600">Expediente Digital</span>
-                            </div>
-                            <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                                {contract.codigo_mercado_publico}
-                            </h2>
-                        </div>
-                    </div>
+      <div className="page">
+        <EmptyState title="Cargando…" description="Obteniendo expediente del contrato." />
+      </div>
+    )
+  }
 
-                    <div className="flex items-center gap-3">
-                        <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm border ${getStatusColor(contract.estado_nombre)}`}>
-                            {contract.estado_nombre}
-                        </span>
-                        {can('contratos.change_contrato') && (
-                            <button
-                                onClick={() => setEditModalOpen(true)}
-                                className={BTN_PRIMARY}
-                            >
-                                <Pencil className="w-4 h-4" />
-                                Editar Contrato
-                            </button>
-                        )}
-                    </div>
-                </div>
+  if (!contract) return null
 
-                {/* Tab Header Strip */}
-                <div className="flex items-center gap-1 p-1 bg-slate-100/50 rounded-2xl border border-slate-200/60 overflow-x-auto no-scrollbar">
-                    {[
-                        { id: 'info', label: 'General', icon: <Info className="w-4 h-4" /> },
-                        { id: 'providers', label: 'Proveedores', icon: <Building2 className="w-4 h-4" />, count: contract.proveedores_asociados?.length },
-                        { id: 'servicios', label: 'Gestión de Contratos', icon: <Truck className="w-4 h-4" /> },
-                        { id: 'receptions', label: 'Recepciones', icon: <ShoppingBag className="w-4 h-4" />, count: receptions?.length },
-                        { id: 'docs', label: 'Archivos', icon: <FileSearch className="w-4 h-4" />, count: contract.documentos?.length },
-                        { id: 'history', label: 'Historial', icon: <History className="w-4 h-4" />, count: history?.length }
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`px-6 py-2 rounded-xl text-[12px] font-bold transition-all flex items-center gap-2.5 whitespace-nowrap ${activeTab === tab.id ? 'bg-white text-blue-600 shadow-sm border border-slate-200/50' : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'}`}
-                        >
-                            <span className={activeTab === tab.id ? 'text-blue-600' : 'opacity-50'}>{tab.icon}</span>
-                            {tab.label}
-                            {tab.count !== undefined && (
-                                <span className={`px-2 py-0.5 rounded-lg text-[9px] ${activeTab === tab.id ? 'bg-blue-50 text-blue-600' : 'bg-slate-200 text-slate-500'}`}>
-                                    {tab.count}
-                                </span>
-                            )}
-                        </button>
-                    ))}
-                </div>
+  const executionPercentage =
+    contract.monto_total > 0
+      ? Math.min(Math.round((contract.monto_ejecutado / contract.monto_total) * 100), 100)
+      : 0
+
+  const calculateTimeExecution = () => {
+    if (!contract.fecha_inicio || (!contract.fecha_termino && !contract.plazo_meses)) {
+      return { percentage: 0, monthsLeft: 0 }
+    }
+    const start = new Date(contract.fecha_inicio)
+    let end
+    if (contract.fecha_termino) {
+      end = new Date(contract.fecha_termino)
+    } else {
+      end = new Date(start)
+      end.setMonth(start.getMonth() + contract.plazo_meses)
+    }
+    const now = new Date()
+    const totalDuration = end.getTime() - start.getTime()
+    if (totalDuration <= 0) return { percentage: 100, monthsLeft: 0 }
+    const elapsed = now.getTime() - start.getTime()
+    const percentage = Math.max(
+      0,
+      Math.min(Math.round((elapsed / totalDuration) * 100), 100),
+    )
+    const monthsLeft = Math.max(
+      0,
+      Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30.44)),
+    )
+    return { percentage, monthsLeft }
+  }
+
+  const { percentage: timePercentage, monthsLeft } = calculateTimeExecution()
+
+  const tabLabel = (tab) => {
+    if (tab.id === 'providers') {
+      return `${tab.label} (${contract.proveedores_asociados?.length || 0})`
+    }
+    if (tab.id === 'receptions') return `${tab.label} (${receptions.length})`
+    if (tab.id === 'docs') return `${tab.label} (${contract.documentos?.length || 0})`
+    if (tab.id === 'history') return `${tab.label} (${history.length})`
+    return tab.label
+  }
+
+  const providerColumns = [
+    {
+      key: 'proveedor',
+      header: 'Proveedor',
+      className: 'col--primary',
+      cardRole: 'title',
+      priority: 1,
+      render: (p) => (
+        <button
+          type="button"
+          className="contracts-provider-link"
+          onClick={() => setSelectedProvider(p)}
+        >
+          {p.proveedor_nombre}
+        </button>
+      ),
+    },
+    {
+      key: 'adjudicado',
+      header: 'Adjudicado',
+      className: 'col--secondary',
+      cardRole: 'subtitle',
+      priority: 1,
+      render: (p) => formatCurrency(p.monto_adjudicado),
+    },
+    {
+      key: 'ejecutado',
+      header: 'Ejecutado',
+      className: 'col--tablet-hide',
+      cardRole: 'field',
+      priority: 2,
+      render: (p) => (
+        <>
+          {formatCurrency(p.monto_ejecutado)}
+          {p.monto_consumido_previo > 0 ? (
+            <span className="contracts-cat">
+              <span>Incluye {formatCurrency(p.monto_consumido_previo)} previo</span>
+            </span>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      key: 'saldo',
+      header: 'Saldo',
+      className: 'col--status',
+      cardRole: 'status',
+      priority: 1,
+      render: (p) => formatCurrency(p.monto_restante),
+    },
+    {
+      key: 'establecimientos',
+      header: 'Establec.',
+      className: 'col--tablet-hide',
+      cardRole: 'field',
+      priority: 2,
+      render: (p) => (
+        <Badge variant="neutral">
+          {(p.establecimientos_detalle || p.establecimientos || []).length}
+        </Badge>
+      ),
+    },
+    {
+      key: 'consumo',
+      header: 'Consumo',
+      className: 'col--tablet-hide',
+      cardRole: 'field',
+      priority: 2,
+      render: (p) => {
+        const pct =
+          p.monto_adjudicado > 0
+            ? Math.min(100, Math.round((p.monto_ejecutado / p.monto_adjudicado) * 100))
+            : 0
+        return (
+          <div>
+            <div className="contracts-gauge__track">
+              <div className="contracts-gauge__fill" style={{ width: `${pct}%` }} />
             </div>
+            <span className="contracts-cat">
+              <span>{pct}%</span>
+            </span>
+          </div>
+        )
+      },
+    },
+    {
+      key: 'actions',
+      header: 'Acciones',
+      className: 'col--actions',
+      render: (p) => (
+        <div className="data-table__actions">
+          <Button variant="outline" size="sm" onClick={() => setSelectedProvider(p)}>
+            Ver
+          </Button>
+        </div>
+      ),
+    },
+  ]
 
-            {/* Main Content Area */}
-            <div className="flex-1 bg-white rounded-[24px] shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-0">
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                    <AnimatePresence mode="wait">
-                        {activeTab === 'info' && (
-                            <motion.div
-                                key="info"
-                                initial={{ opacity: 0, scale: 0.99 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.99 }}
-                                className="p-5 space-y-4"
-                            >
-                                {/* AREA SUPERIOR: Estadísticas y Gráfico */}
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                                    {/* Izquierda: 4 Stats en rejilla 2x2 */}
-                                    <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
-                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">Presupuesto Total</span>
-                                            <p className="text-xl font-black text-slate-900 leading-none">{formatCurrency(contract.monto_total)}</p>
-                                        </div>
-                                        <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
-                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">Monto Ejecutado</span>
-                                            <p className="text-xl font-black text-slate-900 leading-none">{formatCurrency(contract.monto_ejecutado)}</p>
-                                        </div>
-                                        <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
-                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">Disponible</span>
-                                            <p className="text-xl font-black text-emerald-600 leading-none">{formatCurrency(contract.monto_restante)}</p>
-                                        </div>
-                                        <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex flex-col justify-center transition-all hover:bg-white hover:shadow-xl hover:shadow-slate-200/50">
-                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">Plazo Restante</span>
-                                            <p className="text-xl font-black text-slate-900 leading-none">{monthsLeft} <span className="text-xs font-bold text-slate-400 uppercase">Meses</span></p>
-                                        </div>
-                                    </div>
+  const resolveProviderCatalog = (row) => {
+    const id = row?.proveedor
+    return (
+      lookups.providers?.find((p) => String(p.id) === String(id)) ||
+      lookups.proveedores?.find((p) => String(p.id) === String(id)) ||
+      null
+    )
+  }
 
-                                    {/* Derecha: Gráfico Grande */}
-                                    <div className="lg:col-span-7 bg-white rounded-2xl p-5 border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col h-[200px] lg:h-[210px]">
-                                        <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                                            <TrendingUp className="w-3.5 h-3.5 text-blue-600" /> Gráfico Histórico de Ejecución Mensual
-                                        </h4>
-                                        <div className="flex-1 min-h-0">
-                                            {contract.gastos_mensuales?.length > 0 ? (
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <AreaChart data={contract.gastos_mensuales} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                                                        <defs>
-                                                            <linearGradient id="colorMonto" x1="0" y1="0" x2="0" y2="1">
-                                                                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1} />
-                                                                <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                                                            </linearGradient>
-                                                        </defs>
-                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                        <XAxis dataKey="mes" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 9 }} />
-                                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 9 }} tickFormatter={(val) => `$${val / 1000000}M`} />
-                                                        <Tooltip
-                                                            content={({ active, payload, label }) => {
-                                                                if (active && payload && payload.length) {
-                                                                    return (
-                                                                        <div className="bg-white p-3 rounded-xl shadow-2xl border border-slate-100">
-                                                                            <p className="text-[8px] font-black uppercase text-slate-400 mb-1">{label}</p>
-                                                                            <p className="text-[14px] font-black text-slate-900">{formatCurrency(payload[0].value)}</p>
-                                                                        </div>
-                                                                    );
-                                                                }
-                                                                return null;
-                                                            }}
-                                                        />
-                                                        <Area type="monotone" dataKey="monto" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorMonto)" />
-                                                    </AreaChart>
-                                                </ResponsiveContainer>
-                                            ) : (
-                                                <div className="h-full flex flex-col items-center justify-center text-slate-300">
-                                                    <Activity className="w-8 h-8 opacity-20" />
-                                                    <p className="text-[9px] font-black uppercase mt-3 opacity-40 italic tracking-widest">Sin registros de ejecución mensual</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+  const receptionColumns = [
+    {
+      key: 'folio',
+      header: 'Folio / OC',
+      className: 'col--primary',
+      cardRole: 'title',
+      priority: 1,
+      sortable: true,
+      render: (rc) => (
+        <>
+          <strong>{rc.folio}</strong>
+          <span className="contracts-cat">
+            <span>{rc.nro_oc || contract.nro_oc || 'SIN OC'}</span>
+          </span>
+        </>
+      ),
+    },
+    {
+      key: 'descripcion',
+      header: 'Glosa',
+      className: 'col--secondary',
+      cardRole: 'subtitle',
+      priority: 1,
+      render: (rc) => rc.descripcion || '—',
+    },
+    {
+      key: 'total_pagar',
+      header: 'Total RC',
+      className: 'col--tablet-hide',
+      cardRole: 'field',
+      priority: 2,
+      sortable: true,
+      render: (rc) => formatCurrency(rc.total_pagar),
+    },
+    {
+      key: 'periodo',
+      header: 'Periodo',
+      className: 'col--status',
+      cardRole: 'status',
+      priority: 1,
+      sortable: true,
+      render: (rc) => (
+        <Badge variant={rc.nro_factura ? 'success' : 'warning'} dot>
+          {rc.nro_factura ? 'Con factura' : 'Pendiente'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Acciones',
+      className: 'col--actions',
+      render: (rc) => (
+        <div className="data-table__actions">
+          {can('servicios.change_recepcionconforme') ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setEditingRC(rc)
+                setReceptionModalOpen(true)
+              }}
+            >
+              <Icon name="edit" size="sm" />
+            </Button>
+          ) : null}
+          <Button variant="outline" size="sm" onClick={() => handleDownloadPDF(rc)}>
+            PDF
+          </Button>
+          {can('servicios.delete_recepcionconforme') ? (
+            <Button variant="ghost" size="sm" onClick={() => setDeleteRcTarget(rc)}>
+              <Icon name="trash" size="sm" />
+            </Button>
+          ) : null}
+        </div>
+      ),
+    },
+  ]
 
-                                {/* AREA INFERIOR: 3 Columnas Sincronizadas */}
-                                <div className="space-y-3">
-                                    <div className="flex items-center gap-3 px-1 mb-1">
-                                        <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-widest shrink-0">Resumen del Contrato</h3>
-                                        <p className="text-[11px] font-black text-blue-600 uppercase tracking-tight truncate leading-none">
-                                            {contract.descripcion}
-                                        </p>
-                                    </div>
+  const docColumns = [
+    {
+      key: 'nombre',
+      header: 'Documento',
+      className: 'col--primary',
+      cardRole: 'title',
+      priority: 1,
+    },
+    {
+      key: 'fecha',
+      header: 'Fecha',
+      className: 'col--secondary',
+      cardRole: 'subtitle',
+      priority: 1,
+      render: (doc) => formatDate(doc.fecha_subida),
+    },
+    {
+      key: 'actions',
+      header: 'Acciones',
+      className: 'col--actions',
+      render: (doc) => (
+        <div className="data-table__actions">
+          <Button variant="outline" size="sm" onClick={() => setPreviewDoc(doc)}>
+            Ver
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.open(doc.archivo, '_blank', 'noopener,noreferrer')}
+          >
+            Descargar
+          </Button>
+          {can('contratos.delete_documentocontrato') ? (
+            <Button variant="ghost" size="sm" onClick={() => setDeleteDocTarget(doc)}>
+              <Icon name="trash" size="sm" />
+            </Button>
+          ) : null}
+        </div>
+      ),
+    },
+  ]
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 lg:h-[240px]">
-                                        {/* Col 1: 4 ítems */}
-                                        <div className="flex flex-col justify-between h-full space-y-2.5 lg:space-y-0">
-                                            {[
-                                                { label: 'Tipo de Proceso', val: contract.proceso_nombre },
-                                                { label: 'Orientación', val: contract.orientacion_nombre || "No definida" },
-                                                { label: 'Tipo de OC', val: contract.tipo_oc === 'UNICA' ? 'Única' : 'Múltiple' },
-                                                { label: 'Nº de OC', val: contract.nro_oc || "No aplica" }
-                                            ].map((item, i) => (
-                                                <div key={i} className="flex justify-between items-center px-5 py-3.5 lg:py-0 bg-white rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-blue-200 lg:h-[22%] min-h-[50px]">
-                                                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">{item.label}</span>
-                                                    <span className="text-[10px] font-black text-slate-900 uppercase tracking-tight">{item.val}</span>
-                                                </div>
-                                            ))}
-                                        </div>
+  const historyColumns = [
+    {
+      key: 'fecha',
+      header: 'Momento',
+      className: 'col--secondary',
+      cardRole: 'subtitle',
+      priority: 1,
+      sortable: true,
+      render: (log) =>
+        new Date(log.fecha).toLocaleString('es-CL', {
+          dateStyle: 'short',
+          timeStyle: 'short',
+        }),
+    },
+    {
+      key: 'accion',
+      header: 'Acción',
+      className: 'col--status',
+      cardRole: 'status',
+      priority: 1,
+      sortable: true,
+      render: (log) => <Badge variant="accent">{log.accion}</Badge>,
+    },
+    {
+      key: 'detalle',
+      header: 'Detalle',
+      className: 'col--primary',
+      cardRole: 'title',
+      priority: 1,
+      sortable: true,
+      render: (log) => log.detalle,
+    },
+    {
+      key: 'usuario',
+      header: 'Usuario',
+      className: 'col--tablet-hide',
+      cardRole: 'field',
+      priority: 2,
+      sortable: true,
+      render: (log) => log.usuario || '—',
+    },
+  ]
 
-                                        {/* Col 2: 3 ítems */}
-                                        <div className="flex flex-col justify-between h-full space-y-3 lg:space-y-0">
-                                            {[
-                                                { label: 'Adjudicación', val: contract.fecha_adjudicacion },
-                                                { label: 'Inicio Vigencia', val: contract.fecha_inicio },
-                                                { label: 'Término Contractual', val: contract.fecha_termino }
-                                            ].map((f, i) => (
-                                                <div key={i} className="flex justify-between items-center px-6 lg:px-6 py-4 lg:py-0 bg-white rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-blue-200 lg:h-[30%] min-h-[60px]">
-                                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{f.label}</span>
-                                                    <span className="text-[11px] font-mono font-black text-slate-800">{new Date(f.val).toLocaleDateString('es-CL')}</span>
-                                                </div>
-                                            ))}
-                                        </div>
+  return (
+    <div className="page" data-od-id="contract-detail-page" data-fill-viewport>
+      <PageHeader
+        icon="contratos"
+        title={contract.codigo_mercado_publico}
+        description={contract.descripcion}
+        breadcrumbs={[
+          { label: 'SSGG' },
+          { label: 'Contratos', to: '/contracts' },
+          { label: contract.codigo_mercado_publico },
+        ]}
+        linkComponent={Link}
+        split
+        actions={
+          <>
+            <Badge variant={estadoVariant(contract.estado_nombre)} dot>
+              {contract.estado_nombre}
+            </Badge>
+            {can('contratos.change_contrato') ? (
+              <Button variant="primary" size="sm" onClick={() => setEditModalOpen(true)}>
+                <Icon name="edit" size="sm" /> Editar
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
-                                        {/* Col 3: 2 ítems Premium */}
-                                        <div className="flex flex-col justify-between h-full space-y-3 lg:space-y-0">
-                                            <div className="bg-emerald-600 p-5 lg:p-6 rounded-2xl shadow-xl shadow-emerald-600/20 flex flex-col justify-between transition-all hover:scale-[1.01] lg:h-[48%] min-h-[110px] relative overflow-hidden group">
-                                                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
-                                                    <DollarSign className="w-14 lg:w-16 h-14 lg:h-16 text-white" />
-                                                </div>
-                                                <div className="flex items-center gap-2 relative z-10">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                                    <h4 className="text-[9px] font-black text-emerald-50 uppercase tracking-widest leading-none">Control Presupuestario</h4>
-                                                </div>
-                                                <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 lg:p-5 border border-white/10 relative z-10 my-1">
-                                                    <div className="flex justify-between items-center mb-2 lg:mb-2.5">
-                                                        <span className="text-[10px] font-black text-white uppercase tracking-tight">Presupuesto</span>
-                                                        <span className="text-sm font-black text-white">{executionPercentage}%</span>
-                                                    </div>
-                                                    <div className="w-full bg-emerald-900/30 rounded-full h-2.5 overflow-hidden">
-                                                        <div className="bg-emerald-400 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, executionPercentage)}%` }} />
-                                                    </div>
-                                                </div>
-                                                <p className="text-[9px] font-bold text-emerald-100/80 uppercase tracking-tight relative z-10 italic">
-                                                    {formatCurrency(contract.monto_restante)} disponibles
-                                                </p>
-                                            </div>
+      
 
-                                            <div className="bg-blue-600 p-5 lg:p-6 rounded-2xl shadow-xl shadow-blue-600/20 flex flex-col justify-between transition-all hover:scale-[1.01] lg:h-[48%] min-h-[110px] relative overflow-hidden group">
-                                                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
-                                                    <Clock className="w-14 lg:w-16 h-14 lg:h-16 text-white" />
-                                                </div>
-                                                <div className="flex items-center gap-2 relative z-10">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-pulse" />
-                                                    <h4 className="text-[9px] font-black text-blue-50 uppercase tracking-widest leading-none">Control de Plazos</h4>
-                                                </div>
-                                                <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 lg:p-5 border border-white/10 relative z-10 my-1">
-                                                    <div className="flex justify-between items-center mb-2 lg:mb-2.5">
-                                                        <span className="text-[10px] font-black text-white uppercase tracking-tight">Tiempo</span>
-                                                        <span className="text-sm font-black text-white">{timePercentage}%</span>
-                                                    </div>
-                                                    <div className="w-full bg-blue-900/30 rounded-full h-2.5 overflow-hidden">
-                                                        <div className="bg-blue-300 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, timePercentage)}%` }} />
-                                                    </div>
-                                                </div>
-                                                <p className="text-[9px] font-bold text-blue-100/80 uppercase tracking-tight relative z-10 italic">
-                                                    {monthsLeft} meses restantes
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
+      <div className="tabs contracts-tabs">
+        <ul className="tabs__list" role="tablist" aria-label="Secciones del contrato">
+          {TABS.map((tab) => (
+            <li key={tab.id}>
+              <button
+                type="button"
+                role="tab"
+                id={`contract-tab-${tab.id}`}
+                aria-selected={activeTab === tab.id}
+                aria-controls={`contract-panel-${tab.id}`}
+                className={`tabs__btn${activeTab === tab.id ? ' is-active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tabLabel(tab)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
 
-                        {activeTab === 'providers' && (
-                            <motion.div
-                                key="providers"
-                                initial={{ opacity: 0, scale: 0.99 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.99 }}
-                                className="p-6 lg:p-8 space-y-6"
-                            >
-                                <div>
-                                    <h3 className="text-lg font-black text-slate-800 tracking-tight">Proveedores Adjudicados</h3>
-                                    <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1">Líneas de adjudicación y presupuestos individuales</p>
-                                </div>
-
-                                <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                                    <table className="w-full text-left whitespace-nowrap">
-                                        <thead className="bg-slate-50 border-b border-slate-100">
-                                            <tr>
-                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Proveedor</th>
-                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Monto Adjudicado</th>
-                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Monto Ejecutado</th>
-                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo Disponible</th>
-                                                <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Consumo</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {(contract.proveedores_asociados || []).map(p => {
-                                                const provPercentage = p.monto_adjudicado > 0 ? Math.min(100, Math.round((p.monto_ejecutado / p.monto_adjudicado) * 100)) : 0;
-                                                return (
-                                                    <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                                                        <td className="px-6 py-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
-                                                                    <Building2 className="w-4 h-4" />
-                                                                </div>
-                                                                <span className="font-bold text-slate-700 text-xs">{p.proveedor_nombre}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right font-black text-slate-800">{formatCurrency(p.monto_adjudicado)}</td>
-                                                        <td className="px-6 py-4 text-right font-black text-slate-600">
-                                                            {formatCurrency(p.monto_ejecutado)}
-                                                            {p.monto_consumido_previo > 0 && (
-                                                                <div className="text-[9px] text-slate-400 italic font-medium">Incluye {formatCurrency(p.monto_consumido_previo)} previo</div>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right font-black text-emerald-600">{formatCurrency(p.monto_restante)}</td>
-                                                        <td className="px-6 py-4">
-                                                            <div className="flex flex-col gap-1 items-center">
-                                                                <div className="w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                                                                    <div className="bg-blue-600 h-full rounded-full transition-all" style={{ width: `${provPercentage}%` }}></div>
-                                                                </div>
-                                                                <span className="text-[9px] font-black text-slate-500">{provPercentage}%</span>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                    {(!contract.proveedores_asociados || contract.proveedores_asociados.length === 0) && (
-                                        <div className="py-16 text-center">
-                                            <Building2 className="w-8 h-8 text-slate-100 mx-auto mb-4" />
-                                            <p className="font-black text-slate-300 uppercase tracking-widest text-[10px]">Sin proveedores asignados</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </motion.div>
-                        )}
-
-                        {activeTab === 'servicios' && (
-                            <motion.div
-                                key="servicios"
-                                initial={{ opacity: 0, scale: 0.99 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.99 }}
-                                className="p-6 lg:p-8"
-                            >
-                                <ContratoServiciosTab contractId={contract.id} />
-                            </motion.div>
-                        )}
-
-                        {activeTab === 'docs' && (
-                            <motion.div
-                                key="docs"
-                                initial={{ opacity: 0, scale: 0.99 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.99 }}
-                                className="p-6 lg:p-8 space-y-6"
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-black text-slate-800 tracking-tight">Expediente Documental</h3>
-                                        <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1">Gestión Centralizada</p>
-                                    </div>
-                                    {can('contratos.add_documentocontrato') && (
-                                        <button
-                                            onClick={() => setDocModalOpen(true)}
-                                            className={BTN_PRIMARY}
-                                        >
-                                            <Plus className="w-4 h-4" />
-                                            Adjuntar
-                                        </button>
-                                    )}
-                                </div>
-
-                                <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm max-h-[400px] overflow-y-auto custom-scrollbar">
-                                    <table className="w-full text-left whitespace-nowrap relative">
-                                        <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
-                                            <tr className="bg-slate-50/50 border-b border-slate-100">
-                                                <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Documento</th>
-                                                <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Fecha</th>
-                                                <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-50">
-                                            {contract.documentos?.map(doc => (
-                                                <tr key={doc.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center border border-blue-100">
-                                                                <FileText className="w-4 h-4" />
-                                                            </div>
-                                                            <span className="font-medium text-slate-700 text-[11px] uppercase tracking-tighter">{doc.nombre}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <span className="text-[10px] font-medium text-slate-500 uppercase tracking-tighter">
-                                                            {new Date(doc.fecha_subida).toLocaleDateString('es-CL')}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right">
-                                                        <div className="flex justify-end gap-1.5">
-                                                            <button
-                                                                onClick={() => setPreviewDoc(doc)}
-                                                                className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                                                                title="Ver documento"
-                                                            >
-                                                                <Eye className="w-3.5 h-3.5" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => window.open(doc.archivo)}
-                                                                className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                                                                title="Descargar documento"
-                                                            >
-                                                                <Download className="w-3.5 h-3.5" />
-                                                            </button>
-                                                            {can('contratos.delete_documentocontrato') && (
-                                                                <button
-                                                                    onClick={() => handleDeleteDoc(doc.id)}
-                                                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                                                    title="Eliminar documento"
-                                                                >
-                                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                    {(!contract.documentos || contract.documentos.length === 0) && (
-                                        <div className="py-16 text-center">
-                                            <FolderSearch className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                                            <p className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">Sin archivos</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </motion.div>
-                        )}
-
-                        {activeTab === 'receptions' && (
-                            <motion.div
-                                key="receptions"
-                                initial={{ opacity: 0, scale: 0.99 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.99 }}
-                                className="p-6 lg:p-8 space-y-6"
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-black text-slate-800 tracking-tight">Recepciones Conformes relacionadas</h3>
-                                        <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1">Control de entregas y facturación</p>
-                                    </div>
-                                    {can('servicios.add_recepcionconforme') && (
-                                        <button
-                                            onClick={() => setReceptionModalOpen(true)}
-                                            className={BTN_PRIMARY}
-                                        >
-                                            <Plus className="w-4 h-4" />
-                                            Nueva Recepción
-                                        </button>
-                                    )}
-                                </div>
-
-                                <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                                    <table className="w-full text-left whitespace-nowrap">
-                                        <thead className="bg-slate-50 border-b border-slate-100">
-                                            <tr>
-                                                <th
-                                                    className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100/50 transition-colors"
-                                                    onClick={() => handleSort('folio')}
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        Folio / OC <SortIcon column="folio" />
-                                                    </div>
-                                                </th>
-                                                <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Glosa / Concepto</th>
-                                                <th
-                                                    className="px-4 py-3 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100/50 transition-colors"
-                                                    onClick={() => handleSort('total_pagar')}
-                                                >
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        Total RC <SortIcon column="total_pagar" />
-                                                    </div>
-                                                </th>
-                                                <th
-                                                    className="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100/50 transition-colors"
-                                                    onClick={() => handleSort('periodo')}
-                                                >
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        Periodo / Fecha <SortIcon column="periodo" />
-                                                    </div>
-                                                </th>
-                                                <th className="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Acciones</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {sortedReceptions.map((rc) => (
-                                                <tr key={rc.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                    <td className="px-4 py-4">
-                                                        <div className="space-y-1">
-                                                            <div className="text-[11px] font-black text-slate-900">{rc.folio}</div>
-                                                            <div className="text-[9px] font-bold text-slate-400 flex items-center gap-1.5">
-                                                                <Hash className="w-2.5 h-2.5" />
-                                                                {rc.nro_oc || contract.nro_oc || 'SIN OC'}
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-4">
-                                                        <div className="space-y-1 max-w-xs">
-                                                            <div className="text-[11px] font-bold text-slate-700 truncate" title={rc.descripcion}>{rc.descripcion}</div>
-                                                            <div className="text-[9px] text-slate-400 font-medium italic">
-                                                                {rc.periodo ? (() => {
-                                                                    const [year, month] = rc.periodo.split('-');
-                                                                    const date = new Date(year, month - 1, 1);
-                                                                    return date.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' }).toUpperCase();
-                                                                })() : 'Sin periodo'}
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-4 text-right">
-                                                        <div className="text-[11px] font-black text-slate-900">{formatCurrency(rc.total_pagar)}</div>
-                                                        <div className="text-[9px] font-bold text-slate-400">{new Date(rc.fecha_recepcion).toLocaleDateString('es-CL')}</div>
-                                                    </td>
-                                                    <td className="px-4 py-4 text-center">
-                                                        <div className="flex flex-col items-center gap-1">
-                                                            <div className="text-[11px] font-black text-slate-900">{rc.fecha_recepcion}</div>
-                                                            <div className="flex justify-center">
-                                                                {rc.nro_factura ? (
-                                                                    <span className="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase flex items-center gap-1">
-                                                                        <CheckCircle2 className="w-2 h-2" /> RC
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 text-[8px] font-black uppercase flex items-center gap-1">
-                                                                        <AlertCircle className="w-2 h-2" /> PEND
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-4">
-                                                        <div className="flex items-center justify-center gap-2 transition-all">
-                                                            {can('servicios.change_recepcionconforme') && (
-                                                                <button
-                                                                    onClick={() => handleEditReception(rc)}
-                                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                                    title="Editar RC"
-                                                                >
-                                                                    <Pencil className="w-3.5 h-3.5" />
-                                                                </button>
-                                                            )}
-                                                            <button
-                                                                onClick={() => handleDownloadPDF(rc)}
-                                                                className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 transition-all"
-                                                                title="Descargar PDF"
-                                                            >
-                                                                <Download className="w-3.5 h-3.5" />
-                                                            </button>
-                                                            {can('servicios.delete_recepcionconforme') && (
-                                                                <button
-                                                                    onClick={() => handleDeleteReception(rc.id)}
-                                                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                                                    title="Anular RC"
-                                                                >
-                                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                    {(!receptions || receptions.length === 0) && (
-                                        <div className="py-16 text-center">
-                                            <ShoppingBag className="w-8 h-8 text-slate-100 mx-auto mb-4" />
-                                            <p className="font-black text-slate-300 uppercase tracking-widest text-[10px]">Sin recepciones registradas</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </motion.div>
-                        )}
-
-                        {activeTab === 'history' && (
-                            <motion.div
-                                key="history"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="p-6 lg:p-8 h-full flex flex-col"
-                            >
-                                <div className="space-y-4 flex flex-col flex-1 min-h-0">
-                                    <div className="flex items-center justify-between shrink-0">
-                                        <div>
-                                            <h3 className="text-lg font-black text-slate-800 tracking-tight">Bitácora de Cambios</h3>
-                                            <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1">Auditoría completa del proceso</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm flex flex-col flex-1 min-h-0">
-                                        <div className="overflow-x-auto overflow-y-auto custom-scrollbar flex-1">
-                                            <table className="w-full text-left">
-                                                <thead className="sticky top-0 z-20 bg-slate-50 border-b border-slate-100">
-                                                    <tr>
-                                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest w-1/4">Momento / Acción</th>
-                                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest w-2/4">Detalle de la Operación</th>
-                                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest w-1/4 text-right">Usuario</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-50">
-                                                    {history?.map((log) => (
-                                                        <tr key={log.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                            <td className="px-6 py-4 align-top">
-                                                                <div className="flex flex-col gap-1.5">
-                                                                    <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md self-start">
-                                                                        {new Date(log.fecha).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}
-                                                                    </span>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div className={`w-2 h-2 rounded-full ${log.accion === 'CREACION' ? 'bg-emerald-500' :
-                                                                            log.accion === 'MODIFICACION' ? 'bg-blue-500' :
-                                                                                log.accion.includes('ELIMINACION') ? 'bg-red-500' : 'bg-slate-400'
-                                                                            }`} />
-                                                                        <span className="text-[9px] font-black text-slate-700 uppercase tracking-wider">{log.accion}</span>
-                                                                    </div>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-6 py-4 align-top">
-                                                                <p className="text-xs text-slate-600 font-bold leading-relaxed max-w-xl whitespace-pre-wrap">
-                                                                    {log.detalle}
-                                                                </p>
-                                                            </td>
-                                                            <td className="px-6 py-4 align-top text-right">
-                                                                <div className="flex items-center justify-end gap-1.5 text-[9px] font-black text-slate-400 uppercase">
-                                                                    <Users className="w-3 h-3 text-slate-300" />
-                                                                    <span className="text-slate-600">{log.usuario}</span>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                            {(!history || history.length === 0) && (
-                                                <div className="py-16 text-center">
-                                                    <History className="w-8 h-8 text-slate-100 mx-auto mb-4" />
-                                                    <p className="font-black text-slate-300 uppercase tracking-widest text-[10px]">Sin registros en bitácora</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+      <div
+        className="tabs__panel is-active contracts-tabs__panel"
+        role="tabpanel"
+        id={`contract-panel-${activeTab}`}
+        aria-labelledby={`contract-tab-${activeTab}`}
+      >
+        {activeTab === 'info' ? (
+          <div className="contracts-tab contracts-general">
+            <div className="contracts-metric-strip">
+              <div className="contracts-metric contracts-metric--total">
+                <span className="contracts-metric__label">Presupuesto total</span>
+                <span className="contracts-metric__value">
+                  {formatCurrency(contract.monto_total)}
+                </span>
+                <span className="contracts-metric__hint">Monto adjudicado del convenio</span>
+              </div>
+              <div className="contracts-metric contracts-metric--spent">
+                <span className="contracts-metric__label">Ejecutado</span>
+                <span className="contracts-metric__value">
+                  {formatCurrency(contract.monto_ejecutado)}
+                </span>
+                <div className="contracts-metric__bar" aria-hidden>
+                  <span style={{ width: `${Math.min(100, executionPercentage)}%` }} />
                 </div>
+                <span className="contracts-metric__hint">{executionPercentage}% del presupuesto</span>
+              </div>
+              <div className="contracts-metric contracts-metric--available">
+                <span className="contracts-metric__label">Disponible</span>
+                <span className="contracts-metric__value">
+                  {formatCurrency(contract.monto_restante)}
+                </span>
+                <div className="contracts-metric__bar" aria-hidden>
+                  <span
+                    style={{
+                      width: `${Math.min(100, Math.max(0, 100 - executionPercentage))}%`,
+                    }}
+                  />
+                </div>
+                <span className="contracts-metric__hint">
+                  {Math.max(0, 100 - executionPercentage)}% aún disponible
+                </span>
+              </div>
+              <div className="contracts-metric contracts-metric--time">
+                <span className="contracts-metric__label">Plazo restante</span>
+                <span className="contracts-metric__value">
+                  {monthsLeft}
+                  <small> meses</small>
+                </span>
+                <div className="contracts-metric__bar" aria-hidden>
+                  <span style={{ width: `${Math.min(100, timePercentage)}%` }} />
+                </div>
+                <span className="contracts-metric__hint">
+                  {timePercentage}% del tiempo transcurrido
+                </span>
+              </div>
             </div>
-
-            {/* Upload Modal */}
-            <ModalPortal>
-            <AnimatePresence>
-                {isDocModalOpen && (
-                    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 overflow-hidden">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="fixed top-0 left-0 w-screen h-screen bg-slate-900/60 backdrop-blur-sm z-[9998]"
-                            onClick={() => setDocModalOpen(false)}
+            <div className="contracts-general__top">
+              <ChartCard title="Información del proceso" subtitle="Ficha del convenio">
+                <dl className="contracts-meta">
+                  <div className="contracts-meta__item">
+                    <dt>Proceso</dt>
+                    <dd>{contract.proceso_nombre || '—'}</dd>
+                  </div>
+                  <div className="contracts-meta__item">
+                    <dt>Categoría</dt>
+                    <dd>{contract.categoria_nombre || '—'}</dd>
+                  </div>
+                  <div className="contracts-meta__item">
+                    <dt>Orientación</dt>
+                    <dd>{contract.orientacion_nombre || 'No definida'}</dd>
+                  </div>
+                  <div className="contracts-meta__item">
+                    <dt>Tipo de OC</dt>
+                    <dd>{contract.tipo_oc === 'UNICA' ? 'Única' : 'Múltiple'}</dd>
+                  </div>
+                  <div className="contracts-meta__item">
+                    <dt>Nº OC</dt>
+                    <dd>{contract.nro_oc || 'No aplica'}</dd>
+                  </div>
+                  <div className="contracts-meta__item">
+                    <dt>CDP</dt>
+                    <dd>{contract.cdp || '—'}</dd>
+                  </div>
+                  <div className="contracts-meta__item">
+                    <dt>Adjudicación</dt>
+                    <dd>{formatDate(contract.fecha_adjudicacion)}</dd>
+                  </div>
+                  <div className="contracts-meta__item">
+                    <dt>Inicio</dt>
+                    <dd>{formatDate(contract.fecha_inicio)}</dd>
+                  </div>
+                  <div className="contracts-meta__item">
+                    <dt>Término</dt>
+                    <dd>{formatDate(contract.fecha_termino)}</dd>
+                  </div>
+                  <div className="contracts-meta__item">
+                    <dt>Plazo</dt>
+                    <dd>
+                      {contract.plazo_meses != null
+                        ? `${contract.plazo_meses} meses`
+                        : '—'}
+                    </dd>
+                  </div>
+                </dl>
+              </ChartCard>
+              <ChartCard title="Ejecución mensual" subtitle="Histórico de gastos">
+                <div className="contracts-chart">
+                  {contract.gastos_mensuales?.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={200}>
+                      <AreaChart
+                        data={contract.gastos_mensuales}
+                        margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                      >
+                        <defs>
+                          <linearGradient id="colorMonto" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
+                            <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
+                        <YAxis
+                          tick={{ fontSize: 10 }}
+                          tickFormatter={(val) => `$${val / 1000000}M`}
                         />
-                        <motion.div
-                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                            className="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-lg w-full mx-4 relative z-[10000] border border-slate-200 flex flex-col max-h-[90vh]"
-                        >
-                            <div className="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex justify-between items-center shrink-0">
-                                <div>
-                                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Adjuntar Expediente</h3>
-                                    <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter">Formatos aceptados: PDF, DOCX, Imágenes</p>
-                                </div>
-                                <button onClick={() => setDocModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors">
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-
-                            <form onSubmit={handleFileUpload} className="p-4 md:p-6 space-y-5 overflow-y-auto custom-scrollbar">
-                                <FormInput
-                                    label="Nombre del Documento"
-                                    required
-                                    placeholder="Ej: Contrato Firmado, Resolución..."
-                                    value={uploadFormData.nombre}
-                                    onChange={e => setUploadFormData({ ...uploadFormData, nombre: e.target.value })}
-                                    labelClassName={DOC_LABEL_CLASS}
-                                    inputClassName={DOC_INPUT_CLASS}
-                                />
-
-                                <div className="space-y-1.5">
-                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
-                                        Seleccionar Archivo
-                                    </label>
-                                    <div className="relative group/file">
-                                        <div className="w-full p-6 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center gap-2 group-hover/file:border-blue-200 group-hover/file:bg-blue-50/40 transition-colors cursor-pointer">
-                                            <div className="p-2 bg-white rounded-xl border border-slate-100 text-slate-400 group-hover/file:text-blue-500 transition-colors">
-                                                <FileText className="w-4 h-4" />
-                                            </div>
-                                            <div className="text-center">
-                                                <p className="text-[10px] font-bold text-slate-700 uppercase tracking-tighter">{uploadFormData.archivo ? uploadFormData.archivo.name : "Haga clic para buscar archivo"}</p>
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Máximo 10MB · PDF, DOCX, IMG</p>
-                                            </div>
-                                            <input
-                                                type="file"
-                                                required
-                                                className="absolute inset-0 opacity-0 cursor-pointer"
-                                                onChange={e => setUploadFormData({ ...uploadFormData, archivo: e.target.files[0] })}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="pt-2 flex justify-end gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setDocModalOpen(false)}
-                                        className={BTN_SECONDARY}
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className={BTN_PRIMARY}
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        Subir Archivo
-                                    </button>
-                                </div>
-                            </form>
-                        </motion.div>
+                        <Tooltip
+                          formatter={(val) => formatCurrency(val)}
+                          contentStyle={{ fontSize: 12 }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="monto"
+                          stroke="var(--primary)"
+                          strokeWidth={2}
+                          fill="url(#colorMonto)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <EmptyState
+                      title="Sin ejecución"
+                      description="Aún no hay registros mensuales."
+                    />
+                  )}
+                </div>
+              </ChartCard>
+            </div>
+            <div className="contracts-kpi-grid">
+              <ChartCard
+                title="Control presupuestario"
+                subtitle="Avance del gasto frente al techo"
+                range={`${formatCurrency(contract.monto_restante)} disponibles`}
+              >
+                <div className="chart-kpi">
+                  <div className="chart-kpi__label">Presupuesto utilizado</div>
+                  <div className="chart-kpi__row">
+                    <span className="chart-kpi__value">{executionPercentage}%</span>
+                    <span
+                      className={`chart-kpi__trend ${
+                        executionPercentage >= 80
+                          ? 'chart-kpi__trend--up'
+                          : executionPercentage >= 40
+                            ? 'chart-kpi__trend--flat'
+                            : 'chart-kpi__trend--down'
+                      }`}
+                    >
+                      {formatCurrency(contract.monto_restante)} libre
+                    </span>
+                  </div>
+                  <div className="chart-kpi__hint">
+                    {formatCurrency(contract.monto_ejecutado)} ejecutados de{' '}
+                    {formatCurrency(contract.monto_total)}
+                  </div>
+                  <div className="contracts-timeline">
+                    <div className="contracts-timeline__rail contracts-timeline__rail--success">
+                      <div
+                        className="contracts-timeline__elapsed contracts-timeline__elapsed--success"
+                        style={{ width: `${Math.min(100, executionPercentage)}%` }}
+                      />
+                      <span
+                        className="contracts-timeline__marker contracts-timeline__marker--success"
+                        style={{ left: `${Math.min(100, executionPercentage)}%` }}
+                        aria-hidden
+                      />
                     </div>
-                )}
-            </AnimatePresence>
-            </ModalPortal>
+                    <div className="contracts-timeline__labels">
+                      <span>$0</span>
+                      <span>Actual</span>
+                      <span>Techo</span>
+                    </div>
+                  </div>
+                  <div className="contracts-kpi-split">
+                    <div>
+                      <span className="contracts-kpi-split__label">Ejecutado</span>
+                      <strong>{formatCurrency(contract.monto_ejecutado)}</strong>
+                    </div>
+                    <div>
+                      <span className="contracts-kpi-split__label">Disponible</span>
+                      <strong>{formatCurrency(contract.monto_restante)}</strong>
+                    </div>
+                  </div>
+                </div>
+              </ChartCard>
 
-            {/* Preview Modal */}
-            <ModalPortal>
-            <DocumentViewerModal
-                isOpen={!!previewDoc}
-                onClose={() => setPreviewDoc(null)}
-                title={previewDoc?.nombre}
-                subtitle={contract.codigo_mercado_publico}
-                documentType="Documento de Contrato"
-                fileUrl={previewDoc?.archivo}
+              <ChartCard
+                title="Control de plazos"
+                subtitle="Avance temporal del convenio"
+                range={`${monthsLeft} meses restantes`}
+              >
+                <div className="chart-kpi">
+                  <div className="chart-kpi__label">Tiempo transcurrido</div>
+                  <div className="chart-kpi__row">
+                    <span className="chart-kpi__value">{timePercentage}%</span>
+                    <span
+                      className={`chart-kpi__trend ${
+                        monthsLeft <= 2
+                          ? 'chart-kpi__trend--up'
+                          : monthsLeft <= 6
+                            ? 'chart-kpi__trend--flat'
+                            : 'chart-kpi__trend--down'
+                      }`}
+                    >
+                      {monthsLeft} mes{monthsLeft === 1 ? '' : 'es'}
+                    </span>
+                  </div>
+                  <div className="chart-kpi__hint">
+                    {formatDate(contract.fecha_inicio)} → {formatDate(contract.fecha_termino)}
+                  </div>
+                  <div className="contracts-timeline">
+                    <div className="contracts-timeline__rail">
+                      <div
+                        className="contracts-timeline__elapsed"
+                        style={{ width: `${Math.min(100, timePercentage)}%` }}
+                      />
+                      <span
+                        className="contracts-timeline__marker"
+                        style={{ left: `${Math.min(100, timePercentage)}%` }}
+                        aria-hidden
+                      />
+                    </div>
+                    <div className="contracts-timeline__labels">
+                      <span>Inicio</span>
+                      <span>Hoy</span>
+                      <span>Término</span>
+                    </div>
+                  </div>
+                  <div className="contracts-kpi-split">
+                    <div>
+                      <span className="contracts-kpi-split__label">Plazo total</span>
+                      <strong>
+                        {contract.plazo_meses != null
+                          ? `${contract.plazo_meses} meses`
+                          : '—'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="contracts-kpi-split__label">Restante</span>
+                      <strong>
+                        {monthsLeft} mes{monthsLeft === 1 ? '' : 'es'}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              </ChartCard>
+            </div>
+          </div>
+        ) : null}
+
+        {activeTab === 'providers' ? (
+          <div className="contracts-tab">
+            <DataTable
+              columns={providerColumns}
+              rows={contract.proveedores_asociados || []}
+              totalCount={contract.proveedores_asociados?.length || 0}
+              emptyTitle="Sin proveedores"
+              emptyDescription="No hay proveedores adjudicados."
+              fillViewport
+              showFooter={false}
+              pageSizeId="prov-page"
+              mobileCardActions={(p) => ({
+                primary: { label: 'Ver detalle', onClick: () => setSelectedProvider(p) },
+              })}
+              toolbar={
+                <div className="table-toolbar__left">
+                  <span className="table-toolbar__title">Proveedores adjudicados</span>
+                  <Badge variant="neutral">
+                    {contract.proveedores_asociados?.length || 0}
+                  </Badge>
+                </div>
+              }
             />
-            </ModalPortal>
+          </div>
+        ) : null}
 
-            {
-                isReceptionModalOpen && (
-                    <ContractReceptionModal
-                        isOpen={isReceptionModalOpen}
-                        onClose={() => {
-                            setReceptionModalOpen(false);
-                            setEditingRC(null);
+        {activeTab === 'servicios' ? (
+          <div className="contracts-tab">
+            <ContratoServiciosTab contractId={contract.id} />
+          </div>
+        ) : null}
+
+        {activeTab === 'receptions' ? (
+          <div className="contracts-tab">
+            <DataTable
+              columns={receptionColumns}
+              rows={sortedReceptions}
+              totalCount={receptions.length}
+              emptyTitle="Sin recepciones"
+              emptyDescription="No hay recepciones conformes registradas."
+              emptyAction={
+                can('servicios.add_recepcionconforme') ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      setEditingRC(null)
+                      setReceptionModalOpen(true)
+                    }}
+                  >
+                    <Icon name="plus" size="sm" /> Nueva recepción
+                  </Button>
+                ) : undefined
+              }
+              fillViewport
+              showFooter={false}
+              sortKey={sortConfig.key}
+              onSort={handleSortReceptions}
+              pageSizeId="rc-page"
+              toolbar={
+                <>
+                  <div className="table-toolbar__left">
+                    <span className="table-toolbar__title">Recepciones</span>
+                    <Badge variant="neutral">{receptions.length}</Badge>
+                  </div>
+                  {can('servicios.add_recepcionconforme') ? (
+                    <div className="table-toolbar__right">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => {
+                          setEditingRC(null)
+                          setReceptionModalOpen(true)
                         }}
-                        onSave={handleCreateReception}
-                        contract={contract}
-                        lookups={lookups}
-                        editingRC={editingRC}
-                    />
-                )
-            }
+                      >
+                        <Icon name="plus" size="sm" /> Nueva recepción
+                      </Button>
+                    </div>
+                  ) : null}
+                </>
+              }
+            />
+          </div>
+        ) : null}
 
-            {
-                isEditModalOpen && (
-                    <ContractModal
-                        isOpen={isEditModalOpen}
-                        onClose={() => setEditModalOpen(false)}
-                        onSave={async (dataToSubmit) => {
-                            try {
-                                const finalData = { ...dataToSubmit };
-                                if (finalData.orientacion === '') delete finalData.orientacion;
-                                
-                                await api.put(`contratos/contratos/${contract.id}/`, finalData);
-                                setEditModalOpen(false);
-                                fetchContract();
-                            } catch (error) {
-                                console.error(error);
-                                alert("Error al actualizar el contrato.");
-                            }
-                        }}
-                        editingId={contract.id}
-                        initialData={contract}
-                        lookups={lookups}
-                    />
-                )
-            }
-        </div >
-    );
-};
+        {activeTab === 'docs' ? (
+          <div className="contracts-tab">
+            <DataTable
+              columns={docColumns}
+              rows={contract.documentos || []}
+              totalCount={contract.documentos?.length || 0}
+              emptyTitle="Sin archivos"
+              emptyDescription="No hay documentos en el expediente."
+              emptyAction={
+                can('contratos.add_documentocontrato') ? (
+                  <Button variant="primary" size="sm" onClick={() => setDocModalOpen(true)}>
+                    <Icon name="plus" size="sm" /> Adjuntar
+                  </Button>
+                ) : undefined
+              }
+              fillViewport
+              showFooter={false}
+              pageSizeId="docs-page"
+              toolbar={
+                <>
+                  <div className="table-toolbar__left">
+                    <span className="table-toolbar__title">Expediente</span>
+                    <Badge variant="neutral">{contract.documentos?.length || 0}</Badge>
+                  </div>
+                  {can('contratos.add_documentocontrato') ? (
+                    <div className="table-toolbar__right">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => setDocModalOpen(true)}
+                      >
+                        <Icon name="plus" size="sm" /> Adjuntar
+                      </Button>
+                    </div>
+                  ) : null}
+                </>
+              }
+            />
+          </div>
+        ) : null}
 
-export default ContractDetail;
+        {activeTab === 'history' ? (
+          <div className="contracts-tab contracts-history-tab">
+            <FiltersBar
+              onSearch={() => setHistoryPage(1)}
+              onClear={() => {
+                setHistorySearch('')
+                setHistoryPage(1)
+              }}
+            >
+              <Field label="Buscar" htmlFor="hist-q">
+                <div className="input-wrap">
+                  <Icon name="search" className="input-wrap__icon" size="sm" />
+                  <Input
+                    id="hist-q"
+                    type="search"
+                    placeholder="Acción, detalle o usuario…"
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                  />
+                </div>
+              </Field>
+            </FiltersBar>
+            <DataTable
+              columns={historyColumns}
+              rows={historyPageRows}
+              totalCount={filteredHistory.length}
+              emptyTitle="Sin historial"
+              emptyDescription="No hay registros con la búsqueda actual."
+              fillViewport
+              page={historyPage}
+              pageSize={historyPageSize}
+              pageSizeId="hist-page"
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageChange={setHistoryPage}
+              onPageSizeChange={(n) => {
+                setHistoryPageSize(n)
+                setHistoryPage(1)
+              }}
+              sortKey={historySort.key}
+              onSort={handleHistorySort}
+              toolbar={
+                <div className="table-toolbar__left">
+                  <span className="table-toolbar__title">Bitácora</span>
+                  <Badge variant="neutral">{filteredHistory.length}</Badge>
+                </div>
+              }
+            />
+          </div>
+        ) : null}
+      </div>
+
+      <ContractModal
+        open={isEditModalOpen}
+        onClose={handleEditClose}
+        onSave={handleEditSave}
+        editingId={contract.id}
+        initialData={editFormData}
+        lookups={lookups}
+      />
+
+      <ContractReceptionModal
+        open={isReceptionModalOpen}
+        onClose={handleReceptionClose}
+        onSave={handleCreateReception}
+        contract={contract}
+        lookups={lookups}
+        editingRC={editingRC}
+      />
+
+      <Modal
+        open={isDocModalOpen}
+        onClose={handleDocClose}
+        title="Adjuntar documento"
+        subheader="PDF, DOCX o imagen · máx. 10MB"
+        {...docOverlay.modalProps}
+        onOverlayDismiss={handleDocOverlayDismiss}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={handleDocClose}
+              disabled={docOverlay.busy}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              form="contract-doc-form"
+              loading={docOverlay.busy}
+              disabled={docOverlay.busy || docOverlay.active}
+            >
+              Subir
+            </Button>
+          </>
+        }
+      >
+        <form id="contract-doc-form" className="crud-form" onSubmit={handleDocSubmit}>
+          <div className="form-grid">
+            <Field label="Nombre" required htmlFor="doc-nombre" className="field--full">
+              <Input
+                id="doc-nombre"
+                required
+                value={uploadFormData.nombre}
+                onChange={(e) =>
+                  setUploadFormData({ ...uploadFormData, nombre: e.target.value })
+                }
+              />
+            </Field>
+            <Field label="Archivo" required htmlFor="doc-file" className="field--full">
+              <FileInput
+                id="doc-file"
+                label="Seleccionar archivo"
+                required
+                onChange={(e) =>
+                  setUploadFormData({
+                    ...uploadFormData,
+                    archivo: e.target.files?.[0] || null,
+                  })
+                }
+              />
+            </Field>
+          </div>
+        </form>
+      </Modal>
+
+      <DocumentViewerModal
+        open={!!previewDoc}
+        onClose={() => setPreviewDoc(null)}
+        title={previewDoc?.nombre}
+        subtitle={contract.codigo_mercado_publico}
+        documentType="Documento de Contrato"
+        fileUrl={previewDoc?.archivo}
+      />
+
+      <Modal
+        open={!!selectedProvider}
+        onClose={() => setSelectedProvider(null)}
+        title={selectedProvider?.proveedor_nombre || 'Proveedor'}
+        subheader="Detalle de adjudicación en este contrato"
+        footer={
+          <Button variant="secondary" type="button" onClick={() => setSelectedProvider(null)}>
+            Cerrar
+          </Button>
+        }
+      >
+        {selectedProvider ? (
+          <div className="ticket-aside__details">
+            {(() => {
+              const catalog = resolveProviderCatalog(selectedProvider)
+              const pct =
+                selectedProvider.monto_adjudicado > 0
+                  ? Math.min(
+                      100,
+                      Math.round(
+                        (selectedProvider.monto_ejecutado /
+                          selectedProvider.monto_adjudicado) *
+                          100,
+                      ),
+                    )
+                  : 0
+              const establecimientos =
+                selectedProvider.establecimientos_detalle ||
+                (selectedProvider.establecimientos || [])
+                  .map((id) =>
+                    typeof id === 'object'
+                      ? id
+                      : lookups.establishments.find((e) => e.id === id),
+                  )
+                  .filter(Boolean)
+              return (
+                <>
+                  <DetailItem label="RUT">{catalog?.rut || '—'}</DetailItem>
+                  <DetailItem label="Acrónimo">{catalog?.acronimo || '—'}</DetailItem>
+                  <DetailItem label="Tipo">
+                    {catalog?.tipo_proveedor_nombre || '—'}
+                  </DetailItem>
+                  <DetailItem label="Contacto">{catalog?.contacto || '—'}</DetailItem>
+                  <DetailItem label="Adjudicado">
+                    {formatCurrency(selectedProvider.monto_adjudicado)}
+                  </DetailItem>
+                  <DetailItem label="Ejecutado">
+                    {formatCurrency(selectedProvider.monto_ejecutado)}
+                  </DetailItem>
+                  <DetailItem label="Consumo previo">
+                    {formatCurrency(selectedProvider.monto_consumido_previo)}
+                  </DetailItem>
+                  <DetailItem label="Saldo">
+                    {formatCurrency(selectedProvider.monto_restante)}
+                  </DetailItem>
+                  <DetailItem label="Consumo">
+                    <div className="contracts-gauge__track" style={{ marginTop: '0.35rem' }}>
+                      <div
+                        className="contracts-gauge__fill"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span>{pct}%</span>
+                  </DetailItem>
+                  <DetailItem label="Establecimientos">
+                    {establecimientos.length ? (
+                      <ul className="contracts-estab-list">
+                        {establecimientos.map((e) => (
+                          <li key={e.id || e.nombre}>{e.nombre || e}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      'Sin asignaciones'
+                    )}
+                  </DetailItem>
+                </>
+              )
+            })()}
+          </div>
+        ) : null}
+      </Modal>
+
+      <ConfirmModal
+        open={!!deleteDocTarget}
+        onClose={() => {
+          if (!deleting) setDeleteDocTarget(null)
+        }}
+        onConfirm={confirmDeleteDoc}
+        title="Eliminar documento"
+        description={
+          deleteDocTarget ? `¿Eliminar «${deleteDocTarget.nombre}»?` : ''
+        }
+        confirmLabel={deleting ? 'Eliminando…' : 'Eliminar'}
+        danger
+      />
+
+      <ConfirmModal
+        open={!!deleteRcTarget}
+        onClose={() => {
+          if (!deleting) setDeleteRcTarget(null)
+        }}
+        onConfirm={confirmDeleteRc}
+        title="Anular recepción"
+        description="¿Anular esta recepción? El presupuesto se restaurará."
+        confirmLabel={deleting ? 'Anulando…' : 'Anular'}
+        danger
+      />
+    </div>
+  )
+}
+
+export default ContractDetail

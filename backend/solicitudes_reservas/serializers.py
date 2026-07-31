@@ -47,6 +47,12 @@ class SolicitudReservaSerializer(serializers.ModelSerializer):
         now = timezone.now()
         user = self.context['request'].user
         
+        # El término no puede quedar en el pasado: las PENDIENTE se eliminan al vencer
+        if ff and ff <= now:
+            raise serializers.ValidationError({
+                'fecha_fin': 'La hora de término debe ser posterior a la hora actual.'
+            })
+
         if fi:
             # Si el usuario tiene el permiso especial o es superusuario, saltamos la antelación
             can_bypass = user.is_superuser or user.has_perm('solicitudes_reservas.can_bypass_antelacion')

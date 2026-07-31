@@ -1,286 +1,450 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { Plus, Edit3, Trash2, Search, Power, X, Layers } from 'lucide-react';
-import api from '../../api';
-import { usePermission } from '../../hooks/usePermission';
-import Pagination from '../../components/common/Pagination';
-import FuncionariosPageHeader from './shared/FuncionariosPageHeader';
-import { TableLoading, TableEmpty } from './shared/FuncionariosTableStates';
+import React, { useState, useEffect, useMemo } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import api from '../../api'
+import { usePermission } from '../../hooks/usePermission'
+import { useNotify } from '../../hooks/useNotify'
+import useDebouncedValue from '../../hooks/useDebouncedValue'
 import {
-    PAGE_LAYOUT, TABLE_PANEL, INPUT_FILTER, SELECT_FILTER, THEAD_TR, TH, TD, TD_MAIN,
-    BTN_ICON_EDIT, BTN_ICON_DELETE, statusBadgeClass, countBadgeClass,
-    MODAL_SHELL, MODAL_BACKDROP_LAYER, MODAL_PANEL, MODAL_HEADER, MODAL_HEADER_ICON,
-    INPUT_FORM, SELECT_FORM, BTN_PRIMARY, BTN_SECONDARY,
-} from './shared/funcionariosUi';
+  PageHeader,
+  FiltersBar,
+  DataTable,
+  Badge,
+  Button,
+  Field,
+  Input,
+  Select,
+  Modal,
+  ConfirmModal,
+  Icon,
+  useFormOverlay,
+  formatApiFormError,
+} from '@slep/ui'
+
+const emptyForm = () => ({ nombre: '', departamento: '', activo: true })
 
 const Unidades = () => {
-    const { can } = usePermission();
-    const [unidades, setUnidades] = useState([]);
-    const [departamentos, setDepartamentos] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [showModal, setShowModal] = useState(false);
-    const [editingId, setEditingId] = useState(null);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterDepartamento, setFilterDepartamento] = useState('');
-    const [formData, setFormData] = useState({ nombre: '', departamento: '', activo: true });
-    const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
-    const [totalPages, setTotalPages] = useState(1);
-    const [totalResults, setTotalResults] = useState(0);
+  const navigate = useNavigate()
+  const { can } = usePermission()
+  const canAdd = can('funcionarios.add_unidad')
+  const canChange = can('funcionarios.change_unidad')
+  const canDelete = can('funcionarios.delete_unidad')
+  const { notify } = useNotify()
+  const overlay = useFormOverlay()
 
-    useEffect(() => {
-        fetchDepartamentos();
-        fetchData(1);
-    }, []);
+  const [items, setItems] = useState([])
+  const [departamentos, setDepartamentos] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterDepartamento, setFilterDepartamento] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [totalResults, setTotalResults] = useState(0)
 
-    const fetchDepartamentos = async () => {
-        try {
-            const response = await api.get('departamentos/', { params: { nopaginate: true } });
-            setDepartamentos(response.data.results || (Array.isArray(response.data) ? response.data : []));
-        } catch (error) {
-            console.error('Error fetching departamentos:', error);
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [formData, setFormData] = useState(emptyForm())
+  const [savedOk, setSavedOk] = useState(false)
+
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const debouncedSearch = useDebouncedValue(searchTerm)
+
+  useEffect(() => {
+    fetchDepartamentos()
+  }, [])
+
+  useEffect(() => {
+    fetchData(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, filterDepartamento, pageSize])
+
+  const fetchDepartamentos = async () => {
+    try {
+      const response = await api.get('departamentos/', { params: { nopaginate: true } })
+      setDepartamentos(
+        response.data.results || (Array.isArray(response.data) ? response.data : []),
+      )
+    } catch (error) {
+      console.error('Error fetching departamentos:', error)
+    }
+  }
+
+  const fetchData = async (page = currentPage) => {
+    setLoading(true)
+    try {
+      const params = { page, page_size: pageSize }
+      if (debouncedSearch) params.search = debouncedSearch
+      if (filterDepartamento) params.departamento = filterDepartamento
+
+      const response = await api.get('unidades/', { params })
+      if (response.data.results) {
+        setItems(response.data.results)
+        setTotalResults(response.data.count || 0)
+      } else {
+        setItems(response.data || [])
+        setTotalResults(response.data?.length || 0)
+      }
+      setCurrentPage(page)
+    } catch (error) {
+      console.error('Error fetching unidades:', error)
+      setItems([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const clearFilters = () => {
+    setSearchTerm('')
+    setFilterDepartamento('')
+    setCurrentPage(1)
+  }
+
+  const openCreate = () => {
+    setEditingId(null)
+    setFormData(emptyForm())
+    setSavedOk(false)
+    overlay.reset()
+    setModalOpen(true)
+  }
+
+  const openEdit = (item) => {
+    setEditingId(item.id)
+    setFormData({
+      nombre: item.nombre,
+      departamento: item.departamento || '',
+      activo: item.activo,
+    })
+    setSavedOk(false)
+    overlay.reset()
+    setModalOpen(true)
+  }
+
+  const closeModal = () => {
+    if (overlay.busy) return
+    overlay.reset()
+    setModalOpen(false)
+    setEditingId(null)
+    setFormData(emptyForm())
+    setSavedOk(false)
+  }
+
+  const handleOverlayDismiss = () => {
+    if (overlay.status === 'success') {
+      overlay.reset()
+      setModalOpen(false)
+      setEditingId(null)
+      setFormData(emptyForm())
+      if (savedOk) fetchData(editingId ? currentPage : 1)
+      setSavedOk(false)
+      return
+    }
+    overlay.dismiss()
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const wasEdit = Boolean(editingId)
+    try {
+      await overlay.run(
+        async () => {
+          if (editingId) {
+            await api.put(`unidades/${editingId}/`, formData)
+          } else {
+            await api.post('unidades/', formData)
+          }
+          setSavedOk(true)
+        },
+        {
+          successDescription: wasEdit ? 'Unidad actualizada.' : 'Unidad guardada.',
+          formatError: (err) => formatApiFormError(err, 'No se pudo guardar la unidad.'),
+        },
+      )
+    } catch {
+      // FormOverlay
+    }
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`unidades/${deleteTarget.id}/`)
+      setDeleteTarget(null)
+      notify({ variant: 'success', text: 'Unidad eliminada.' })
+      await fetchData(currentPage)
+    } catch (error) {
+      console.error('Error deleting:', error)
+      notify({ variant: 'danger', text: 'Error al eliminar la unidad.' })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const handleToggleActivo = async (item) => {
+    try {
+      await api.patch(`unidades/${item.id}/`, { activo: !item.activo })
+      fetchData(currentPage)
+    } catch (error) {
+      console.error('Error toggling status:', error)
+    }
+  }
+
+  const columns = useMemo(
+    () => [
+      {
+        key: 'activo',
+        header: 'Estado',
+        className: 'col--status',
+        cardRole: 'status',
+        priority: 1,
+        render: (item) =>
+          canChange ? (
+            <button
+              type="button"
+              className="badge-toggle"
+              aria-label={item.activo ? 'Desactivar' : 'Activar'}
+              onClick={() => handleToggleActivo(item)}
+            >
+              <Badge variant={item.activo ? 'success' : 'neutral'} dot>
+                {item.activo ? 'Activo' : 'Inactivo'}
+              </Badge>
+            </button>
+          ) : (
+            <Badge variant={item.activo ? 'success' : 'neutral'} dot>
+              {item.activo ? 'Activo' : 'Inactivo'}
+            </Badge>
+          ),
+      },
+      {
+        key: 'nombre',
+        header: 'Nombre',
+        className: 'col--primary',
+        cardRole: 'title',
+        priority: 1,
+      },
+      {
+        key: 'departamento_nombre',
+        header: 'Departamento',
+        className: 'col--secondary',
+        cardRole: 'subtitle',
+        priority: 1,
+        render: (item) => item.departamento_nombre || '—',
+      },
+      {
+        key: 'subdireccion_nombre',
+        header: 'Subdirección',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 2,
+        render: (item) => item.subdireccion_nombre || '—',
+      },
+      {
+        key: 'total_funcionarios',
+        header: 'Personal',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 2,
+        render: (item) => (
+          <Badge variant="neutral">{item.total_funcionarios || 0}</Badge>
+        ),
+      },
+      {
+        key: 'actions',
+        header: 'Acciones',
+        className: 'col--actions',
+        render: (item) => (
+          <div className="data-table__actions">
+            {canChange ? (
+              <Button variant="outline" size="sm" onClick={() => openEdit(item)}>
+                Editar
+              </Button>
+            ) : null}
+            {canDelete ? (
+              <Button variant="danger" size="sm" onClick={() => setDeleteTarget(item)}>
+                Eliminar
+              </Button>
+            ) : null}
+          </div>
+        ),
+      },
+    ],
+    [canChange, canDelete],
+  )
+
+  return (
+    <div className="page" data-od-id="unidades-page">
+      <PageHeader
+        icon="box"
+        title="Unidades"
+        description="Unidades operativas del servicio"
+        breadcrumbs={[
+          { label: 'Operaciones' },
+          { label: 'Funcionarios', to: '/funcionarios' },
+          { label: 'Unidades' },
+        ]}
+        linkComponent={Link}
+        split
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate('/funcionarios')}
+            >
+              Volver al directorio
+            </Button>
+            {canAdd ? (
+              <Button variant="primary" size="sm" onClick={openCreate}>
+                <Icon name="plus" size="sm" /> Nueva unidad
+              </Button>
+            ) : null}
+          </>
         }
-    };
+      />
 
-    const fetchData = async (page = 1, search = searchTerm, depto = filterDepartamento, size = pageSize) => {
-        setLoading(true);
-        try {
-            const params = { page, page_size: size };
-            if (search) params.search = search;
-            if (depto) params.departamento = depto;
-            const response = await api.get('unidades/', { params });
-            if (response.data.results) {
-                setUnidades(response.data.results);
-                setTotalPages(Math.ceil(response.data.count / size));
-                setTotalResults(response.data.count);
-            } else {
-                setUnidades(response.data);
-                setTotalPages(1);
-                setTotalResults(response.data.length);
-            }
-            setCurrentPage(page);
-        } catch (error) {
-            console.error('Error fetching data:', error);
-        } finally {
-            setLoading(false);
+      <FiltersBar
+        onSearch={() => setCurrentPage(1)}
+        onClear={clearFilters}
+        advanced={
+          <Field label="Departamento" htmlFor="unidad-depto">
+            <Select
+              id="unidad-depto"
+              value={filterDepartamento}
+              onChange={(e) => {
+                setFilterDepartamento(e.target.value)
+                setCurrentPage(1)
+              }}
+            >
+              <option value="">Todos los departamentos</option>
+              {departamentos.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
         }
-    };
-
-    const handleSearch = (e) => {
-        const value = e.target.value;
-        setSearchTerm(value);
-        fetchData(1, value);
-    };
-
-    const handleFilterDepto = (e) => {
-        const value = e.target.value;
-        setFilterDepartamento(value);
-        fetchData(1, searchTerm, value);
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            if (editingId) {
-                await api.put(`unidades/${editingId}/`, formData);
-            } else {
-                await api.post('unidades/', formData);
-            }
-            fetchData(currentPage);
-            handleCloseModal();
-        } catch (error) {
-            console.error('Error saving:', error);
-            alert('Error al guardar');
-        }
-    };
-
-    const handleDelete = async (id) => {
-        if (!confirm('¿Estás seguro de eliminar esta unidad?')) return;
-        try {
-            await api.delete(`unidades/${id}/`);
-            fetchData(currentPage);
-        } catch (error) {
-            console.error('Error deleting:', error);
-            alert('Error al eliminar');
-        }
-    };
-
-    const handleToggleActivo = async (item) => {
-        if (!confirm(`¿Deseas ${item.activo ? 'desactivar' : 'activar'} esta unidad?`)) return;
-        try {
-            await api.patch(`unidades/${item.id}/`, { activo: !item.activo });
-            fetchData(currentPage);
-        } catch (error) {
-            console.error('Error toggling status:', error);
-        }
-    };
-
-    const handleEdit = (item) => {
-        setFormData({ nombre: item.nombre, departamento: item.departamento, activo: item.activo });
-        setEditingId(item.id);
-        setShowModal(true);
-    };
-
-    const handleCloseModal = () => {
-        setShowModal(false);
-        setEditingId(null);
-        setFormData({ nombre: '', departamento: '', activo: true });
-    };
-
-    const openCreate = () => {
-        setEditingId(null);
-        setFormData({ nombre: '', departamento: '', activo: true });
-        setShowModal(true);
-    };
-
-    return (
-        <div className={PAGE_LAYOUT}>
-            <FuncionariosPageHeader
-                title="Unidades"
-                titleIcon={Layers}
-                subtitle={`Unidades operativas · ${totalResults} registros`}
-                actionLabel="Nueva unidad"
-                actionIcon={Plus}
-                onAction={openCreate}
-                showAction={can('funcionarios.add_unidad')}
+      >
+        <Field label="Buscar" htmlFor="unidad-q">
+          <div className="input-wrap">
+            <Icon name="search" className="input-wrap__icon" size="sm" />
+            <Input
+              id="unidad-q"
+              type="search"
+              placeholder="Buscar por nombre…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
+          </div>
+        </Field>
+      </FiltersBar>
 
-            <div className={TABLE_PANEL}>
-                <div className="shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-3 bg-slate-50 border-b border-slate-200">
-                    <div className="relative flex-1 min-w-0">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                        <input type="text" placeholder="Buscar..." value={searchTerm} onChange={handleSearch} className={INPUT_FILTER} />
-                    </div>
-                    <select value={filterDepartamento} onChange={handleFilterDepto} className={`${SELECT_FILTER} w-full sm:w-48`}>
-                        <option value="">Todos los departamentos</option>
-                        {departamentos.map((d) => (
-                            <option key={d.id} value={d.id}>{d.nombre}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={pageSize}
-                        onChange={(e) => {
-                            const newSize = Number(e.target.value);
-                            setPageSize(newSize);
-                            fetchData(1, searchTerm, filterDepartamento, newSize);
-                        }}
-                        className={`${SELECT_FILTER} w-20 shrink-0`}
-                    >
-                        <option value={10}>10</option>
-                        <option value={20}>20</option>
-                        <option value={50}>50</option>
-                        <option value={100}>100</option>
-                    </select>
-                </div>
+      <DataTable
+        columns={columns}
+        rows={items}
+        loading={loading}
+        totalCount={totalResults}
+        emptyTitle="Sin unidades"
+        emptyDescription="No hay registros con los filtros actuales."
+        emptyAction={
+          <Button variant="quiet" onClick={clearFilters}>
+            Limpiar filtros
+          </Button>
+        }
+        page={currentPage}
+        pageSize={pageSize}
+        pageSizeId="unidad-page-size"
+        onPageChange={(page) => fetchData(page)}
+        onPageSizeChange={(n) => {
+          setPageSize(n)
+          setCurrentPage(1)
+        }}
+        mobileCardActions={(item) => ({
+          primary: canChange ? { label: 'Editar', onClick: () => openEdit(item) } : undefined,
+          secondary: canDelete
+            ? { label: 'Eliminar', onClick: () => setDeleteTarget(item) }
+            : undefined,
+        })}
+        toolbar={
+          <div className="table-toolbar__left">
+            <span className="table-toolbar__title">Listado</span>
+            <Badge variant="neutral">{totalResults} registros</Badge>
+          </div>
+        }
+      />
 
-                <div className="overflow-auto flex-1 bg-white custom-scrollbar">
-                    {loading ? (
-                        <TableLoading />
-                    ) : unidades.length === 0 ? (
-                        <TableEmpty />
-                    ) : (
-                        <table className="w-full text-left border-collapse border-spacing-0 min-w-[1000px]">
-                            <thead className="sticky top-0 z-10">
-                                <tr className={THEAD_TR}>
-                                    <th className={`${TH} w-28`}>Estado</th>
-                                    <th className={TH}>Nombre</th>
-                                    <th className={TH}>Departamento</th>
-                                    <th className={TH}>Subdirección</th>
-                                    <th className={`${TH} text-center w-24`}>Personal</th>
-                                    <th className={`${TH} text-center w-24 border-r-0`}>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {unidades.map((item) => (
-                                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className={TD}>
-                                            <button type="button" onClick={() => handleToggleActivo(item)} className={statusBadgeClass(item.activo)}>
-                                                <Power className="w-3 h-3 shrink-0" />
-                                                {item.activo ? 'Activo' : 'Inactivo'}
-                                            </button>
-                                        </td>
-                                        <td className={TD_MAIN}><span className="line-clamp-2 block">{item.nombre}</span></td>
-                                        <td className={TD}><span className="line-clamp-2 block">{item.departamento_nombre || '—'}</span></td>
-                                        <td className={TD}><span className="line-clamp-2 block">{item.subdireccion_nombre || '—'}</span></td>
-                                        <td className={`${TD} text-center`}><span className={countBadgeClass}>{item.total_funcionarios || 0}</span></td>
-                                        <td className="px-4 py-3 align-middle text-center">
-                                            <div className="flex items-center justify-center gap-1">
-                                                {can('funcionarios.change_unidad') && (
-                                                    <button type="button" onClick={() => handleEdit(item)} className={BTN_ICON_EDIT} title="Editar">
-                                                        <Edit3 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                                {can('funcionarios.delete_unidad') && (
-                                                    <button type="button" onClick={() => handleDelete(item.id)} className={BTN_ICON_DELETE} title="Eliminar">
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        title={editingId ? 'Editar unidad' : 'Nueva unidad'}
+        subheader="Datos de la unidad operativa"
+        {...overlay.modalProps}
+        onOverlayDismiss={handleOverlayDismiss}
+        footer={
+          <>
+            <Button variant="ghost" type="button" onClick={closeModal} disabled={overlay.busy}>
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              form="unidad-form"
+              loading={overlay.busy}
+              disabled={overlay.busy || overlay.active}
+            >
+              {editingId ? 'Guardar cambios' : 'Crear'}
+            </Button>
+          </>
+        }
+      >
+        <form id="unidad-form" className="crud-form" onSubmit={handleSubmit}>
+          <div className="form-grid">
+            <Field label="Departamento" required htmlFor="unidad-form-depto" className="field--full">
+              <Select
+                id="unidad-form-depto"
+                required
+                value={formData.departamento}
+                onChange={(e) => setFormData({ ...formData, departamento: e.target.value })}
+              >
+                <option value="">Seleccionar…</option>
+                {departamentos.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.nombre}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Nombre" required htmlFor="unidad-form-nombre" className="field--full">
+              <Input
+                id="unidad-form-nombre"
+                required
+                value={formData.nombre}
+                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+              />
+            </Field>
+          </div>
+        </form>
+      </Modal>
 
-                {!loading && (
-                    <div className="p-3 bg-slate-50 border-t border-slate-200 shrink-0 flex flex-col sm:flex-row items-center justify-between gap-3">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                            Mostrando {unidades.length} de {totalResults}
-                        </span>
-                        <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={(page) => fetchData(page)} totalCount={totalResults} />
-                    </div>
-                )}
-            </div>
+      <ConfirmModal
+        open={Boolean(deleteTarget)}
+        onClose={() => {
+          if (!deleting) setDeleteTarget(null)
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Eliminar unidad"
+        description={
+          deleteTarget
+            ? `¿Eliminar «${deleteTarget.nombre}»? Esta acción no se puede deshacer.`
+            : '¿Eliminar esta unidad?'
+        }
+        confirmLabel={deleting ? 'Eliminando…' : 'Eliminar'}
+        cancelLabel="Cancelar"
+        danger
+      />
+    </div>
+  )
+}
 
-            {showModal && createPortal(
-                <div className={MODAL_SHELL}>
-                    <div className={MODAL_BACKDROP_LAYER} onClick={handleCloseModal} aria-hidden />
-                    <div className={MODAL_PANEL} onClick={(e) => e.stopPropagation()}>
-                        <div className={MODAL_HEADER}>
-                            <div className="flex items-center gap-2.5 min-w-0">
-                                <div className={MODAL_HEADER_ICON}>
-                                    <Layers className="w-4 h-4" />
-                                </div>
-                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                    {editingId ? 'Editar unidad' : 'Nueva unidad'}
-                                </h3>
-                            </div>
-                            <button type="button" onClick={handleCloseModal} className="p-2 hover:bg-slate-200 rounded-xl text-slate-500 transition-colors shrink-0">
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleSubmit} className="p-4 space-y-4">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Departamento</label>
-                                <select
-                                    value={formData.departamento}
-                                    onChange={(e) => setFormData({ ...formData, departamento: e.target.value })}
-                                    className={SELECT_FORM}
-                                    required
-                                >
-                                    <option value="">Seleccionar...</option>
-                                    {departamentos.map((d) => (
-                                        <option key={d.id} value={d.id}>{d.nombre}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Nombre</label>
-                                <input type="text" value={formData.nombre} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })} className={INPUT_FORM} required />
-                            </div>
-                            <div className="flex gap-2 pt-2">
-                                <button type="button" onClick={handleCloseModal} className={`${BTN_SECONDARY} flex-1`}>Cancelar</button>
-                                <button type="submit" className={`${BTN_PRIMARY} flex-1`}>Guardar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>,
-                document.body
-            )}
-        </div>
-    );
-};
-
-export default Unidades;
+export default Unidades
