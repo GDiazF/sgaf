@@ -94,9 +94,18 @@ docker compose up -d --build
 
 ---
 
+## Archivos `design-system/src/lib/`
+
+Helpers como `cn.js` y `charts.js` viven en `design-system/src/lib/`. Un `.gitignore` con la regla genérica `lib/` (pensada para packaging de Python) los excluía del Git, así que en la VM el build fallaba con `Could not resolve "./lib/cn.js"`.
+
+El `.gitignore` debe permitir `design-system/src/lib/` (p. ej. `!design-system/src/lib/` y evitar un `lib/` suelto que aplique a todo el repo).
+
+---
+
 ## Qué no cambiar sin cuidado
 
 - No volver el contexto a `./frontend` sin otra forma de incluir `design-system` (por ejemplo multi-context o empaquetar `@slep/ui` de otra manera).
 - No quitar `resolve.dedupe` de `vite.config.js` sin instalar deps de `design-system` en el Dockerfile (o el build Docker vuelve a fallar al resolver `react`).
+- No reintroducir una regla bare `lib/` en `.gitignore` sin excepción para `design-system/src/lib/`.
 - No mover `design-system/` en el repo sin actualizar: `package.json` (`file:`), alias de Vite, import de CSS en `main.jsx` y el Dockerfile.
 - El backend sigue con `context: ./backend`; su build no depende del design system.
