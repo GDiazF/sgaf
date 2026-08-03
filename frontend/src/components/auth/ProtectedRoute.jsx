@@ -12,7 +12,7 @@ const ProtectedRoute = ({ permission, requireSuperuser = false }) => {
     const { can } = usePermission();
 
     if (loading) {
-        return <div className="h-screen flex items-center justify-center bg-slate-50 text-slate-400 font-medium">Verificando acceso...</div>;
+        return <div className="app-boot-screen">Verificando acceso…</div>;
     }
 
     if (!user) {

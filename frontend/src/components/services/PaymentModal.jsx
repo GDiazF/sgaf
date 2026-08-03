@@ -1,223 +1,227 @@
-import React, { useState, useEffect } from 'react';
-import BaseModal from '../common/BaseModal';
-import { Building2, Calendar, FileText, Info } from 'lucide-react';
-import DateInput from '../common/DateInput';
-import SearchableSelect from '../common/SearchableSelect';
+import React, { useState, useEffect } from 'react'
+import SearchableSelect from '../common/SearchableSelect'
+import { Modal, Button, Field, Input, Alert, useFormOverlay, formatApiFormError } from '@slep/ui'
 
-const PAYMENT_INPUT_CLASS = 'no-global !w-full !min-w-0 !box-border !h-10 !min-h-10 !text-[10px] !font-bold !bg-white !border !border-slate-200 !px-3 !py-0 !rounded-xl !outline-none focus:!border-blue-500 !uppercase !transition-all !shadow-sm placeholder:!text-slate-300';
-const PAYMENT_LABEL_CLASS = 'block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1';
-const PAYMENT_FIELD_CLASS = 'space-y-1.5 min-w-0';
-
-const SectionHeader = ({ icon, children }) => (
-    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-        <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
-            {React.createElement(icon, { className: 'w-3.5 h-3.5' })}
-        </span>
-        {children}
-    </h4>
-);
+const emptyForm = {
+  servicio: '',
+  establecimiento: '',
+  fecha_emision: '',
+  fecha_vencimiento: '',
+  fecha_pago: '',
+  nro_documento: '',
+  monto_interes: 0,
+  monto_total: '',
+  consumo: '',
+}
 
 const PaymentModal = ({
-    isOpen,
-    onClose,
-    onSave,
-    editingId,
-    initialData,
-    lookups: { establishments, services }
+  open,
+  onClose,
+  onSave,
+  editingId,
+  initialData,
+  lookups: { establishments = [], services = [] } = {},
 }) => {
-    const [formData, setFormData] = useState({
-        servicio: '',
-        establecimiento: '',
-        fecha_emision: '',
-        fecha_vencimiento: '',
-        fecha_pago: '',
-        nro_documento: '',
-        monto_interes: 0,
-        monto_total: '',
-        consumo: ''
-    });
-    const [modalError, setModalError] = useState('');
-    const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState(emptyForm)
+  const overlay = useFormOverlay()
 
-    useEffect(() => {
-        if (initialData) {
-            // Sync modal form when switching between create/edit records.
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setFormData({
-                servicio: initialData.servicio || '',
-                establecimiento: initialData.establecimiento || '',
-                fecha_emision: initialData.fecha_emision || '',
-                fecha_vencimiento: initialData.fecha_vencimiento || '',
-                fecha_pago: initialData.fecha_pago || '',
-                nro_documento: initialData.nro_documento || '',
-                monto_interes: initialData.monto_interes || 0,
-                monto_total: initialData.monto_total || '',
-                consumo: initialData.consumo || ''
-            });
-            setModalError('');
-        }
-    }, [initialData]);
+  useEffect(() => {
+    if (!open) return
+    overlay.reset()
+    setFormData({
+      servicio: initialData?.servicio || '',
+      establecimiento: initialData?.establecimiento || '',
+      fecha_emision: initialData?.fecha_emision || '',
+      fecha_vencimiento: initialData?.fecha_vencimiento || '',
+      fecha_pago: initialData?.fecha_pago || '',
+      nro_documento: initialData?.nro_documento || '',
+      monto_interes: initialData?.monto_interes ?? 0,
+      monto_total: initialData?.monto_total ?? '',
+      consumo: initialData?.consumo ?? '',
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset solo al abrir
+  }, [open, initialData])
 
-    const handleFormSave = async () => {
-        setModalError('');
-        setSaving(true);
-        try {
-            await onSave(formData);
-        } catch (error) {
-            console.error(error);
-            const detail = error.response?.data
-                ? JSON.stringify(error.response.data)
-                : error.message;
-            setModalError(`Error al guardar registro: ${detail}`);
-        } finally {
-            setSaving(false);
-        }
-    };
+  const filteredServices = formData.establecimiento
+    ? services.filter((s) => s.establecimiento === parseInt(formData.establecimiento, 10))
+    : []
 
-    // Filter services based on selected establishment
-    const filteredServices = formData.establecimiento
-        ? services.filter(s => s.establecimiento === parseInt(formData.establecimiento))
-        : [];
+  const selectedService = services.find((s) => s.id === parseInt(formData.servicio, 10))
+  const unidadMedida = selectedService?.unidad_medida
 
-    const selectedService = services.find(s => s.id === parseInt(formData.servicio));
-    const unidadMedida = selectedService?.unidad_medida;
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      await overlay.run(
+        async () => {
+          await onSave(formData)
+        },
+        {
+          successDescription: editingId ? 'Pago actualizado.' : 'Pago registrado.',
+          formatError: formatApiFormError,
+        },
+      )
+    } catch {
+      // El error se muestra en FormOverlay
+    }
+  }
 
-    return (
-        <BaseModal
-            isOpen={isOpen}
-            onClose={onClose}
-            onSave={handleFormSave}
-            title={editingId ? 'Editar Registro de Pago' : 'Registrar Pago / Consumo'}
-            subtitle="Ingrese los datos de facturación recibidos del proveedor"
-            maxWidth="max-w-3xl"
-            saveLabel={saving ? 'Guardando...' : editingId ? 'Actualizar Registro' : 'Registrar Pago'}
-            saveDisabled={saving}
-        >
-            <div className="space-y-6 min-w-0 overflow-x-hidden">
-                {modalError && (
-                    <div className="bg-rose-50 text-rose-700 text-[10px] font-bold uppercase p-3 rounded-xl border border-rose-200 leading-relaxed">
-                        {modalError}
-                    </div>
-                )}
-                {/* Section: Contexto */}
-                <div className="space-y-3">
-                    <SectionHeader icon={Building2}>Contexto del Servicio</SectionHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <SearchableSelect
-                            className="min-w-0"
-                            label="Establecimiento"
-                            options={establishments ? establishments.map(e => ({ value: e.id, label: e.nombre })) : []}
-                            value={formData.establecimiento}
-                            onChange={val => setFormData({ ...formData, establecimiento: val, servicio: '' })}
-                            placeholder="Seleccione Establecimiento..."
-                            required
-                        />
-                        <SearchableSelect
-                            className="min-w-0"
-                            label="Servicio / ID Cliente"
-                            options={filteredServices.map(s => ({ value: s.id, label: `${s.proveedor_nombre} - ID: ${s.numero_cliente}` }))}
-                            value={formData.servicio}
-                            onChange={val => setFormData({ ...formData, servicio: val })}
-                            placeholder={formData.establecimiento ? 'Seleccione Servicio...' : 'Primero elija establecimiento'}
-                            required
-                            disabled={!formData.establecimiento}
-                        />
-                    </div>
-                </div>
+  const handleOverlayDismiss = () => {
+    if (overlay.status === 'success') {
+      overlay.reset()
+      onClose({ saved: true })
+      return
+    }
+    overlay.dismiss()
+  }
 
-                {/* Section: Documento */}
-                <div className="space-y-3">
-                    <SectionHeader icon={FileText}>Detalles del Documento</SectionHeader>
-                    <div className={`grid grid-cols-1 md:grid-cols-2 ${unidadMedida ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-6`}>
-                        <div className={PAYMENT_FIELD_CLASS}>
-                            <label className={PAYMENT_LABEL_CLASS}>Nº Documento / Folio</label>
-                            <input
-                                type="text"
-                                required
-                                placeholder="Folio de factura/boleta..."
-                                className={PAYMENT_INPUT_CLASS}
-                                value={formData.nro_documento}
-                                onChange={e => setFormData({ ...formData, nro_documento: e.target.value })}
-                            />
-                        </div>
-                        <div className={PAYMENT_FIELD_CLASS}>
-                            <label className={PAYMENT_LABEL_CLASS}>Monto Total ($)</label>
-                            <input
-                                type="number"
-                                required
-                                placeholder="Ej: 45000"
-                                className={PAYMENT_INPUT_CLASS}
-                                value={formData.monto_total}
-                                onChange={e => setFormData({ ...formData, monto_total: e.target.value })}
-                            />
-                        </div>
-                        <div className={PAYMENT_FIELD_CLASS}>
-                            <label className={PAYMENT_LABEL_CLASS}>Interés / Multa (Op.)</label>
-                            <input
-                                type="number"
-                                placeholder="0"
-                                className={PAYMENT_INPUT_CLASS}
-                                value={formData.monto_interes}
-                                onChange={e => setFormData({ ...formData, monto_interes: e.target.value })}
-                            />
-                        </div>
-                        {unidadMedida && (
-                            <div className={`${PAYMENT_FIELD_CLASS} animate-fadeIn`}>
-                                <label className={PAYMENT_LABEL_CLASS}>Consumo ({unidadMedida})</label>
-                                <input
-                                    name="consumo"
-                                    type="number"
-                                    placeholder={`Lectura en ${unidadMedida}...`}
-                                    className={PAYMENT_INPUT_CLASS}
-                                    value={formData.consumo}
-                                    onChange={e => setFormData({ ...formData, consumo: e.target.value })}
-                                />
-                            </div>
-                        )}
-                    </div>
-                </div>
+  const handleClose = () => {
+    if (overlay.busy) return
+    overlay.reset()
+    onClose()
+  }
 
-                {/* Section: Cronología */}
-                <div className="space-y-3">
-                    <SectionHeader icon={Calendar}>Cronología del Cobro</SectionHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className={PAYMENT_FIELD_CLASS}>
-                            <label className={PAYMENT_LABEL_CLASS}>Fecha Emisión</label>
-                            <DateInput
-                                value={formData.fecha_emision}
-                                onChange={val => setFormData({ ...formData, fecha_emision: val })}
-                                required
-                            />
-                        </div>
-                        <div className={PAYMENT_FIELD_CLASS}>
-                            <label className={PAYMENT_LABEL_CLASS}>Fecha Vencimiento</label>
-                            <DateInput
-                                value={formData.fecha_vencimiento}
-                                onChange={val => setFormData({ ...formData, fecha_vencimiento: val })}
-                                required
-                            />
-                        </div>
-                        <div className={PAYMENT_FIELD_CLASS}>
-                            <label className={PAYMENT_LABEL_CLASS}>Fecha de Pago</label>
-                            <DateInput
-                                value={formData.fecha_pago}
-                                onChange={val => setFormData({ ...formData, fecha_pago: val })}
-                                required
-                            />
-                        </div>
-                    </div>
-                </div>
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      size="lg"
+      title={editingId ? 'Editar registro de pago' : 'Registrar pago / consumo'}
+      subheader="Ingrese los datos de facturación recibidos del proveedor"
+      {...overlay.modalProps}
+      onOverlayDismiss={handleOverlayDismiss}
+      footer={
+        <>
+          <Button variant="ghost" type="button" onClick={handleClose} disabled={overlay.busy}>
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            type="submit"
+            form="payment-form"
+            loading={overlay.busy}
+            disabled={overlay.busy || overlay.active}
+          >
+            {editingId ? 'Actualizar' : 'Registrar pago'}
+          </Button>
+        </>
+      }
+    >
+      <form id="payment-form" className="crud-form" onSubmit={handleSubmit}>
+        <p className="contracts-section-title">1. Contexto del servicio</p>
+        <div className="form-grid">
+          <div className="field">
+            <SearchableSelect
+              label="Establecimiento"
+              required
+              options={establishments.map((e) => ({ value: e.id, label: e.nombre }))}
+              value={formData.establecimiento}
+              onChange={(val) => setFormData({ ...formData, establecimiento: val, servicio: '' })}
+              placeholder="Seleccione establecimiento…"
+            />
+          </div>
+          <div className="field">
+            <SearchableSelect
+              label="Servicio / ID cliente"
+              required
+              options={filteredServices.map((s) => ({
+                value: s.id,
+                label: `${s.proveedor_nombre} — ID: ${s.numero_cliente}`,
+              }))}
+              value={formData.servicio}
+              onChange={(val) => setFormData({ ...formData, servicio: val })}
+              placeholder={
+                formData.establecimiento
+                  ? 'Seleccione servicio…'
+                  : 'Primero elija establecimiento'
+              }
+              disabled={!formData.establecimiento}
+            />
+          </div>
+        </div>
 
-                {/* Info Box */}
-                <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex gap-3">
-                    <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-                    <p className="text-[10px] text-blue-700 leading-relaxed font-medium uppercase tracking-tight">
-                        Asegúrese de que el <strong>Monto Total</strong> incluya el IVA y cualquier cargo adicional. Si el pago ya cuenta con Recepción Conforme, aparecerá bloqueado para edición según políticas de integridad.
-                    </p>
-                </div>
-            </div>
-        </BaseModal>
-    );
-};
+        <p className="contracts-section-title">2. Detalles del documento</p>
+        <div className="form-grid">
+          <Field label="Nº documento / folio" required htmlFor="pay-doc">
+            <Input
+              id="pay-doc"
+              required
+              placeholder="Folio de factura/boleta…"
+              value={formData.nro_documento}
+              onChange={(e) => setFormData({ ...formData, nro_documento: e.target.value })}
+            />
+          </Field>
+          <Field label="Monto total ($)" required htmlFor="pay-monto">
+            <Input
+              id="pay-monto"
+              type="number"
+              required
+              placeholder="Ej: 45000"
+              value={formData.monto_total}
+              onChange={(e) => setFormData({ ...formData, monto_total: e.target.value })}
+            />
+          </Field>
+          <Field label="Interés / multa (opcional)" htmlFor="pay-interes">
+            <Input
+              id="pay-interes"
+              type="number"
+              placeholder="0"
+              value={formData.monto_interes}
+              onChange={(e) => setFormData({ ...formData, monto_interes: e.target.value })}
+            />
+          </Field>
+          {unidadMedida ? (
+            <Field label={`Consumo (${unidadMedida})`} htmlFor="pay-consumo">
+              <Input
+                id="pay-consumo"
+                type="number"
+                step="any"
+                placeholder={`Lectura en ${unidadMedida}…`}
+                value={formData.consumo}
+                onChange={(e) => setFormData({ ...formData, consumo: e.target.value })}
+              />
+            </Field>
+          ) : null}
+        </div>
 
-export default PaymentModal;
+        <p className="contracts-section-title">3. Cronología del cobro</p>
+        <div className="form-grid">
+          <Field label="Fecha emisión" required htmlFor="pay-emision">
+            <Input
+              id="pay-emision"
+              type="date"
+              required
+              value={formData.fecha_emision}
+              onChange={(e) => setFormData({ ...formData, fecha_emision: e.target.value })}
+            />
+          </Field>
+          <Field label="Fecha vencimiento" required htmlFor="pay-venc">
+            <Input
+              id="pay-venc"
+              type="date"
+              required
+              value={formData.fecha_vencimiento}
+              onChange={(e) => setFormData({ ...formData, fecha_vencimiento: e.target.value })}
+            />
+          </Field>
+          <Field label="Fecha de pago" required htmlFor="pay-pago">
+            <Input
+              id="pay-pago"
+              type="date"
+              required
+              value={formData.fecha_pago}
+              onChange={(e) => setFormData({ ...formData, fecha_pago: e.target.value })}
+            />
+          </Field>
+        </div>
+
+        <Alert variant="info">
+          El monto total debe incluir IVA y cargos adicionales. Si el pago ya tiene recepción
+          conforme, la edición puede quedar bloqueada según políticas de integridad.
+        </Alert>
+      </form>
+    </Modal>
+  )
+}
+
+export default PaymentModal

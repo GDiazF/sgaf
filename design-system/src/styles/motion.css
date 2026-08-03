@@ -1,0 +1,303 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SLEP Iquique — Motion system v6.0
+   Animaciones suaves, breves y contextuales · prefers-reduced-motion
+   Migrar a: tailwind transition-* + framer-motion variants
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Permite interpolar height/width hacia `auto` en navegadores compatibles. */
+:root {
+  interpolate-size: allow-keywords;
+}
+
+/* ── Modal / drawer enter-exit + resize ─────────────────────────────────── */
+.modal-backdrop,
+.drawer-backdrop {
+  opacity: 0;
+  transition: opacity var(--motion-duration-slow) var(--motion-ease-out);
+}
+.modal-backdrop.is-open,
+.drawer-backdrop.is-open {
+  opacity: 1;
+}
+.modal-backdrop .modal,
+.drawer-backdrop .drawer {
+  opacity: 0;
+  transform: translateY(var(--motion-distance-md));
+  transition:
+    opacity var(--motion-duration-slow) var(--motion-ease-enter),
+    transform var(--motion-duration-slow) var(--motion-ease-enter),
+    height var(--motion-duration-emphasis) var(--motion-ease-out),
+    max-height var(--motion-duration-emphasis) var(--motion-ease-out),
+    width var(--motion-duration-emphasis) var(--motion-ease-out),
+    max-width var(--motion-duration-emphasis) var(--motion-ease-out);
+}
+.modal-backdrop.is-open .modal,
+.drawer-backdrop.is-open .drawer {
+  opacity: 1;
+  transform: translateY(0);
+}
+.drawer-backdrop .drawer {
+  transform: translateX(var(--motion-distance-lg));
+}
+.drawer-backdrop.is-open .drawer {
+  transform: translateX(0);
+}
+.drawer-backdrop .drawer.drawer--left {
+  transform: translateX(calc(-1 * var(--motion-distance-lg)));
+}
+.drawer-backdrop.is-open .drawer.drawer--left {
+  transform: translateX(0);
+}
+
+/* Resize suave del shell cuando el contenido cambia (tabs / formularios). */
+.modal {
+  transition:
+    height var(--motion-duration-emphasis) var(--motion-ease-out),
+    max-height var(--motion-duration-emphasis) var(--motion-ease-out),
+    width var(--motion-duration-emphasis) var(--motion-ease-out),
+    max-width var(--motion-duration-emphasis) var(--motion-ease-out);
+}
+
+/* ── Page route enter (AppShell remounts .app-main > .page on navigation) ─ */
+.app-main > .page {
+  animation: motion-page-in var(--motion-duration-slow) var(--motion-ease-enter) both;
+}
+@keyframes motion-page-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Listados / tablas: aparición suave del cuerpo tras skeleton */
+.data-table-shell .table-wrap,
+.data-table-shell .record-list {
+  animation: motion-fade-in var(--motion-duration-normal) var(--motion-ease-enter) both;
+}
+
+.table-loading {
+  animation: motion-fade-in var(--motion-duration-fast) var(--motion-ease-out) both;
+}
+
+/* ── Nav drawer (sidebar tablet/móvil) ─────────────────────────────────── */
+.sidebar-backdrop {
+  opacity: 0;
+  transition: opacity var(--motion-duration-normal) var(--motion-ease-out);
+}
+.sidebar-backdrop:not([hidden]) {
+  opacity: 1;
+}
+.sidebar[data-drawer-mode] {
+  transition: transform var(--motion-duration-slow) var(--motion-ease-enter);
+}
+.sidebar[data-drawer-mode]:not(.is-drawer-open) {
+  transform: translateX(-100%);
+}
+
+/* ── Notificaciones popover ────────────────────────────────────────────── */
+.notif-panel {
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-out),
+    transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+/* ── Tabs content ──────────────────────────────────────────────────────── */
+.tabs__panel {
+  animation: motion-tab-in var(--motion-duration-normal) var(--motion-ease-enter);
+}
+@keyframes motion-tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-distance-sm));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Cards / list items enter ──────────────────────────────────────────── */
+.motion-fade-in {
+  animation: motion-fade-in var(--motion-duration-normal) var(--motion-ease-enter) both;
+}
+.motion-slide-up {
+  animation: motion-slide-up var(--motion-duration-normal) var(--motion-ease-enter) both;
+}
+.motion-stagger > * {
+  animation: motion-fade-in var(--motion-duration-normal) var(--motion-ease-enter) both;
+}
+.motion-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.motion-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.motion-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.motion-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.motion-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.motion-stagger > *:nth-child(6) { animation-delay: 200ms; }
+
+@keyframes motion-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes motion-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-distance-md));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Filtros / actualización de listado ────────────────────────────────── */
+.motion-filter-update {
+  animation: motion-filter-pulse var(--motion-duration-slow) var(--motion-ease-out);
+}
+@keyframes motion-filter-pulse {
+  0% { opacity: 1; }
+  40% { opacity: 0.55; }
+  100% { opacity: 1; }
+}
+
+/* ── Logo gear toggle (sidebar) ────────────────────────────────────────── */
+.logo-gear {
+  transition: transform var(--motion-duration-slow) var(--motion-ease-in-out);
+}
+.sidebar-brand.is-animating .logo-gear {
+  transform: rotate(48deg);
+}
+.sidebar.is-collapsed .logo-gear {
+  transform: rotate(0deg);
+}
+
+/* ── Hover / focus micro-interactions (normadas) ───────────────────────── */
+.btn,
+.nav-item,
+.record-card,
+.chart-svg__bar,
+.chart-svg__dot {
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    color var(--transition),
+    box-shadow var(--transition),
+    opacity var(--transition),
+    transform var(--transition);
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.icon-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+/* ── Toast ─────────────────────────────────────────────────────────────── */
+.toast {
+  animation: motion-toast-in var(--motion-duration-normal) var(--motion-ease-enter);
+}
+@keyframes motion-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--motion-distance-md)));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Demo playground helpers ───────────────────────────────────────────── */
+.motion-demo-stage {
+  position: relative;
+  min-height: 12rem;
+  padding: var(--space-4);
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.motion-demo-panel {
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  max-width: 280px;
+}
+.motion-demo-backdrop {
+  position: absolute;
+  inset: 0;
+  background: oklch(0% 0 0 / 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-duration-normal) var(--motion-ease-out);
+}
+.motion-demo-backdrop.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.motion-demo-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(240px, 70%);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(100%);
+  transition: transform var(--motion-duration-slow) var(--motion-ease-enter);
+  padding: var(--space-4);
+}
+.motion-demo-drawer.is-open {
+  transform: translateX(0);
+}
+
+/* ── Tabla de duraciones (documentación) ───────────────────────────────── */
+.motion-spec-table {
+  width: 100%;
+  font-size: var(--text-sm);
+  border-collapse: collapse;
+}
+.motion-spec-table th,
+.motion-spec-table td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.motion-spec-table th {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heading);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--surface-raised);
+}
+.motion-spec-table code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  background: var(--surface-inset);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .logo-gear {
+    transition: none;
+  }
+  .sidebar-brand.is-animating .logo-gear,
+  .sidebar.is-collapsed .logo-gear {
+    transform: none;
+  }
+}

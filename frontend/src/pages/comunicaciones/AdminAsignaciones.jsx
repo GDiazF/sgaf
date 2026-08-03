@@ -1,169 +1,323 @@
-import React, { useState, useEffect } from 'react';
-import api from '../../api';
-import { Users, Building2, Plus, Trash2 } from 'lucide-react';
-import SearchableSelect from '../../components/common/SearchableSelect';
-import { BTN_PRIMARY, ICON_BOX_SM, ICON_SM, AVATAR_ICON } from './comunicacionesUi';
+import React, { useState, useEffect, useMemo } from 'react'
+import api from '../../api'
+import { useNotify } from '../../hooks/useNotify'
+import SearchableSelect from '../../components/common/SearchableSelect'
+import {
+  DataTable,
+  Badge,
+  Button,
+  Field,
+  Modal,
+  ConfirmModal,
+  Icon,
+  useFormOverlay,
+  formatApiFormError,
+} from '@slep/ui'
+
+const EMPTY_FORM = { funcionario: '', establecimiento: '' }
 
 const AdminAsignaciones = () => {
-    const [asignaciones, setAsignaciones] = useState([]);
-    const [funcionarios, setFuncionarios] = useState([]);
-    const [establecimientos, setEstablecimientos] = useState([]);
-    const [loading, setLoading] = useState(true);
+  const [asignaciones, setAsignaciones] = useState([])
+  const [funcionarios, setFuncionarios] = useState([])
+  const [establecimientos, setEstablecimientos] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [savedOk, setSavedOk] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const { notify } = useNotify()
+  const overlay = useFormOverlay()
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
-    const [form, setForm] = useState({ funcionario: '', establecimiento: '' });
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      const [resAsig, resFunc, resEst] = await Promise.all([
+        api.get('ejecutivos/asignaciones/', { params: { page_size: 1000 } }),
+        api.get('funcionarios/', { params: { activos: true, page_size: 1000 } }),
+        api.get('establecimientos/', { params: { page_size: 1000 } }),
+      ])
+      const data = resAsig.data.results || resAsig.data
+      setAsignaciones(Array.isArray(data) ? data : [])
+      setFuncionarios(resFunc.data.results || resFunc.data || [])
+      setEstablecimientos(resEst.data.results || resEst.data || [])
+    } catch (error) {
+      console.error(error)
+      notify({
+        variant: 'danger',
+        text: 'No se pudieron cargar las asignaciones.',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+  useEffect(() => {
+    fetchData()
+  }, [])
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            const [resAsig, resFunc, resEst] = await Promise.all([
-                api.get('ejecutivos/asignaciones/?page_size=1000'),
-                api.get('funcionarios/?activos=true&page_size=1000'),
-                api.get('establecimientos/?page_size=1000')
-            ]);
-            const data = resAsig.data.results || resAsig.data;
-            setAsignaciones(Array.isArray(data) ? data : []);
-            setFuncionarios(resFunc.data.results || resFunc.data || []);
-            setEstablecimientos(resEst.data.results || resEst.data || []);
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
+  const pageRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return asignaciones.slice(start, start + pageSize)
+  }, [asignaciones, currentPage, pageSize])
+
+  const funcionarioOptions = useMemo(
+    () =>
+      funcionarios.map((f) => ({
+        value: f.id,
+        label: f.nombre_funcionario,
+      })),
+    [funcionarios],
+  )
+
+  const establecimientoOptions = useMemo(
+    () =>
+      establecimientos.map((e) => ({
+        value: e.id,
+        label: e.nombre,
+      })),
+    [establecimientos],
+  )
+
+  const openModal = () => {
+    setForm(EMPTY_FORM)
+    setSavedOk(false)
+    overlay.reset()
+    setModalOpen(true)
+  }
+
+  const closeModal = () => {
+    if (overlay.busy) return
+    overlay.reset()
+    setModalOpen(false)
+    setForm(EMPTY_FORM)
+    setSavedOk(false)
+  }
+
+  const handleOverlayDismiss = () => {
+    if (overlay.status === 'success') {
+      overlay.reset()
+      setModalOpen(false)
+      setForm(EMPTY_FORM)
+      if (savedOk) fetchData()
+      setSavedOk(false)
+      return
+    }
+    overlay.dismiss()
+  }
+
+  const handleAssign = async (e) => {
+    e.preventDefault()
+    if (!form.funcionario || !form.establecimiento) {
+      overlay.setTitle(undefined)
+      overlay.setDescription('Seleccione ejecutivo y establecimiento.')
+      overlay.setStatus('error')
+      return
+    }
+    try {
+      await overlay.run(
+        async () => {
+          await api.post('ejecutivos/asignaciones/', form)
+          setSavedOk(true)
+        },
+        {
+          successDescription: 'Asignación creada.',
+          formatError: (err) =>
+            formatApiFormError(err, 'Error al asignar o ya existe la asignación.'),
+        },
+      )
+    } catch {
+      // FormOverlay
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`ejecutivos/asignaciones/${deleteTarget.id}/`)
+      setDeleteTarget(null)
+      notify({ variant: 'success', text: 'Asignación eliminada.' })
+      await fetchData()
+    } catch (error) {
+      console.error(error)
+      notify({ variant: 'danger', text: 'Error al eliminar la asignación.' })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const columns = useMemo(
+    () => [
+      {
+        key: 'ejecutivo',
+        header: 'Ejecutivo',
+        className: 'col--primary',
+        cardRole: 'title',
+        priority: 1,
+        render: (item) =>
+          item.funcionario_details?.nombre_funcionario || '—',
+      },
+      {
+        key: 'establecimiento',
+        header: 'Establecimiento',
+        className: 'col--secondary',
+        cardRole: 'subtitle',
+        priority: 2,
+        render: (item) => item.establecimiento_details?.nombre || '—',
+      },
+      {
+        key: 'vigencia',
+        header: 'Vigencia',
+        className: 'col--status',
+        cardRole: 'status',
+        priority: 1,
+        render: (item) => (
+          <Badge variant={item.vigente ? 'success' : 'danger'}>
+            {item.vigente ? 'Vigente' : 'Inactivo'}
+          </Badge>
+        ),
+      },
+      {
+        key: 'actions',
+        header: 'Acciones',
+        className: 'col--actions',
+        render: (item) => (
+          <div className="data-table__actions" onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Eliminar"
+              onClick={() => setDeleteTarget(item)}
+            >
+              <Icon name="trash" size="sm" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [],
+  )
+
+  return (
+    <>
+      <DataTable
+        columns={columns}
+        rows={pageRows}
+        loading={loading}
+        totalCount={asignaciones.length}
+        emptyTitle="Sin asignaciones"
+        emptyDescription="Asigná un ejecutivo a un establecimiento para comenzar."
+        emptyAction={
+          <Button variant="primary" size="sm" onClick={openModal}>
+            <Icon name="plus" size="sm" /> Nueva asignación
+          </Button>
         }
-    };
-
-    const handleAssign = async (e) => {
-        e.preventDefault();
-        try {
-            await api.post('ejecutivos/asignaciones/', form);
-            setForm({ funcionario: '', establecimiento: '' });
-            fetchData();
-        } catch (error) {
-            alert('Error al asignar o ya existe la asignación.');
-        }
-    };
-
-    const handleDelete = async (id) => {
-        if(window.confirm('¿Eliminar asignación?')) {
-            try {
-                await api.delete(`ejecutivos/asignaciones/${id}/`);
-                fetchData();
-            } catch (error) {
-                console.error(error);
-            }
-        }
-    };
-
-    const funcionarioOptions = funcionarios.map(f => ({ value: f.id, label: f.nombre_funcionario }));
-    const establecimientoOptions = establecimientos.map(e => ({ value: e.id, label: e.nombre }));
-
-    return (
-        <div className="flex flex-col flex-1 min-h-0 overflow-hidden gap-4">
-            <div className="bg-white p-3 md:p-4 rounded-[1.5rem] shadow-sm border border-slate-200 shrink-0">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className={ICON_BOX_SM}>
-                        <Plus className={ICON_SM} />
-                    </div>
-                    <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">Nueva Asignación</h2>
-                </div>
-                
-                <form onSubmit={handleAssign} className="flex flex-col md:flex-row gap-6 items-end w-full">
-                    <SearchableSelect 
-                        options={funcionarioOptions}
-                        value={form.funcionario}
-                        onChange={(selected) => setForm({...form, funcionario: selected})}
-                        placeholder="BUSCAR EJECUTIVO..."
-                        label="Funcionario (Ejecutivo)"
-                        icon={Users}
-                        className="flex-1"
-                    />
-
-                    <SearchableSelect 
-                        options={establecimientoOptions}
-                        value={form.establecimiento}
-                        onChange={(selected) => setForm({...form, establecimiento: selected})}
-                        placeholder="SELECCIONAR SEDE..."
-                        label="Establecimiento"
-                        icon={Building2}
-                        className="flex-1"
-                    />
-
-                    <button 
-                        type="submit"
-                        className={`${BTN_PRIMARY} w-full md:w-auto justify-center shrink-0`}
-                    >
-                        <Plus className="w-4 h-4" />
-                        Asignar
-                    </button>
-                </form>
+        fillViewport
+        page={currentPage}
+        pageSize={pageSize}
+        pageSizeId="com-asig-page-size"
+        pageSizeOptions={[10, 25, 50]}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(n) => {
+          setPageSize(n)
+          setCurrentPage(1)
+        }}
+        mobileCardActions={(item) => ({
+          primary: {
+            label: 'Eliminar',
+            onClick: () => setDeleteTarget(item),
+          },
+        })}
+        toolbar={
+          <div
+            className="table-toolbar__left"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-3)',
+              width: '100%',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <span className="table-toolbar__title">Asignaciones</span>
+              <Badge variant="neutral">{asignaciones.length}</Badge>
             </div>
+            <Button variant="primary" size="sm" onClick={openModal}>
+              <Icon name="plus" size="sm" /> Nueva asignación
+            </Button>
+          </div>
+        }
+      />
 
-            <div className="bg-slate-50 rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-0">
-                <div className="overflow-auto flex-1 min-h-0 bg-white custom-scrollbar">
-                    <table className="w-full text-left border-collapse border-spacing-0">
-                        <thead className="sticky top-0 z-10">
-                            <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-200 shadow-sm">
-                                <th className="px-4 py-3 border-r border-slate-100 bg-slate-50">Ejecutivo</th>
-                                <th className="px-4 py-3 border-r border-slate-100 bg-slate-50">Establecimiento</th>
-                                <th className="px-4 py-3 border-r border-slate-100 bg-slate-50">Vigencia</th>
-                                <th className="px-4 py-3 text-center w-24 bg-slate-50">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                        {loading ? (
-                            <tr><td colSpan="4" className="text-center py-6 text-slate-400 text-xs font-bold uppercase">Cargando...</td></tr>
-                        ) : asignaciones.length === 0 ? (
-                            <tr><td colSpan="4" className="text-center py-6 text-slate-400 text-xs font-bold uppercase italic">No hay asignaciones registradas.</td></tr>
-                        ) : asignaciones.map(a => (
-                            <tr key={a.id} className="hover:bg-slate-50/50 transition-colors group">
-                                <td className="px-4 py-2 border-r border-slate-50">
-                                    <div className="flex items-center gap-3">
-                                        <div className={AVATAR_ICON}>
-                                            <Users className="w-3.5 h-3.5" />
-                                        </div>
-                                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-tighter leading-none line-clamp-1">{a.funcionario_details?.nombre_funcionario}</span>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-2 border-r border-slate-50">
-                                    <div className="flex items-center gap-2">
-                                        <Building2 className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-                                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-tighter leading-none line-clamp-1">{a.establecimiento_details?.nombre}</span>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-2 border-r border-slate-50">
-                                    <span className={`px-2 py-0.5 text-[9px] uppercase font-black tracking-widest rounded-lg ${a.vigente ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
-                                        {a.vigente ? 'Vigente' : 'Inactivo'}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-2 text-center">
-                                    <div className="flex items-center justify-center gap-1">
-                                        <button
-                                            type="button"
-                                            onClick={() => handleDelete(a.id)}
-                                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                            title="Eliminar asignación"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                </div>
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        title="Nueva asignación"
+        subheader="Vinculá un ejecutivo con un establecimiento"
+        {...overlay.modalProps}
+        onOverlayDismiss={handleOverlayDismiss}
+        footer={
+          <>
+            <Button variant="ghost" type="button" onClick={closeModal} disabled={overlay.busy}>
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              form="asignacion-form"
+              loading={overlay.busy}
+              disabled={overlay.busy || overlay.active}
+            >
+              <Icon name="plus" size="sm" />
+              {overlay.busy ? 'Asignando…' : 'Asignar'}
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="asignacion-form"
+          className="crud-form"
+          onSubmit={handleAssign}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}
+        >
+          <Field label="Funcionario (ejecutivo)" required htmlFor="asig-func">
+            <SearchableSelect
+              options={funcionarioOptions}
+              value={form.funcionario}
+              onChange={(selected) => setForm({ ...form, funcionario: selected })}
+              placeholder="Buscar ejecutivo…"
+            />
+          </Field>
+          <Field label="Establecimiento" required htmlFor="asig-estab">
+            <SearchableSelect
+              options={establecimientoOptions}
+              value={form.establecimiento}
+              onChange={(selected) => setForm({ ...form, establecimiento: selected })}
+              placeholder="Seleccionar sede…"
+            />
+          </Field>
+        </form>
+      </Modal>
 
-                <div className="p-3 bg-slate-50 border-t border-slate-200 shrink-0 flex items-center justify-between">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        {loading ? 'Cargando...' : `${asignaciones.length} asignación${asignaciones.length !== 1 ? 'es' : ''}`}
-                    </span>
-                </div>
-            </div>
-        </div>
-    );
-};
+      <ConfirmModal
+        open={!!deleteTarget}
+        onClose={() => {
+          if (!deleting) setDeleteTarget(null)
+        }}
+        onConfirm={confirmDelete}
+        title="Eliminar asignación"
+        description={`¿Eliminar la asignación de «${
+          deleteTarget?.funcionario_details?.nombre_funcionario || ''
+        }»?`}
+        confirmLabel="Eliminar"
+        danger
+      />
+    </>
+  )
+}
 
-export default AdminAsignaciones;
+export default AdminAsignaciones

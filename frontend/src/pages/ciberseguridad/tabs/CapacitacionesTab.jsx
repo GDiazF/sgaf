@@ -1,149 +1,341 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, CheckCircle2, ShieldAlert, RefreshCw, X, Download } from 'lucide-react';
-import api from '../../../api';
+import React, { useState, useEffect, useMemo } from 'react'
+import api from '../../../api'
+import useDebouncedValue from '../../../hooks/useDebouncedValue'
+import { useNotify } from '../../../hooks/useNotify'
+import {
+  FiltersBar,
+  DataTable,
+  Badge,
+  Button,
+  Field,
+  Input,
+  Textarea,
+  Modal,
+  FileInput,
+  Icon,
+  useFormOverlay,
+  formatApiFormError,
+} from '@slep/ui'
+
+const emptyForm = () => ({
+  nombre_campana: '',
+  descripcion: '',
+  documento: null,
+  fecha_inicio: '',
+  fecha_termino: '',
+})
 
 const CapacitacionesTab = ({ user }) => {
-    const [campanas, setCampanas] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [showModal, setShowModal] = useState(false);
-    const [alertMsg, setAlertMsg] = useState({ type: '', text: '' });
+  const canAdd = user?.user_permissions?.includes('core.add_ciberseguridadcapacitacion')
 
-    const [formData, setFormData] = useState({
-        nombre_campana: '',
-        descripcion: '',
-        documento: null,
-        fecha_inicio: '',
-        fecha_termino: ''
-    });
+  const [campanas, setCampanas] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [search, setSearch] = useState('')
+  const [modalOpen, setModalOpen] = useState(false)
+  const [formData, setFormData] = useState(emptyForm())
+  const [savedOk, setSavedOk] = useState(false)
+  const overlay = useFormOverlay()
+  const { notify } = useNotify()
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
-    const fetchCampanas = async () => {
-        setLoading(true);
-        try {
-            const res = await api.get('ciberseguridad/capacitaciones/');
-            setCampanas(res.data.results || res.data || []);
-        } catch (err) {
-            showAlert('error', 'No se pudieron cargar las capacitaciones.');
-        } finally {
-            setLoading(false);
-        }
-    };
+  const debouncedSearch = useDebouncedValue(search)
 
-    useEffect(() => {
-        fetchCampanas();
-    }, []);
+  const fetchCampanas = async () => {
+    setLoading(true)
+    try {
+      const res = await api.get('ciberseguridad/capacitaciones/')
+      setCampanas(res.data.results || res.data || [])
+    } catch (err) {
+      notify({ variant: 'danger', text: 'No se pudieron cargar las capacitaciones.' })
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    const showAlert = (type, text) => {
-        setAlertMsg({ type, text });
-        setTimeout(() => setAlertMsg({ type: '', text: '' }), 5000);
-    };
+  useEffect(() => {
+    fetchCampanas()
+  }, [])
 
-    const handleFormSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        try {
-            const data = new FormData();
-            Object.keys(formData).forEach(key => {
-                if (formData[key] !== null && formData[key] !== '') {
-                    data.append(key, formData[key]);
+  const filtered = useMemo(() => {
+    const q = debouncedSearch.toLowerCase()
+    if (!q) return campanas
+    return campanas.filter(
+      (c) =>
+        (c.nombre_campana || '').toLowerCase().includes(q) ||
+        (c.descripcion || '').toLowerCase().includes(q),
+    )
+  }, [campanas, debouncedSearch])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch])
+
+  const pageRows = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filtered.slice(start, start + pageSize)
+  }, [filtered, page, pageSize])
+
+  const openCreate = () => {
+    setFormData(emptyForm())
+    setSavedOk(false)
+    overlay.reset()
+    setModalOpen(true)
+  }
+
+  const closeModal = () => {
+    if (overlay.busy) return
+    overlay.reset()
+    setModalOpen(false)
+    setFormData(emptyForm())
+    setSavedOk(false)
+  }
+
+  const handleOverlayDismiss = () => {
+    if (overlay.status === 'success') {
+      overlay.reset()
+      setModalOpen(false)
+      setFormData(emptyForm())
+      if (savedOk) fetchCampanas()
+      setSavedOk(false)
+      return
+    }
+    overlay.dismiss()
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const data = new FormData()
+    Object.keys(formData).forEach((key) => {
+      if (formData[key] !== null && formData[key] !== '') data.append(key, formData[key])
+    })
+    try {
+      await overlay.run(
+        async () => {
+          await api.post('ciberseguridad/capacitaciones/', data, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          })
+          setSavedOk(true)
+        },
+        {
+          successDescription: 'Campaña creada.',
+          formatError: (err) => formatApiFormError(err, 'No se pudo guardar la campaña.'),
+        },
+      )
+    } catch {
+      // FormOverlay
+    }
+  }
+
+  const columns = useMemo(
+    () => [
+      {
+        key: 'nombre_campana',
+        header: 'Campaña',
+        className: 'col--primary',
+        cardRole: 'title',
+        priority: 1,
+      },
+      {
+        key: 'descripcion',
+        header: 'Descripción',
+        className: 'col--secondary',
+        cardRole: 'subtitle',
+        priority: 1,
+        render: (item) => item.descripcion || '—',
+      },
+      {
+        key: 'fecha_inicio',
+        header: 'Inicio',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 2,
+        render: (item) => item.fecha_inicio || '—',
+      },
+      {
+        key: 'fecha_termino',
+        header: 'Término',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 2,
+        render: (item) => item.fecha_termino || 'Indefinido',
+      },
+      {
+        key: 'actions',
+        header: 'Acciones',
+        className: 'col--actions',
+        render: (item) =>
+          item.documento_url ? (
+            <div className="data-table__actions">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  window.open(item.documento_url, '_blank', 'noopener,noreferrer')
                 }
-            });
+              >
+                Material
+              </Button>
+            </div>
+          ) : (
+            '—'
+          ),
+      },
+    ],
+    [],
+  )
 
-            await api.post('ciberseguridad/capacitaciones/', data, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-            showAlert('success', 'Campaña registrada exitosamente.');
-            setShowModal(false);
-            fetchCampanas();
-        } catch (err) {
-            showAlert('error', 'Error al guardar la campaña.');
-        } finally {
-            setLoading(false);
+  return (
+    <div className="cyber-tab">
+      
+
+      <FiltersBar
+        onSearch={() => setPage(1)}
+        onClear={() => {
+          setSearch('')
+          setPage(1)
+        }}
+      >
+        <Field label="Buscar" htmlFor="cap-q">
+          <div className="input-wrap">
+            <Icon name="search" className="input-wrap__icon" size="sm" />
+            <Input
+              id="cap-q"
+              type="search"
+              placeholder="Buscar por nombre o descripción…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </Field>
+      </FiltersBar>
+
+      <DataTable
+        columns={columns}
+        rows={pageRows}
+        loading={loading}
+        totalCount={filtered.length}
+        emptyTitle="Sin campañas"
+        emptyDescription="No hay capacitaciones con la búsqueda actual."
+        emptyAction={
+          canAdd ? (
+            <Button variant="primary" size="sm" onClick={openCreate}>
+              <Icon name="plus" size="sm" /> Nueva campaña
+            </Button>
+          ) : undefined
         }
-    };
-
-    return (
-        <div className="p-6 space-y-6">
-            {alertMsg.text && (
-                <div className={`p-4 rounded-2xl flex gap-3 items-center border ${
-                    alertMsg.type === 'error' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
-                }`}>
-                    {alertMsg.type === 'error' ? <ShieldAlert className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
-                    <p className="text-xs font-bold">{alertMsg.text}</p>
-                </div>
-            )}
-
-            <div className="flex justify-end">
-                {user?.user_permissions?.includes('core.add_ciberseguridadcapacitacion') && (
-                    <button
-                        onClick={() => setShowModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md"
-                    >
-                        <Plus className="w-4 h-4" /> Nueva Campaña
-                    </button>
-                )}
+        page={page}
+        pageSize={pageSize}
+        pageSizeId="cap-page-size"
+        onPageChange={setPage}
+        onPageSizeChange={(n) => {
+          setPageSize(n)
+          setPage(1)
+        }}
+        mobileCardActions={(item) =>
+          item.documento_url
+            ? {
+                primary: {
+                  label: 'Material',
+                  onClick: () =>
+                    window.open(item.documento_url, '_blank', 'noopener,noreferrer'),
+                },
+              }
+            : {}
+        }
+        toolbar={
+          <>
+            <div className="table-toolbar__left">
+              <span className="table-toolbar__title">Listado</span>
+              <Badge variant="neutral">{filtered.length}</Badge>
             </div>
+            {canAdd ? (
+              <div className="table-toolbar__right">
+                <Button variant="primary" size="sm" onClick={openCreate}>
+                  <Icon name="plus" size="sm" /> Nueva campaña
+                </Button>
+              </div>
+            ) : null}
+          </>
+        }
+      />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {loading ? (
-                    <div className="col-span-full text-center text-slate-400 p-8"><RefreshCw className="w-6 h-6 animate-spin mx-auto" /></div>
-                ) : campanas.length === 0 ? (
-                    <div className="col-span-full text-center text-slate-400 p-8 bg-white rounded-2xl border border-slate-200">No hay campañas registradas.</div>
-                ) : (
-                    campanas.map(campana => (
-                        <div key={campana.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
-                            <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">{campana.nombre_campana}</h3>
-                            <p className="text-xs text-slate-500">{campana.descripcion}</p>
-                            
-                            <div className="text-[10px] text-slate-500 pt-2 border-t space-y-1">
-                                <div><span className="font-bold">Inicio:</span> {campana.fecha_inicio}</div>
-                                <div><span className="font-bold">Término:</span> {campana.fecha_termino || 'Indefinido'}</div>
-                            </div>
-                            {campana.documento_url && (
-                                <a href={campana.documento_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full py-2 bg-slate-50 hover:bg-slate-100 text-emerald-600 rounded-lg text-[10px] font-black uppercase mt-2">
-                                    <Download className="w-3 h-3" /> Descargar Material
-                                </a>
-                            )}
-                        </div>
-                    ))
-                )}
-            </div>
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        title="Registrar campaña"
+        subheader="Capacitación en ciberseguridad"
+        {...overlay.modalProps}
+        onOverlayDismiss={handleOverlayDismiss}
+        footer={
+          <>
+            <Button variant="ghost" type="button" onClick={closeModal} disabled={overlay.busy}>
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              form="cap-form"
+              loading={overlay.busy}
+              disabled={overlay.busy || overlay.active}
+            >
+              Registrar
+            </Button>
+          </>
+        }
+      >
+        <form id="cap-form" className="crud-form" onSubmit={handleSubmit}>
+          <div className="form-grid">
+            <Field label="Nombre de la campaña" required htmlFor="cap-nombre" className="field--full">
+              <Input
+                id="cap-nombre"
+                required
+                value={formData.nombre_campana}
+                onChange={(e) =>
+                  setFormData({ ...formData, nombre_campana: e.target.value })
+                }
+              />
+            </Field>
+            <Field label="Descripción" required htmlFor="cap-desc" className="field--full">
+              <Textarea
+                id="cap-desc"
+                required
+                rows={4}
+                value={formData.descripcion}
+                onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+              />
+            </Field>
+            <Field label="Fecha inicio" required htmlFor="cap-fi">
+              <Input
+                id="cap-fi"
+                type="date"
+                required
+                value={formData.fecha_inicio}
+                onChange={(e) => setFormData({ ...formData, fecha_inicio: e.target.value })}
+              />
+            </Field>
+            <Field label="Fecha término" htmlFor="cap-ft">
+              <Input
+                id="cap-ft"
+                type="date"
+                value={formData.fecha_termino}
+                onChange={(e) => setFormData({ ...formData, fecha_termino: e.target.value })}
+              />
+            </Field>
+            <Field label="Material adjunto" htmlFor="cap-doc" className="field--full">
+              <FileInput
+                id="cap-doc"
+                label="Seleccionar archivo"
+                onChange={(e) =>
+                  setFormData({ ...formData, documento: e.target.files?.[0] || null })
+                }
+              />
+            </Field>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  )
+}
 
-            {showModal && (
-                <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl w-full max-w-xl p-6 space-y-4 text-left">
-                        <div className="flex justify-between items-center border-b pb-3">
-                            <h3 className="text-xs font-black uppercase text-emerald-600">Registrar Campaña / Capacitación</h3>
-                            <button onClick={() => setShowModal(false)} className="text-slate-400 hover:bg-slate-100 p-1 rounded-lg"><X className="w-5 h-5"/></button>
-                        </div>
-                        <form onSubmit={handleFormSubmit} className="space-y-4">
-                            <div>
-                                <label className="text-[9px] font-black uppercase text-slate-400">Nombre de la Campaña</label>
-                                <input required className="w-full mt-1 px-4 py-2 border rounded-xl text-xs" onChange={e => setFormData({...formData, nombre_campana: e.target.value})} />
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-black uppercase text-slate-400">Descripción</label>
-                                <textarea required className="w-full mt-1 px-4 py-2 border rounded-xl text-xs h-20" onChange={e => setFormData({...formData, descripcion: e.target.value})} />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[9px] font-black uppercase text-slate-400">Fecha Inicio</label>
-                                    <input type="date" required className="w-full mt-1 px-4 py-2 border rounded-xl text-xs" onChange={e => setFormData({...formData, fecha_inicio: e.target.value})} />
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-black uppercase text-slate-400">Fecha Término</label>
-                                    <input type="date" className="w-full mt-1 px-4 py-2 border rounded-xl text-xs" onChange={e => setFormData({...formData, fecha_termino: e.target.value})} />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-black uppercase text-slate-400">Material Adjunto (PDF/Imagen)</label>
-                                <input type="file" className="w-full mt-1 text-xs" onChange={e => setFormData({...formData, documento: e.target.files[0]})} />
-                            </div>
-                            <button type="submit" disabled={loading} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs uppercase font-black">Registrar Campaña</button>
-                        </form>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-export default CapacitacionesTab;
+export default CapacitacionesTab

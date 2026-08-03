@@ -1,0 +1,42 @@
+---
+description: Design system @slep/ui — UI global obligatoria en frontend SGAF
+alwaysApply: true
+---
+
+# SGAF — Design System (`@slep/ui`)
+
+Al crear o editar **módulos, páginas, modales, drawers, formularios o listados** en `frontend/`, la UI debe basarse en el design system. No reinventar estilos por vista.
+
+## Fuentes de verdad
+
+- Paquete: `design-system/` → importar desde `@slep/ui`
+- Estilos globales: `design-system/src/styles/` (`tokens.css`, `components.css`, `layout.css`, …)
+- Showcase / catálogo: `cd design-system && npm run dev` → http://localhost:5174
+- Guía ampliada: `docs/design-system-guidelines.md`
+
+## Obligatorio
+
+- Usar componentes de `@slep/ui`: `PageHeader`, `Button`, `Field`/`Input`/`Select`/`Textarea`, `Modal`/`Drawer`/`ConfirmModal`, `DataTable`, `FiltersBar`, `Alert`, `Badge`, `EmptyState`, `Card`, `FormOverlay` + `useFormOverlay`, `useToast` / `useNotify`, etc.
+- Feedback de guardado en formularios/modales → **FormOverlay** (`useFormOverlay` + `overlay.run`).
+- Feedback de deletes / acciones fuera de formulario → **toast** (`useNotify`).
+- Layout de página → `.page` + `PageHeader` (no inventar headers sueltos).
+- Tokens CSS (`var(--space-*)`, `var(--fg)`, …) o clases BEM del DS; **no** Tailwind utility ad hoc ni hex sueltos salvo datos dinámicos (charts, color de recurso, etc.).
+
+## Prohibido (salvo excepción justificada)
+
+- `style={{...}}` para layout, tipografía, color o espaciado de UI estándar.
+- CSS/HTML “de esa vista” que duplique un componente del DS.
+- Wrappers legacy (`FormInput`, `BaseModal`, etc.) o UI con Lucide/Tailwind de la era anterior.
+- Copiar markup de otra página y pegar estilos locales en lugar de extender el DS.
+
+## Si falta un patrón
+
+1. Revisar el showcase / exports en `design-system/src/index.js`.
+2. Si no existe: **añadir o extender el componente en `design-system/`** y usarlo desde `@slep/ui`.
+3. No resolver el hueco con estilos inline o CSS solo en `frontend/src/pages/...`.
+
+## Excepciones aceptables de `style`
+
+- Posición/tamaño dinámicos (calendario, barras de progreso `%`, portal de menú).
+- Colores que vienen de datos de negocio (recurso, categoría, serie de chart).
+- Integraciones (mapas Leaflet, Recharts) donde el lib exige props de estilo.

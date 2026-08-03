@@ -17,17 +17,27 @@ class SolicitudARCOViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        
-        # Si el usuario tiene el permiso de ver todas las solicitudes ARCO (admins/RRHH)
-        if user.has_perm('arco.view_solicitudarco'):
-            return SolicitudARCO.objects.all().select_related('solicitante', 'resuelto_por')
-            
-        # Para funcionarios regulares, solo retornar sus propias solicitudes
+        qs = SolicitudARCO.objects.select_related('solicitante', 'resuelto_por')
+
+        # Perfil: solo las del usuario autenticado (aunque tenga permiso de gestión).
+        mine = str(self.request.query_params.get('mine', '')).lower() in ('1', 'true', 'yes')
+        if mine:
+            try:
+                funcionario = user.funcionario_profile
+                return qs.filter(solicitante=funcionario)
+            except Funcionario.DoesNotExist:
+                return qs.none()
+
+        # Gestión ARCO: ver todas las solicitudes
+        if user.has_perm('arco.view_solicitudarco') or user.is_superuser:
+            return qs.all()
+
+        # Funcionario regular: solo las propias
         try:
             funcionario = user.funcionario_profile
-            return SolicitudARCO.objects.filter(solicitante=funcionario).select_related('solicitante', 'resuelto_por')
+            return qs.filter(solicitante=funcionario)
         except Funcionario.DoesNotExist:
-            return SolicitudARCO.objects.none()
+            return qs.none()
 
     @action(detail=True, methods=['post'], url_path='resolver')
     def resolver(self, request, pk=None):

@@ -1,440 +1,618 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../../api';
-import { Save, Search, Plus, X, Box as Key, UserPlus, Check, Building, ArrowLeft, GraduationCap } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import ApplicantModal from '../../components/applicants/ApplicantModal';
-import FormInput from '../../components/common/FormInput';
-import MultiSearchableSelect from '../../components/common/MultiSearchableSelect';
-import SearchableSelect from '../../components/common/SearchableSelect';
+import React, { useState, useEffect, useRef, useMemo } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import api from '../../api'
+import { useNotify } from '../../hooks/useNotify'
+import ApplicantModal from '../../components/applicants/ApplicantModal'
+import MultiSearchableSelect from '../../components/common/MultiSearchableSelect'
+import SearchableSelect from '../../components/common/SearchableSelect'
+import {
+  PageHeader,
+  Button,
+  Field,
+  Input,
+  Select,
+  Textarea,
+  Icon,
+  Badge,
+  FormOverlay,
+  useFormOverlay,
+  formatApiFormError,
+} from '@slep/ui'
+
+const RECIPIENT_TYPES = [
+  { value: 'funcionario', label: 'Personal SLEP' },
+  { value: 'externo', label: 'Externo / registrado' },
+  { value: 'director', label: 'Director de establecimiento' },
+]
 
 const LoanForm = () => {
-    const navigate = useNavigate();
+  const navigate = useNavigate()
 
-    // Key Selection State
-    const [establishments, setEstablishments] = useState([]);
-    const [selectedEsts, setSelectedEsts] = useState([]); // Multiple
-    const [keySearchTerm, setKeySearchTerm] = useState('');
-    const [foundKeys, setFoundKeys] = useState([]);
-    const [selectedKeys, setSelectedKeys] = useState([]);
+  const [tiposActivo, setTiposActivo] = useState([])
+  const [selectedTipoId, setSelectedTipoId] = useState('')
+  const [allActivos, setAllActivos] = useState([])
+  const [establishments, setEstablishments] = useState([])
+  const [selectedEsts, setSelectedEsts] = useState([])
+  const [activoSearchTerm, setActivoSearchTerm] = useState('')
+  const [foundActivos, setFoundActivos] = useState([])
+  const [selectedActivos, setSelectedActivos] = useState([])
 
-    // Applicant Selection State
-    const [applicants, setApplicants] = useState([]);
-    const [funcionarios, setFuncionarios] = useState([]);
-    const [selectedApplicantId, setSelectedApplicantId] = useState('');
-    const [selectedFuncionarioId, setSelectedFuncionarioId] = useState('');
-    const [selectedDirectorEstId, setSelectedDirectorEstId] = useState('');
-    const [showApplicantForm, setShowApplicantForm] = useState(false);
-    const [loading, setLoading] = useState(false);
+  const [applicants, setApplicants] = useState([])
+  const [funcionarios, setFuncionarios] = useState([])
+  const [recipientType, setRecipientType] = useState('funcionario')
+  const [selectedApplicantId, setSelectedApplicantId] = useState('')
+  const [selectedFuncionarioId, setSelectedFuncionarioId] = useState('')
+  const [selectedDirectorEstId, setSelectedDirectorEstId] = useState('')
+  const [showApplicantForm, setShowApplicantForm] = useState(false)
+  const { notify } = useNotify()
+  const overlay = useFormOverlay()
+  const [observacion, setObservacion] = useState('')
 
-    const [observacion, setObservacion] = useState('');
+  /** Establecimientos recién agregados → auto-marcar activos disponibles */
+  const pendingAutoSelectEsts = useRef([])
 
-    useEffect(() => {
-        // Initial load of Lookups
-        const loadLookups = async () => {
-            try {
-                const [estRes, appRes, funcRes, allKeysRes] = await Promise.all([
-                    api.get('establecimientos/?page_size=1000'),
-                    api.get('solicitantes/?page_size=1000'),
-                    api.get('funcionarios/?page_size=1000'),
-                    api.get('activos/?page_size=1000') // Fetch all assets to analyze establishments
-                ]);
+  useEffect(() => {
+    const loadLookups = async () => {
+      try {
+        const [estRes, appRes, funcRes, allActivosRes, tiposRes] = await Promise.all([
+          api.get('establecimientos/?page_size=1000'),
+          api.get('solicitantes/?page_size=1000'),
+          api.get('funcionarios/?page_size=1000'),
+          api.get('activos/?page_size=1000'),
+          api.get('tipo-activos/?page_size=1000'),
+        ])
 
-                const allKeys = allKeysRes.data.results || allKeysRes.data || [];
-                const allEsts = estRes.data.results || estRes.data || [];
+        setAllActivos(allActivosRes.data.results || allActivosRes.data || [])
+        setEstablishments(estRes.data.results || estRes.data || [])
+        setTiposActivo(tiposRes.data.results || tiposRes.data || [])
 
-                // Filter establishments: Only those that have at least one key
-                const estsWithKeys = allEsts.filter(est =>
-                    allKeys.some(key => key.establecimiento === est.id)
-                ).map(est => {
-                    const keysOfEst = allKeys.filter(key => key.establecimiento === est.id);
-                    const anyAvailable = keysOfEst.some(key => key.disponible);
-                    return {
-                        ...est,
-                        hasAvailableKeys: anyAvailable
-                    };
-                });
+        const allApplicants = appRes.data.results || appRes.data
+        setApplicants(allApplicants.filter((a) => !a.funcionario))
+        setFuncionarios(funcRes.data.results || funcRes.data || [])
+      } catch (error) {
+        console.error('Error loading lookups:', error)
+        notify({ variant: 'danger', text: 'Error al cargar datos del formulario.' })
+      }
+    }
+    loadLookups()
+  }, [])
 
-                setEstablishments(estsWithKeys);
-
-                // Filter applicants: Only show those who are NOT associated con un funcionario
-                const allApplicants = appRes.data.results || appRes.data;
-                setApplicants(allApplicants.filter(a => !a.funcionario));
-                setFuncionarios(funcRes.data.results || funcRes.data || []);
-            } catch (error) {
-                console.error("Error loading lookups:", error);
-            }
-        };
-        loadLookups();
-    }, []);
-
-    // Search keys when term changes or establishment changes
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            let query = 'activos/?';
-            if (selectedEsts.length > 0) {
-                query += `establecimiento__in=${selectedEsts.join(',')}&`;
-            }
-            if (keySearchTerm.length > 0) {
-                query += `search=${keySearchTerm}`;
-            }
-
-            // Only search if we have at least one establishment selected OR a search term > 1 char
-            if (selectedEsts.length > 0 || keySearchTerm.length > 1) {
-                api.get(query)
-                    .then(res => setFoundKeys(res.data.results || res.data || []))
-                    .catch(console.error);
-            } else {
-                setFoundKeys([]);
-            }
-        }, 300);
-        return () => clearTimeout(timeoutId);
-    }, [keySearchTerm, selectedEsts]);
-
-    const handleAddKey = (key) => {
-        if (!selectedKeys.find(k => k.id === key.id)) {
-            setSelectedKeys([...selectedKeys, key]);
+  const establishmentsForTipo = useMemo(() => {
+    if (!selectedTipoId) return []
+    const tipoId = Number(selectedTipoId)
+    return establishments
+      .map((est) => {
+        const ofTipo = allActivos.filter(
+          (a) => a.establecimiento === est.id && Number(a.tipo) === tipoId,
+        )
+        if (ofTipo.length === 0) return null
+        const anyAvailable = ofTipo.some((a) => a.disponible)
+        return {
+          ...est,
+          hasAvailableActivos: anyAvailable,
+          countOfTipo: ofTipo.length,
         }
-    };
+      })
+      .filter(Boolean)
+  }, [establishments, allActivos, selectedTipoId])
 
-    const handleRemoveKey = (id) => {
-        setSelectedKeys(selectedKeys.filter(k => k.id !== id));
-    };
+  useEffect(() => {
+    if (!selectedTipoId) {
+      setFoundActivos([])
+      return
+    }
 
-    const handleAddAllAvailable = () => {
-        const available = foundKeys.filter(k => k.disponible);
-        const newKeys = [...selectedKeys];
-        available.forEach(k => {
-            if (!newKeys.find(nk => nk.id === k.id)) {
-                newKeys.push(k);
-            }
-        });
-        setSelectedKeys(newKeys);
-    };
+    const timeoutId = setTimeout(() => {
+      const params = new URLSearchParams()
+      params.set('tipo', selectedTipoId)
+      params.set('page_size', '1000')
+      if (selectedEsts.length > 0) {
+        params.set('establecimiento__in', selectedEsts.join(','))
+      }
+      if (activoSearchTerm.length > 0) {
+        params.set('search', activoSearchTerm)
+      }
 
-    const handleSaveApplicant = async (data) => {
-        try {
-            const res = await api.post('solicitantes/', data);
-            setApplicants([...applicants, res.data]);
-            setSelectedApplicantId(res.data.id);
-            setSelectedFuncionarioId('');
-            setShowApplicantForm(false);
-        } catch (error) {
-            console.error(error);
-            alert("Error al crear solicitante. Verifique los datos.");
+      if (selectedEsts.length === 0 && activoSearchTerm.length < 2) {
+        setFoundActivos([])
+        return
+      }
+
+      api
+        .get(`activos/?${params.toString()}`)
+        .then((res) => setFoundActivos(res.data.results || res.data || []))
+        .catch(console.error)
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [selectedTipoId, activoSearchTerm, selectedEsts])
+
+  /* Al agregar establecimientos: marcar disponibles de ese tipo */
+  useEffect(() => {
+    const pending = pendingAutoSelectEsts.current
+    if (!pending.length || foundActivos.length === 0) return
+
+    const toAdd = foundActivos.filter(
+      (a) => a.disponible && pending.includes(a.establecimiento),
+    )
+    if (toAdd.length === 0) {
+      pendingAutoSelectEsts.current = []
+      return
+    }
+
+    setSelectedActivos((prev) => {
+      const next = [...prev]
+      toAdd.forEach((activo) => {
+        if (!next.find((item) => item.id === activo.id)) next.push(activo)
+      })
+      return next
+    })
+    pendingAutoSelectEsts.current = []
+  }, [foundActivos])
+
+  const handleTipoChange = (tipoId) => {
+    setSelectedTipoId(tipoId)
+    setSelectedEsts([])
+    setSelectedActivos([])
+    setFoundActivos([])
+    setActivoSearchTerm('')
+    pendingAutoSelectEsts.current = []
+  }
+
+  const handleEstsChange = (nextEsts) => {
+    const added = nextEsts.filter((id) => !selectedEsts.includes(id))
+    const removed = selectedEsts.filter((id) => !nextEsts.includes(id))
+
+    if (added.length) {
+      pendingAutoSelectEsts.current = [
+        ...new Set([...pendingAutoSelectEsts.current, ...added]),
+      ]
+    }
+
+    if (removed.length) {
+      setSelectedActivos((prev) =>
+        prev.filter((a) => !removed.includes(a.establecimiento)),
+      )
+    }
+
+    setSelectedEsts(nextEsts)
+  }
+
+  const handleToggleActivo = (activo) => {
+    if (!activo.disponible && !selectedActivos.some((s) => s.id === activo.id)) return
+    setSelectedActivos((prev) => {
+      if (prev.find((a) => a.id === activo.id)) {
+        return prev.filter((a) => a.id !== activo.id)
+      }
+      return [...prev, activo]
+    })
+  }
+
+  const handleRemoveActivo = (id) => {
+    setSelectedActivos((prev) => prev.filter((a) => a.id !== id))
+  }
+
+  const handleAddAllAvailable = () => {
+    const available = foundActivos.filter((a) => a.disponible)
+    setSelectedActivos((prev) => {
+      const next = [...prev]
+      available.forEach((activo) => {
+        if (!next.find((item) => item.id === activo.id)) next.push(activo)
+      })
+      return next
+    })
+  }
+
+  const handleRecipientTypeChange = (type) => {
+    setRecipientType(type)
+    setSelectedApplicantId('')
+    setSelectedFuncionarioId('')
+    setSelectedDirectorEstId('')
+  }
+
+  const handleSaveApplicant = async (data) => {
+    const res = await api.post('solicitantes/', data)
+    return res.data
+  }
+
+  const handleApplicantClose = (result) => {
+    setShowApplicantForm(false)
+    if (result?.saved && result?.data) {
+      setApplicants((prev) => [...prev, result.data])
+      setRecipientType('externo')
+      setSelectedApplicantId(result.data.id)
+      setSelectedFuncionarioId('')
+      setSelectedDirectorEstId('')
+    }
+  }
+
+  const handleOverlayDismiss = () => {
+    if (overlay.status === 'success') {
+      overlay.reset()
+      navigate('/loans')
+      return
+    }
+    overlay.dismiss()
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (selectedActivos.length === 0) {
+      overlay.setTitle(undefined)
+      overlay.setDescription('Debe seleccionar al menos un activo.')
+      overlay.setStatus('error')
+      return
+    }
+    if (!selectedApplicantId && !selectedFuncionarioId && !selectedDirectorEstId) {
+      overlay.setTitle(undefined)
+      overlay.setDescription('Debe seleccionar un solicitante.')
+      overlay.setStatus('error')
+      return
+    }
+
+    const payload = {
+      solicitante: selectedApplicantId || null,
+      funcionario: selectedFuncionarioId || null,
+      director_establecimiento_id: selectedDirectorEstId || null,
+      activos: selectedActivos.map((a) => a.id),
+      observacion,
+    }
+
+    try {
+      await overlay.run(
+        async () => {
+          await api.post('prestamos/', payload)
+        },
+        {
+          successDescription: 'Préstamo registrado correctamente.',
+          formatError: (err) => formatApiFormError(err, 'Error al crear el préstamo.'),
+        },
+      )
+    } catch {
+      // FormOverlay
+    }
+  }
+
+  const hasResponsible =
+    Boolean(selectedApplicantId) ||
+    Boolean(selectedFuncionarioId) ||
+    Boolean(selectedDirectorEstId)
+
+  const canSubmit = hasResponsible && selectedActivos.length > 0 && !overlay.busy && !overlay.active
+
+  const selectedTipoNombre =
+    tiposActivo.find((t) => String(t.id) === String(selectedTipoId))?.nombre || ''
+
+  return (
+    <div className="page" data-od-id="loan-form-page">
+      <PageHeader
+        icon="key"
+        title="Nuevo préstamo"
+        description="Registre la entrega de activos a funcionarios o externos."
+        breadcrumbs={[
+          { label: 'Operaciones' },
+          { label: 'Préstamos', to: '/loans' },
+          { label: 'Nuevo préstamo' },
+        ]}
+        linkComponent={Link}
+        split
+        actions={
+          <Button variant="secondary" size="sm" onClick={() => navigate('/loans')}>
+            Volver al panel
+          </Button>
         }
-    };
+      />
 
-    const handleFuncionarioSelect = (id) => {
-        setSelectedFuncionarioId(id);
-        setSelectedApplicantId('');
-        setSelectedDirectorEstId('');
-    };
+      
 
-    const handleApplicantSelect = (id) => {
-        setSelectedApplicantId(id);
-        setSelectedFuncionarioId('');
-        setSelectedDirectorEstId('');
-    };
-
-    const handleDirectorEstSelect = (id) => {
-        setSelectedDirectorEstId(id);
-        setSelectedApplicantId('');
-        setSelectedFuncionarioId('');
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (selectedKeys.length === 0) {
-            alert("Debe seleccionar al menos una llave");
-            return;
-        }
-        if (!selectedApplicantId && !selectedFuncionarioId && !selectedDirectorEstId) {
-            alert("Debe seleccionar un solicitante");
-            return;
-        }
-
-        setLoading(true);
-        const payload = {
-            solicitante: selectedApplicantId || null,
-            funcionario: selectedFuncionarioId || null,
-            director_establecimiento_id: selectedDirectorEstId || null,
-            activos: selectedKeys.map(k => k.id),
-            observacion: observacion
-        };
-
-        try {
-            await api.post('prestamos/', payload);
-            navigate('/loans'); // Redirect to loans panel
-        } catch (error) {
-            console.error("Error creating loan:", error);
-            alert("Error al crear el préstamo");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="flex flex-col h-[calc(100vh-170px)] gap-4 overflow-hidden">
-            {/* Header Area */}
-            <div className="shrink-0 flex items-center justify-between border-b border-slate-200/60 pb-3">
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => navigate('/loans')}
-                        className="p-1.5 hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-slate-600 active:scale-90 shrink-0"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                    </button>
-                    <div>
-                        <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-none uppercase select-none">Nuevo Préstamo</h2>
-                        <div className="flex items-center gap-2 mt-1.5 select-none">
-                            <p className="text-[10px] md:text-xs font-medium text-slate-500 uppercase ml-0">Registre la entrega de activos a funcionarios o externos.</p>
-                        </div>
-                    </div>
+      <FormOverlay
+        className="form-overlay-host--page"
+        status={overlay.status}
+        title={overlay.title}
+        description={overlay.description}
+        onDismiss={handleOverlayDismiss}
+      >
+      <form className="crud-form" onSubmit={handleSubmit}>
+        <div className="loan-form-grid">
+          {/* 1. Activos */}
+          <section className="form-section loan-form-col">
+            <header className="form-section__header">
+              <div className="loan-form-col__head">
+                <div>
+                  <h2 className="form-section__title">1. Activos</h2>
+                  <p className="form-section__desc">
+                    Tipo → establecimiento. Los disponibles se marcan solos.
+                  </p>
                 </div>
+                <div className="loan-form-col__head-actions">
+                  {foundActivos.some((a) => a.disponible) ? (
+                    <Button type="button" variant="ghost" size="sm" onClick={handleAddAllAvailable}>
+                      Todas disponibles
+                    </Button>
+                  ) : null}
+                  {selectedActivos.length > 0 ? (
+                    <Badge variant="accent">{selectedActivos.length}</Badge>
+                  ) : null}
+                </div>
+              </div>
+            </header>
+
+            <div className="form-section__body loan-form-col__body">
+              <Field label="Tipo de activo" htmlFor="loan-tipo" required>
+                <Select
+                  id="loan-tipo"
+                  value={selectedTipoId}
+                  onChange={(e) => handleTipoChange(e.target.value)}
+                >
+                  <option value="">Seleccione tipo (llaves, notebook…)</option>
+                  {tiposActivo.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nombre}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+
+              <MultiSearchableSelect
+                label="Establecimientos"
+                placeholder={
+                  selectedTipoId
+                    ? `Colegios con ${selectedTipoNombre || 'este tipo'}…`
+                    : 'Primero elija el tipo de activo'
+                }
+                options={establishmentsForTipo.map((est) => ({
+                  value: est.id,
+                  label: est.hasAvailableActivos
+                    ? est.nombre
+                    : `${est.nombre} (sin disponibles)`,
+                  disabled: !est.hasAvailableActivos,
+                }))}
+                value={selectedEsts}
+                onChange={handleEstsChange}
+                disabled={!selectedTipoId}
+              />
+
+              <Field label="Buscar en resultados" htmlFor="loan-activo-search">
+                <div className="input-wrap">
+                  <Icon name="search" className="input-wrap__icon" size="sm" />
+                  <Input
+                    id="loan-activo-search"
+                    type="search"
+                    placeholder="Filtrar por nombre o código…"
+                    value={activoSearchTerm}
+                    onChange={(e) => setActivoSearchTerm(e.target.value)}
+                    disabled={!selectedTipoId}
+                  />
+                </div>
+              </Field>
+
+              <div
+                className="combo__options loan-form-picklist"
+                role="listbox"
+                aria-label="Activos encontrados"
+                aria-multiselectable="true"
+              >
+                {!selectedTipoId ? (
+                  <div className="combo__empty loan-form-picklist__empty">
+                    <p>Elija el tipo de activo para comenzar</p>
+                  </div>
+                ) : foundActivos.length === 0 ? (
+                  <div className="combo__empty loan-form-picklist__empty">
+                    <p>
+                      {selectedEsts.length > 0 || activoSearchTerm.length > 1
+                        ? 'No se encontraron activos'
+                        : 'Seleccione uno o más establecimientos'}
+                    </p>
+                  </div>
+                ) : (
+                  foundActivos.map((activo) => {
+                    const isSelected = selectedActivos.some((s) => s.id === activo.id)
+                    const canToggle = activo.disponible || isSelected
+                    return (
+                      <button
+                        key={activo.id}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        disabled={!canToggle}
+                        onClick={() => canToggle && handleToggleActivo(activo)}
+                        className={`combo__option${isSelected ? ' is-selected' : ''}`}
+                      >
+                        <span className="combo__option-check" aria-hidden="true">
+                          {isSelected ? (
+                            <Icon name="check" size="sm" />
+                          ) : (
+                            <Icon name="box" size="sm" />
+                          )}
+                        </span>
+                        <span className="combo__option-label">
+                          <span className="loan-form-picklist__name">{activo.nombre}</span>
+                          <span className="loan-form-picklist__meta">
+                            {activo.establecimiento_nombre}
+                          </span>
+                        </span>
+                        {!activo.disponible && !isSelected ? (
+                          <Badge variant="danger">Ocupado</Badge>
+                        ) : isSelected ? (
+                          <Badge variant="accent">Seleccionado</Badge>
+                        ) : null}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* 2. Solicitante */}
+          <section className="form-section loan-form-col">
+            <header className="form-section__header">
+              <div className="loan-form-col__head">
+                <div>
+                  <h2 className="form-section__title">2. Solicitante</h2>
+                  <p className="form-section__desc">Elija un solo tipo de responsable.</p>
+                </div>
+                {recipientType === 'externo' ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowApplicantForm(true)}
+                  >
+                    <Icon name="plus" size="sm" /> Nuevo
+                  </Button>
+                ) : null}
+              </div>
+            </header>
+
+            <div className="form-section__body loan-form-col__body">
+              <ApplicantModal
+                isOpen={showApplicantForm}
+                onClose={handleApplicantClose}
+                onSave={handleSaveApplicant}
+              />
+
+              <fieldset className="loan-form-recipient">
+                <legend className="loan-form-recipient__legend">Tipo de responsable</legend>
+                <div
+                  className="loan-form-recipient__radios"
+                  role="radiogroup"
+                  aria-label="Tipo de responsable"
+                >
+                  {RECIPIENT_TYPES.map((opt) => (
+                    <label key={opt.value} className="radio">
+                      <input
+                        type="radio"
+                        name="loan-recipient-type"
+                        className="no-global"
+                        value={opt.value}
+                        checked={recipientType === opt.value}
+                        onChange={() => handleRecipientTypeChange(opt.value)}
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              {recipientType === 'funcionario' ? (
+                <SearchableSelect
+                  label="Buscar personal SLEP"
+                  placeholder="Nombre o cargo…"
+                  options={funcionarios.map((f) => ({
+                    value: f.id,
+                    label: `${f.nombre_funcionario} (${f.cargo || 'Funcionario'})`,
+                  }))}
+                  value={selectedFuncionarioId}
+                  onChange={setSelectedFuncionarioId}
+                />
+              ) : null}
+
+              {recipientType === 'externo' ? (
+                <SearchableSelect
+                  label="Buscar externo o registrado"
+                  placeholder="RUT o nombre…"
+                  options={applicants.map((a) => ({
+                    value: a.id,
+                    label: `${a.nombre} ${a.apellido} (${a.rut})`,
+                  }))}
+                  value={selectedApplicantId}
+                  onChange={setSelectedApplicantId}
+                />
+              ) : null}
+
+              {recipientType === 'director' ? (
+                <SearchableSelect
+                  label="Establecimiento (director)"
+                  placeholder="Seleccionar escuela…"
+                  options={establishments.map((e) => ({
+                    value: e.id,
+                    label: `${e.nombre} (${e.rbd})`,
+                  }))}
+                  value={selectedDirectorEstId}
+                  onChange={setSelectedDirectorEstId}
+                />
+              ) : null}
+            </div>
+          </section>
+
+          {/* 3. Resumen */}
+          <section className="form-section loan-form-col">
+            <header className="form-section__header">
+              <h2 className="form-section__title">3. Resumen</h2>
+              <p className="form-section__desc">
+                Revise la selección y agregue observaciones opcionales.
+              </p>
+            </header>
+
+            <div className="form-section__body loan-form-col__body">
+              <Field label="Observaciones" htmlFor="loan-observacion">
+                <Textarea
+                  id="loan-observacion"
+                  rows={3}
+                  placeholder="Observaciones del préstamo…"
+                  value={observacion}
+                  onChange={(e) => setObservacion(e.target.value)}
+                />
+              </Field>
+
+              <div className="loan-form-selected">
+                <div className="loan-form-selected__head">
+                  <span>Activos seleccionados</span>
+                  <Badge variant={selectedActivos.length > 0 ? 'accent' : 'neutral'}>
+                    {selectedActivos.length}
+                  </Badge>
+                </div>
+
+                <ul className="loan-form-selected__list">
+                  {selectedActivos.length === 0 ? (
+                    <li className="loan-form-selected__empty">Ningún activo seleccionado</li>
+                  ) : (
+                    selectedActivos.map((activo) => (
+                      <li key={activo.id} className="loan-form-selected__item">
+                        <span title={activo.nombre}>
+                          {activo.nombre}
+                          {activo.establecimiento_nombre
+                            ? ` · ${activo.establecimiento_nombre}`
+                            : ''}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Quitar ${activo.nombre}`}
+                          onClick={() => handleRemoveActivo(activo.id)}
+                        >
+                          <Icon name="close" size="sm" />
+                        </Button>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
             </div>
 
-            {/* Content Body Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch flex-grow min-h-0 select-none">
-                {/* LEFT SIDE: Selection Step 1 */}
-                <div className="lg:col-span-7 flex flex-col min-h-0 overflow-hidden">
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 relative z-[20] flex-grow flex flex-col overflow-hidden min-h-0">
-                        {/* Tab header */}
-                        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between shrink-0">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-650 border border-indigo-100 flex items-center justify-center font-bold shadow-sm">
-                                    <Key className="w-4 h-4" />
-                                </div>
-                                <div className="flex flex-col md:flex-row md:items-center gap-2">
-                                    <h3 className="text-xs font-black text-slate-850 uppercase tracking-wider">1. Seleccionar Activos</h3>
-                                    {foundKeys.some(k => k.disponible) && (
-                                        <button
-                                            type="button"
-                                            onClick={handleAddAllAvailable}
-                                            className="text-[9px] font-black text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100 transition-all uppercase tracking-widest whitespace-nowrap active:scale-95"
-                                        >
-                                            Seleccionar todas las disponibles
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                            {selectedKeys.length > 0 && (
-                                <span className="bg-indigo-600 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full select-none">
-                                    {selectedKeys.length} SELECCIONADOS
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Form area */}
-                        <div className="p-4 gap-3.5 flex flex-col flex-1 min-h-0 overflow-hidden">
-                            {/* Multiselect Est */}
-                            <MultiSearchableSelect
-                                label="Establecimientos"
-                                icon={Building}
-                                placeholder="Filtrar por establecimientos..."
-                                options={establishments.map(est => ({
-                                    value: est.id,
-                                    label: est.hasAvailableKeys ? est.nombre : `${est.nombre} (OCUPADO)`,
-                                    disabled: !est.hasAvailableKeys
-                                }))}
-                                value={selectedEsts}
-                                onChange={setSelectedEsts}
-                                className="shrink-0"
-                            />
-
-                            <FormInput
-                                placeholder="BUSCAR ACTIVO POR NOMBRE O CÓDIGO..."
-                                icon={Search}
-                                value={keySearchTerm}
-                                onChange={e => setKeySearchTerm(e.target.value)}
-                                className="shrink-0"
-                            />
-
-                            {/* Found Keys Grid/List */}
-                            <div className="flex-1 flex flex-col min-h-0 mt-1 overflow-hidden">
-                                <div className="flex-grow bg-slate-50 border border-slate-200 rounded-2xl shadow-inner overflow-y-auto custom-scrollbar min-h-0">
-                                    {foundKeys.length === 0 ? (
-                                        <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400">
-                                            <Search className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                                            <p className="font-bold text-[10px] uppercase tracking-widest">
-                                                {selectedEsts.length > 0 || keySearchTerm ? 'No se encontraron activos' : 'Filtre para comenzar'}
-                                            </p>
-                                        </div>
-                                    ) : (
-                                        <div className="divide-y divide-slate-150 bg-white">
-                                            {foundKeys.map(k => (
-                                                <button
-                                                    key={k.id}
-                                                    type="button"
-                                                    onClick={() => k.disponible && handleAddKey(k)}
-                                                    disabled={!k.disponible}
-                                                    className={`w-full text-left p-3 flex justify-between items-center group transition-all ${!k.disponible ? 'opacity-40 grayscale-0 bg-slate-100/50 cursor-not-allowed' : 'hover:bg-indigo-50/50'}`}
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${selectedKeys.find(s => s.id === k.id) ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-white border border-slate-200 text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600'}`}>
-                                                            {selectedKeys.find(s => s.id === k.id) ? <Check className="w-4 h-4 stroke-[3px]" /> : <Key className="w-4 h-4" />}
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-semibold text-slate-800 text-xs uppercase">{k.nombre}</p>
-                                                            <p className="text-[9px] text-slate-450 font-medium uppercase tracking-wider mt-0.5">{k.establecimiento_nombre}</p>
-                                                        </div>
-                                                    </div>
-                                                    {!k.disponible && (
-                                                        <span className="text-[8px] font-black bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full uppercase">Ocupada</span>
-                                                    )}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* RIGHT SIDE: Applicant Step 2 */}
-                <div className="lg:col-span-5 flex flex-col gap-4 min-h-0 overflow-hidden">
-                    {/* Applicant Card */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 relative z-[30] shrink-0">
-                        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between rounded-t-2xl overflow-hidden shrink-0">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-650 border border-indigo-100 flex items-center justify-center font-bold shadow-sm">
-                                    <UserPlus className="w-4 h-4" />
-                                </div>
-                                <h3 className="text-xs font-black text-slate-850 uppercase tracking-wider">2. Solicitante</h3>
-                            </div>
-                            <button
-                                onClick={() => setShowApplicantForm(true)}
-                                className="flex items-center gap-1 text-[9px] font-black text-indigo-600 hover:text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-1 rounded-lg active:scale-95 transition-all"
-                            >
-                                <Plus className="w-3 h-3" />
-                                <span>NUEVO</span>
-                            </button>
-                        </div>
-
-                        <div className="p-4 space-y-4">
-                            <ApplicantModal
-                                isOpen={showApplicantForm}
-                                onClose={() => setShowApplicantForm(false)}
-                                onSave={handleSaveApplicant}
-                            />
-
-                            <div className="space-y-3">
-                                <SearchableSelect
-                                    label="Personal de SLEP"
-                                    placeholder="Buscar funcionario..."
-                                    icon={UserPlus}
-                                    options={funcionarios.map(f => ({ value: f.id, label: `${f.nombre_funcionario} (${f.cargo || 'Funcionario'})` }))}
-                                    value={selectedFuncionarioId}
-                                    onChange={handleFuncionarioSelect}
-                                />
-
-                                <div className="flex items-center gap-3 py-0.5">
-                                    <div className="h-px bg-slate-150 flex-1"></div>
-                                    <span className="text-[8px] font-black text-slate-350 uppercase tracking-widest leading-none">o</span>
-                                    <div className="h-px bg-slate-150 flex-1"></div>
-                                </div>
-
-                                <SearchableSelect
-                                    label="Externos o Registrados"
-                                    placeholder="Buscar por RUT o Nombre..."
-                                    icon={Search}
-                                    options={applicants.map(a => ({ value: a.id, label: `${a.nombre} ${a.apellido} (${a.rut})` }))}
-                                    value={selectedApplicantId}
-                                    onChange={handleApplicantSelect}
-                                />
-
-                                <div className="flex items-center gap-3 py-0.5">
-                                    <div className="h-px bg-slate-150 flex-1"></div>
-                                    <span className="text-[8px] font-black text-slate-355 uppercase tracking-widest leading-none">o</span>
-                                    <div className="h-px bg-slate-150 flex-1"></div>
-                                </div>
-
-                                <SearchableSelect
-                                    label="Dirección de Establecimiento (Director)"
-                                    placeholder="Seleccionar escuela..."
-                                    icon={GraduationCap}
-                                    options={establishments.map(e => ({ value: e.id, label: `${e.nombre} (${e.rbd})` }))}
-                                    value={selectedDirectorEstId}
-                                    onChange={handleDirectorEstSelect}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Finalize Card */}
-                    <div className="bg-slate-900 rounded-2xl p-5 text-white shadow-xl shadow-slate-900/20 relative overflow-hidden group flex-grow flex flex-col min-h-0">
-                        {/* Background Decor */}
-                        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-slate-800 rounded-full blur-3xl opacity-50 group-hover:opacity-80 transition-opacity"></div>
-
-                        <div className="relative z-10 flex flex-col flex-grow min-h-0">
-                            <div className="flex items-center gap-2.5 mb-4 shrink-0">
-                                <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center">
-                                    <Save className="w-4 h-4 text-indigo-400" />
-                                </div>
-                                <h3 className="text-xs font-black uppercase tracking-wider">Resumen y Registro</h3>
-                            </div>
-
-                            <div className="space-y-3.5 flex-grow flex flex-col min-h-0 overflow-hidden">
-                                <FormInput
-                                    placeholder="OBSERVACIONES..."
-                                    value={observacion}
-                                    onChange={e => setObservacion(e.target.value)}
-                                    multiline
-                                    rows="2"
-                                    inputClassName="!bg-slate-800 !border-slate-700 !text-white !placeholder-slate-500 rounded-xl text-xs uppercase"
-                                    className="shrink-0"
-                                />
-
-                                <div className="p-3.5 bg-slate-800/50 rounded-xl border border-slate-700/50 flex flex-col flex-grow min-h-0 overflow-hidden">
-                                    <div className="flex justify-between text-[9px] mb-2 shrink-0">
-                                        <span className="text-slate-400 uppercase tracking-widest font-black">Seleccionados</span>
-                                        <span className="text-indigo-400 font-black">{selectedKeys.length}</span>
-                                    </div>
-                                    <div className="space-y-1.5 flex-grow overflow-y-auto custom-scrollbar-dark pr-1 min-h-0">
-                                        <AnimatePresence>
-                                            {selectedKeys.map(k => (
-                                                <motion.div
-                                                    key={k.id}
-                                                    initial={{ opacity: 0, x: -10 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    exit={{ opacity: 0, x: 10 }}
-                                                    className="flex items-center justify-between gap-2 text-[9px] bg-slate-800/80 p-2 rounded-xl border border-slate-700/30 uppercase"
-                                                >
-                                                    <span className="font-bold text-slate-200 truncate">{k.nombre}</span>
-                                                    <button onClick={() => handleRemoveKey(k.id)} className="text-slate-500 hover:text-red-400 transition-colors">
-                                                        <X className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </motion.div>
-                                            ))}
-                                        </AnimatePresence>
-                                        {selectedKeys.length === 0 && (
-                                            <p className="text-slate-500 italic text-center text-[10px] py-4 uppercase">Ninguno seleccionado</p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <button
-                                    onClick={handleSubmit}
-                                    disabled={(!selectedApplicantId && !selectedFuncionarioId && !selectedDirectorEstId) || selectedKeys.length === 0 || loading}
-                                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed shadow-xl shadow-indigo-900/30 transition-all font-black text-[10px] flex items-center justify-center gap-2 uppercase tracking-widest shrink-0 mt-auto"
-                                >
-                                    {loading ? (
-                                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                                    ) : (
-                                        <>
-                                            <Save className="w-4 h-4" />
-                                            <span>Registrar Préstamo</span>
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div className="form-actions form-actions--crud">
+              <div className="form-actions__end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => navigate('/loans')}
+                  disabled={overlay.busy}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" variant="primary" disabled={!canSubmit} loading={overlay.busy}>
+                  {overlay.busy ? 'Registrando…' : 'Registrar préstamo'}
+                </Button>
+              </div>
             </div>
+          </section>
         </div>
-    );
-};
+      </form>
+      </FormOverlay>
+    </div>
+  )
+}
 
-export default LoanForm;
+export default LoanForm

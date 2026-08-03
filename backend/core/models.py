@@ -274,10 +274,11 @@ class ReportConfiguration(models.Model):
 
 class AuditLog(models.Model):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Usuario")
-    action = models.CharField(max_length=50, verbose_name="Acción")  # e.g., LECTURA, CREACION, MODIFICACION, ELIMINACION
+    action = models.CharField(max_length=50, verbose_name="Acción")  # e.g., CREACION, MODIFICACION, ELIMINACION
     model_name = models.CharField(max_length=100, verbose_name="Modelo Afectado")
     object_id = models.CharField(max_length=50, blank=True, null=True, verbose_name="ID Objeto")
     details = models.TextField(blank=True, null=True, verbose_name="Detalles")
+    changes = models.JSONField(default=dict, blank=True, verbose_name="Cambios")
     ip_address = models.GenericIPAddressField(blank=True, null=True, verbose_name="Dirección IP")
     user_agent = models.TextField(blank=True, null=True, verbose_name="User Agent")
     timestamp = models.DateTimeField(auto_now_add=True, verbose_name="Fecha y Hora")

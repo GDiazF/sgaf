@@ -1,233 +1,364 @@
-import React, { useState, useEffect } from 'react';
-import api from '../../api';
-import { Search, Filter, UserCircle, Calendar, ChevronDown, ChevronUp, FolderSearch } from 'lucide-react';
-import { INPUT_FILTER, SELECT_FILTER, FOCUS_ICON, SORT_ACTIVE } from './comunicacionesUi';
+import React, { useState, useEffect, useMemo } from 'react'
+import api from '../../api'
+import useDebouncedValue from '../../hooks/useDebouncedValue'
+import { useNotify } from '../../hooks/useNotify'
+import GestionSeguimientoPanel from '../../components/comunicaciones/GestionSeguimientoPanel'
+import {
+  FiltersBar,
+  DataTable,
+  Badge,
+  Button,
+  Field,
+  Input,
+  Select,
+  Icon,
+  IconButton,
+  Drawer
+} from '@slep/ui'
+
+const ESTADO_BADGE = {
+  PENDIENTE: { variant: 'danger', label: 'Pendiente' },
+  EN_PROCESO: { variant: 'warning', label: 'En proceso' },
+  RESPONDIDO: { variant: 'accent', label: 'Respondido' },
+  CERRADO: { variant: 'success', label: 'Cerrado' },
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return '—'
+  return new Date(dateString).toLocaleDateString('es-CL')
+}
 
 const AdminGestionesGlobal = () => {
-    const [gestiones, setGestiones] = useState([]);
-    const [loading, setLoading] = useState(true);
-    
-    // Filtros
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterEstado, setFilterEstado] = useState('TODOS');
-    
-    // Ordenamiento
-    const [sortConfig, setSortConfig] = useState({ key: 'fecha_creacion', direction: 'desc' });
+  const [gestiones, setGestiones] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterEstado, setFilterEstado] = useState('TODOS')
+  const [sortKey, setSortKey] = useState('fecha')
+  const [sortDir, setSortDir] = useState('desc')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const { notify } = useNotify()
+  const [selected, setSelected] = useState(null)
+  const debouncedSearch = useDebouncedValue(searchQuery)
 
-    useEffect(() => {
-        const fetchGestiones = async () => {
-            try {
-                // Obtenemos todas las gestiones
-                const res = await api.get('ejecutivos/gestiones/?page_size=1000');
-                // Dependiendo de si está paginado o no
-                const data = res.data.results || res.data;
-                setGestiones(Array.isArray(data) ? data : []);
-            } catch (error) {
-                console.error('Error fetching gestiones', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchGestiones();
-    }, []);
+  useEffect(() => {
+    const fetchGestiones = async () => {
+      setLoading(true)
+      try {
+        const res = await api.get('ejecutivos/gestiones/', {
+          params: { page_size: 1000 },
+        })
+        const data = res.data.results || res.data
+        setGestiones(Array.isArray(data) ? data : [])
+      } catch (error) {
+        console.error('Error fetching gestiones', error)
+        setGestiones([])
+        notify({
+          variant: 'danger',
+          text: 'No se pudieron cargar las gestiones.',
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchGestiones()
+  }, [])
 
-    const handleSort = (key) => {
-        let direction = 'asc';
-        if (sortConfig.key === key && sortConfig.direction === 'asc') {
-            direction = 'desc';
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [debouncedSearch, filterEstado, pageSize])
+
+  const filteredSorted = useMemo(() => {
+    let items = [...gestiones]
+
+    if (filterEstado !== 'TODOS') {
+      items = items.filter((g) => g.estado === filterEstado)
+    }
+
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase()
+      items = items.filter(
+        (g) =>
+          g.establecimiento_details?.nombre?.toLowerCase().includes(q) ||
+          g.ejecutivo_details?.nombre_funcionario?.toLowerCase().includes(q) ||
+          g.requerimiento?.toLowerCase().includes(q) ||
+          g.establecimiento_details?.rbd?.toString().includes(q),
+      )
+    }
+
+    items.sort((a, b) => {
+      let aValue
+      let bValue
+      switch (sortKey) {
+        case 'establecimiento':
+          aValue = a.establecimiento_details?.nombre || ''
+          bValue = b.establecimiento_details?.nombre || ''
+          break
+        case 'rbd':
+          aValue = a.establecimiento_details?.rbd ?? ''
+          bValue = b.establecimiento_details?.rbd ?? ''
+          break
+        case 'ejecutivo':
+          aValue = a.ejecutivo_details?.nombre_funcionario || ''
+          bValue = b.ejecutivo_details?.nombre_funcionario || ''
+          break
+        case 'fecha':
+          aValue = new Date(a.fecha_creacion).getTime()
+          bValue = new Date(b.fecha_creacion).getTime()
+          break
+        case 'estado':
+          aValue = a.estado || ''
+          bValue = b.estado || ''
+          break
+        default:
+          aValue = a[sortKey]
+          bValue = b[sortKey]
+      }
+      if (aValue < bValue) return sortDir === 'asc' ? -1 : 1
+      if (aValue > bValue) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return items
+  }, [gestiones, filterEstado, debouncedSearch, sortKey, sortDir])
+
+  const pageRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return filteredSorted.slice(start, start + pageSize)
+  }, [filteredSorted, currentPage, pageSize])
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setFilterEstado('TODOS')
+    setCurrentPage(1)
+  }
+
+  const handleSort = (colKey) => {
+    if (sortKey === colKey) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(colKey)
+      setSortDir(colKey === 'fecha' ? 'desc' : 'asc')
+    }
+  }
+
+  const openDetail = (item) => setSelected(item)
+
+  const columns = useMemo(
+    () => [
+      {
+        key: 'fecha',
+        header: 'Fecha',
+        cardRole: 'field',
+        priority: 3,
+        sortable: true,
+        render: (item) => formatDate(item.fecha_creacion),
+      },
+      {
+        key: 'establecimiento',
+        header: 'Establecimiento',
+        className: 'col--primary',
+        cardRole: 'title',
+        priority: 1,
+        sortable: true,
+        render: (item) => item.establecimiento_details?.nombre || '—',
+      },
+      {
+        key: 'rbd',
+        header: 'RBD',
+        className: 'col--secondary',
+        cardRole: 'subtitle',
+        priority: 2,
+        sortable: true,
+        render: (item) => item.establecimiento_details?.rbd ?? '—',
+      },
+      {
+        key: 'ejecutivo',
+        header: 'Ejecutivo',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 4,
+        sortable: true,
+        render: (item) =>
+          item.ejecutivo_details?.nombre_funcionario || 'Sin asignar',
+      },
+      {
+        key: 'requerimiento',
+        header: 'Requerimiento',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 5,
+        render: (item) => item.requerimiento || '—',
+      },
+      {
+        key: 'estado',
+        header: 'Estado',
+        className: 'col--status',
+        cardRole: 'status',
+        priority: 1,
+        sortable: true,
+        render: (item) => {
+          const meta = ESTADO_BADGE[item.estado] || {
+            variant: 'neutral',
+            label: (item.estado || '').replace('_', ' '),
+          }
+          return <Badge variant={meta.variant}>{meta.label}</Badge>
+        },
+      },
+      {
+        key: 'acciones',
+        header: '',
+        className: 'col--actions',
+        cardRole: 'actions',
+        render: (item) => (
+          <IconButton
+            type="button"
+            aria-label="Ver detalle"
+            title="Ver detalle"
+            onClick={() => openDetail(item)}
+          >
+            <Icon name="eye" size={16} />
+          </IconButton>
+        ),
+      },
+    ],
+    [],
+  )
+
+  const estadoMeta = selected
+    ? ESTADO_BADGE[selected.estado] || {
+        variant: 'neutral',
+        label: selected.estado,
+      }
+    : null
+
+  return (
+    <>
+      
+
+      <FiltersBar
+        onSearch={() => setCurrentPage(1)}
+        onClear={clearFilters}
+        activeCount={filterEstado !== 'TODOS' ? 1 : 0}
+        advanced={
+          <Field label="Estado" htmlFor="com-gest-estado">
+            <Select
+              id="com-gest-estado"
+              value={filterEstado}
+              onChange={(e) => setFilterEstado(e.target.value)}
+            >
+              <option value="TODOS">Todos los estados</option>
+              <option value="PENDIENTE">Pendientes</option>
+              <option value="EN_PROCESO">En proceso</option>
+              <option value="RESPONDIDO">Respondidos</option>
+              <option value="CERRADO">Cerrados</option>
+            </Select>
+          </Field>
         }
-        setSortConfig({ key, direction });
-    };
+      >
+        <Field label="Buscar" htmlFor="com-gest-q">
+          <div className="input-wrap">
+            <Icon name="search" className="input-wrap__icon" size="sm" />
+            <Input
+              id="com-gest-q"
+              type="search"
+              placeholder="Colegio, RBD, ejecutivo o requerimiento…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </Field>
+      </FiltersBar>
 
-    const sortedData = React.useMemo(() => {
-        let sortableItems = [...gestiones];
-        
-        // Primero filtramos
-        if (filterEstado !== 'TODOS') {
-            sortableItems = sortableItems.filter(g => g.estado === filterEstado);
+      <DataTable
+        columns={columns}
+        rows={pageRows}
+        loading={loading}
+        totalCount={filteredSorted.length}
+        emptyTitle="Sin gestiones"
+        emptyDescription="No hay gestiones con los filtros actuales."
+        emptyAction={
+          <Button variant="quiet" onClick={clearFilters}>
+            Limpiar filtros
+          </Button>
         }
-        
-        if (searchTerm) {
-            const lowerSearch = searchTerm.toLowerCase();
-            sortableItems = sortableItems.filter(g => 
-                g.establecimiento_details?.nombre?.toLowerCase().includes(lowerSearch) ||
-                g.ejecutivo_details?.nombre_funcionario?.toLowerCase().includes(lowerSearch) ||
-                g.requerimiento?.toLowerCase().includes(lowerSearch) ||
-                g.establecimiento_details?.rbd?.toString().includes(lowerSearch)
-            );
+        fillViewport
+        page={currentPage}
+        pageSize={pageSize}
+        pageSizeId="com-gestiones-page-size"
+        pageSizeOptions={[10, 20, 50, 100]}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(n) => {
+          setPageSize(n)
+          setCurrentPage(1)
+        }}
+        sortKey={sortKey}
+        onSort={handleSort}
+        onRowClick={openDetail}
+        mobileCardActions={(item) => ({
+          primary: {
+            label: 'Ver detalle',
+            onClick: () => openDetail(item),
+          },
+        })}
+        toolbar={
+          <div className="table-toolbar__left">
+            <span className="table-toolbar__title">Gestiones</span>
+            <Badge variant="neutral">{filteredSorted.length}</Badge>
+          </div>
         }
+      />
 
-        // Luego ordenamos
-        sortableItems.sort((a, b) => {
-            let aValue, bValue;
-            
-            switch (sortConfig.key) {
-                case 'establecimiento':
-                    aValue = a.establecimiento_details?.nombre || '';
-                    bValue = b.establecimiento_details?.nombre || '';
-                    break;
-                case 'rbd':
-                    aValue = a.establecimiento_details?.rbd ?? '';
-                    bValue = b.establecimiento_details?.rbd ?? '';
-                    break;
-                case 'ejecutivo':
-                    aValue = a.ejecutivo_details?.nombre_funcionario || '';
-                    bValue = b.ejecutivo_details?.nombre_funcionario || '';
-                    break;
-                case 'fecha_creacion':
-                    aValue = new Date(a.fecha_creacion).getTime();
-                    bValue = new Date(b.fecha_creacion).getTime();
-                    break;
-                case 'estado':
-                    aValue = a.estado;
-                    bValue = b.estado;
-                    break;
-                default:
-                    aValue = a[sortConfig.key];
-                    bValue = b[sortConfig.key];
-            }
-
-            if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-            if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-            return 0;
-        });
-        
-        return sortableItems;
-    }, [gestiones, sortConfig, filterEstado, searchTerm]);
-
-    const SortIcon = ({ columnKey }) => {
-        if (sortConfig.key !== columnKey) return <ChevronDown className="w-3 h-3 opacity-20" />;
-        return sortConfig.direction === 'asc' ? <ChevronUp className={SORT_ACTIVE} /> : <ChevronDown className={SORT_ACTIVE} />;
-    };
-
-    return (
-        <div className="flex flex-col h-full overflow-hidden gap-4">
-            <div className="bg-white p-3 md:p-4 rounded-[1.5rem] shadow-sm border border-slate-200 shrink-0">
-                <div className="flex flex-col md:flex-row gap-4 justify-between items-center w-full">
-                    <div className="flex-1 w-full relative">
-                        <div className="relative group">
-                            <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 transition-colors pointer-events-none ${FOCUS_ICON}`} />
-                            <input 
-                                type="text" 
-                                placeholder="Buscar por colegio, RBD, ejecutivo o requerimiento..." 
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className={INPUT_FILTER}
-                            />
-                        </div>
-                    </div>
-                    
-                    <div className="w-full md:w-72">
-                        <div className="relative group">
-                            <Filter className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 transition-colors pointer-events-none ${FOCUS_ICON}`} />
-                            <select 
-                                value={filterEstado}
-                                onChange={(e) => setFilterEstado(e.target.value)}
-                                className={SELECT_FILTER}
-                            >
-                                <option value="TODOS">Todos los estados</option>
-                                <option value="PENDIENTE">🔴 Pendientes</option>
-                                <option value="EN_PROCESO">🟠 En Proceso</option>
-                                <option value="RESPONDIDO">🔵 Respondidos</option>
-                                <option value="CERRADO">🟢 Cerrados</option>
-                            </select>
-                            <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                        </div>
-                    </div>
-                </div>
+      <Drawer
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        wide
+        title={selected?.requerimiento || 'Detalle de gestión'}
+        footer={
+          <Button type="button" variant="quiet" onClick={() => setSelected(null)}>
+            Cerrar
+          </Button>
+        }
+      >
+        {selected ? (
+          <div className="comunicaciones-gestion-admin-detail">
+            <div className="comunicaciones-gestion-admin-detail__context">
+              <div className="comunicaciones-gestion-admin-detail__context-main">
+                {estadoMeta ? (
+                  <Badge variant={estadoMeta.variant}>{estadoMeta.label}</Badge>
+                ) : null}
+                <span className="comunicaciones-gestion-admin-detail__date">
+                  {formatDate(selected.fecha_creacion)}
+                </span>
+              </div>
+              <p className="comunicaciones-gestion-admin-detail__estab">
+                {selected.establecimiento_details?.nombre || 'Sin establecimiento'}
+                {selected.establecimiento_details?.rbd != null
+                  ? ` · RBD ${selected.establecimiento_details.rbd}`
+                  : ''}
+              </p>
+              <p className="comunicaciones-gestion-admin-detail__ejecutivo">
+                Ejecutivo:{' '}
+                <strong>
+                  {selected.ejecutivo_details?.nombre_funcionario || 'Sin asignar'}
+                </strong>
+              </p>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-0">
-                <div className="overflow-y-auto flex-1 custom-scrollbar">
-                    <table className="w-full text-left border-collapse border-spacing-0 min-w-[1000px]">
-                        <thead className="sticky top-0 z-10">
-                            <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-200 select-none shadow-sm">
-                                <th className="px-4 py-3 align-middle border-r border-slate-100 bg-slate-50 cursor-pointer hover:bg-slate-100/80 transition-colors" onClick={() => handleSort('fecha_creacion')}>
-                                    <div className="flex items-center gap-2">Fecha <SortIcon columnKey="fecha_creacion" /></div>
-                                </th>
-                                <th className="px-4 py-3 align-middle border-r border-slate-100 bg-slate-50 cursor-pointer hover:bg-slate-100/80 transition-colors" onClick={() => handleSort('establecimiento')}>
-                                    <div className="flex items-center gap-2">Establecimiento <SortIcon columnKey="establecimiento" /></div>
-                                </th>
-                                <th className="px-4 py-3 align-middle border-r border-slate-100 bg-slate-50 w-28 text-center cursor-pointer hover:bg-slate-100/80 transition-colors" onClick={() => handleSort('rbd')}>
-                                    <div className="flex items-center justify-center gap-2">RBD <SortIcon columnKey="rbd" /></div>
-                                </th>
-                                <th className="px-4 py-3 align-middle border-r border-slate-100 bg-slate-50 cursor-pointer hover:bg-slate-100/80 transition-colors" onClick={() => handleSort('ejecutivo')}>
-                                    <div className="flex items-center gap-2">Ejecutivo <SortIcon columnKey="ejecutivo" /></div>
-                                </th>
-                                <th className="px-4 py-3 align-middle border-r border-slate-100 bg-slate-50">Requerimiento</th>
-                                <th className="px-4 py-3 align-middle bg-slate-50 text-center cursor-pointer hover:bg-slate-100/80 transition-colors" onClick={() => handleSort('estado')}>
-                                    <div className="flex items-center justify-center gap-2">Estado <SortIcon columnKey="estado" /></div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan="6">
-                                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                                            <span className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Cargando gestiones...</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : sortedData.length === 0 ? (
-                                <tr>
-                                    <td colSpan="6">
-                                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                                            <FolderSearch className="w-10 h-10 text-slate-200 mb-3" />
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No se encontraron registros</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : sortedData.map(g => (
-                                <tr key={g.id} className="hover:bg-slate-50/50 transition-colors">
-                                    <td className="px-4 py-3 align-middle border-r border-slate-50 whitespace-nowrap">
-                                        <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium uppercase tracking-tighter">
-                                            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                            {new Date(g.fecha_creacion).toLocaleDateString('es-CL')}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3 align-middle border-r border-slate-50 max-w-[220px]">
-                                        <span className="text-[11px] font-medium text-slate-700 uppercase tracking-tighter line-clamp-2 block">
-                                            {g.establecimiento_details?.nombre || '—'}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 align-middle border-r border-slate-50 text-center whitespace-nowrap">
-                                        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-tighter">
-                                            {g.establecimiento_details?.rbd ?? '—'}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 align-middle border-r border-slate-50">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <UserCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                            <span className="text-[11px] font-medium text-slate-600 uppercase tracking-tighter truncate">
-                                                {g.ejecutivo_details?.nombre_funcionario || 'Sin asignar'}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3 align-middle border-r border-slate-50">
-                                        <p className="text-[11px] font-medium text-slate-700 line-clamp-1 uppercase tracking-tighter">{g.requerimiento}</p>
-                                    </td>
-                                    <td className="px-4 py-3 align-middle text-center whitespace-nowrap">
-                                        <span className={`px-2 py-0.5 text-[9px] uppercase font-black tracking-tighter rounded-lg border ${
-                                            g.estado === 'PENDIENTE' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                                            g.estado === 'EN_PROCESO' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                            g.estado === 'RESPONDIDO' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                            'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                        }`}>
-                                            {g.estado.replace('_', ' ')}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-                <div className="bg-slate-50 border-t border-slate-200 py-2.5 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right shrink-0">
-                    Mostrando {sortedData.length} gestiones
-                </div>
-            </div>
-        </div>
-    );
-};
+            <GestionSeguimientoPanel
+              gestion={selected}
+              newPaso=""
+              onNewPasoChange={() => {}}
+              onAddPaso={() => {}}
+              onToggleSubtarea={() => {}}
+              canEditPasos={false}
+              hideHeader
+            />
+          </div>
+        ) : null}
+      </Drawer>
+    </>
+  )
+}
 
-export default AdminGestionesGlobal;
+export default AdminGestionesGlobal

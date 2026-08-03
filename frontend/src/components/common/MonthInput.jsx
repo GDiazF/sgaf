@@ -1,147 +1,180 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useRef, useId } from 'react'
+import { Field, Button, Icon } from '@slep/ui'
 
-const MonthInput = ({ label, value, onChange, required = false, className = "" }) => {
-    // Value coming in is YYYY-MM
-    const [isOpen, setIsOpen] = useState(false);
-    const [displayValue, setDisplayValue] = useState('');
-    const [viewDate, setViewDate] = useState(new Date()); // Date used for navigating years
-    const containerRef = useRef(null);
+const MESES = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+]
 
-    const MESES = [
-        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-    ];
+/**
+ * Selector de periodo (YYYY-MM) con UI del design system.
+ */
+const MonthInput = ({
+  label = 'Periodo',
+  value,
+  onChange,
+  required = false,
+  className = '',
+  htmlFor,
+}) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const [displayValue, setDisplayValue] = useState('')
+  const [viewDate, setViewDate] = useState(new Date())
+  const containerRef = useRef(null)
+  const autoId = useId()
+  const triggerId = htmlFor || `month-${autoId}`
 
-    useEffect(() => {
-        if (value) {
-            const [y, m] = value.split('-');
-            const date = new Date(parseInt(y), parseInt(m) - 1, 2);
-            setDisplayValue(date.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' }).toUpperCase());
-            setViewDate(date);
-        } else {
-            setDisplayValue('');
-            setViewDate(new Date());
-        }
-    }, [value]);
+  useEffect(() => {
+    if (value) {
+      const [y, m] = value.split('-')
+      const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 2)
+      setDisplayValue(
+        date.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' }).toUpperCase(),
+      )
+      setViewDate(date)
+    } else {
+      setDisplayValue('')
+      setViewDate(new Date())
+    }
+  }, [value])
 
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (containerRef.current && !containerRef.current.contains(event.target)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
-    const handleMonthSelect = (monthIndex) => {
-        const year = viewDate.getFullYear();
-        const month = (monthIndex + 1).toString().padStart(2, '0');
-        onChange(`${year}-${month}`);
-        setIsOpen(false);
-    };
+  const handleMonthSelect = (monthIndex) => {
+    const year = viewDate.getFullYear()
+    const month = (monthIndex + 1).toString().padStart(2, '0')
+    onChange(`${year}-${month}`)
+    setIsOpen(false)
+  }
 
-    const changeYear = (delta) => {
-        const newDate = new Date(viewDate);
-        newDate.setFullYear(viewDate.getFullYear() + delta);
-        setViewDate(newDate);
-    };
+  const changeYear = (delta) => {
+    const next = new Date(viewDate)
+    next.setFullYear(viewDate.getFullYear() + delta)
+    setViewDate(next)
+  }
 
-    return (
-        <div className={`form-container ${className}`} ref={containerRef}>
-            {label && (
-                <label className="form-label">
-                    <Calendar className="w-3.5 h-3.5 text-blue-500" />
-                    {label} {required && <span className="text-rose-500">*</span>}
-                </label>
-            )}
-            <div className="relative">
-                <div
-                    onClick={() => setIsOpen(!isOpen)}
-                    className="no-global w-full h-10 text-[10px] font-bold bg-white border border-slate-200 px-3 rounded-xl outline-none focus:border-blue-500 uppercase transition-all shadow-sm flex items-center justify-between cursor-pointer group"
+  return (
+    <div className={className}>
+      <Field label={label} required={required} htmlFor={triggerId}>
+        <div className="combo" ref={containerRef}>
+          <button
+            type="button"
+            id={triggerId}
+            className={`combo__trigger${isOpen ? ' is-open' : ''}${
+              !displayValue ? ' is-placeholder' : ''
+            }`}
+            aria-haspopup="listbox"
+            aria-expanded={isOpen}
+            onClick={() => setIsOpen((open) => !open)}
+          >
+            <span className="combo__trigger-text">
+              {displayValue || 'Seleccione periodo…'}
+            </span>
+            <span className="combo__trigger-actions">
+              <Icon name="reservas" size={14} className="month-picker__trigger-icon" />
+            </span>
+          </button>
+
+          {isOpen ? (
+            <div className="combo__menu month-picker" role="listbox">
+              <div className="month-picker__header">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Año anterior"
+                  onClick={() => changeYear(-1)}
                 >
-                    <span className={displayValue ? "text-slate-700 font-bold" : "text-slate-400 font-bold"}>
-                        {displayValue || "Seleccione periodo..."}
-                    </span>
-                    <Calendar className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
-                </div>
+                  <Icon name="chevron" size="sm" className="month-picker__chevron--prev" />
+                </Button>
+                <span className="month-picker__year">{viewDate.getFullYear()}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Año siguiente"
+                  onClick={() => changeYear(1)}
+                >
+                  <Icon name="chevron" size="sm" className="month-picker__chevron--next" />
+                </Button>
+              </div>
 
-                {isOpen && (
-                    <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[100] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                        {/* Header: Year selection */}
-                        <div className="flex items-center justify-between px-4 py-3 bg-slate-50/50 border-b border-slate-100">
-                            <button
-                                type="button"
-                                onClick={() => changeYear(-1)}
-                                className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-400 hover:text-blue-500"
-                            >
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
-                            <span className="text-sm font-black text-slate-800 tracking-tight">
-                                {viewDate.getFullYear()}
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() => changeYear(1)}
-                                className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-400 hover:text-blue-500"
-                            >
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
-                        </div>
+              <div className="month-picker__grid">
+                {MESES.map((monthName, idx) => {
+                  const key = `${viewDate.getFullYear()}-${(idx + 1)
+                    .toString()
+                    .padStart(2, '0')}`
+                  const selected = value === key
+                  return (
+                    <button
+                      key={monthName}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      className={`month-picker__month${selected ? ' is-selected' : ''}`}
+                      onClick={() => handleMonthSelect(idx)}
+                    >
+                      {monthName.substring(0, 3)}
+                    </button>
+                  )
+                })}
+              </div>
 
-                        {/* Month Grid */}
-                        <div className="p-3 grid grid-cols-3 gap-2">
-                            {MESES.map((monthName, idx) => {
-                                const isSelected = value === `${viewDate.getFullYear()}-${(idx + 1).toString().padStart(2, '0')}`;
-                                return (
-                                    <button
-                                        key={monthName}
-                                        type="button"
-                                        onClick={() => handleMonthSelect(idx)}
-                                        className={`
-                                            py-2.5 px-1 rounded-xl text-[10px] font-bold uppercase tracking-tight transition-all
-                                            ${isSelected
-                                                ? "bg-blue-600 text-white shadow-md shadow-blue-200 ring-2 ring-blue-100"
-                                                : "text-slate-600 hover:bg-blue-50 hover:text-blue-600"}
-                                        `}
-                                    >
-                                        {monthName.substring(0, 3)}
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        {/* Footer: Quick Actions */}
-                        <div className="px-3 py-2 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    onChange('');
-                                    setIsOpen(false);
-                                }}
-                                className="text-[9px] font-black text-rose-600 uppercase hover:underline"
-                            >
-                                Limpiar
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const now = new Date();
-                                    onChange(`${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`);
-                                    setIsOpen(false);
-                                }}
-                                className="text-[9px] font-black text-blue-500 uppercase hover:underline"
-                            >
-                                Mes Actual
-                            </button>
-                        </div>
-                    </div>
-                )}
+              <div className="month-picker__footer">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    onChange('')
+                    setIsOpen(false)
+                  }}
+                >
+                  Limpiar
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const now = new Date()
+                    onChange(
+                      `${now.getFullYear()}-${(now.getMonth() + 1)
+                        .toString()
+                        .padStart(2, '0')}`,
+                    )
+                    setIsOpen(false)
+                  }}
+                >
+                  Mes actual
+                </Button>
+              </div>
             </div>
-            {required && <input type="hidden" value={value || ''} required />}
+          ) : null}
         </div>
-    );
-};
+      </Field>
 
-export default MonthInput;
+      {required ? <input type="hidden" value={value || ''} required /> : null}
+    </div>
+  )
+}
+
+export default MonthInput

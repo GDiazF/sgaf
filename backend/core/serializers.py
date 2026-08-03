@@ -138,11 +138,19 @@ class AuditLogSerializer(serializers.ModelSerializer):
     content_type_name = serializers.CharField(source='model_name', read_only=True)
     object_repr = serializers.CharField(source='details', read_only=True)
     action = serializers.SerializerMethodField()
-    changes = serializers.SerializerMethodField()
 
     class Meta:
         model = AuditLog
-        fields = ['id', 'action', 'timestamp', 'actor_name', 'remote_addr', 'content_type_name', 'object_repr', 'changes']
+        fields = [
+            'id',
+            'action',
+            'timestamp',
+            'actor_name',
+            'remote_addr',
+            'content_type_name',
+            'object_repr',
+            'changes',
+        ]
 
     def get_actor_name(self, obj):
         if obj.user:
@@ -154,14 +162,11 @@ class AuditLogSerializer(serializers.ModelSerializer):
         act = str(obj.action or '').upper()
         if 'CREACION' in act:
             return 0
-        elif 'MODIFICACION' in act or 'ACCESO' in act:
+        if 'MODIFICACION' in act:
             return 1
-        elif 'ELIMINACION' in act:
+        if 'ELIMINACION' in act:
             return 2
         return 3
-
-    def get_changes(self, obj):
-        return {}
 
 
 from .models import BreachReport, CiberseguridadPlan, CiberseguridadCapacitacion

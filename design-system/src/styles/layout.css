@@ -1,0 +1,1672 @@
+/* App shell — sidebar + topbar + main */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--fg);
+  background: var(--bg);
+  min-height: 100dvh;
+}
+
+/*
+ * Con AppShell: el documento no scrollea (evita el flash de scrollbar al
+ * montar páginas / animar entrada). El scroll vive en .app-main, o dentro
+ * de la página si usa data-fill-viewport.
+ */
+html:has(.app-shell:not(.app-shell--contained)),
+body:has(.app-shell:not(.app-shell--contained)),
+body:has(.app-shell:not(.app-shell--contained)) #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+.app-shell {
+  display: flex;
+  min-height: 100dvh;
+  --current-sidebar-width: var(--sidebar-width);
+}
+
+.app-shell:not(.app-shell--contained) {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.app-shell.is-sidebar-collapsed {
+  --current-sidebar-width: var(--sidebar-width-collapsed);
+}
+
+/* Sidebar */
+.sidebar {
+  width: var(--current-sidebar-width);
+  min-width: var(--current-sidebar-width);
+  max-width: var(--current-sidebar-width);
+  background: var(--sidebar-bg);
+  color: var(--sidebar-fg);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 200;
+  transition: width var(--motion-duration-sidebar) var(--motion-ease-sidebar),
+    min-width var(--motion-duration-sidebar) var(--motion-ease-sidebar),
+    max-width var(--motion-duration-sidebar) var(--motion-ease-sidebar);
+  overflow: hidden;
+}
+
+.sidebar.is-collapsed {
+  overflow-x: visible;
+  overflow-y: hidden;
+}
+
+/* ── SidebarBrand + LogoGearToggle (normado) ───────────────────────────── */
+.sidebar-brand {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--sidebar-divider);
+}
+
+.logo-gear-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--topbar-height);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--sidebar-active-fg);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition), padding 120ms ease, justify-content 120ms ease;
+}
+
+.logo-gear-toggle:hover {
+  background: var(--sidebar-hover);
+}
+
+.logo-gear-toggle:focus-visible {
+  outline: var(--ring-width) solid var(--sidebar-accent);
+  outline-offset: calc(-1 * var(--ring-offset));
+}
+
+.logo-gear-toggle:active .logo-gear-toggle__icon {
+  transform: scale(0.94);
+}
+
+.logo-gear-toggle__icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: oklch(100% 0.02 250 / 0.06);
+  border: 1px solid oklch(100% 0.02 250 / 0.1);
+  color: #ffffff;
+  transition: transform var(--transition), background var(--transition), border-color var(--transition), width 120ms ease, height 120ms ease, margin 120ms ease;
+}
+
+.logo-gear-toggle:hover .logo-gear-toggle__icon {
+  background: oklch(100% 0.02 250 / 0.1);
+  border-color: oklch(100% 0.02 250 / 0.16);
+}
+
+.logo-gear {
+  width: 22px;
+  height: 22px;
+  display: block;
+  flex-shrink: 0;
+  transform-origin: center center;
+  transition: transform var(--transition-slow);
+}
+
+/* Rotar el <svg> completo — NUNCA el <g> con transform de coordenadas */
+.logo-gear-toggle.is-collapsed-state:not(.is-animating) .logo-gear {
+  transform: rotate(48deg);
+}
+
+.logo-gear-toggle.is-animating .logo-gear {
+  transition: none;
+}
+
+.logo-gear-toggle.is-animating.is-collapsing .logo-gear {
+  animation: logo-gear-to-collapsed var(--motion-duration-sidebar) var(--motion-ease-sidebar) forwards;
+}
+
+.logo-gear-toggle.is-animating.is-expanding .logo-gear {
+  animation: logo-gear-to-expanded var(--motion-duration-sidebar) var(--motion-ease-sidebar) forwards;
+}
+
+@keyframes logo-gear-to-collapsed {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(48deg); }
+}
+
+@keyframes logo-gear-to-expanded {
+  from { transform: rotate(48deg); }
+  to { transform: rotate(0deg); }
+}
+
+/* Toggle sidebar — timing compartido con tokens */
+.app-shell.is-sidebar-animating .sidebar {
+  transition-duration: var(--motion-duration-sidebar);
+  transition-timing-function: var(--motion-ease-sidebar);
+}
+
+.app-shell.is-sidebar-animating .app-main {
+  transition-duration: var(--motion-duration-sidebar);
+  transition-timing-function: var(--motion-ease-sidebar);
+  will-change: margin-left;
+}
+
+/*
+ * Vistas pesadas (calendario / charts): durante el colapso evitar reflow
+ * “pegajoso” — contain + capa propia; el grid no pelea frame a frame.
+ */
+.app-shell.is-sidebar-animating .calendar-module,
+.app-shell.is-sidebar-animating .calendar-grid-wrap,
+.app-shell.is-sidebar-animating .calendar-day-view,
+.app-shell.is-sidebar-animating .chart-card,
+.app-shell.is-sidebar-animating .recharts-responsive-container,
+.app-shell.is-sidebar-animating [data-charts] {
+  contain: layout paint;
+  pointer-events: none;
+}
+
+.app-shell.is-sidebar-animating .calendar-module,
+.app-shell.is-sidebar-animating [data-charts] {
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
+  opacity: 0.94;
+}
+
+.app-shell:not(.is-sidebar-animating) .calendar-module,
+.app-shell:not(.is-sidebar-animating) [data-charts] {
+  transition: opacity var(--motion-duration-normal) var(--motion-ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell.is-sidebar-animating .calendar-module,
+  .app-shell.is-sidebar-animating [data-charts] {
+    opacity: 1;
+    transition: none;
+  }
+}
+
+/* Durante colapso: tuerca estable mientras gira (no saltar al centro del rail) */
+.sidebar.is-collapsed.is-collapsing .logo-gear-toggle {
+  justify-content: flex-start;
+  min-height: var(--topbar-height);
+  height: auto;
+  padding: var(--space-2) var(--space-3);
+}
+
+.sidebar.is-collapsed.is-collapsing .logo-gear-toggle__icon {
+  width: 36px;
+  height: 36px;
+  margin: 0;
+}
+
+.sidebar.is-collapsed.is-collapsing .sidebar-brand__text {
+  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
+  transition: none;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-gear-toggle.is-animating .logo-gear {
+    animation: none;
+  }
+  .logo-gear,
+  .sidebar,
+  .app-main {
+    transition: none;
+  }
+}
+
+.sidebar-brand__text {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity var(--transition-slow), max-width var(--transition-slow);
+  max-width: 12rem;
+}
+
+.sidebar-brand__dept {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heading);
+  line-height: 1.3;
+  color: var(--sidebar-active-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-brand__sub {
+  font-size: 0.625rem;
+  font-weight: var(--weight-ui);
+  line-height: 1.35;
+  color: var(--sidebar-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sidebar colapsado — rail de iconos (modo propio, no versión apretada) */
+.sidebar.is-collapsed .sidebar-brand {
+  flex-shrink: 0;
+}
+
+.sidebar.is-collapsed .logo-gear-toggle {
+  justify-content: center;
+  align-items: center;
+  min-height: var(--sidebar-brand-height);
+  height: var(--sidebar-brand-height);
+  padding: 0;
+  width: 100%;
+}
+
+.sidebar.is-collapsed .logo-gear-toggle__icon {
+  width: 32px;
+  height: 32px;
+  margin: 0 auto;
+}
+
+.sidebar.is-collapsed .sidebar-brand__text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar.is-collapsed .sidebar__section-label,
+.sidebar.is-collapsed .nav-accordion__chevron,
+.sidebar.is-collapsed .nav-item__badge,
+.sidebar.is-collapsed .sidebar__footer .sidebar__meta,
+.sidebar.is-collapsed .sidebar__status {
+  display: none !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
+}
+
+/* Cascadas: ocultas por completo en colapsado (sin artefactos de is-open) */
+.sidebar.is-collapsed .nav-accordion__panel,
+.sidebar.is-collapsed .nav-accordion.is-open .nav-accordion__panel {
+  display: none !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
+  border: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.sidebar.is-collapsed .nav-accordion,
+.sidebar.is-collapsed .nav-accordion.is-open {
+  margin: 0;
+  padding: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.sidebar.is-collapsed .nav-accordion.is-open > .nav-accordion__trigger {
+  background: transparent;
+  font-weight: var(--weight-read);
+  color: var(--sidebar-fg);
+}
+
+.sidebar.is-collapsed .sidebar__nav {
+  flex: 1;
+  padding: var(--space-2) var(--space-1);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: oklch(100% 0.02 250 / 0.22) transparent;
+}
+
+.sidebar.is-collapsed .nav-item,
+.sidebar.is-collapsed .nav-accordion__trigger {
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  min-height: var(--sidebar-rail-item-height);
+  height: var(--sidebar-rail-item-height);
+  width: 100%;
+  max-width: 100%;
+  font-size: 0;
+  line-height: 0;
+  gap: 0;
+  position: relative;
+  overflow: visible;
+  border-radius: var(--radius-sm);
+}
+
+.sidebar.is-collapsed .nav-accordion__label {
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.sidebar.is-collapsed .nav-item__icon,
+.sidebar.is-collapsed .nav-accordion__label .nav-item__icon {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  margin: 0;
+  flex-shrink: 0;
+  font-size: initial;
+}
+
+.sidebar.is-collapsed .nav-item.is-active {
+  box-shadow: inset 3px 0 0 var(--sidebar-accent);
+  background: var(--sidebar-active);
+  color: var(--sidebar-active-fg);
+}
+
+.sidebar.is-collapsed .nav-accordion:has(.nav-item.is-active) > .nav-accordion__trigger {
+  box-shadow: inset 3px 0 0 var(--sidebar-accent);
+  background: var(--sidebar-active);
+  color: var(--sidebar-active-fg);
+  font-weight: var(--weight-heading);
+}
+
+.sidebar.is-collapsed .nav-accordion__trigger:hover,
+.sidebar.is-collapsed .nav-item:hover {
+  background: var(--sidebar-hover);
+  color: var(--sidebar-active-fg);
+}
+
+.sidebar.is-collapsed .nav-accordion__trigger:focus-visible,
+.sidebar.is-collapsed .nav-item:focus-visible {
+  outline: var(--ring-width) solid var(--sidebar-accent);
+  outline-offset: calc(-1 * var(--ring-offset));
+}
+
+/* Tooltips en rail colapsado */
+.sidebar.is-collapsed [data-nav-tooltip]::after {
+  content: attr(data-nav-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: var(--space-1) var(--space-3);
+  background: var(--charcoal, oklch(22% 0.01 100));
+  color: oklch(96% 0.004 250);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-ui);
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+  border: 1px solid oklch(100% 0.02 250 / 0.1);
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 400;
+  transition: opacity var(--transition), visibility var(--transition);
+}
+
+.sidebar.is-collapsed [data-nav-tooltip]:hover::after,
+.sidebar.is-collapsed [data-nav-tooltip]:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+.sidebar.is-collapsed .sidebar__footer {
+  padding: var(--space-3) var(--space-2);
+  text-align: center;
+}
+
+.sidebar.is-collapsed .sidebar__status-dot {
+  margin: 0 auto;
+}
+
+/* Accesibilidad — región viva oculta visualmente */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Legacy — mantener compatibilidad si queda markup antiguo */
+.sidebar__logo {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: oklch(100% 0.02 250 / 0.07);
+  border: 1px solid oklch(100% 0.02 250 / 0.12);
+  border-bottom: 2px solid var(--sidebar-accent);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--sidebar-active-fg);
+  letter-spacing: 0.04em;
+}
+
+.sidebar__nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-2);
+  /* Scroll discreto sobre fondo institucional (evita thumb gris del SO) */
+  scrollbar-width: thin;
+  scrollbar-color: oklch(100% 0.02 250 / 0.22) transparent;
+}
+
+.sidebar__nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar__nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar__nav::-webkit-scrollbar-thumb {
+  background: oklch(100% 0.02 250 / 0.18);
+  border-radius: var(--radius-full);
+}
+
+.sidebar__nav::-webkit-scrollbar-thumb:hover {
+  background: oklch(100% 0.02 250 / 0.32);
+}
+
+.sidebar__section-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heading);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--sidebar-muted);
+  padding: var(--space-4) var(--space-3) var(--space-2);
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--sidebar-divider);
+}
+.sidebar__section-label:first-child {
+  margin-top: 0;
+  border-top: none;
+}
+
+.sidebar__footer {
+  padding: var(--space-4);
+  border-top: 1px solid var(--sidebar-divider);
+  font-size: var(--text-xs);
+  color: var(--sidebar-muted);
+}
+
+.sidebar__status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-weight: 550;
+  color: var(--success);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: var(--text-xs);
+}
+
+.sidebar__status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-subtle);
+}
+
+.sidebar__meta {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  line-height: 1.6;
+  opacity: 0.7;
+}
+
+/* Main column */
+.app-main {
+  flex: 1;
+  margin-left: var(--current-sidebar-width);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  max-height: 100dvh;
+  overflow-x: clip;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transition: margin-left var(--motion-duration-sidebar) var(--motion-ease-sidebar);
+}
+
+/*
+ * Listados CRUD con DataTable fillViewport:
+ * bloquea el alto del shell y deja el scroll dentro del cuerpo de la tabla
+ * (evita scroll de página en FHD). No aplica a .app-shell--contained (playground).
+ */
+.app-shell:not(.app-shell--contained):has([data-fill-viewport]) {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.app-shell:not(.app-shell--contained):has([data-fill-viewport]) .app-main {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.app-shell:not(.app-shell--contained):has([data-fill-viewport]) .app-main > .page {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-header-rule-gap);
+}
+
+/* Páginas que anidan otro .page dentro del wrapper del AppShell */
+.app-shell:not(.app-shell--contained):has([data-fill-viewport]) .app-main > .page > .page {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-header-rule-gap);
+}
+
+/*
+ * fillViewport en .page: el flex gap aporta el espacio bajo la línea.
+ * (La regla shell :has([data-fill-viewport]) .page-header ya cubre también
+ *  el caso DataTable fillViewport sin atributo en .page.)
+ */
+.page[data-fill-viewport] > .page-header {
+  margin-bottom: 0;
+}
+
+.app-shell:not(.app-shell--contained):has([data-fill-viewport]) .app-main .page-header,
+.app-shell:not(.app-shell--contained):has([data-fill-viewport]) .app-main .filters,
+.app-shell:not(.app-shell--contained):has([data-fill-viewport]) .app-main .metric-strip,
+.app-shell:not(.app-shell--contained):has([data-fill-viewport]) .app-main .alert,
+.app-shell:not(.app-shell--contained):has([data-fill-viewport]) .app-main .cyber-tabs,
+.app-shell:not(.app-shell--contained):has([data-fill-viewport]) .app-main .tabs {
+  flex-shrink: 0;
+}
+
+/*
+ * Cuando el shell está en modo fill (página o DataTable con fillViewport),
+ * el flex gap ya aporta el aire bajo la línea. Sin esto, vistas como
+ * Establecimientos/Procedimientos/Funcionarios (fill en la tabla, no en .page)
+ * suman margin-bottom + gap y se ven con más espacio que Mesa de ayuda.
+ */
+.app-shell:not(.app-shell--contained):has([data-fill-viewport]) .app-main .page-header {
+  margin-bottom: 0;
+}
+
+/* Showcase / demos enmarcados — sidebar relativo al frame, no al viewport */
+.app-shell--contained {
+  position: relative;
+  isolation: isolate;
+  min-height: 28rem;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  /* Evitar que --current-sidebar-width del shell live afecte el chrome del playground */
+  --current-sidebar-width: var(--sidebar-width);
+}
+
+.app-shell--contained.is-sidebar-collapsed {
+  --current-sidebar-width: var(--sidebar-width-collapsed);
+}
+
+.app-shell--contained .sidebar {
+  position: absolute !important;
+  inset: 0 auto 0 0 !important;
+  height: 100% !important;
+  z-index: 5;
+}
+
+.app-shell--contained .sidebar-backdrop {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 4;
+}
+
+.app-shell--contained .app-main {
+  position: relative;
+  z-index: 1;
+  min-height: 100%;
+  margin-left: var(--current-sidebar-width);
+}
+
+@media (max-width: 1023px) {
+  .app-shell--contained {
+    --current-sidebar-width: 0;
+  }
+
+  .app-shell--contained .app-main {
+    margin-left: 0 !important;
+  }
+
+  .app-shell--contained .sidebar {
+    width: min(var(--drawer-width), 88vw) !important;
+    min-width: 0 !important;
+    max-width: min(var(--drawer-width), 88vw) !important;
+  }
+}
+
+/* Topbar — mismo gutter horizontal que .page (título y campana alineados al cuerpo) */
+.topbar {
+  --topbar-edge-start: var(--space-4);
+  --topbar-edge-end: var(--space-4);
+  height: var(--topbar-height);
+  background: var(--topbar-bg);
+  border-bottom: 1px solid var(--topbar-border);
+  box-shadow: 0 1px 0 oklch(100% 0.008 92 / 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: calc(var(--topbar-edge-start) + env(safe-area-inset-left, 0px));
+  padding-right: calc(var(--topbar-edge-end) + env(safe-area-inset-right, 0px));
+  position: sticky;
+  top: 0;
+  z-index: var(--z-dropdown);
+}
+
+/* Al abrir notificaciones en tablet/móvil: topbar + panel encima del backdrop ligero */
+body.is-notif-open .topbar {
+  z-index: calc(var(--z-dropdown) + 20);
+}
+
+.topbar__left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.topbar__titles {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+}
+
+/* Botón abrir navegación — visible solo tablet/móvil (drawer) */
+.nav-drawer-trigger {
+  display: none;
+  flex-shrink: 0;
+  width: var(--control-height-md);
+  height: var(--control-height-md);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.nav-drawer-trigger:hover {
+  background: var(--surface-inset);
+  border-color: var(--border-strong);
+}
+
+.nav-drawer-trigger:focus-visible {
+  outline: var(--ring-width) solid var(--border-focus);
+  outline-offset: var(--ring-offset);
+}
+
+.nav-drawer-trigger:active {
+  background: var(--surface-raised);
+}
+
+.nav-drawer-trigger .icon {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+  stroke: currentColor;
+}
+
+/* Backdrop del drawer (tablet/móvil) */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-overlay) - 1);
+  background: oklch(18% 0.02 250 / 0.42);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-slow);
+}
+
+.sidebar-backdrop:not([hidden]) {
+  display: block;
+}
+
+.app-shell.is-drawer-open .sidebar-backdrop {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.topbar__eyebrow {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary-text);
+  line-height: 1.2;
+}
+
+.topbar__title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Orden: usuario (izq) → campana (der, borde derecho de la topbar) */
+.topbar__right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 100%;
+}
+
+/* Wrappers: sin baseline de inline-block (dropdown / refs) */
+.topbar__right > *,
+.topbar__user--avatar-only,
+.topbar__user--avatar-only > *,
+.topbar__user--avatar-only .dropdown,
+.topbar .notif-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  line-height: 0;
+  height: var(--topbar-control-size);
+  overflow: visible;
+}
+
+/* Wrapper del ref de notificaciones: no recortar el panel absoluto */
+.topbar__notifications {
+  position: relative;
+  overflow: visible;
+}
+
+.topbar__control {
+  width: var(--topbar-control-size);
+  height: var(--topbar-control-size);
+  min-width: var(--topbar-control-size);
+  min-height: var(--topbar-control-size);
+  box-sizing: border-box;
+}
+
+.topbar__user {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: right;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-ui);
+  color: var(--fg);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  transition: background var(--transition);
+}
+.topbar__user:hover { background: var(--bg); }
+.topbar__user--avatar-only {
+  padding: 0;
+  gap: 0;
+  background: none;
+  cursor: default;
+}
+.topbar__user--avatar-only:hover {
+  background: none;
+}
+.topbar__avatar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  line-height: 0;
+  transition: box-shadow var(--transition), opacity var(--transition);
+}
+.topbar__avatar-btn:hover .avatar {
+  border-color: var(--border-strong, var(--border));
+}
+.topbar__avatar-btn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+.topbar__avatar-btn .avatar {
+  width: var(--topbar-control-size);
+  height: var(--topbar-control-size);
+  min-width: var(--topbar-control-size);
+  min-height: var(--topbar-control-size);
+  overflow: hidden;
+  object-fit: contain;
+  font-size: 10px;
+}
+.topbar__avatar-btn img.avatar {
+  display: block;
+}
+.topbar__avatar-btn .avatar--initials {
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  text-align: center;
+}
+
+.topbar .notif-btn.icon-btn {
+  width: var(--topbar-control-size);
+  height: var(--topbar-control-size);
+  min-width: var(--topbar-control-size);
+  min-height: var(--topbar-control-size);
+  border-radius: var(--radius-full);
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+}
+.topbar .notif-btn .icon {
+  width: var(--topbar-control-icon);
+  height: var(--topbar-control-icon);
+}
+.topbar .notif-btn__badge {
+  top: -2px;
+  right: -2px;
+}
+
+.topbar__user-name {
+  font-size: var(--text-sm);
+  font-weight: 550;
+  line-height: 1.3;
+}
+
+.topbar__user-role {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+/* Page content */
+.page {
+  flex: 1;
+  /* Antes space-5 (~20px) en los 4 lados: demasiado aire en listados */
+  padding: var(--space-3) var(--space-4);
+  /* Única fuente: aire arriba/abajo de la línea del PageHeader (todas las vistas) */
+  --page-header-rule-gap: var(--space-2);
+}
+
+/*
+ * AppShell envuelve el Outlet en .page; casi todas las rutas montan otro .page.
+ * Sin esto el cuerpo queda con doble gutter y la topbar (un solo padding) se ve
+ * más pegada a los bordes que el contenido.
+ */
+.app-main > .page:has(> .page) {
+  padding: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PageHeader — patrón transversal v8 (dashboard, listado, CRUD, detalle)
+   Variantes: --split (acciones) · --no-icon (sin slot) · --compact (menos desc)
+   React: <PageHeader icon="proveedores" eyebrow="…" title="…" actions={…} />
+
+   Espacio de la línea separadora: ÚNICA fuente de verdad.
+   --page-header-rule-gap controla aire arriba y abajo de la línea en todas las vistas.
+   ══════════════════════════════════════════════════════════════════════════ */
+.page-header {
+  margin-bottom: var(--page-header-rule-gap, var(--space-2));
+  padding-bottom: var(--page-header-rule-gap, var(--space-2));
+  border-bottom: 1px solid var(--separator);
+}
+
+/* Bloque de identidad — breadcrumb + icono + texto como una sola unidad */
+.page-header__identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.page-header--no-icon .page-header__icon-slot {
+  display: none;
+}
+
+.page-header__identity .breadcrumbs {
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.page-header__body {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.page-header--split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4) var(--space-5);
+}
+
+.page-header--split .page-header__identity {
+  grid-column: 1;
+}
+
+.page-header--split .page-header__actions {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  flex-shrink: 0;
+}
+
+.page-header--compact .page-header__desc {
+  display: none;
+}
+
+.page-header__actions--solo {
+  justify-content: flex-end;
+}
+
+/* Compatibilidad: estructura anterior page-header__main + __heading */
+.page-header__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.page-header__heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: 0;
+}
+
+.page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Encabezado de página — icono = mismo data-icon que sidebar (regla v1) */
+.page-header__icon-slot {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-inset);
+  color: var(--primary-text);
+}
+
+.page-header__icon-slot .icon,
+.page-header__icon {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+  color: var(--primary-text);
+  stroke: currentColor;
+}
+
+.page-header__icon-slot:empty::before {
+  content: '';
+  display: block;
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius-sm);
+  opacity: 0.5;
+}
+
+.page-header__content,
+.page-header__text {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* v9: eyebrow eliminado del PageHeader — contexto de módulo solo en breadcrumbs */
+.page-header .page-header__eyebrow {
+  display: none;
+}
+
+.page-header__eyebrow {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--primary-text);
+  margin: 0;
+  line-height: 1.35;
+}
+
+.page-header__title {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0;
+  color: var(--primary-text);
+}
+
+.page-header__desc {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  max-width: 58ch;
+}
+
+.page-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.page-layout--full {
+  grid-template-columns: 1fr;
+}
+
+.page-content {
+  min-width: 0;
+}
+
+.page-content > section:not(:last-child) {
+  margin-bottom: var(--space-5);
+}
+
+.page-aside {
+  min-width: 0;
+}
+
+/* Showcase — demos aisladas de SidebarBrand */
+.showcase-brand-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+.showcase-brand-demo {
+  position: relative !important;
+  inset: auto !important;
+  z-index: auto !important;
+  height: auto;
+  min-height: 0;
+  background: var(--sidebar-bg);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.showcase-brand-demo--collapsed {
+  width: var(--sidebar-width-collapsed);
+}
+
+.showcase-brand-demo--expanded {
+  width: 100%;
+  max-width: var(--sidebar-width);
+}
+
+.showcase-brand-demo .sidebar-brand {
+  border-bottom-color: var(--sidebar-divider);
+}
+
+.showcase-gear-states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.showcase-gear-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--sidebar-bg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  min-width: 100px;
+}
+
+.showcase-gear-state__label {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  letter-spacing: var(--tracking-wide);
+}
+
+.logo-gear-toggle.is-state-hover {
+  background: var(--sidebar-hover);
+}
+
+.logo-gear-toggle.is-state-hover .logo-gear-toggle__icon {
+  background: oklch(100% 0.02 250 / 0.1);
+  border-color: oklch(100% 0.02 250 / 0.16);
+}
+
+.showcase-brand-demo .logo-gear-toggle__icon .logo-gear[src] {
+  filter: brightness(0) invert(1);
+}
+
+/* Responsive — page layout (tablet/móvil: una columna, aside arriba) */
+@media (max-width: 1023px) {
+  .page-layout {
+    grid-template-columns: 1fr;
+  }
+  .page-aside {
+    order: -1;
+  }
+}
+
+/* Encabezado de módulo — tablet: más compacto, jerarquía clara */
+@media (max-width: 1023px) and (min-width: 768px) {
+  .page-header__identity {
+    gap: var(--space-1);
+  }
+
+  .page-header__body {
+    gap: var(--space-2);
+  }
+
+  .page-header__icon-slot {
+    width: 40px;
+    height: 40px;
+  }
+
+  .page-header__title {
+    font-size: var(--text-xl);
+    line-height: 1.22;
+    color: var(--primary-text);
+  }
+
+  .page-header__desc {
+    font-size: var(--text-sm);
+    max-width: 52ch;
+    margin-top: var(--space-1);
+  }
+
+  .page-header--split {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+
+  .page-header--split .page-header__actions {
+    grid-column: 1;
+    grid-row: auto;
+    align-self: stretch;
+    padding-bottom: 0;
+    justify-content: flex-start;
+  }
+
+  /*
+   * Listados fillViewport en tablet: mismo modo compacto que móvil.
+   * Prioriza alto útil para tabla/cards.
+   */
+  .page[data-fill-viewport] > .page-header {
+    margin-bottom: 0;
+  }
+
+  .page[data-fill-viewport] > .page-header .page-header__desc,
+  .page[data-fill-viewport] > .page-header .breadcrumbs,
+  .page[data-fill-viewport] > .page-header .page-header__identity .breadcrumbs {
+    display: none;
+  }
+
+  .page[data-fill-viewport] > .page-header .page-header__title {
+    font-size: var(--text-lg);
+    line-height: 1.2;
+  }
+
+  .page[data-fill-viewport] > .page-header.page-header--split {
+    gap: var(--space-2);
+  }
+
+  .page[data-fill-viewport] > .page-header .page-header__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    gap: var(--space-1);
+  }
+
+  .page[data-fill-viewport] > .page-header .page-header__actions .btn {
+    justify-content: center;
+    min-height: var(--control-height-sm);
+    height: var(--control-height-sm);
+    font-size: var(--text-xs);
+    width: 100%;
+  }
+
+  .page[data-fill-viewport] > .page-header .page-header__actions .btn--primary {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Nav drawer — tablet y móvil (≤1023px)
+   Desktop: sidebar persistente expandido/colapsado
+   Tablet/móvil: drawer superpuesto, sin empujar contenido
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 1023px) {
+  .nav-drawer-trigger {
+    display: inline-flex;
+  }
+
+  /* Topbar drawer — mismo gutter que .page */
+  .topbar {
+    --topbar-edge-start: var(--space-4);
+    --topbar-edge-end: var(--space-4);
+  }
+
+  .app-shell {
+    --current-sidebar-width: 0;
+  }
+
+  .app-shell.is-sidebar-collapsed {
+    --current-sidebar-width: 0;
+  }
+
+  .app-main {
+    margin-left: 0 !important;
+    width: 100%;
+  }
+
+  .sidebar {
+    width: min(var(--drawer-width), 88vw);
+    min-width: 0;
+    max-width: min(var(--drawer-width), 88vw);
+    transform: translateX(-100%);
+    transition: transform var(--transition-slow);
+    z-index: var(--z-overlay);
+    box-shadow: var(--shadow-lg);
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .app-shell.is-drawer-open .sidebar {
+    transform: translateX(0);
+  }
+
+  body.is-nav-drawer-open {
+    overflow: hidden;
+  }
+
+  /* En drawer mode: siempre sidebar expandido (sin rail colapsado) */
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .sidebar-brand__text {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    clip: auto;
+    overflow: hidden;
+    opacity: 1;
+    pointer-events: auto;
+    max-width: 12rem;
+  }
+
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .logo-gear-toggle {
+    justify-content: flex-start;
+    min-height: var(--topbar-height);
+    height: auto;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .logo-gear-toggle__icon {
+    width: 36px;
+    height: 36px;
+    margin: 0;
+  }
+
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .sidebar__section-label,
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .nav-accordion__chevron,
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .nav-item__badge,
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .sidebar__footer .sidebar__meta,
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .sidebar__status {
+    display: revert !important;
+    height: auto !important;
+    padding: revert !important;
+    margin: revert !important;
+    border: revert !important;
+    overflow: visible !important;
+    visibility: visible !important;
+  }
+
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .nav-accordion__panel {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .nav-accordion:not(.is-open) .nav-accordion__panel {
+    display: none !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .nav-item,
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .nav-accordion__trigger {
+    justify-content: flex-start;
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    min-height: var(--sidebar-rail-item-height);
+  }
+
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .nav-accordion__label,
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .nav-item {
+    font-size: var(--text-sm);
+  }
+
+  .app-shell.is-drawer-mode .sidebar.is-collapsed [data-nav-tooltip]::after {
+    display: none !important;
+  }
+
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .nav-item__icon,
+  .app-shell.is-drawer-mode .sidebar.is-collapsed .nav-accordion__label .nav-item__icon {
+    margin: 0;
+    width: var(--icon-md);
+    height: var(--icon-md);
+  }
+}
+
+@media (max-width: 767px) {
+  .topbar__user-name,
+  .topbar__user-role {
+    display: none;
+  }
+  .page {
+    padding: var(--space-3);
+  }
+  .sidebar-brand__sub {
+    display: none;
+  }
+
+  /* Topbar móvil — mismo gutter que .page */
+  .topbar {
+    --topbar-edge-start: var(--space-3);
+    --topbar-edge-end: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .topbar__left {
+    gap: var(--space-2);
+    min-width: 0;
+    flex: 1;
+  }
+
+  .topbar__titles {
+    min-width: 0;
+  }
+
+  .topbar__title {
+    font-size: var(--text-sm);
+  }
+
+  /* Avatar + campana: alineación natural, sin padding/margin que corra la campana a la izquierda */
+  .topbar__right {
+    flex-shrink: 0;
+    gap: var(--space-2);
+  }
+
+  .topbar__user {
+    min-width: 44px;
+    min-height: 44px;
+    padding: var(--space-2);
+    justify-content: center;
+  }
+
+  .topbar__user--avatar-only {
+    padding: 0;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .topbar__user--avatar-only .topbar__avatar-btn,
+  .topbar__user--avatar-only .topbar__avatar-btn .avatar,
+  .topbar .notif-btn.icon-btn {
+    width: var(--topbar-control-size);
+    height: var(--topbar-control-size);
+    min-width: var(--topbar-control-size);
+    min-height: var(--topbar-control-size);
+  }
+
+  .topbar__right {
+    --topbar-control-size: 2.25rem;
+  }
+
+  .notif-trigger {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  /* Badge numérico: no sobresalir visualmente hacia el borde del viewport */
+  .notif-btn__badge {
+    top: 4px;
+    right: 6px;
+  }
+
+  .nav-drawer-trigger {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    flex-shrink: 0;
+  }
+
+  /* Encabezado de módulo — móvil: compacto, una columna, icono oculto.
+   * El aire de la línea separadora NO se redefine aquí (regla única en .page / .page-header). */
+  .page-header--show-icon-mobile .page-header__body {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .page-header--show-icon-mobile .page-header__icon-slot {
+    display: grid;
+    width: 36px;
+    height: 36px;
+  }
+
+  .page-header__identity {
+    gap: var(--space-2);
+  }
+
+  .page-header__body {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .page-header__icon-slot {
+    display: none;
+  }
+
+  .page-header__content,
+  .page-header__text {
+    gap: var(--space-1);
+  }
+
+  .page-header__identity .breadcrumbs,
+  .page-header .breadcrumbs {
+    margin: 0;
+    line-height: 1.4;
+    font-size: 11px;
+  }
+
+  .page-header__heading {
+    align-items: flex-start;
+    gap: 0;
+    margin-top: 0;
+  }
+
+  .page-header__title {
+    font-size: clamp(1.375rem, 5vw, 1.625rem);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    margin: 0;
+    color: var(--primary-text);
+  }
+
+  .page-header__desc {
+    margin-top: var(--space-2);
+    line-height: 1.5;
+    max-width: none;
+    font-size: var(--text-sm);
+    color: var(--muted);
+  }
+
+  .page-header--split {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-4);
+  }
+
+  .page-header__main {
+    margin-bottom: 0;
+  }
+
+  .page-header__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+    gap: var(--space-2);
+  }
+
+  .page-header__actions .btn {
+    justify-content: center;
+    min-height: var(--control-height-md);
+    width: 100%;
+  }
+
+  .page-header__actions .btn--primary {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+
+  /*
+   * Listados fillViewport: priorizar alto útil para cards.
+   * Descripción y breadcrumbs se ocultan (chrome → contenido).
+   */
+  .page[data-fill-viewport] > .page-header {
+    margin-bottom: 0;
+  }
+
+  .page[data-fill-viewport] > .page-header.page-header--split {
+    gap: var(--space-2);
+  }
+
+  .page[data-fill-viewport] > .page-header .page-header__desc,
+  .page[data-fill-viewport] > .page-header .breadcrumbs,
+  .page[data-fill-viewport] > .page-header .page-header__identity .breadcrumbs {
+    display: none;
+  }
+
+  .page[data-fill-viewport] > .page-header .page-header__title {
+    font-size: var(--text-lg);
+    line-height: 1.2;
+  }
+
+  .page[data-fill-viewport] > .page-header .page-header__actions {
+    gap: var(--space-1);
+  }
+
+  .page[data-fill-viewport] > .page-header .page-header__actions .btn {
+    min-height: var(--control-height-sm);
+    height: var(--control-height-sm);
+    font-size: var(--text-xs);
+  }
+
+  .page-header__import-mobile {
+    display: inline-flex !important;
+  }
+
+  .page-layout--full,
+  .page {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+}
+
+/* Importar en header — solo visible en móvil (toolbar lo oculta) */
+.page-header__import-mobile {
+  display: none;
+}

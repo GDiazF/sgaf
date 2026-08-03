@@ -1,0 +1,685 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+  SLEP Iquique — Chart library v6.3
+   Visualización institucional con mayor jerarquía y contraste útil
+   Base azul/celeste + acentos analíticos controlados
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Contenedor de gráfico ─────────────────────────────────────────────── */
+.chart-card {
+  background: var(--chart-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 1px 0 color-mix(in oklch, var(--chart-2) 12%, transparent);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.chart-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 4rem;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid color-mix(in oklch, var(--border) 80%, var(--chart-2) 20%);
+  background: color-mix(in oklch, var(--surface-raised) 70%, var(--chart-3-soft) 30%);
+  flex-wrap: wrap;
+  box-sizing: border-box;
+}
+.chart-card__titles { min-width: 0; }
+.chart-card__title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heading);
+  letter-spacing: var(--tracking-tight);
+  color: color-mix(in oklch, var(--fg) 88%, var(--chart-2) 12%);
+}
+.chart-card__subtitle {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin-top: 2px;
+  line-height: var(--leading-normal);
+}
+.chart-card__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+.chart-card__range {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+.chart-card__body {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.chart-card__footer {
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  border-top: 1px solid var(--separator);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+/* ── KPI con tendencia ─────────────────────────────────────────────────── */
+.chart-kpi {
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: 5.5rem;
+}
+.chart-kpi__label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-ui);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.chart-kpi__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.chart-kpi__value {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-heading);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-tight);
+  line-height: 1;
+  color: var(--fg);
+}
+.chart-kpi__trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-ui);
+  font-variant-numeric: tabular-nums;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-inset);
+}
+.chart-kpi__trend--up { color: var(--chart-positive); border-color: oklch(50% 0.12 150 / 0.18); background: var(--success-subtle); }
+.chart-kpi__trend--down { color: var(--chart-negative); border-color: oklch(48% 0.14 25 / 0.18); background: var(--danger-subtle); }
+.chart-kpi__trend--flat { color: var(--chart-neutral); }
+.chart-kpi__hint {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.chart-kpi__spark {
+  margin-top: var(--space-2);
+  height: 24px;
+  opacity: 0.7;
+}
+.chart-kpi__spark .chart-svg__line {
+  stroke: var(--chart-1);
+  stroke-width: 1.5;
+  opacity: 0.85;
+}
+
+/* ── Leyenda ───────────────────────────────────────────────────────────── */
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--chart-label);
+}
+.chart-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chart-legend__swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+.chart-legend__swatch--line {
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+/* ── Ejes y rejilla (SVG) ──────────────────────────────────────────────── */
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+.chart-svg__grid line {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.chart-svg__axis text {
+  fill: var(--chart-label);
+  font-size: 10px;
+  font-family: var(--font-body);
+}
+.chart-svg__axis line,
+.chart-svg__axis path {
+  stroke: color-mix(in oklch, var(--chart-grid) 72%, var(--chart-axis) 28%);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.chart-svg__line {
+  fill: none;
+  stroke: var(--chart-1);
+  stroke-width: var(--chart-line-width);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 1px 0 color-mix(in oklch, var(--chart-2) 28%, transparent));
+}
+.chart-svg__line--secondary {
+  stroke: var(--chart-2);
+  stroke-width: 1.8px;
+  opacity: 0.95;
+}
+.chart-svg__line--support {
+  stroke: var(--chart-4);
+  stroke-width: 1.5px;
+  opacity: 0.85;
+  stroke-dasharray: 4 4;
+}
+.chart-svg__area {
+  fill: var(--chart-area-fill);
+  stroke: none;
+}
+.chart-svg__dot {
+  fill: var(--chart-1);
+  stroke: var(--surface);
+  stroke-width: 1.8;
+  cursor: pointer;
+  transition: r var(--transition), fill var(--transition);
+}
+.chart-svg__dot:hover,
+.chart-svg__dot.is-active {
+  fill: var(--chart-2);
+}
+.chart-svg__bar {
+  fill: var(--chart-1);
+  opacity: 0.97;
+  transition: fill var(--transition), opacity var(--transition);
+  cursor: pointer;
+}
+.chart-svg__bar:hover,
+.chart-svg__bar.is-active {
+  fill: var(--chart-2);
+  opacity: 1;
+}
+.chart-svg__bar--2 { fill: var(--chart-3); }
+.chart-svg__bar--2:hover { fill: var(--chart-2); }
+.chart-svg__bar--3 { fill: var(--chart-5); }
+.chart-svg__bar--4 { fill: var(--chart-6); }
+.chart-svg__bar--5 { fill: var(--chart-8); }
+.chart-svg__bar--muted { fill: color-mix(in oklch, var(--muted) 58%, var(--surface)); opacity: 0.85; }
+
+/* ── Barras horizontales (CSS) ───────────────────────────────────────── */
+.chart-bars-h {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.chart-bars-h__row {
+  display: grid;
+  grid-template-columns: minmax(5rem, 28%) 1fr minmax(2.5rem, auto);
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+.chart-bars-h__label {
+  color: var(--fg);
+  font-weight: var(--weight-ui);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chart-bars-h__track {
+  height: 6px;
+  background: color-mix(in oklch, var(--chart-3-soft) 82%, var(--surface));
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: none;
+}
+.chart-bars-h__fill {
+  height: 100%;
+  background: var(--chart-1);
+  border-radius: var(--radius-sm);
+  opacity: 0.96;
+  transition: width var(--motion-duration-normal) var(--motion-ease-out),
+              opacity var(--transition);
+}
+.chart-bars-h__row:hover .chart-bars-h__fill {
+  opacity: 1;
+  background: var(--chart-2);
+}
+.chart-bars-h__fill--2 { background: var(--chart-5); }
+.chart-bars-h__fill--3 { background: var(--chart-6); }
+.chart-bars-h__fill--4 { background: var(--chart-8); }
+.chart-bars-h__value {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  text-align: right;
+}
+
+/* ── Donut ─────────────────────────────────────────────────────────────── */
+.chart-donut {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+.chart-donut__ring {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  flex-shrink: 0;
+}
+.chart-donut__ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.chart-donut__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+.chart-donut__center-value {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-heading);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--fg);
+}
+.chart-donut__center-label {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin-top: 2px;
+}
+.chart-donut__segment {
+  fill: none;
+  stroke-width: 11;
+  stroke-linecap: round;
+  transition: opacity var(--transition), stroke-width var(--transition);
+  cursor: pointer;
+  opacity: 0.96;
+}
+.chart-donut__segment:hover { opacity: 1; stroke-width: 12; }
+
+/* ── Timeline / actividad ──────────────────────────────────────────────── */
+.chart-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+.chart-timeline::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 6px;
+  bottom: 6px;
+  width: 1px;
+  background: var(--separator);
+}
+.chart-timeline__item {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+  position: relative;
+}
+.chart-timeline__item:last-child { padding-bottom: 0; }
+.chart-timeline__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--chart-1);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--border-subtle);
+  margin-top: 4px;
+  z-index: 1;
+}
+.chart-timeline__dot--success { background: var(--success); }
+.chart-timeline__dot--warning { background: var(--warning); }
+.chart-timeline__time {
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.chart-timeline__title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-ui);
+  color: var(--fg);
+}
+.chart-timeline__desc {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin-top: 2px;
+  line-height: var(--leading-normal);
+}
+
+/* ── Heatmap ligero ────────────────────────────────────────────────────── */
+.chart-heatmap {
+  display: grid;
+  gap: 3px;
+  font-size: var(--text-xs);
+}
+.chart-heatmap--week {
+  grid-template-columns: auto repeat(7, 1fr);
+}
+.chart-heatmap__label {
+  color: var(--muted);
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  padding-right: var(--space-2);
+}
+.chart-heatmap__cell {
+  aspect-ratio: 1;
+  min-height: 20px;
+  border-radius: var(--radius-sm);
+  background: var(--chart-1-soft);
+  border: 1px solid var(--border-subtle);
+  transition: background var(--transition), transform var(--transition);
+  cursor: default;
+}
+.chart-heatmap__cell[data-level="1"] { background: var(--chart-3-soft); }
+.chart-heatmap__cell[data-level="2"] { background: oklch(70% 0.06 232 / 0.35); }
+.chart-heatmap__cell[data-level="3"] { background: oklch(58% 0.13 230 / 0.48); }
+.chart-heatmap__cell[data-level="4"] { background: var(--chart-2); opacity: 0.84; }
+.chart-heatmap__cell:hover {
+  transform: scale(1.04);
+  z-index: 1;
+  opacity: 1;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Combo tabla + gráfico ─────────────────────────────────────────────── */
+.chart-combo {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+.chart-combo__table {
+  font-size: var(--text-sm);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.chart-combo__table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.chart-combo__table th,
+.chart-combo__table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.chart-combo__table th {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heading);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--surface-raised);
+}
+.chart-combo__table tr:last-child td { border-bottom: none; }
+.chart-combo__table .mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* ── Tooltip (claro — integrado al sistema) ─────────────────────────────── */
+.chart-tooltip {
+  position: absolute;
+  z-index: calc(var(--z-dropdown) + 5);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--text-xs);
+  border: 1px solid color-mix(in oklch, var(--border-strong) 70%, var(--chart-2) 30%);
+  border-radius: var(--radius-md);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out),
+              transform var(--motion-duration-fast) var(--motion-ease-out);
+  white-space: nowrap;
+  box-shadow: 0 6px 16px color-mix(in oklch, var(--chart-2) 22%, transparent);
+}
+.chart-tooltip.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.chart-tooltip__label { color: var(--muted); margin-bottom: 2px; }
+.chart-tooltip__value {
+  font-weight: var(--weight-heading);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+/* Tooltip Recharts — mismo look, sin position absolute del tooltip SVG */
+.chart-tooltip--recharts {
+  position: static;
+  opacity: 1;
+  transform: none;
+  pointer-events: none;
+  white-space: normal;
+  min-width: 7rem;
+}
+.chart-tooltip__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.chart-tooltip__series {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-ui);
+}
+
+/* ── Recharts battery (wrappers @slep/ui) ─────────────────────────────── */
+.chart-recharts {
+  width: 100%;
+  height: 100%;
+  min-height: 12rem;
+  position: relative;
+}
+.chart-recharts .recharts-responsive-container {
+  width: 100% !important;
+  height: 100% !important;
+}
+.chart-recharts .recharts-cartesian-axis-tick-value tspan,
+.chart-recharts .recharts-cartesian-axis-tick-value {
+  fill: var(--chart-label);
+  font-size: 10px;
+  font-family: var(--font-body);
+}
+.chart-recharts .recharts-legend-item-text {
+  color: var(--chart-label) !important;
+  font-size: 11px !important;
+  font-family: var(--font-body) !important;
+}
+.chart-recharts .recharts-pie-label-text {
+  fill: var(--chart-label);
+  font-size: 10px;
+  font-family: var(--font-body);
+}
+.chart-recharts .recharts-default-tooltip {
+  display: none;
+}
+
+.chart-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 10rem;
+  padding: var(--space-6);
+  color: var(--muted);
+}
+.chart-state__icon {
+  width: 36px;
+  height: 36px;
+  margin-bottom: var(--space-3);
+  opacity: 0.3;
+  color: var(--muted);
+}
+.chart-state__title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-ui);
+  color: var(--fg);
+  margin-bottom: var(--space-1);
+}
+.chart-state__desc {
+  font-size: var(--text-xs);
+  max-width: 32ch;
+  line-height: var(--leading-normal);
+}
+.chart-state--loading .chart-state__icon {
+  animation: chart-spin 0.8s linear infinite;
+  opacity: 0.45;
+}
+@keyframes chart-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Comparativa antes / después (showcase) ─────────────────────────────── */
+.chart-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+.chart-compare__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.chart-compare__label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heading);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.chart-compare__label--new { color: var(--chart-2); }
+
+/* Estilo legacy v6.0 — para comparación visual en showcase */
+.chart-legacy {
+  --chart-1: oklch(56% 0.11 232);
+  --chart-2: oklch(42% 0.095 248);
+  --chart-3: oklch(50% 0.12 150);
+  --chart-4: oklch(62% 0.12 75);
+  --chart-area-fill: oklch(56% 0.11 232 / 0.18);
+  --chart-grid: oklch(19% 0.015 250 / 0.10);
+}
+.chart-legacy .chart-card {
+  box-shadow: var(--shadow-inset);
+  border-color: var(--border);
+}
+.chart-legacy .chart-card__header {
+  background: var(--surface-raised);
+}
+.chart-legacy .chart-svg__line { stroke-width: 2.5px; }
+.chart-legacy .chart-svg__bar { opacity: 1; }
+.chart-legacy .chart-bars-h__track {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-inset);
+  height: 8px;
+}
+.chart-legacy .chart-tooltip {
+  background: var(--fg);
+  color: var(--surface);
+  border: none;
+  box-shadow: var(--shadow-md);
+}
+.chart-legacy .chart-tooltip__label { color: oklch(90% 0.01 250); }
+
+/* Ajuste v6.3 — comparación de mayor contraste y personalidad */
+.chart-enhanced {
+  --chart-1: var(--chart-1);
+  --chart-2: var(--chart-2);
+  --chart-3: var(--chart-3);
+  --chart-4: var(--chart-4);
+  --chart-5: var(--chart-5);
+  --chart-area-fill: var(--chart-1-soft);
+  --chart-line-width: 2.4px;
+}
+
+/* ── Dashboard compositions ────────────────────────────────────────────── */
+.dashboard-analytics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.dashboard-analytics__kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+}
+.dashboard-analytics__kpis .chart-card { min-height: 0; }
+.dashboard-analytics__main {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-4);
+}
+.dashboard-analytics__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .dashboard-analytics__kpis { grid-template-columns: repeat(2, 1fr); }
+  .dashboard-analytics__main { grid-template-columns: 1fr; }
+  .dashboard-analytics__row { grid-template-columns: 1fr; }
+  .chart-combo { grid-template-columns: 1fr; }
+  .chart-compare { grid-template-columns: 1fr; }
+}
+@media (max-width: 767px) {
+  .dashboard-analytics__kpis { grid-template-columns: 1fr; }
+  .chart-donut { flex-direction: column; align-items: flex-start; }
+  .chart-bars-h__row {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+  .chart-bars-h__value { text-align: left; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-svg__dot,
+  .chart-svg__bar,
+  .chart-bars-h__fill,
+  .chart-donut__segment,
+  .chart-heatmap__cell,
+  .chart-tooltip {
+    transition: none;
+  }
+  .chart-state--loading .chart-state__icon {
+    animation: none;
+  }
+}

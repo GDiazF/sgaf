@@ -1,0 +1,265 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SLEP Iquique — Design Tokens v2.5
+   Dirección: Azul sidebar + celeste acento + neutros fríos
+   Referencia hex: #1E5F8C (azul) · #172D45 (sidebar) · #6EC4E8 (celeste)
+   Fuente única de verdad. Migrar a tailwind.config / globals.css / theme.ts
+   ═══════════════════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+
+:root {
+  /* ── Carbón (texto sobre claro — no sidebar) ───────────────────────────── */
+  --charcoal: oklch(28.8% 0.008 250);
+  --charcoal-fg: oklch(98% 0.004 250);
+
+  /* ── Azul institucional (sidebar + referencia de marca) ──────────────── */
+  --institutional-blue: oklch(42% 0.095 248);       /* #1E5F8C — azul oficial */
+  --institutional-blue-deep: oklch(26.5% 0.048 250); /* #172D45 — fondo sidebar */
+  --institutional-blue-mid: oklch(32% 0.055 250);    /* hover / capas elevadas */
+
+  /* ── Celeste institucional (acento principal — reemplaza verde) ───────── */
+  --institutional-celeste: oklch(78% 0.10 232);      /* #6EC4E8 — tabs, links, barra nav */
+  --institutional-celeste-deep: oklch(56% 0.11 232);  /* #3A94C4 — botones primarios */
+  --institutional-celeste-muted: oklch(78% 0.10 232 / 0.14);
+
+  /* Verde de marca — solo casos puntuales de identidad, no acento UI */
+  --institutional-green: oklch(77.2% 0.19 130);      /* #90d039 — reservado */
+
+  /* ── Neutros fríos (contenido claro — sin beige ni gris SaaS) ─────────── */
+  --bg: oklch(98.2% 0.004 250);
+  --surface: oklch(100% 0 0);
+  --surface-raised: oklch(97.8% 0.006 250);
+  --surface-inset: oklch(96.2% 0.008 250);
+  --fg: oklch(19% 0.015 250);
+  --muted: oklch(46% 0.016 250);
+  --muted-fg: oklch(46% 0.016 250);
+
+  /* ── Acción primaria (celeste profundo — coherente con azul sidebar) ─── */
+  --primary: var(--institutional-celeste-deep);
+  --primary-hover: oklch(50% 0.11 232);
+  --primary-active: oklch(45% 0.10 232);
+  --primary-subtle: var(--institutional-celeste-muted);
+  --primary-border: oklch(56% 0.11 232 / 0.32);
+  --primary-fg: oklch(99% 0.005 250);
+  --primary-text: oklch(44% 0.10 232);
+
+  --accent: var(--institutional-celeste);
+  --accent-hover: oklch(72% 0.10 232);
+  --accent-subtle: var(--institutional-celeste-muted);
+
+  /* ── Colores semánticos (distintos del acento de marca) ──────────────── */
+  --success: oklch(50% 0.12 150);
+  --success-hover: oklch(46% 0.12 150);
+  --success-subtle: oklch(50% 0.12 150 / 0.1);
+  --success-fg: oklch(99% 0 0);
+
+  --warning: oklch(62% 0.12 75);
+  --warning-hover: oklch(56% 0.12 75);
+  --warning-subtle: oklch(62% 0.12 75 / 0.12);
+  --warning-fg: oklch(28% 0.06 75);
+
+  --danger: oklch(48% 0.14 25);
+  --danger-hover: oklch(42% 0.14 25);
+  --danger-subtle: oklch(48% 0.14 25 / 0.1);
+  --danger-fg: oklch(99% 0 0);
+
+  --info: var(--institutional-blue);
+  --info-subtle: oklch(42% 0.095 248 / 0.1);
+
+  /* ── Bordes y separadores (fríos, sutiles) ───────────────────────────── */
+  --border: oklch(92.5% 0.007 250);
+  --border-subtle: oklch(95.5% 0.005 250);
+  --border-strong: oklch(86% 0.010 250);
+  --border-focus: var(--institutional-celeste-deep);
+  --separator: oklch(19% 0.015 250 / 0.06);
+
+  /* ── Topbar (blanco limpio, separado del canvas) ─────────────────────── */
+  --topbar-bg: var(--surface);
+  --topbar-border: var(--border-subtle);
+
+  /* ── Sidebar (azul profundo — celeste solo en acentos activos) ───────── */
+  --sidebar-bg: var(--institutional-blue-deep);
+  --sidebar-fg: oklch(83% 0.028 248);
+  --sidebar-muted: oklch(64% 0.035 248);
+  --sidebar-border: oklch(100% 0.02 250 / 0.08);
+  --sidebar-hover: oklch(100% 0.02 250 / 0.07);
+  --sidebar-active: oklch(100% 0.02 250 / 0.11);
+  --sidebar-active-fg: oklch(99% 0.008 248);
+  --sidebar-accent: var(--institutional-celeste);
+  --sidebar-divider: oklch(100% 0.02 250 / 0.09);
+
+  /* ── Tipografía ───────────────────────────────────────────────────────── */
+  --font-display: 'Source Sans 3', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-body: var(--font-display);
+  --font-mono: 'Cascadia Code', 'Consolas', ui-monospace, Menlo, monospace;
+
+  --text-xs: 0.6875rem;   /* 11px — caption, metadata */
+  --text-sm: 0.75rem;      /* 12px — UI labels, table cells */
+  --text-base: 0.875rem;   /* 14px — body */
+  --text-lg: 1rem;         /* 16px — card titles */
+  --text-xl: 1.125rem;     /* 18px — section headings */
+  --text-2xl: 1.25rem;     /* 20px — page titles */
+
+  --leading-tight: 1.2;
+  --leading-normal: 1.45;
+  --leading-relaxed: 1.55;
+
+  --tracking-tight: -0.015em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+  --tracking-caps: 0.07em;
+
+  --weight-read: 400;
+  --weight-ui: 500;
+  --weight-heading: 600;
+
+  /* ── Spacing (4px base, escala compacta) ──────────────────────────────── */
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* ── Radius (compacto — ERP maduro) ───────────────────────────────────── */
+  --radius-none: 0;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --radius-full: 9999px;
+
+  /* ── Shadows (tinte frío — jerarquía por borde e inset) ───────────────── */
+  --shadow-none: none;
+  --shadow-sm: 0 1px 2px oklch(25% 0.02 250 / 0.04);
+  --shadow-md: 0 2px 6px oklch(25% 0.02 250 / 0.06);
+  --shadow-lg: 0 4px 12px oklch(25% 0.02 250 / 0.08);
+  --shadow-inset: inset 0 1px 0 oklch(100% 0.005 250 / 0.7);
+  --shadow-inset-deep: inset 0 1px 2px oklch(25% 0.02 250 / 0.03);
+  --shadow-focus: 0 0 0 2px var(--primary-subtle);
+
+  /* ── Iconografía ──────────────────────────────────────────────────────── */
+  --icon-xs: 14px;
+  --icon-sm: 16px;
+  --icon-md: 18px;
+  --icon-lg: 20px;
+  --icon-xl: 24px;
+  --icon-stroke: 1.6;
+
+  /* ── Paleta de gráficos v6.3 — institucional con más carácter ────────────
+     Jerarquía: 1-2 series protagonistas, 3-4 soporte, 5-8 acentos analíticos.
+     Incluye verde/amarillo/rojo/rosado institucionalizados (no SaaS genérico). */
+  --chart-1: oklch(56% 0.14 231);           /* celeste principal (serie foco) */
+  --chart-1-soft: oklch(56% 0.14 231 / 0.22);
+  --chart-2: oklch(42% 0.11 248);           /* azul institucional profundo */
+  --chart-2-soft: oklch(42% 0.11 248 / 0.17);
+  --chart-3: oklch(69% 0.10 220);           /* celeste de soporte */
+  --chart-3-soft: oklch(69% 0.10 220 / 0.24);
+  --chart-4: oklch(50% 0.09 266);           /* índigo técnico */
+  --chart-4-soft: oklch(50% 0.09 266 / 0.18);
+  --chart-5: oklch(62% 0.15 156);           /* verde institucional analítico */
+  --chart-5-soft: oklch(62% 0.15 156 / 0.16);
+  --chart-6: oklch(76% 0.16 90);            /* amarillo/ámbar analítico */
+  --chart-6-soft: oklch(76% 0.16 90 / 0.18);
+  --chart-7: oklch(60% 0.17 18);            /* rojo institucional para alertas de serie */
+  --chart-7-soft: oklch(60% 0.17 18 / 0.16);
+  --chart-8: oklch(63% 0.16 345);           /* rosado institucional para breakdown */
+  --chart-8-soft: oklch(63% 0.16 345 / 0.16);
+  --chart-axis: oklch(44% 0.016 250);
+  --chart-grid: oklch(19% 0.015 250 / 0.11);
+  --chart-label: oklch(52% 0.014 250);
+  --chart-surface: var(--surface);
+  --chart-area-fill: var(--chart-1-soft);
+  --chart-line-width: 2.4px;
+  --chart-dot-r: 4px;
+  --chart-bar-radius: 3px;
+  /* Tendencias KPI — sí semántico */
+  --chart-positive: var(--success);
+  --chart-negative: var(--danger);
+  --chart-neutral: var(--muted);
+
+  /* ── Calendario de reservas — recurso vs estado (v2.4) ───────────────────
+     Paleta propia por recurso — saturada, amigable, claramente distinguible.
+     Agendada = fondo sólido del recurso · Pendiente = mismo matiz muy claro.
+     Bloqueado = neutro gris — estado independiente del recurso.              */
+  --res-radius: 6px;
+  --res-today-bg: oklch(48% 0.12 248);
+  --res-today-fg: oklch(99% 0.005 250);
+  /* Bloqueo / colación — colores muestreados de la ref. */
+  --res-status-blocked-bg: #fffbeb;
+  --res-status-blocked-stripe: #fde68a;
+  --res-status-blocked-border: #fbbf24;
+  --res-status-blocked-fg: #b45309;
+  /* Coposa — lavanda pastel (sala principal) v2.5 */
+  --resource-coposa: oklch(82% 0.10 285);
+  --resource-coposa-pending: oklch(96% 0.04 285);
+  --resource-coposa-on: oklch(32% 0.06 285);
+  /* Esmeralda — verde menta pastel (sala secundaria) v2.5 */
+  --resource-esmeralda: oklch(84% 0.09 158);
+  --resource-esmeralda-pending: oklch(96% 0.035 158);
+  --resource-esmeralda-on: oklch(30% 0.05 158);
+  /* Camioneta 29 — melocotón pastel (vehículo) v2.5 */
+  --resource-camioneta29: oklch(86% 0.10 48);
+  --resource-camioneta29-pending: oklch(96% 0.04 48);
+  --resource-camioneta29-on: oklch(32% 0.06 48);
+
+  /* ── Motion system (v6.0) ─────────────────────────────────────────────── */
+  --motion-duration-instant: 80ms;
+  --motion-duration-fast: 140ms;
+  --motion-duration-normal: 240ms;
+  --motion-duration-slow: 320ms;
+  --motion-duration-emphasis: 380ms;
+  --motion-duration-sidebar: 320ms;
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-sidebar: cubic-bezier(0.25, 0.8, 0.25, 1);
+  --motion-distance-sm: 4px;
+  --motion-distance-md: 10px;
+  --motion-distance-lg: 18px;
+
+  /* ── Estados interactivos ─────────────────────────────────────────────── */
+  --transition-fast: var(--motion-duration-instant) var(--motion-ease-out);
+  --transition: var(--motion-duration-fast) var(--motion-ease-out);
+  --transition-slow: var(--motion-duration-normal) var(--motion-ease-out);
+
+  --opacity-disabled: 0.45;
+  --opacity-muted: 0.6;
+
+  --ring-width: 2px;
+  --ring-color: var(--primary-subtle);
+  --ring-offset: 1px;
+
+  /* ── Altura de controles (inputs, selects, botones alineados) ─────────── */
+  --control-height-sm: 2rem;      /* 32px — toolbars densas */
+  --control-height-md: 2.25rem;   /* 36px — default formularios y filtros */
+  --control-height-lg: 2.5rem;    /* 40px — acciones destacadas */
+
+  /* ── Layout ───────────────────────────────────────────────────────────── */
+  --sidebar-width: 248px;
+  --sidebar-width-collapsed: 60px;
+  --drawer-width: 280px;
+  --sidebar-rail-item-height: 40px;
+  --sidebar-brand-height: 52px;
+  --topbar-height: 52px;
+  --topbar-control-size: 1.75rem; /* 28px — avatar + campana */
+  --topbar-control-icon: 1.125rem; /* 18px — ícono campana */
+  --notif-panel-width: 22.5rem; /* 360px — independiente del tamaño de la campana */
+  --widget-width: 320px;
+  --content-max: 1440px;
+
+  /* ── Breakpoints (referencia — usar en @media) ───────────────────────── */
+  --bp-desktop: 1024px;
+  --bp-tablet-max: 1023px;
+  --bp-mobile-max: 767px;
+
+  /* ── Z-index ──────────────────────────────────────────────────────────── */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+}

@@ -1,480 +1,465 @@
-import React, { useState, useEffect } from 'react';
-import BaseModal from '../common/BaseModal';
-import { Info } from 'lucide-react';
-import DateInput from '../common/DateInput';
-import MultiSearchableSelect from '../common/MultiSearchableSelect';
-import FormInput from '../common/FormInput';
-import FormSelect from '../common/FormSelect';
-import MonthInput from '../common/MonthInput';
+import React, { useState, useEffect } from 'react'
+import MultiSearchableSelect from '../common/MultiSearchableSelect'
+import {
+  Modal,
+  Button,
+  Field,
+  Input,
+  Select,
+  Textarea,
+  Switch,
+  Alert,
+  Icon,
+  CurrencyInput,
+  useFormOverlay,
+  formatApiFormError,
+} from '@slep/ui'
 
-const RC_INPUT_CLASS =
-    'no-global !w-full !h-10 !min-h-10 !text-[10px] !font-bold !bg-white !border !border-slate-200 !px-3 !py-0 !rounded-xl !outline-none focus:!border-blue-500 uppercase !transition-all !shadow-sm placeholder:!text-slate-300';
+const ContractReceptionModal = ({
+  open,
+  onClose,
+  onSave,
+  contract,
+  lookups = {},
+  editingRC = null,
+}) => {
+  const {
+    establishments = [],
+    deliveryTypes = [],
+    establishmentTypes = [],
+    groups = [],
+  } = lookups
 
-const RC_SELECT_CLASS =
-    "no-global !w-full !h-10 !min-h-10 !text-[10px] !font-black uppercase tracking-widest !px-3 !py-0 !rounded-xl !border !border-slate-200 !outline-none cursor-pointer appearance-none !bg-white !text-slate-700 focus:!border-blue-500 !shadow-sm bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M7%209l3%203%203-3%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1rem_1rem] bg-[right_0.5rem_center] bg-no-repeat";
+  const buildInitial = () => ({
+    cdp: contract?.cdp || '',
+    nro_factura: '',
+    nro_oc: contract?.tipo_oc === 'UNICA' ? contract?.nro_oc || '' : '',
+    fecha_recepcion: new Date().toISOString().split('T')[0],
+    descripcion: contract?.descripcion || '',
+    periodo: '',
+    proveedor:
+      contract?.proveedores_asociados?.length === 1
+        ? contract.proveedores_asociados[0].proveedor
+        : '',
+    establecimientos: contract?.establecimientos || [],
+    tipo_entrega: '',
+    total_neto: '',
+    iva: '',
+    total_pagar: '',
+    grupo_firmante: '',
+    firmante: '',
+    folio: '',
+  })
 
-const RC_LABEL_CLASS =
-    '!block !text-[10px] !font-black !text-slate-500 !uppercase !tracking-widest !mb-1.5 !ml-1';
+  const [formData, setFormData] = useState(buildInitial)
+  const [isSplit, setIsSplit] = useState(false)
+  const overlay = useFormOverlay()
 
-const BULK_BUTTON_CLASS =
-    'h-9 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-100 border border-transparent transition-colors';
+  useEffect(() => {
+    if (!open || !contract) return
+    overlay.reset()
+    if (editingRC) {
+      setIsSplit(false)
+      setFormData({
+        ...editingRC,
+        periodo: editingRC.periodo ? editingRC.periodo.substring(0, 7) : '',
+        tipo_entrega: editingRC.tipo_entrega?.id || editingRC.tipo_entrega,
+        grupo_firmante: editingRC.grupo_firmante?.id || editingRC.grupo_firmante,
+        firmante: editingRC.firmante?.id || editingRC.firmante,
+        establecimientos: editingRC.establecimientos?.map((e) => e.id || e) || [],
+        folio: editingRC.folio || '',
+      })
+    } else {
+      setIsSplit(false)
+      setFormData(buildInitial())
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset solo al abrir
+  }, [open, contract, editingRC])
 
-const SectionHeader = ({ number, title }) => (
-    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2">
-        {number}. {title}
-    </h4>
-);
+  const allowedEstablishmentIds = formData.proveedor
+    ? contract?.proveedores_asociados?.find(
+        (p) => p.proveedor.toString() === formData.proveedor.toString(),
+      )?.establecimientos || []
+    : []
 
-const ContractReceptionModal = ({ isOpen, onClose, onSave, contract, lookups, editingRC = null }) => {
-    const { establishments, deliveryTypes, establishmentTypes } = lookups;
+  const filteredEstablishments =
+    formData.proveedor && allowedEstablishmentIds.length > 0
+      ? establishments.filter((e) => allowedEstablishmentIds.includes(e.id))
+      : establishments
 
-    const initialData = {
-        cdp: contract?.cdp || '',
-        nro_factura: '',
-        nro_oc: contract?.tipo_oc === 'UNICA' ? (contract?.nro_oc || '') : '',
-        fecha_recepcion: new Date().toISOString().split('T')[0],
-        descripcion: contract?.descripcion || '',
-        periodo: '',
-        proveedor: contract?.proveedores_asociados?.length === 1 ? contract.proveedores_asociados[0].proveedor : '',
-        establecimientos: contract?.establecimientos || [],
-        tipo_entrega: '',
-        total_neto: '',
-        iva: '',
-        total_pagar: '',
-        grupo_firmante: '',
-        firmante: '',
-        folio: ''
-    };
+  const handleBulkSelect = (type) => {
+    let selectedIds = []
+    if (type === 'ALL') {
+      selectedIds = filteredEstablishments.map((e) => e.id)
+    } else if (type === 'CLEAR') {
+      selectedIds = []
+    } else {
+      const typesInArea = establishmentTypes
+        .filter((t) => t.area_gestion === type)
+        .map((t) => t.id)
+      selectedIds = filteredEstablishments
+        .filter((e) => typesInArea.includes(e.tipo))
+        .map((e) => e.id)
+    }
+    setFormData((prev) => ({ ...prev, establecimientos: selectedIds }))
+  }
 
-    const [formData, setFormData] = useState(initialData);
-    const [isSplit, setIsSplit] = useState(false);
+  const getSmartGlosa = () => {
+    if (!formData.establecimientos?.length) return ''
+    const count = formData.establecimientos.length
+    if (count === establishments.length && count > 5) {
+      return '\n- TOTALIDAD DE ESTABLECIMIENTOS'
+    }
+    const selectedSet = new Set(formData.establecimientos)
+    const areaTotals = {}
+    const areaCounts = {}
+    establishmentTypes.forEach((t) => {
+      const area = t.area_gestion || 'ESTABLECIMIENTO'
+      areaTotals[area] =
+        (areaTotals[area] || 0) + establishments.filter((e) => e.tipo === t.id).length
+      areaCounts[area] =
+        (areaCounts[area] || 0) +
+        establishments.filter((e) => e.tipo === t.id && selectedSet.has(e.id)).length
+    })
+    if (count > 5) {
+      if (
+        areaCounts.ESTABLECIMIENTO === areaTotals.ESTABLECIMIENTO &&
+        count === areaCounts.ESTABLECIMIENTO
+      ) {
+        return '\n- TOTALIDAD DE ESTABLECIMIENTOS (ESCUELAS/LICEOS)'
+      }
+      if (areaCounts.JARDIN === areaTotals.JARDIN && count === areaCounts.JARDIN) {
+        return '\n- TOTALIDAD DE JARDINES INFANTILES VTF'
+      }
+      if (areaCounts.OFICINA === areaTotals.OFICINA && count === areaCounts.OFICINA) {
+        return '\n- OFICINA CENTRAL ADM.'
+      }
+    }
+    const names = formData.establecimientos
+      .map((estId) => establishments.find((e) => e.id === estId)?.nombre)
+      .filter(Boolean)
+    return names.length > 0 ? `\n- ${names.join('\n- ')}` : ''
+  }
 
-    useEffect(() => {
-        if (isOpen && contract) {
-            if (editingRC) {
-                setIsSplit(false);
-                setFormData({
-                    ...editingRC,
-                    periodo: editingRC.periodo ? editingRC.periodo.substring(0, 7) : '',
-                    // Ensure IDs are used for selects if incoming data has objects
-                    tipo_entrega: editingRC.tipo_entrega?.id || editingRC.tipo_entrega,
-                    grupo_firmante: editingRC.grupo_firmante?.id || editingRC.grupo_firmante,
-                    firmante: editingRC.firmante?.id || editingRC.firmante,
-                    establecimientos: editingRC.establecimientos?.map(e => e.id || e) || [],
-                    folio: editingRC.folio || ''
-                });
-            } else {
-                setIsSplit(false);
-                setFormData({
-                    ...initialData,
-                    cdp: contract.cdp || '',
-                    nro_oc: contract.tipo_oc === 'UNICA' ? (contract.nro_oc || '') : '',
-                    descripcion: contract.descripcion,
-                    proveedor: contract.proveedores_asociados?.length === 1 ? contract.proveedores_asociados[0].proveedor : '',
-                    establecimientos: contract.establecimientos || []
-                });
-            }
-        }
-    }, [isOpen, contract, editingRC]);
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      await overlay.run(
+        async () => {
+          const finalData = { ...formData }
+          if (finalData.periodo && finalData.periodo.length === 7) {
+            finalData.periodo = `${finalData.periodo}-01`
+          } else if (!finalData.periodo) {
+            finalData.periodo = null
+          }
+          if (!finalData.establecimientos) finalData.establecimientos = []
+          await onSave(finalData, isSplit)
+        },
+        {
+          successDescription: editingRC
+            ? 'Recepción actualizada.'
+            : 'Recepción registrada.',
+          formatError: (err) => formatApiFormError(err),
+        },
+      )
+    } catch {
+      // El error se muestra en FormOverlay
+    }
+  }
 
-    // Filter establishments based on selected provider
-    const allowedEstablishmentIds = formData.proveedor 
-        ? contract?.proveedores_asociados?.find(p => p.proveedor.toString() === formData.proveedor.toString())?.establecimientos || []
-        : [];
-        
-    const filteredEstablishments = formData.proveedor && allowedEstablishmentIds.length > 0
-        ? establishments.filter(e => allowedEstablishmentIds.includes(e.id))
-        : establishments;
+  const handleOverlayDismiss = () => {
+    if (overlay.status === 'success') {
+      overlay.reset()
+      onClose({ saved: true })
+      return
+    }
+    overlay.dismiss()
+  }
 
-    const handleBulkSelect = (type) => {
-        let selectedIds = [];
-        if (type === 'ALL') {
-            selectedIds = filteredEstablishments.map(e => e.id);
-        } else if (type === 'CLEAR') {
-            selectedIds = [];
-        } else {
-            // New dynamic logic: type is the 'area_gestion'
-            // 1. Get IDs of TipoEstablecimiento that belong to this area
-            const typesInArea = establishmentTypes
-                .filter(t => t.area_gestion === type)
-                .map(t => t.id);
+  const handleClose = () => {
+    if (overlay.busy) return
+    overlay.reset()
+    onClose()
+  }
 
-            // 2. Select establishments belonging to those types from the filtered list
-            selectedIds = filteredEstablishments
-                .filter(e => typesInArea.includes(e.tipo))
-                .map(e => e.id);
-        }
-        setFormData(prev => ({ ...prev, establecimientos: selectedIds }));
-    };
+  const selectedGroup = groups.find(
+    (g) => g.id.toString() === formData.grupo_firmante?.toString(),
+  )
 
-    const getSmartGlosa = () => {
-        if (!formData.establecimientos || formData.establecimientos.length === 0) return "";
+  const periodoLabel = (() => {
+    if (!formData.periodo) return ''
+    const [year, month] = formData.periodo.split('-')
+    const date = new Date(year, month - 1, 1)
+    return ` - ${date.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' }).toUpperCase()}`
+  })()
 
-        const count = formData.establecimientos.length;
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      size="lg"
+      title={editingRC ? 'Editar recepción' : 'Registrar recepción'}
+      subheader={`Contrato ${contract?.codigo_mercado_publico || ''}`}
+      {...overlay.modalProps}
+      onOverlayDismiss={handleOverlayDismiss}
+      footer={
+        <>
+          <Button variant="ghost" type="button" onClick={handleClose} disabled={overlay.busy}>
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            type="submit"
+            form="rc-form"
+            loading={overlay.busy}
+            disabled={overlay.busy || overlay.active}
+          >
+            {editingRC ? 'Actualizar' : 'Guardar'}
+          </Button>
+        </>
+      }
+    >
+      <form id="rc-form" className="crud-form" onSubmit={handleSubmit}>
+        <p className="contracts-section-title">1. Facturación</p>
+        <div className="form-grid">
+          <Field label="Folio RC" htmlFor="rc-folio">
+            <Input
+              id="rc-folio"
+              value={formData.folio || ''}
+              onChange={(e) => setFormData({ ...formData, folio: e.target.value })}
+            />
+          </Field>
+          <Field label="Nº CDP" required htmlFor="rc-cdp">
+            <Input
+              id="rc-cdp"
+              required
+              value={formData.cdp || ''}
+              onChange={(e) => setFormData({ ...formData, cdp: e.target.value })}
+            />
+          </Field>
+          <Field label="Nº Factura" htmlFor="rc-fac">
+            <Input
+              id="rc-fac"
+              value={formData.nro_factura || ''}
+              onChange={(e) => setFormData({ ...formData, nro_factura: e.target.value })}
+            />
+          </Field>
+          <Field label="Nº Orden de compra" htmlFor="rc-oc">
+            <Input
+              id="rc-oc"
+              value={formData.nro_oc || ''}
+              readOnly={contract?.tipo_oc === 'UNICA' && !!contract?.nro_oc}
+              onChange={(e) => setFormData({ ...formData, nro_oc: e.target.value })}
+            />
+          </Field>
+        </div>
 
-        // If all are selected, use summary
-        if (count === establishments.length && count > 5) {
-            return "\n- TOTALIDAD DE ESTABLECIMIENTOS";
-        }
+        <p className="contracts-section-title">2. Proveedor y destino</p>
+        <div className="form-grid">
+          <Field label="Proveedor" required htmlFor="rc-prov" className="field--full">
+            <Select
+              id="rc-prov"
+              required
+              value={formData.proveedor || ''}
+              onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
+            >
+              <option value="">Seleccione…</option>
+              {(contract?.proveedores_asociados || []).map((p) => (
+                <option key={p.proveedor} value={p.proveedor}>
+                  {p.proveedor_nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <div className="field field--full">
+            <MultiSearchableSelect
+              label="Establecimientos de destino"
+              options={filteredEstablishments.map((e) => ({
+                value: e.id,
+                label: e.nombre,
+              }))}
+              value={formData.establecimientos || []}
+              onChange={(val) => setFormData({ ...formData, establecimientos: val })}
+              placeholder="Seleccione uno o muchos…"
+            />
+          </div>
+        </div>
+        <div className="contracts-bulk">
+          <Button type="button" variant="outline" size="sm" onClick={() => handleBulkSelect('ALL')}>
+            Todos
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleBulkSelect('ESTABLECIMIENTO')}
+          >
+            Establecimientos
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleBulkSelect('JARDIN')}
+          >
+            Jardines VTF
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleBulkSelect('OFICINA')}
+          >
+            Oficina Central
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => handleBulkSelect('CLEAR')}>
+            Limpiar
+          </Button>
+        </div>
+        {!editingRC && formData.establecimientos?.length > 1 ? (
+          <div className="field field--full" style={{ marginTop: '0.75rem' }}>
+            <Switch
+              id="rc-split"
+              label={`Generar recepciones individuales (${formData.establecimientos.length} RCs)`}
+              checked={isSplit}
+              onChange={(e) => setIsSplit(e.target.checked)}
+            />
+          </div>
+        ) : null}
 
-        const selectedSet = new Set(formData.establecimientos);
-        const areaTotals = {};
-        const areaCounts = {};
+        <p className="contracts-section-title">3. Cronología</p>
+        <div className="form-grid form-grid--3">
+          <Field label="Fecha recepción" required htmlFor="rc-fr">
+            <Input
+              id="rc-fr"
+              type="date"
+              required
+              value={formData.fecha_recepcion || ''}
+              onChange={(e) =>
+                setFormData({ ...formData, fecha_recepcion: e.target.value })
+              }
+            />
+          </Field>
+          <Field label="Periodo de cobro" htmlFor="rc-periodo">
+            <Input
+              id="rc-periodo"
+              type="month"
+              value={formData.periodo || ''}
+              onChange={(e) => setFormData({ ...formData, periodo: e.target.value })}
+            />
+          </Field>
+          <Field label="Tipo de entrega" required htmlFor="rc-te">
+            <Select
+              id="rc-te"
+              required
+              value={formData.tipo_entrega || ''}
+              onChange={(e) => setFormData({ ...formData, tipo_entrega: e.target.value })}
+            >
+              <option value="">Seleccione…</option>
+              {deliveryTypes.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
 
-        establishmentTypes.forEach(t => {
-            const area = t.area_gestion || 'ESTABLECIMIENTO';
-            areaTotals[area] = (areaTotals[area] || 0) + establishments.filter(e => e.tipo === t.id).length;
-            areaCounts[area] = (areaCounts[area] || 0) + establishments.filter(e => e.tipo === t.id && selectedSet.has(e.id)).length;
-        });
+        <p className="contracts-section-title">4. Finanzas</p>
+        <div className="form-grid">
+          <Field label="Concepto / glosa" required htmlFor="rc-desc" className="field--full">
+            <Textarea
+              id="rc-desc"
+              required
+              rows={3}
+              value={formData.descripcion || ''}
+              onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+            />
+          </Field>
+          <div className="field field--full">
+            <Alert variant="info" title="Vista previa glosa (PDF)">
+              <pre className="contracts-glosa-preview">
+                {(formData.descripcion || '') + periodoLabel + getSmartGlosa()}
+              </pre>
+            </Alert>
+          </div>
+        </div>
+        <div className="form-grid form-grid--3">
+          <Field label="Monto neto" required htmlFor="rc-neto">
+            <CurrencyInput
+              id="rc-neto"
+              required
+              value={formData.total_neto ?? ''}
+              onChange={(val) => setFormData({ ...formData, total_neto: val })}
+            />
+          </Field>
+          <Field label="IVA" required htmlFor="rc-iva">
+            <CurrencyInput
+              id="rc-iva"
+              required
+              value={formData.iva ?? ''}
+              onChange={(val) => setFormData({ ...formData, iva: val })}
+            />
+          </Field>
+          <Field label="Total a pagar" required htmlFor="rc-total">
+            <CurrencyInput
+              id="rc-total"
+              required
+              value={formData.total_pagar ?? ''}
+              onChange={(val) => setFormData({ ...formData, total_pagar: val })}
+            />
+          </Field>
+        </div>
 
-        // Summary labels for full areas if more than 5
-        if (count > 5) {
-            if (areaCounts['ESTABLECIMIENTO'] === areaTotals['ESTABLECIMIENTO'] && count === areaCounts['ESTABLECIMIENTO'])
-                return "\n- TOTALIDAD DE ESTABLECIMIENTOS (ESCUELAS/LICEOS)";
-            if (areaCounts['JARDIN'] === areaTotals['JARDIN'] && count === areaCounts['JARDIN'])
-                return "\n- TOTALIDAD DE JARDINES INFANTILES VTF";
-            if (areaCounts['OFICINA'] === areaTotals['OFICINA'] && count === areaCounts['OFICINA'])
-                return "\n- OFICINA CENTRAL ADM.";
-        }
+        <p className="contracts-section-title">5. Firmante</p>
+        <div className="form-grid">
+          <Field label="Grupo de firmantes" htmlFor="rc-grp">
+            <Select
+              id="rc-grp"
+              value={formData.grupo_firmante || ''}
+              onChange={(e) => {
+                const gid = e.target.value
+                const grp = groups.find((g) => g.id.toString() === gid)
+                setFormData((prev) => ({
+                  ...prev,
+                  grupo_firmante: gid,
+                  firmante: grp ? grp.jefe || '' : '',
+                }))
+              }}
+            >
+              <option value="">Seleccione…</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Funcionario firmante" htmlFor="rc-firm">
+            <Select
+              id="rc-firm"
+              value={formData.firmante || ''}
+              disabled={!formData.grupo_firmante}
+              onChange={(e) => setFormData({ ...formData, firmante: e.target.value })}
+            >
+              <option value="">Seleccione…</option>
+              {(selectedGroup?.miembros_detalle || []).map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nombre}
+                  {m.id === selectedGroup?.jefe ? ' (Jefe)' : ''}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
 
-        // Default to vertical list
-        const names = formData.establecimientos
-            .map(id => establishments.find(e => e.id === id)?.nombre)
-            .filter(Boolean);
+        <p className="contracts-empty-hint" style={{ marginTop: '1rem' }}>
+          <Icon name="info" size="sm" /> Esta recepción quedará vinculada permanentemente
+          al contrato.
+        </p>
+      </form>
+    </Modal>
+  )
+}
 
-        return names.length > 0 ? "\n- " + names.join('\n- ') : "";
-    };
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleSelectChange = (name, value) => {
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleFormSave = () => {
-        // Prepare data for backend: periodo must be a full date (YYYY-MM-DD) or null
-        const finalData = { ...formData };
-        if (finalData.periodo && finalData.periodo.length === 7) {
-            finalData.periodo = `${finalData.periodo}-01`;
-        } else if (!finalData.periodo) {
-            finalData.periodo = null;
-        }
-
-        // Ensure establecimientos is at least an empty array if empty
-        if (!finalData.establecimientos) {
-            finalData.establecimientos = [];
-        }
-
-        onSave(finalData, isSplit);
-    };
-
-    return (
-        <BaseModal
-            isOpen={isOpen}
-            onClose={onClose}
-            onSave={handleFormSave}
-            title={editingRC ? "Editar Recepción de Contrato" : "Registrar Recepción de Contrato"}
-            subtitle={`Proceso: ${contract?.codigo_mercado_publico}`}
-            maxWidth="max-w-3xl"
-            saveLabel={editingRC ? "Actualizar Recepción" : "Guardar Recepción"}
-        >
-            <div className="space-y-10 px-1 py-2">
-                {/* Section 1: Identificación del Documento */}
-                <div className="space-y-5">
-                    <SectionHeader number="1" title="Detalles de Facturación" />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                        <FormInput
-                            label="Folio RC"
-                            name="folio"
-                            placeholder="Opcional (Manual)..."
-                            value={formData.folio}
-                            onChange={handleChange}
-                            labelClassName={RC_LABEL_CLASS}
-                            inputClassName={`${RC_INPUT_CLASS} font-mono`}
-                        />
-                        <FormInput
-                            label="Nº CDP"
-                            name="cdp"
-                            required
-                            placeholder="Certificado..."
-                            value={formData.cdp}
-                            onChange={handleChange}
-                            labelClassName={RC_LABEL_CLASS}
-                            inputClassName={RC_INPUT_CLASS}
-                        />
-                        <FormInput
-                            label="Nº Factura"
-                            name="nro_factura"
-                            placeholder="Folio..."
-                            value={formData.nro_factura}
-                            onChange={handleChange}
-                            labelClassName={RC_LABEL_CLASS}
-                            inputClassName={RC_INPUT_CLASS}
-                        />
-                        <FormInput
-                            label="Nº Orden de Compra"
-                            name="nro_oc"
-                            placeholder={contract?.tipo_oc === 'MULTIPLE' ? "Individual para esta RC..." : "Autocompletado..."}
-                            value={formData.nro_oc}
-                            onChange={handleChange}
-                            readOnly={contract?.tipo_oc === 'UNICA' && !!contract?.nro_oc}
-                            labelClassName={RC_LABEL_CLASS}
-                            inputClassName={`${RC_INPUT_CLASS} ${contract?.tipo_oc === 'UNICA' && contract?.nro_oc ? "!bg-slate-100/50" : ""}`}
-                        />
-                    </div>
-                </div>
-
-                {/* Section 2: Actores Involucrados */}
-                <div className="space-y-5">
-                    <SectionHeader number="2" title="Proveedor y Destino" />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <FormSelect
-                            label="Proveedor (Vinculado)"
-                            name="proveedor"
-                            value={formData.proveedor || ''}
-                            onChange={handleChange}
-                            required
-                            placeholder="Seleccione el proveedor..."
-                            options={(contract?.proveedores_asociados || []).map(p => ({ value: p.proveedor, label: p.proveedor_nombre }))}
-                            labelClassName={RC_LABEL_CLASS}
-                            inputClassName={RC_SELECT_CLASS}
-                        />
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
-                                    Establecimientos de Destino
-                                </label>
-                                <MultiSearchableSelect
-                                    options={filteredEstablishments.map(e => ({ value: e.id, label: e.nombre }))}
-                                    value={formData.establecimientos || []}
-                                    onChange={(val) => handleSelectChange('establecimientos', val)}
-                                    placeholder="Seleccione uno o muchos..."
-                                />
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => handleBulkSelect('ALL')}
-                                    className={BULK_BUTTON_CLASS}
-                                >
-                                    Todos
-                                </button>
-
-                            {/* Dynamic Buttons by Area */}
-                            {[
-                                { key: 'ESTABLECIMIENTO', label: 'Establecimientos' },
-                                { key: 'JARDIN', label: 'Jardines VTF' },
-                                { key: 'OFICINA', label: 'Oficina Central' }
-                            ].map(area => (
-                                <button
-                                    key={area.key}
-                                    type="button"
-                                    onClick={() => handleBulkSelect(area.key)}
-                                    className={BULK_BUTTON_CLASS}
-                                >
-                                    {area.label}
-                                </button>
-                            ))}
-
-                            <button
-                                type="button"
-                                onClick={() => handleBulkSelect('CLEAR')}
-                                className="h-9 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest text-rose-600 hover:bg-rose-50 transition-colors ml-auto"
-                            >
-                                Limpiar
-                            </button>
-                        </div>
-                    </div>
-
-                        {/* Split Option Checkbox */}
-                        {!editingRC && formData.establecimientos?.length > 1 && (
-                            <div className="md:col-span-2 mt-2">
-                                <label className="flex items-start gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-                                    <input
-                                        type="checkbox"
-                                        checked={isSplit}
-                                        onChange={(e) => setIsSplit(e.target.checked)}
-                                        className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-                                    />
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">
-                                            Generar recepciones individuales por establecimiento ({formData.establecimientos.length} RCs separadas)
-                                        </span>
-                                        <span className="text-[10px] font-medium text-slate-500 mt-1 uppercase tracking-tighter">
-                                            Si se especifica un folio manual (ej. RCI-01), este se incrementará automáticamente (ej. RCI-02, RCI-03) por cada registro generado.
-                                        </span>
-                                    </div>
-                                </label>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Section 3: Tiempos y Entrega */}
-                <div className="space-y-5">
-                    <SectionHeader number="3" title="Cronología y Entrega" />
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="space-y-2">
-                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
-                                Fecha Recepción
-                            </label>
-                            <DateInput
-                                value={formData.fecha_recepcion}
-                                onChange={(val) => handleSelectChange('fecha_recepcion', val)}
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
-                                Periodo de Cobro
-                            </label>
-                            <MonthInput
-                                name="periodo"
-                                value={formData.periodo || ''}
-                                onChange={(val) => handleSelectChange('periodo', val)}
-                            />
-                        </div>
-                        <FormSelect
-                            label="Tipo de Entrega"
-                            name="tipo_entrega"
-                            value={formData.tipo_entrega}
-                            onChange={handleChange}
-                            required
-                            placeholder="Seleccione..."
-                            options={deliveryTypes.map(t => ({ value: t.id, label: t.nombre }))}
-                            labelClassName={RC_LABEL_CLASS}
-                            inputClassName={RC_SELECT_CLASS}
-                        />
-                    </div>
-                </div>
-
-                {/* Section 4: Detalle y Costos */}
-                <div className="space-y-5">
-                    <SectionHeader number="4" title="Contenido y Finanzas" />
-                    <div className="space-y-4">
-                        <div className="space-y-3">
-                            <FormInput
-                                label="Concepto / Glosa Base"
-                                name="descripcion"
-                                value={formData.descripcion || ''}
-                                onChange={handleChange}
-                                required
-                                placeholder="Ej: Servicios de transporte..."
-                                labelClassName={RC_LABEL_CLASS}
-                                inputClassName={RC_INPUT_CLASS}
-                            />
-
-                            {/* Preview of the final combined description */}
-                            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-                                <span className="text-xs font-bold text-slate-700 block">Vista Previa Glosa Final (PDF)</span>
-                                <p className="text-xs text-slate-500 leading-relaxed italic whitespace-pre-line">
-                                    {formData.descripcion || ''}
-                                    {formData.periodo && (() => {
-                                        const [year, month] = formData.periodo.split('-');
-                                        const date = new Date(year, month - 1, 1);
-                                        return ` - ${date.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' }).toUpperCase()}`;
-                                    })()}
-                                    {getSmartGlosa()}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormInput
-                                    type="number"
-                                    label="Monto Neto ($)"
-                                    name="total_neto"
-                                    value={formData.total_neto}
-                                    onChange={handleChange}
-                                    required
-                                    placeholder="0"
-                                    labelClassName={RC_LABEL_CLASS}
-                                    inputClassName={RC_INPUT_CLASS}
-                                />
-                                <FormInput
-                                    type="number"
-                                    label="IVA ($)"
-                                    name="iva"
-                                    value={formData.iva}
-                                    onChange={handleChange}
-                                    required
-                                    placeholder="0"
-                                    labelClassName={RC_LABEL_CLASS}
-                                    inputClassName={RC_INPUT_CLASS}
-                                />
-                            </div>
-                            <div className="flex justify-start">
-                                <div className="w-full md:w-1/2">
-                                    <FormInput
-                                        type="number"
-                                        label="Total a Pagar ($)"
-                                        name="total_pagar"
-                                        value={formData.total_pagar}
-                                        onChange={handleChange}
-                                        required
-                                        placeholder="0"
-                                        labelClassName={RC_LABEL_CLASS}
-                                        inputClassName={RC_INPUT_CLASS}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Section 5: Aprobación */}
-                <div className="space-y-5">
-                    <SectionHeader number="5" title="Firmante de la RC" />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <FormSelect
-                            label="Grupo de Firmantes"
-                            name="grupo_firmante"
-                            value={formData.grupo_firmante || ''}
-                            onChange={(e) => {
-                                const gid = e.target.value;
-                                const grp = lookups.groups?.find(g => g.id.toString() === gid);
-                                setFormData(prev => ({
-                                    ...prev,
-                                    grupo_firmante: gid,
-                                    firmante: grp ? (grp.jefe || '') : ''
-                                }));
-                            }}
-                            placeholder="Seleccione grupo..."
-                            options={lookups.groups?.map(g => ({ value: g.id, label: g.nombre }))}
-                            labelClassName={RC_LABEL_CLASS}
-                            inputClassName={RC_SELECT_CLASS}
-                        />
-                        <FormSelect
-                            label="Funcionario Firmante"
-                            name="firmante"
-                            value={formData.firmante || ''}
-                            onChange={handleChange}
-                            disabled={!formData.grupo_firmante}
-                            placeholder="Seleccione funcionario..."
-                            options={lookups.groups?.find(g => g.id.toString() === formData.grupo_firmante?.toString())?.miembros_detalle?.map(m => ({
-                                value: m.id,
-                                label: `${m.nombre} ${m.id === lookups.groups?.find(g => g.id.toString() === formData.grupo_firmante.toString())?.jefe ? '(Jefe)' : ''}`
-                            })) || []}
-                            labelClassName={RC_LABEL_CLASS}
-                            inputClassName={RC_SELECT_CLASS}
-                        />
-                    </div>
-                </div>
-
-                {/* Info Box */}
-                <div className="flex items-center gap-2.5 text-slate-400 mt-2 pb-2">
-                    <Info className="w-4 h-4" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">
-                        Nota: Esta recepción quedará vinculada permanentemente al contrato.
-                    </span>
-                </div>
-            </div>
-        </BaseModal>
-    );
-};
-
-export default ContractReceptionModal;
+export default ContractReceptionModal

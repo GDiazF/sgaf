@@ -149,6 +149,17 @@ class AvatarUploadView(APIView):
             'avatar': avatar_url
         })
 
+    def delete(self, request):
+        user = request.user
+        if hasattr(user, 'profile') and user.profile.avatar:
+            user.profile.avatar.delete(save=False)
+            user.profile.avatar = None
+            user.profile.save()
+        return Response({
+            'message': 'Avatar eliminado correctamente.',
+            'avatar': None,
+        })
+
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -610,7 +621,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             if action == '0':
                 queryset = queryset.filter(action__icontains='CREACION')
             elif action == '1':
-                queryset = queryset.filter(Q(action__icontains='MODIFICACION') | Q(action__icontains='ACCESO'))
+                queryset = queryset.filter(action__icontains='MODIFICACION')
             elif action == '2':
                 queryset = queryset.filter(action__icontains='ELIMINACION')
 

@@ -1,259 +1,462 @@
-import React, { useState, useEffect } from 'react';
-import { Edit3, Power, Search, Plus, Trash2, Users } from 'lucide-react';
-import api from '../../api';
-import { usePermission } from '../../hooks/usePermission';
-import FuncionarioModal from '../../components/funcionarios/FuncionarioModal';
-import Pagination from '../../components/common/Pagination';
-import FuncionariosPageHeader from './shared/FuncionariosPageHeader';
-import { TableLoading, TableEmpty } from './shared/FuncionariosTableStates';
+import React, { useState, useEffect, useMemo, useRef } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import api from '../../api'
+import { usePermission } from '../../hooks/usePermission'
+import { useNotify } from '../../hooks/useNotify'
+import useDebouncedValue from '../../hooks/useDebouncedValue'
+import FuncionarioModal from '../../components/funcionarios/FuncionarioModal'
 import {
-    PAGE_LAYOUT, TABLE_PANEL, INPUT_FILTER, SELECT_FILTER, THEAD_TR, TH, TD, TD_MAIN,
-    BTN_ICON_EDIT, BTN_ICON_DELETE, statusBadgeClass,
-} from './shared/funcionariosUi';
+  PageHeader,
+  FiltersBar,
+  DataTable,
+  Badge,
+  Button,
+  Field,
+  Input,
+  Select,
+  Icon,
+  ConfirmModal,
+  MetricStrip,
+} from '@slep/ui'
+
+const ORG_LINKS = [
+  { to: '/funcionarios/subdirecciones', label: 'Subdirecciones' },
+  { to: '/funcionarios/departamentos', label: 'Departamentos' },
+  { to: '/funcionarios/unidades', label: 'Unidades' },
+  { to: '/funcionarios/grupos', label: 'Grupos' },
+]
 
 const FuncionariosList = () => {
-    const { can } = usePermission();
-    const [funcionarios, setFuncionarios] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterEstado, setFilterEstado] = useState('all');
-    const [filterSubdireccion, setFilterSubdireccion] = useState('');
-    const [subdirecciones, setSubdirecciones] = useState([]);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
-    const [totalPages, setTotalPages] = useState(1);
-    const [totalResults, setTotalResults] = useState(0);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedId, setSelectedId] = useState(null);
+  const navigate = useNavigate()
+  const { can } = usePermission()
+  const canAdd = can('funcionarios.add_funcionario')
+  const canChange = can('funcionarios.change_funcionario')
+  const canDelete = can('funcionarios.delete_funcionario')
+  const { notify } = useNotify()
 
-    useEffect(() => {
-        fetchSubdirecciones();
-        fetchData(1);
-    }, []);
+  const [funcionarios, setFuncionarios] = useState([])
+  const [stats, setStats] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterEstado, setFilterEstado] = useState('all')
+  const [filterSubdireccion, setFilterSubdireccion] = useState('')
+  const [subdirecciones, setSubdirecciones] = useState([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [totalResults, setTotalResults] = useState(0)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedId, setSelectedId] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [orgMenuOpen, setOrgMenuOpen] = useState(false)
+  const orgMenuRef = useRef(null)
 
-    const fetchSubdirecciones = async () => {
-        try {
-            const response = await api.get('subdirecciones/', { params: { nopaginate: true } });
-            setSubdirecciones(Array.isArray(response.data) ? response.data : (response.data.results || []));
-        } catch (error) {
-            console.error('Error fetching subdirecciones:', error);
-        }
-    };
+  const debouncedSearch = useDebouncedValue(searchTerm)
 
-    const fetchData = async (page = 1, search = searchTerm, estado = filterEstado, sub = filterSubdireccion, size = pageSize) => {
-        setLoading(true);
-        try {
-            const params = { page, page_size: size, ordering: 'nombre_funcionario' };
-            if (search) params.search = search;
-            if (estado !== 'all') params.estado = estado === 'activo';
-            if (sub) params.subdireccion = sub;
+  useEffect(() => {
+    fetchSubdirecciones()
+    fetchStats()
+  }, [])
 
-            const response = await api.get('funcionarios/', { params });
-            if (response.data.results) {
-                setFuncionarios(response.data.results);
-                setTotalPages(Math.ceil(response.data.count / size));
-                setTotalResults(response.data.count);
-            } else {
-                setFuncionarios(response.data);
-                setTotalPages(1);
-                setTotalResults(response.data.length);
-            }
-            setCurrentPage(page);
-        } catch (error) {
-            console.error('Error fetching data:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+  useEffect(() => {
+    if (!orgMenuOpen) return undefined
+    const onDocClick = (e) => {
+      if (orgMenuRef.current && !orgMenuRef.current.contains(e.target)) {
+        setOrgMenuOpen(false)
+      }
+    }
+    const onKey = (e) => {
+      if (e.key === 'Escape') setOrgMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [orgMenuOpen])
 
-    const handleSearch = (e) => {
-        const value = e.target.value;
-        setSearchTerm(value);
-        fetchData(1, value, filterEstado, filterSubdireccion);
-    };
+  useEffect(() => {
+    fetchData(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, filterEstado, filterSubdireccion, pageSize])
 
-    const handleFilterEstado = (e) => {
-        const value = e.target.value;
-        setFilterEstado(value);
-        fetchData(1, searchTerm, value, filterSubdireccion);
-    };
+  const fetchStats = async () => {
+    try {
+      const response = await api.get('funcionarios/estadisticas/')
+      setStats(response.data)
+    } catch (error) {
+      console.error('Error fetching stats:', error)
+    }
+  }
 
-    const handleFilterSubdireccion = (e) => {
-        const value = e.target.value;
-        setFilterSubdireccion(value);
-        fetchData(1, searchTerm, filterEstado, value);
-    };
+  const fetchSubdirecciones = async () => {
+    try {
+      const response = await api.get('subdirecciones/', { params: { nopaginate: true } })
+      setSubdirecciones(
+        Array.isArray(response.data) ? response.data : response.data.results || [],
+      )
+    } catch (error) {
+      console.error('Error fetching subdirecciones:', error)
+    }
+  }
 
-    const handleToggleEstado = async (id) => {
-        try {
-            await api.post(`funcionarios/${id}/toggle_estado/`);
-            fetchData(currentPage);
-        } catch (error) {
-            console.error('Error toggling estado:', error);
-            alert('Error al cambiar estado');
-        }
-    };
+  const fetchData = async (page = currentPage) => {
+    setLoading(true)
+    try {
+      const params = {
+        page,
+        page_size: pageSize,
+        ordering: 'nombre_funcionario',
+      }
+      if (debouncedSearch) params.search = debouncedSearch
+      if (filterEstado !== 'all') params.estado = filterEstado === 'activo'
+      if (filterSubdireccion) params.subdireccion = filterSubdireccion
 
-    const handleCreate = () => {
-        setSelectedId(null);
-        setIsModalOpen(true);
-    };
+      const response = await api.get('funcionarios/', { params })
+      if (response.data.results) {
+        setFuncionarios(response.data.results)
+        setTotalResults(response.data.count || 0)
+      } else {
+        setFuncionarios(response.data || [])
+        setTotalResults(response.data?.length || 0)
+      }
+      setCurrentPage(page)
+    } catch (error) {
+      console.error('Error fetching data:', error)
+      setFuncionarios([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    const handleEdit = (id) => {
-        setSelectedId(id);
-        setIsModalOpen(true);
-    };
+  const clearFilters = () => {
+    setSearchTerm('')
+    setFilterEstado('all')
+    setFilterSubdireccion('')
+    setCurrentPage(1)
+  }
 
-    const handleDelete = async (id) => {
-        if (!window.confirm('¿Estás seguro de eliminar este funcionario? Esta acción no se puede deshacer.')) return;
-        try {
-            await api.delete(`funcionarios/${id}/`);
-            fetchData(currentPage);
-        } catch (error) {
-            console.error('Error deleting funcionario:', error);
-            alert('Error al eliminar funcionario. Podría estar vinculado a otros registros.');
-        }
-    };
+  const handleCreate = () => {
+    setSelectedId(null)
+    setIsModalOpen(true)
+  }
 
-    return (
-        <div className={PAGE_LAYOUT}>
-            <FuncionariosPageHeader
-                title="Funcionarios"
-                titleIcon={Users}
-                subtitle={`Directorio de personal · ${totalResults} registros`}
-                actionLabel="Nuevo funcionario"
-                actionIcon={Plus}
-                onAction={handleCreate}
-                showAction={can('funcionarios.add_funcionario')}
-            />
+  const handleEdit = (id) => {
+    setSelectedId(id)
+    setIsModalOpen(true)
+  }
 
-            <div className={TABLE_PANEL}>
-                <div className="shrink-0 flex flex-col lg:flex-row items-stretch lg:items-center gap-3 p-3 bg-slate-50 border-b border-slate-200">
-                    <div className="relative flex-1 min-w-0">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                        <input
-                            type="text"
-                            placeholder="Buscar por nombre, rut o cargo..."
-                            value={searchTerm}
-                            onChange={handleSearch}
-                            className={INPUT_FILTER}
-                        />
-                    </div>
-                    <select value={filterEstado} onChange={handleFilterEstado} className={`${SELECT_FILTER} w-full sm:w-36`}>
-                        <option value="all">Todos los estados</option>
-                        <option value="activo">Activos</option>
-                        <option value="inactivo">Inactivos</option>
-                    </select>
-                    <select value={filterSubdireccion} onChange={handleFilterSubdireccion} className={`${SELECT_FILTER} w-full sm:w-48`}>
-                        <option value="">Todas las subdirecciones</option>
-                        {subdirecciones.map((sub) => (
-                            <option key={sub.id} value={sub.id}>{sub.nombre}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={pageSize}
-                        onChange={(e) => {
-                            const newSize = Number(e.target.value);
-                            setPageSize(newSize);
-                            fetchData(1, searchTerm, filterEstado, filterSubdireccion, newSize);
-                        }}
-                        className={`${SELECT_FILTER} w-20 shrink-0`}
-                    >
-                        <option value={10}>10</option>
-                        <option value={20}>20</option>
-                        <option value={50}>50</option>
-                        <option value={100}>100</option>
-                    </select>
-                </div>
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`funcionarios/${deleteTarget.id}/`)
+      setDeleteTarget(null)
+      notify({ variant: 'success', text: 'Funcionario eliminado.' })
+      await fetchData(currentPage)
+      fetchStats()
+    } catch (error) {
+      console.error('Error deleting funcionario:', error)
+      notify({ variant: 'danger', text: 'Error al eliminar el funcionario.' })
+    } finally {
+      setDeleting(false)
+    }
+  }
 
-                <div className="overflow-auto flex-1 bg-white custom-scrollbar">
-                    {loading ? (
-                        <TableLoading />
-                    ) : funcionarios.length === 0 ? (
-                        <TableEmpty />
-                    ) : (
-                        <table className="w-full text-left border-collapse border-spacing-0 min-w-[1200px]">
-                            <thead className="sticky top-0 z-10">
-                                <tr className={THEAD_TR}>
-                                    <th className={`${TH} w-28`}>Estado</th>
-                                    <th className={TH}>Nombre</th>
-                                    <th className={`${TH} w-28`}>RUT</th>
-                                    <th className={`${TH} text-center w-20`}>Anexo</th>
-                                    <th className={`${TH} text-center w-24`}>Tel. público</th>
-                                    <th className={TH}>Subdirección</th>
-                                    <th className={TH}>Departamento</th>
-                                    <th className={TH}>Cargo</th>
-                                    <th className={`${TH} text-center w-24 border-r-0`}>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {funcionarios.map((item) => (
-                                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className={TD}>
-                                            <button type="button" onClick={() => handleToggleEstado(item.id)} className={statusBadgeClass(item.estado)}>
-                                                <Power className="w-3 h-3 shrink-0" />
-                                                {item.estado ? 'Activo' : 'Inactivo'}
-                                            </button>
-                                        </td>
-                                        <td className={TD_MAIN}>
-                                            <span className="line-clamp-2 block">{item.nombre_funcionario}</span>
-                                        </td>
-                                        <td className={TD}>{item.rut || '—'}</td>
-                                        <td className={`${TD} text-center`}>{item.anexo || '—'}</td>
-                                        <td className={`${TD} text-center`}>{item.numero_publico || '—'}</td>
-                                        <td className={TD}>
-                                            <span className="line-clamp-2 block">{item.subdireccion_nombre || '—'}</span>
-                                        </td>
-                                        <td className={TD}>
-                                            <span className="line-clamp-2 block">{item.departamento_nombre || '—'}</span>
-                                        </td>
-                                        <td className={TD}>
-                                            <span className="line-clamp-2 block">{item.cargo || '—'}</span>
-                                        </td>
-                                        <td className="px-4 py-3 align-middle text-center">
-                                            <div className="flex items-center justify-center gap-1">
-                                                {can('funcionarios.change_funcionario') && (
-                                                    <button type="button" onClick={() => handleEdit(item.id)} className={BTN_ICON_EDIT} title="Editar">
-                                                        <Edit3 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                                {can('funcionarios.delete_funcionario') && (
-                                                    <button type="button" onClick={() => handleDelete(item.id)} className={BTN_ICON_DELETE} title="Eliminar">
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
+  const handleToggleEstado = async (id) => {
+    try {
+      await api.post(`funcionarios/${id}/toggle_estado/`)
+      fetchData(currentPage)
+      fetchStats()
+    } catch (error) {
+      console.error('Error toggling estado:', error)
+    }
+  }
 
-                {!loading && (
-                    <div className="p-3 bg-slate-50 border-t border-slate-200 shrink-0 flex flex-col sm:flex-row items-center justify-between gap-3">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                            Mostrando {funcionarios.length} de {totalResults}
-                        </span>
-                        <Pagination
-                            currentPage={currentPage}
-                            totalPages={totalPages}
-                            onPageChange={(page) => fetchData(page)}
-                            totalCount={totalResults}
-                        />
-                    </div>
-                )}
+  const metrics = [
+    { label: 'Nómina total', value: stats?.total ?? totalResults ?? 0 },
+    { label: 'Activos', value: stats?.activos ?? '—' },
+    { label: 'Inactivos', value: stats?.inactivos ?? '—' },
+    { label: 'Subdirecciones', value: stats?.subdirecciones ?? '—' },
+  ]
+
+  const columns = useMemo(
+    () => [
+      {
+        key: 'estado',
+        header: 'Estado',
+        className: 'col--status',
+        cardRole: 'status',
+        priority: 1,
+        render: (item) =>
+          canChange ? (
+            <button
+              type="button"
+              className="badge-toggle"
+              aria-label={item.estado ? 'Marcar inactivo' : 'Marcar activo'}
+              onClick={() => handleToggleEstado(item.id)}
+            >
+              <Badge variant={item.estado ? 'success' : 'neutral'} dot>
+                {item.estado ? 'Activo' : 'Inactivo'}
+              </Badge>
+            </button>
+          ) : (
+            <Badge variant={item.estado ? 'success' : 'neutral'} dot>
+              {item.estado ? 'Activo' : 'Inactivo'}
+            </Badge>
+          ),
+      },
+      {
+        key: 'nombre_funcionario',
+        header: 'Nombre',
+        className: 'col--primary',
+        cardRole: 'title',
+        priority: 1,
+      },
+      {
+        key: 'rut',
+        header: 'RUT',
+        className: 'col--secondary mono',
+        cardRole: 'subtitle',
+        priority: 1,
+        render: (item) => <span className="mono">{item.rut || '—'}</span>,
+      },
+      {
+        key: 'anexo',
+        header: 'Anexo',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 2,
+        render: (item) => item.anexo || '—',
+      },
+      {
+        key: 'numero_publico',
+        header: 'Tel. público',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 2,
+        render: (item) => item.numero_publico || '—',
+      },
+      {
+        key: 'subdireccion_nombre',
+        header: 'Subdirección',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 2,
+        render: (item) => item.subdireccion_nombre || '—',
+      },
+      {
+        key: 'departamento_nombre',
+        header: 'Departamento',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 2,
+        render: (item) => item.departamento_nombre || '—',
+      },
+      {
+        key: 'cargo',
+        header: 'Cargo',
+        cardRole: 'field',
+        priority: 2,
+        render: (item) => item.cargo || '—',
+      },
+      {
+        key: 'actions',
+        header: 'Acciones',
+        className: 'col--actions',
+        render: (item) => (
+          <div className="data-table__actions">
+            {canChange ? (
+              <Button variant="outline" size="sm" onClick={() => handleEdit(item.id)}>
+                Editar
+              </Button>
+            ) : null}
+            {canDelete ? (
+              <Button variant="danger" size="sm" onClick={() => setDeleteTarget(item)}>
+                Eliminar
+              </Button>
+            ) : null}
+          </div>
+        ),
+      },
+    ],
+    [canChange, canDelete],
+  )
+
+  return (
+    <div className="page" data-od-id="funcionarios-list-page">
+      <PageHeader
+        icon="funcionarios"
+        title="Funcionarios"
+        description="Directorio de personal del servicio"
+        breadcrumbs={[{ label: 'Operaciones' }, { label: 'Funcionarios' }]}
+        linkComponent={Link}
+        split
+        actions={
+          <>
+            <div
+              ref={orgMenuRef}
+              className={`dropdown${orgMenuOpen ? ' is-open' : ''}`}
+            >
+              <Button
+                variant="secondary"
+                size="sm"
+                type="button"
+                aria-expanded={orgMenuOpen}
+                aria-haspopup="menu"
+                onClick={() => setOrgMenuOpen((v) => !v)}
+              >
+                Organización
+                <Icon name="chevron" size={14} />
+              </Button>
+              <div className="dropdown__menu" role="menu" aria-label="Mantenedores de organización">
+                {ORG_LINKS.map((item) => (
+                  <button
+                    key={item.to}
+                    type="button"
+                    role="menuitem"
+                    className="dropdown__item"
+                    onClick={() => {
+                      setOrgMenuOpen(false)
+                      navigate(item.to)
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
+            {canAdd ? (
+              <Button variant="primary" size="sm" onClick={handleCreate}>
+                <Icon name="plus" size="sm" /> Nuevo funcionario
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
-            <FuncionarioModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSave={() => fetchData(currentPage)}
-                funcionarioId={selectedId}
+      <MetricStrip items={metrics} />
+
+      <FiltersBar
+        onSearch={() => setCurrentPage(1)}
+        onClear={clearFilters}
+        advanced={
+          <>
+            <Field label="Estado" htmlFor="func-estado">
+              <Select
+                id="func-estado"
+                value={filterEstado}
+                onChange={(e) => {
+                  setFilterEstado(e.target.value)
+                  setCurrentPage(1)
+                }}
+              >
+                <option value="all">Todos los estados</option>
+                <option value="activo">Activos</option>
+                <option value="inactivo">Inactivos</option>
+              </Select>
+            </Field>
+            <Field label="Subdirección" htmlFor="func-sub">
+              <Select
+                id="func-sub"
+                value={filterSubdireccion}
+                onChange={(e) => {
+                  setFilterSubdireccion(e.target.value)
+                  setCurrentPage(1)
+                }}
+              >
+                <option value="">Todas las subdirecciones</option>
+                {subdirecciones.map((sub) => (
+                  <option key={sub.id} value={sub.id}>
+                    {sub.nombre}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </>
+        }
+      >
+        <Field label="Buscar" htmlFor="func-q">
+          <div className="input-wrap">
+            <Icon name="search" className="input-wrap__icon" size="sm" />
+            <Input
+              id="func-q"
+              type="search"
+              placeholder="Nombre, RUT o cargo…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
-        </div>
-    );
-};
+          </div>
+        </Field>
+      </FiltersBar>
 
-export default FuncionariosList;
+      <DataTable
+        columns={columns}
+        rows={funcionarios}
+        loading={loading}
+        totalCount={totalResults}
+        emptyTitle="Sin funcionarios"
+        emptyDescription="No hay registros con los filtros actuales."
+        emptyAction={
+          <Button variant="quiet" onClick={clearFilters}>
+            Limpiar filtros
+          </Button>
+        }
+        page={currentPage}
+        pageSize={pageSize}
+        pageSizeId="func-page-size"
+        onPageChange={(page) => fetchData(page)}
+        onPageSizeChange={(n) => {
+          setPageSize(n)
+          setCurrentPage(1)
+        }}
+        mobileCardActions={(item) => ({
+          primary: canChange
+            ? { label: 'Editar', onClick: () => handleEdit(item.id) }
+            : undefined,
+          secondary: canDelete
+            ? { label: 'Eliminar', onClick: () => setDeleteTarget(item) }
+            : undefined,
+        })}
+        toolbar={
+          <div className="table-toolbar__left">
+            <span className="table-toolbar__title">Listado</span>
+            <Badge variant="neutral">{totalResults} registros</Badge>
+          </div>
+        }
+      />
+
+      <FuncionarioModal
+        isOpen={isModalOpen}
+        onClose={(result) => {
+          setIsModalOpen(false)
+          if (result?.saved) {
+            fetchData(currentPage)
+            fetchStats()
+          }
+        }}
+        funcionarioId={selectedId}
+      />
+
+      <ConfirmModal
+        open={Boolean(deleteTarget)}
+        onClose={() => {
+          if (!deleting) setDeleteTarget(null)
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Eliminar funcionario"
+        description={
+          deleteTarget
+            ? `¿Eliminar a «${deleteTarget.nombre_funcionario}»? Esta acción no se puede deshacer.`
+            : '¿Eliminar este funcionario?'
+        }
+        confirmLabel={deleting ? 'Eliminando…' : 'Eliminar'}
+        cancelLabel="Cancelar"
+        danger
+      />
+    </div>
+  )
+}
+
+export default FuncionariosList
