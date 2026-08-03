@@ -1,0 +1,19 @@
+# Keep frontend Docker build context lean (context = repo root)
+.git
+.gitignore
+**/node_modules
+**/dist
+**/__pycache__
+**/*.pyc
+.env
+.env.*
+backend
+media
+staticfiles
+docker/postgres_data
+docs
+*.md
+.cursor
+.vscode
+agent-transcripts
+mcps
