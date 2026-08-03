@@ -8,6 +8,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   plugins: [react()],
   resolve: {
+    // design-system se resuelve por alias a fuentes fuera de frontend/;
+    // sin dedupe, el build (p. ej. Docker) no encuentra react desde /design-system.
+    dedupe: ['react', 'react-dom', 'react-router-dom', 'recharts', 'clsx'],
     alias: [
       {
         find: /^@slep\/ui$/,

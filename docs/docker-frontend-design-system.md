@@ -62,6 +62,16 @@ Estructura dentro del stage de build (igual que en local):
   frontend/
 ```
 
+### Resolución de `react` y peers (`vite.config.js`)
+
+Vite alias `@slep/ui` al código fuente en `../design-system/src/`. Esas fuentes importan `react`, `react-dom`, etc. En Docker, `design-system` no tiene su propio `node_modules`, así que Rollup fallaría con:
+
+```text
+Rollup failed to resolve import "react" from "/app/design-system/src/hooks/..."
+```
+
+Por eso `frontend/vite.config.js` usa `resolve.dedupe` para forzar que esas dependencias se resuelvan desde `frontend/node_modules` (una sola copia de React, válida en local y en Docker).
+
 ### `.dockerignore`
 
 Como el contexto es la raíz del repo, `.dockerignore` en la raíz excluye lo innecesario (backend, `node_modules`, media, datos de Postgres, etc.) para no inflar el contexto de build.
@@ -87,5 +97,6 @@ docker compose up -d --build
 ## Qué no cambiar sin cuidado
 
 - No volver el contexto a `./frontend` sin otra forma de incluir `design-system` (por ejemplo multi-context o empaquetar `@slep/ui` de otra manera).
+- No quitar `resolve.dedupe` de `vite.config.js` sin instalar deps de `design-system` en el Dockerfile (o el build Docker vuelve a fallar al resolver `react`).
 - No mover `design-system/` en el repo sin actualizar: `package.json` (`file:`), alias de Vite, import de CSS en `main.jsx` y el Dockerfile.
 - El backend sigue con `context: ./backend`; su build no depende del design system.
