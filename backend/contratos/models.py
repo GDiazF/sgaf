@@ -212,6 +212,7 @@ class TipoServicioOperativo(models.Model):
     class Meta:
         verbose_name = "Tipo de Servicio Operativo"
         verbose_name_plural = "Tipos de Servicios Operativos"
+        ordering = ['nombre']
 
 class ServicioContrato(models.Model):
     contrato = models.ForeignKey(Contrato, on_delete=models.CASCADE, related_name='servicios_operativos')
@@ -224,6 +225,7 @@ class ServicioContrato(models.Model):
     class Meta:
         verbose_name = "Servicio de Contrato"
         verbose_name_plural = "Servicios de Contrato"
+        ordering = ['nombre', 'id']
 
 class RutaTransporte(models.Model):
     servicio = models.ForeignKey(ServicioContrato, related_name='rutas', on_delete=models.CASCADE)

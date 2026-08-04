@@ -14,7 +14,7 @@ from .serializers import (
 from rest_framework.permissions import IsAuthenticated, DjangoModelPermissions
 
 class CuentaSMTPViewSet(viewsets.ModelViewSet):
-    queryset = CuentaSMTP.objects.all()
+    queryset = CuentaSMTP.objects.all().order_by('nombre')
     serializer_class = CuentaSMTPSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions]
 
@@ -38,7 +38,7 @@ class CuentaSMTPViewSet(viewsets.ModelViewSet):
             return Response({'error': f'Falló la conexión: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
 class PlantillaCorreoViewSet(viewsets.ModelViewSet):
-    queryset = PlantillaCorreo.objects.all()
+    queryset = PlantillaCorreo.objects.all().order_by('proposito')
     serializer_class = PlantillaCorreoSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions]
 
@@ -116,6 +116,6 @@ class PlantillaCorreoViewSet(viewsets.ModelViewSet):
 
 
 class DestinatariosCorreoOperativoViewSet(viewsets.ModelViewSet):
-    queryset = DestinatariosCorreoOperativo.objects.prefetch_related('grupos', 'usuarios').all()
+    queryset = DestinatariosCorreoOperativo.objects.prefetch_related('grupos', 'usuarios').all().order_by('proposito')
     serializer_class = DestinatariosCorreoOperativoSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions]

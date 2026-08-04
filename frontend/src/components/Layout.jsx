@@ -8,6 +8,7 @@ import {
   NotificationBell,
   Button,
   Modal,
+  Alert,
   Icon,
   Dropdown,
   DropdownMenu,
@@ -300,39 +301,94 @@ const Layout = () => {
         <Modal
           open
           onClose={() => {}}
-          title="Tratamiento y Protección de Datos Personales"
+          showClose={false}
+          size="lg"
+          title="Tratamiento y Protección de sus Datos Personales"
+          subheader="Servicio Local de Educación Pública (SLEP) Iquique"
+          className="terms-consent-modal"
           footer={
-            <Button
-              variant="primary"
-              disabled={!termsAcceptedCheckbox || acceptLoading}
-              onClick={async () => {
-                setAcceptLoading(true)
-                try {
-                  await api.post('auth/me/aceptar-terminos/')
-                  await checkUserStatus()
-                } catch (err) {
-                  console.error(err)
-                } finally {
-                  setAcceptLoading(false)
-                }
-              }}
-            >
-              {acceptLoading ? 'Guardando…' : 'Entendido, Aceptar y Continuar'}
-            </Button>
+            <div className="terms-consent__footer">
+              <label className="terms-consent__check check">
+                <input
+                  type="checkbox"
+                  className="no-global"
+                  checked={termsAcceptedCheckbox}
+                  onChange={(e) => setTermsAcceptedCheckbox(e.target.checked)}
+                />
+                <span>
+                  <span className="terms-consent__check-title">Declaro estar informado</span>
+                  <span className="terms-consent__check-desc">
+                    Confirmo que he leído y comprendo cómo se tratan mis datos y las medidas de
+                    seguridad del SGAF en cumplimiento con la Ley N° 21.719.
+                  </span>
+                </span>
+              </label>
+              <Button
+                variant="primary"
+                disabled={!termsAcceptedCheckbox || acceptLoading}
+                onClick={async () => {
+                  setAcceptLoading(true)
+                  try {
+                    await api.post('auth/me/aceptar-terminos/')
+                    await checkUserStatus()
+                  } catch (err) {
+                    console.error(err)
+                  } finally {
+                    setAcceptLoading(false)
+                  }
+                }}
+              >
+                {acceptLoading ? 'Guardando…' : 'Entendido, Aceptar y Continuar'}
+              </Button>
+            </div>
           }
         >
-          <p style={{ marginBottom: 12 }}>
-            En conformidad a la Ley N° 21.719, informamos el tratamiento de datos personales en SGAF
-            antes de continuar.
-          </p>
-          <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                                <input
-                                    type="checkbox"
-                                    checked={termsAcceptedCheckbox}
-                                    onChange={(e) => setTermsAcceptedCheckbox(e.target.checked)}
-                                />
-            <span>Declaro estar informado sobre el tratamiento de mis datos.</span>
-                            </label>
+          <div className="terms-consent">
+            <Alert variant="info" title="Importante">
+              En conformidad a la <strong>Ley N° 21.719</strong> sobre Protección de Datos
+              Personales en Chile (Diario Oficial, 13-Dic-2024), requerimos informarle de manera
+              transparente sobre el uso de su información en el sistema SGAF antes de iniciar su
+              sesión.
+            </Alert>
+
+            <section className="terms-consent__section">
+              <h3 className="terms-consent__heading">1. Finalidad y licitud del tratamiento</h3>
+              <p>
+                El SLEP Iquique, en su calidad de órgano de la Administración del Estado, recopila
+                y procesa sus datos personales (RUT, nombre completo, cargo, anexo telefónico,
+                correo institucional) exclusivamente para el cumplimiento de sus funciones legales
+                y administrativas (ej: gestión de reservas, control de activos y préstamos de
+                llaves). Su información no será comunicada ni cedida a terceros no autorizados.
+              </p>
+            </section>
+
+            <section className="terms-consent__section">
+              <h3 className="terms-consent__heading">2. Sus derechos ARCO y bloqueo temporal</h3>
+              <p>
+                Usted goza plenamente de los derechos de Acceso, Rectificación, Supresión,
+                Oposición y Portabilidad. Asimismo, tiene derecho a solicitar el{' '}
+                <strong>Bloqueo Temporal (Art. 8° ter)</strong> de sus datos mientras se tramita
+                una rectificación o supresión. Puede ejercerlos en cualquier momento ingresando a
+                la sección &quot;Mis Datos&quot; de su perfil.
+              </p>
+            </section>
+
+            <section className="terms-consent__section">
+              <h3 className="terms-consent__heading">3. Vía de reclamación</h3>
+              <p>
+                Si estima que el SLEP Iquique ha infringido sus derechos, puede interponer un
+                reclamo de tutela ante la{' '}
+                <strong>Agencia de Protección de Datos Personales (APDP)</strong> de conformidad
+                al Artículo 41° de la ley.
+              </p>
+            </section>
+
+            <p className="terms-consent__note">
+              Para conocer en detalle las medidas de seguridad adoptadas (como el cifrado
+              simétrico robusto de sus claves y MFA), puede leer la Política de Privacidad
+              completa ingresando al pie de página del sistema.
+            </p>
+          </div>
         </Modal>
       )}
 

@@ -39,6 +39,11 @@ class Activo(models.Model):
     codigo_inventario = models.CharField("Código de Inventario", max_length=50, blank=True, help_text="Opcional. Ej: Placa de inventario o S/N")
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE, related_name="activos")
     ubicacion = models.CharField("Ubicación Física", max_length=100, blank=True, help_text="Donde se guarda físicamente")
+
+    class Meta:
+        verbose_name = "Activo"
+        verbose_name_plural = "Activos"
+        ordering = ['nombre', 'id']
     
     def __str__(self):
         return f"[{self.tipo}] {self.nombre} - {self.establecimiento.nombre}"

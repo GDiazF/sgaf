@@ -4,7 +4,7 @@ from .models import Procedimiento, TipoProcedimiento
 from .serializers import ProcedimientoSerializer, TipoProcedimientoSerializer
 
 class TipoProcedimientoViewSet(viewsets.ModelViewSet):
-    queryset = TipoProcedimiento.objects.all()
+    queryset = TipoProcedimiento.objects.all().order_by('nombre')
     serializer_class = TipoProcedimientoSerializer
     permission_classes = [permissions.DjangoModelPermissions]
 

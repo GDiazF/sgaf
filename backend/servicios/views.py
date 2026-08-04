@@ -1169,7 +1169,7 @@ class CDPViewSet(viewsets.ModelViewSet):
     search_fields = ['nombre', 'descripcion']
 
 class TipoEntregaViewSet(viewsets.ModelViewSet):
-    queryset = TipoEntrega.objects.all()
+    queryset = TipoEntrega.objects.all().order_by('nombre')
     serializer_class = TipoEntregaSerializer
 
 class FacturaAdquisicionViewSet(viewsets.ModelViewSet):

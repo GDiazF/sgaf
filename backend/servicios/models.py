@@ -208,6 +208,10 @@ class TipoEntrega(models.Model):
     class Meta:
         verbose_name = "Tipo de Entrega"
         verbose_name_plural = "Tipos de Entrega"
+        ordering = ['nombre']
+
+        ordering = ['nombre']
+        ordering = ['nombre']
 class FacturaAdquisicion(models.Model):
     # Folio field (RCF-YYYY-XXXX)
     folio = models.CharField(max_length=50, unique=True, blank=True, null=True, verbose_name="Folio RC")

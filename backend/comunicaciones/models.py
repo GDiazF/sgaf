@@ -16,6 +16,7 @@ class CuentaSMTP(models.Model):
     class Meta:
         verbose_name = "Cuenta SMTP"
         verbose_name_plural = "Cuentas SMTP"
+        ordering = ['nombre']
 
     def __str__(self):
         return f"{self.nombre} ({self.smtp_user})"
@@ -50,6 +51,7 @@ class PlantillaCorreo(models.Model):
     class Meta:
         verbose_name = "Plantilla de Correo"
         verbose_name_plural = "Plantillas de Correo"
+        ordering = ['proposito']
 
     def __str__(self):
         return f"{self.get_proposito_display()} - {self.nombre}"
@@ -84,6 +86,7 @@ class DestinatariosCorreoOperativo(models.Model):
     class Meta:
         verbose_name = "Destinatarios de Correo Operativo"
         verbose_name_plural = "Destinatarios de Correos Operativos"
+        ordering = ['proposito']
 
     def __str__(self):
         return self.get_proposito_display()
