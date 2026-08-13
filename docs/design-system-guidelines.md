@@ -33,7 +33,7 @@ Una sola capa visual y de componentes. Cualquier módulo, vista, modal o formula
 ```jsx
 import { PageHeader, FiltersBar, DataTable, Button, Field, Input } from '@slep/ui'
 
-<div className="page" data-od-id="mi-modulo-page" data-fill-viewport>
+<div className="page" data-od-id="mi-modulo-page" data-fill-viewport>entonces, 
   <PageHeader
     icon="…"
     title="…"

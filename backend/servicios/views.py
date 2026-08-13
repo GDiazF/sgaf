@@ -12,43 +12,14 @@ from establecimientos.models import Establecimiento
 from .serializers import (
     ProveedorSerializer, TipoDocumentoSerializer, ServicioSerializer, 
     TipoProveedorSerializer, RegistroPagoSerializer, RecepcionConformeSerializer, 
-    CDPSerializer, TipoEntregaSerializer, FacturaAdquisicionSerializer
+    CDPSerializer, TipoEntregaSerializer, FacturaAdquisicionSerializer,
+    CompraAgilSerializer,
 )
 from reportlab.lib.colors import HexColor
 from core.utils.report_utils import get_report_assets
 
 # Sufijo estándar para PDF corporativo en carga masiva: {nro_documento}_CORP.pdf
 PAGO_PDF_CORPORATE_SUFFIX = 'CORP'
-
-# --- Corporate Branding for PDFs ---
-COLOR_VERDE = HexColor('#92D050')
-COLOR_AMARILLO = HexColor('#FFD400')
-COLOR_ROSADO = HexColor('#F68A91')
-COLOR_ROJO = HexColor('#E33E41')
-COLOR_CELESTE = HexColor('#48C1EB')
-COLOR_AZUL = HexColor('#3E7AB7')
-STRIP_COLORS = [COLOR_VERDE, COLOR_AMARILLO, COLOR_ROSADO, COLOR_ROJO, COLOR_CELESTE, COLOR_AZUL]
-
-def draw_color_strips(canvas, doc):
-    """
-    Robustly draws corporate color strips at the very top and bottom of the page.
-    Uses canvas._pagesize to ensure anchoring to physical boundaries regardless of doc setting.
-    """
-    canvas.saveState()
-    page_w, page_h = canvas._pagesize
-    h_strip = 12
-    n = len(STRIP_COLORS)
-    w_seg = page_w / n
-    
-    for i, color in enumerate(STRIP_COLORS):
-        # Top strip
-        canvas.setFillColor(color)
-        canvas.rect(i * w_seg, page_h - h_strip, w_seg, h_strip, stroke=0, fill=1)
-        # Bottom strip
-        canvas.rect(i * w_seg, 0, w_seg, h_strip, stroke=0, fill=1)
-    
-    canvas.restoreState()
-# ----------------------------------
 
 class TipoProveedorViewSet(viewsets.ModelViewSet):
     queryset = TipoProveedor.objects.all()
@@ -1173,335 +1144,125 @@ class TipoEntregaViewSet(viewsets.ModelViewSet):
     serializer_class = TipoEntregaSerializer
 
 class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
-    queryset = FacturaAdquisicion.objects.all()
+    """
+    Facturas sin OC (RCF). Solo filas con contrato=null y modalidad SIN_OC.
+    Compra ágil → /api/compras-agiles/
+    Recepciones de contrato (ROC) → contratos/recepciones-contrato/
+    """
+    queryset = FacturaAdquisicion.objects.filter(
+        contrato__isnull=True,
+        modalidad=FacturaAdquisicion.MODALIDAD_SIN_OC,
+    )
     serializer_class = FacturaAdquisicionSerializer
+    permission_classes = [permissions.DjangoModelPermissions]
     filterset_fields = ['proveedor', 'establecimiento', 'tipo_entrega', 'cdp']
     search_fields = ['descripcion', 'proveedor__nombre', 'id', 'folio', 'cdp', 'total_pagar']
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-        sin_contrato = self.request.query_params.get('sin_contrato')
-        if sin_contrato == 'true':
-            queryset = queryset.filter(contrato__isnull=True)
-        return queryset
+        from servicios.services.factura_sin_oc import FacturaSinOcService
+
+        return FacturaSinOcService.queryset()
+
+    def _reject_contrato(self, data):
+        raw = data.get('contrato')
+        if raw not in (None, '', 'null', 'None'):
+            return Response(
+                {'detail': 'Use la API de recepciones de contrato para vincular un contrato.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return None
+
+    def create(self, request, *args, **kwargs):
+        err = self._reject_contrato(request.data)
+        if err:
+            return err
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        err = self._reject_contrato(request.data)
+        if err:
+            return err
+        return super().update(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        serializer.save(
+            contrato=None,
+            modalidad=FacturaAdquisicion.MODALIDAD_SIN_OC,
+        )
+
+    def perform_update(self, serializer):
+        serializer.save(
+            contrato=None,
+            modalidad=FacturaAdquisicion.MODALIDAD_SIN_OC,
+        )
 
     @action(detail=True, methods=['get'])
     def generate_pdf(self, request, pk=None):
-        import io
-        from django.http import FileResponse
-        from reportlab.lib import colors
-        from reportlab.lib.pagesizes import letter
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import inch, mm
-        from reportlab.lib.enums import TA_CENTER, TA_LEFT
-        from reportlab.lib.colors import HexColor
-        from django.conf import settings
-        from reportlab.lib.utils import ImageReader
-        from django.utils import timezone
-        import os
+        from servicios.pdf import build_rc_adq_pdf
 
-        # Page Size Folio (216x330mm)
-        FOLIO = (216*mm, 330*mm)
+        return build_rc_adq_pdf(self.get_object())
 
-        # Spanish Month Names
-        MESES = {
-            1: "enero", 2: "febrero", 3: "marzo", 4: "abril",
-            5: "mayo", 6: "junio", 7: "julio", 8: "agosto",
-            9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
-        }
 
-        factura = self.get_object()
-        buffer = io.BytesIO()
-        
-        # Margins for content
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=FOLIO,
-            rightMargin=50,
-            leftMargin=50,
-            topMargin=60, # Increased for color strip
-            bottomMargin=60  # Increased for color strip
+class CompraAgilViewSet(viewsets.ModelViewSet):
+    """
+    Recepciones de compra ágil (RCA). Sin contrato, modalidad COMPRA_AGIL, OC obligatoria.
+    """
+    queryset = FacturaAdquisicion.objects.filter(
+        contrato__isnull=True,
+        modalidad=FacturaAdquisicion.MODALIDAD_COMPRA_AGIL,
+    )
+    serializer_class = CompraAgilSerializer
+    permission_classes = [permissions.DjangoModelPermissions]
+    filterset_fields = ['proveedor', 'establecimiento', 'tipo_entrega', 'cdp']
+    search_fields = [
+        'descripcion', 'proveedor__nombre', 'id', 'folio', 'cdp',
+        'total_pagar', 'nro_oc', 'nro_factura',
+    ]
+
+    def get_queryset(self):
+        from servicios.services.compra_agil import CompraAgilService
+
+        return CompraAgilService.queryset()
+
+    def _validate_compra_agil(self, data, instance=None):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from servicios.services.compra_agil import CompraAgilService
+
+        try:
+            CompraAgilService.validate_nro_oc(data.get('nro_oc'), instance=instance)
+        except DjangoValidationError as exc:
+            return Response(
+                exc.message_dict if hasattr(exc, 'message_dict') else {'detail': str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return None
+
+    def create(self, request, *args, **kwargs):
+        err = self._validate_compra_agil(request.data)
+        if err:
+            return err
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        err = self._validate_compra_agil(request.data, instance=self.get_object())
+        if err:
+            return err
+        return super().update(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        serializer.save(
+            contrato=None,
+            modalidad=FacturaAdquisicion.MODALIDAD_COMPRA_AGIL,
         )
 
-        elements = []
-        styles = getSampleStyleSheet()
-
-        # Styles from user snippet
-        title_style = ParagraphStyle(
-            "OCTitle",
-            parent=styles["Heading2"],
-            fontSize=11,
-            textColor=colors.black,
-            alignment=TA_CENTER,
-            spaceAfter=8,
-            fontName='Helvetica-Bold'
+    def perform_update(self, serializer):
+        serializer.save(
+            contrato=None,
+            modalidad=FacturaAdquisicion.MODALIDAD_COMPRA_AGIL,
         )
 
-        section_style = ParagraphStyle(
-            "OCSection",
-            parent=styles["Normal"],
-            fontSize=9,
-            textColor=colors.black,
-            alignment=TA_LEFT,
-            spaceBefore=6,
-            spaceAfter=4,
-            fontName='Helvetica-Bold'
-        )
+    @action(detail=True, methods=['get'])
+    def generate_pdf(self, request, pk=None):
+        from servicios.pdf import build_rc_adq_pdf
 
-        cell_label_style = ParagraphStyle(
-            "OCLabel",
-            parent=styles["Normal"],
-            fontSize=8,
-            textColor=colors.black,
-            alignment=TA_LEFT,
-            leading=10,
-        )
-
-        cell_value_style = ParagraphStyle(
-            "OCValue",
-            parent=styles["Normal"],
-            fontSize=8,
-            textColor=colors.black,
-            alignment=TA_LEFT,
-            leading=10,
-        )
-
-        # Helper for proportional scaling
-        def get_scaled_image(path, max_w, max_h):
-            img_reader = ImageReader(path)
-            iw, ih = img_reader.getSize()
-            aspect = ih / float(iw)
-            w = max_w
-            h = w * aspect
-            if h > max_h:
-                h = max_h
-                w = h / aspect
-            return Image(path, width=w, height=h)
-
-        # Dynamic configuration for Adquisiciones
-        assets = get_report_assets('RC_ADQ')
-        
-        header_data = [[]]
-        
-        # Logo Izquierdo (DEP or dynamic)
-        if assets['logo_izquierdo'] and os.path.exists(assets['logo_izquierdo']):
-            header_data[0].append(get_scaled_image(assets['logo_izquierdo'], 1.8*inch, 0.9*inch))
-        else:
-            header_data[0].append("")
-            
-        header_data[0].append(Paragraph("", styles['Normal']))
-        
-        # Logo Derecho (SLEP or dynamic)
-        if assets['logo_derecho'] and os.path.exists(assets['logo_derecho']):
-            header_data[0].append(get_scaled_image(assets['logo_derecho'], 1.8*inch, 1.2*inch))
-        else:
-            header_data[0].append("")
-
-        header_table = Table(header_data, colWidths=[2.5*inch, 2.2*inch, 2.5*inch])
-        header_table.setStyle(TableStyle([
-            ('ALIGN', (0,0), (0,0), 'LEFT'),
-            ('ALIGN', (2,0), (2,0), 'RIGHT'),
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ]))
-        elements.append(header_table)
-        elements.append(Spacer(1, 15))
-
-        # Folio Table (Right Aligned)
-        folio_label = Paragraph("<b>Folio</b>", cell_label_style)
-        folio_value = Paragraph(f"<b>{factura.folio}</b>", cell_label_style)
-        folio_table = Table([[folio_label, folio_value]], colWidths=[0.8*inch, 1.4*inch])
-        folio_table.setStyle(TableStyle([
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("GRID", (0, 0), (-1, -1), 0.8, colors.black),
-            ("LEFTPADDING", (0, 0), (-1, -1), 6),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ]))
-        
-        folio_wrapper = Table([[ "", folio_table ]], colWidths=[doc.width - 2.2*inch, 2.2*inch])
-        folio_wrapper.setStyle(TableStyle([
-            ("ALIGN", (1, 0), (1, 0), "RIGHT"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ]))
-        elements.append(folio_wrapper)
-        elements.append(Spacer(1, 10))
-
-        # Title
-        acta_table = Table([[Paragraph("ACTA DE RECEPCIÓN CONFORME", title_style)]], colWidths=[doc.width])
-        acta_table.setStyle(TableStyle([
-            ("GRID", (0, 0), (-1, -1), 0.8, colors.black),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ]))
-        elements.append(acta_table)
-        elements.append(Spacer(1, 12))
-
-        # Section: Identificación Producto
-        elements.append(Paragraph("<b>IDENTIFICACIÓN DEL PRODUCTO OR SERVICIO ADQUIRIDO</b>", section_style))
-        fecha_recepcion = factura.fecha_recepcion.strftime("%d-%m-%Y")
-        
-        # Format establishments string
-        establecimientos_str = ", ".join([e.nombre for e in factura.establecimientos.all()])
-        
-        descripcion_final = factura.descripcion or ""
-        period_str = ""
-        if factura.periodo:
-            m_name = MESES.get(factura.periodo.month, "").upper()
-            period_str = f"{m_name} {factura.periodo.year}"
-        
-        if period_str and period_str.lower() not in descripcion_final.lower():
-            if descripcion_final:
-                descripcion_final += f" - {period_str}"
-            else:
-                descripcion_final = period_str
-                
-        if establecimientos_str and establecimientos_str.lower() not in descripcion_final.lower():
-            est_list = [f"- {e.nombre}" for e in factura.establecimientos.all()]
-            vertical_est_str = "<br/>" + "<br/>".join(est_list)
-            
-            if descripcion_final:
-                descripcion_final += vertical_est_str
-            else:
-                descripcion_final = vertical_est_str.replace("<br/>", "", 1) # remove leading br if empty
-
-        nro_oc_final = factura.nro_oc
-        if not nro_oc_final and factura.contrato:
-            nro_oc_final = factura.contrato.nro_oc
-            
-        producto_rows = [
-            ["NÚMERO DE ORDEN DE COMPRA", str(nro_oc_final or "-")],
-            ["NÚMERO DE FACTURA", str(factura.nro_factura or "")],
-            ["NÚMERO DE CERTIFICADO DE PRESUPUESTO", factura.cdp],
-            ["DESCRIPCIÓN DE PRODUCTO O SERVICIO ADQUIRIDO", descripcion_final],
-            ["FECHA DE RECEPCIÓN CONFORME", fecha_recepcion],
-            ["ENTREGA PARCIALIZADA O TOTAL DE PRODUCTO Y/O SERVICIO", str(factura.tipo_entrega)],
-        ]
-        
-        producto_table = Table(
-            [[Paragraph(label, cell_label_style), Paragraph(value, cell_value_style)] for label, value in producto_rows],
-            colWidths=[doc.width * 0.45, doc.width * 0.55]
-        )
-        producto_table.setStyle(TableStyle([
-            ("GRID", (0, 0), (-1, -1), 0.6, colors.black),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ]))
-        elements.append(producto_table)
-        elements.append(Spacer(1, 12))
-
-        # Section: Identificación Proveedor
-        elements.append(Paragraph("<b>IDENTIFICACIÓN DEL PROVEEDOR</b>", section_style))
-        proveedor_rows = [
-            ["NOMBRE O RAZÓN SOCIAL DEL PROVEEDOR", factura.proveedor.nombre],
-            ["ROL ÚNICO TRIBUTARIO (RUT)", factura.proveedor.rut or "-"],
-        ]
-        proveedor_table = Table(
-            [[Paragraph(label, cell_label_style), Paragraph(value, cell_value_style)] for label, value in proveedor_rows],
-            colWidths=[doc.width * 0.45, doc.width * 0.55]
-        )
-        proveedor_table.setStyle(TableStyle([
-            ("GRID", (0, 0), (-1, -1), 0.6, colors.black),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("LEFTPADDING", (0, 0), (-1,-1), 4),
-            ("RIGHTPADDING", (0, 0), (-1,-1), 4),
-            ("TOPPADDING", (0, 0), (-1,-1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1,-1), 4),
-        ]))
-        elements.append(proveedor_table)
-        elements.append(Spacer(1, 12))
-
-        # Section: Pago
-        elements.append(Paragraph("<b>PAGO</b>", section_style))
-        def format_clp(valor):
-            return f"$ {valor:,}".replace(",", ".")
-
-        pago_rows = [
-            ["TOTAL NETO", format_clp(factura.total_neto)],
-            ["IMPUESTOS", format_clp(factura.iva)],
-            ["TOTAL A PAGAR", format_clp(factura.total_pagar)],
-        ]
-        pago_table = Table(
-            [[Paragraph(label, cell_label_style), Paragraph(value, cell_value_style)] for label, value in pago_rows],
-            colWidths=[2.2*inch, 1.8*inch]
-        )
-        pago_table.setStyle(TableStyle([
-            ("GRID", (0, 0), (-1, -1), 0.8, colors.black),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 6),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("ALIGN", (0,0), (-1,-1), "LEFT"),
-        ]))
-        pago_wrapper = Table([[pago_table]], colWidths=[doc.width])
-        pago_wrapper.setStyle(TableStyle([
-            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ]))
-        elements.append(pago_wrapper)
-        elements.append(Spacer(1, 80))
-
-        # Signature Table Styles
-        sig_p_style = ParagraphStyle(
-            'SigText', parent=styles['Normal'], fontSize=8.5, alignment=TA_CENTER, fontName='Helvetica-Bold', leading=10,
-            spaceBefore=0, spaceAfter=0
-        )
-
-        # Signature Box for "FIRMANTE" (Centered)
-        firmante = factura.firmante
-        firmante_details = []
-        if firmante:
-            name = firmante.nombre_funcionario.upper()
-            cargo = firmante.cargo.upper() if firmante.cargo else ""
-            org_unit = ""
-            if firmante.departamento:
-                d_name = firmante.departamento.nombre.upper()
-                org_unit = f"DEPARTAMENTO {d_name}" if "DEPARTAMENTO" not in d_name else d_name
-            elif firmante.subdireccion:
-                s_name = firmante.subdireccion.nombre.upper()
-                org_unit = s_name if "SUBDIRECCIÓN" in s_name else f"SUBDIRECCIÓN {s_name}"
-            else:
-                org_unit = "DIRECCIÓN"
-            
-            cargo_line = f"{cargo} DE {org_unit}" if cargo and org_unit else (cargo or org_unit)
-            
-            firmante_details = [
-                [Spacer(1, 40)],
-                [Paragraph("_________________________________", sig_p_style)],
-                [Paragraph(name, sig_p_style)],
-                [Paragraph(cargo_line, sig_p_style)]
-            ]
-        else:
-            firmante_details = [
-                [Spacer(1, 40)],
-                [Paragraph("_________________________________", sig_p_style)],
-                [Paragraph("FIRMANTE DEL DOCUMENTO", sig_p_style)]
-            ]
-
-        t_right = Table(firmante_details, colWidths=[4*inch])
-        t_right.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'BOTTOM'),
-        ]))
-
-        available_width = doc.width
-        main_sig_table = Table([[t_right]], colWidths=[available_width])
-        main_sig_table.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ]))
-        elements.append(main_sig_table)
-
-        # Factura KEEP color strips as requested in previous design rules (if not specified otherwise)
-        doc.build(elements, onFirstPage=draw_color_strips, onLaterPages=draw_color_strips)
-        buffer.seek(0)
-        return FileResponse(buffer, as_attachment=True, filename=f'{factura.folio}.pdf')
+        return build_rc_adq_pdf(self.get_object())

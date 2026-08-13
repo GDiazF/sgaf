@@ -51,6 +51,7 @@ const EstablishmentDetailModal = ({
     longitud,
     director,
     email,
+    email_director,
     url_web,
     tipo_nombre,
     logo,
@@ -148,10 +149,19 @@ const EstablishmentDetailModal = ({
             </DetailItem>
             <DetailItem label="Tipo">{tipo_nombre || '—'}</DetailItem>
             <DetailItem label="Director/a">{director || '—'}</DetailItem>
-            <DetailItem label="Correo">
+            <DetailItem label="Correo institucional">
               {email ? (
                 <a href={`mailto:${email}`} className="est-detail-view__link">
                   {email}
+                </a>
+              ) : (
+                '—'
+              )}
+            </DetailItem>
+            <DetailItem label="Correo del director/a">
+              {email_director ? (
+                <a href={`mailto:${email_director}`} className="est-detail-view__link">
+                  {email_director}
                 </a>
               ) : (
                 '—'

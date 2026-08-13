@@ -269,7 +269,7 @@ const LABELS = {
   receipt: 'Factura / comprobante',
   'credit-card': 'Pagos',
   'clipboard-check': 'Recepciones',
-  stamp: 'Sello',
+  stamp: 'Documentación',
   'file-check': 'CDPs / certificado',
   'chart-bar': 'Indicadores',
   'user-cog': 'Personal TI',

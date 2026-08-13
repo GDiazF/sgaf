@@ -260,7 +260,7 @@ const ContractDetail = () => {
 
   const handleCreateReception = async (formData, isSplit = false) => {
     if (editingRC) {
-      await api.put(`facturas-adquisicion/${editingRC.id}/`, {
+      await api.put(`contratos/recepciones-contrato/${editingRC.id}/`, {
         ...formData,
         contrato: contract.id,
       })
@@ -269,7 +269,7 @@ const ContractDetail = () => {
       for (const estId of formData.establecimientos) {
         const estName =
           lookups.establishments.find((e) => e.id === estId)?.nombre || ''
-        await api.post('facturas-adquisicion/', {
+        await api.post('contratos/recepciones-contrato/', {
           ...formData,
           establecimientos: [estId],
           contrato: contract.id,
@@ -284,7 +284,7 @@ const ContractDetail = () => {
         }
       }
     } else {
-      await api.post('facturas-adquisicion/', {
+      await api.post('contratos/recepciones-contrato/', {
         ...formData,
         contrato: contract.id,
       })
@@ -301,7 +301,7 @@ const ContractDetail = () => {
     if (!deleteRcTarget) return
     setDeleting(true)
     try {
-      await api.delete(`facturas-adquisicion/${deleteRcTarget.id}/`)
+      await api.delete(`contratos/recepciones-contrato/${deleteRcTarget.id}/`)
       setDeleteRcTarget(null)
       notify({ variant: 'success', text: 'Recepción anulada.' })
       await fetchContract()
@@ -315,7 +315,7 @@ const ContractDetail = () => {
 
   const handleDownloadPDF = async (rc) => {
     try {
-      const response = await api.get(`facturas-adquisicion/${rc.id}/generate_pdf/`, {
+      const response = await api.get(`contratos/recepciones-contrato/${rc.id}/generate_pdf/`, {
         responseType: 'blob',
       })
       const url = window.URL.createObjectURL(new Blob([response.data]))
@@ -613,7 +613,7 @@ const ContractDetail = () => {
       className: 'col--actions',
       render: (rc) => (
         <div className="data-table__actions">
-          {can('servicios.change_recepcionconforme') ? (
+          {can('servicios.change_facturaadquisicion') ? (
             <Button
               variant="ghost"
               size="sm"
@@ -628,7 +628,7 @@ const ContractDetail = () => {
           <Button variant="outline" size="sm" onClick={() => handleDownloadPDF(rc)}>
             PDF
           </Button>
-          {can('servicios.delete_recepcionconforme') ? (
+          {can('servicios.delete_facturaadquisicion') ? (
             <Button variant="ghost" size="sm" onClick={() => setDeleteRcTarget(rc)}>
               <Icon name="trash" size="sm" />
             </Button>
@@ -1081,7 +1081,7 @@ const ContractDetail = () => {
               emptyTitle="Sin recepciones"
               emptyDescription="No hay recepciones conformes registradas."
               emptyAction={
-                can('servicios.add_recepcionconforme') ? (
+                can('servicios.add_facturaadquisicion') ? (
                   <Button
                     variant="primary"
                     size="sm"
@@ -1105,7 +1105,7 @@ const ContractDetail = () => {
                     <span className="table-toolbar__title">Recepciones</span>
                     <Badge variant="neutral">{receptions.length}</Badge>
                   </div>
-                  {can('servicios.add_recepcionconforme') ? (
+                  {can('servicios.add_facturaadquisicion') ? (
                     <div className="table-toolbar__right">
                       <Button
                         variant="primary"

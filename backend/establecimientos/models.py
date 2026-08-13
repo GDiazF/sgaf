@@ -34,6 +34,10 @@ class Establecimiento(models.Model):
     director = models.CharField(max_length=255, blank=True)
     direccion = models.CharField(max_length=255, blank=True)
     email = models.EmailField(blank=True)
+    email_director = models.EmailField(
+        blank=True,
+        verbose_name='Correo del director/a',
+    )
     logo = models.ImageField(upload_to='establecimientos/logos/', null=True, blank=True)
     latitud = models.FloatField(null=True, blank=True, verbose_name="Latitud")
     longitud = models.FloatField(null=True, blank=True, verbose_name="Longitud")

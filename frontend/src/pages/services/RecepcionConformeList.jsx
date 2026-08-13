@@ -16,6 +16,7 @@ import {
   Textarea,
   Modal,
   ConfirmModal,
+  EmptyState,
   Icon,
   useFormOverlay,
   formatApiFormError,
@@ -48,7 +49,7 @@ const ESTADO_BADGE = {
   HISTORICA: { variant: 'neutral', label: 'Histórica' },
 }
 
-const RecepcionConformeList = () => {
+const RecepcionConformeList = ({ embedded = false }) => {
   const { can } = usePermission()
 
   const [rcs, setRcs] = useState([])
@@ -376,11 +377,12 @@ const RecepcionConformeList = () => {
         cardRole: 'title',
         priority: 1,
         sortable: true,
-        render: (item) => (
-          <span style={item.estado === 'ANULADA' ? { color: 'var(--danger)', textDecoration: 'line-through' } : undefined}>
-            {item.folio || 'Sin folio'}
-          </span>
-        ),
+        render: (item) =>
+          item.estado === 'ANULADA' ? (
+            <s>{item.folio || 'Sin folio'}</s>
+          ) : (
+            item.folio || 'Sin folio'
+          ),
       },
       {
         key: 'estado',
@@ -408,13 +410,9 @@ const RecepcionConformeList = () => {
         priority: 4,
         sortable: true,
         render: (item) => (
-          <div>
-            <div>{item.proveedor_nombre || 'S/P'}</div>
-            {item.tipo_proveedor_nombre ? (
-              <div style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>
-                {item.tipo_proveedor_nombre}
-              </div>
-            ) : null}
+          <div className="contracts-cat">
+            <strong>{item.proveedor_nombre || 'S/P'}</strong>
+            {item.tipo_proveedor_nombre ? <span>{item.tipo_proveedor_nombre}</span> : null}
           </div>
         ),
       },
@@ -540,21 +538,21 @@ const RecepcionConformeList = () => {
     [can, processingIds],
   )
 
-  return (
-    <div className="page" data-od-id="recepciones-conformes-page" data-fill-viewport>
-      <PageHeader
-        icon="clipboard-check"
-        title="Recepciones conformes"
-        description={`Historial y gestión de documentos tributarios aceptados (${totalCount})`}
-        breadcrumbs={[
-          { label: 'SSGG' },
-          { label: 'Recepciones conformes' },
-        ]}
-        linkComponent={Link}
-        split
-      />
-
-      
+  const list = (
+    <>
+      {!embedded ? (
+        <PageHeader
+          icon="clipboard-check"
+          title="Recepciones conformes"
+          description={`Historial y gestión de documentos tributarios aceptados (${totalCount})`}
+          breadcrumbs={[
+            { label: 'SSGG' },
+            { label: 'Recepciones conformes' },
+          ]}
+          linkComponent={Link}
+          split
+        />
+      ) : null}
 
       <FiltersBar
         onSearch={() => setCurrentPage(1)}
@@ -692,7 +690,7 @@ const RecepcionConformeList = () => {
               </div>
             ))
           ) : (
-            <p style={{ color: 'var(--muted)', margin: 0 }}>Sin registros históricos.</p>
+            <EmptyState title="Sin registros históricos." />
           )}
         </div>
       </Modal>
@@ -865,6 +863,14 @@ const RecepcionConformeList = () => {
         confirmLabel={activeConfirm?.confirmLabel}
         danger={activeConfirm?.danger}
       />
+    </>
+  )
+
+  if (embedded) return list
+
+  return (
+    <div className="page" data-od-id="recepciones-conformes-page" data-fill-viewport>
+      {list}
     </div>
   )
 }

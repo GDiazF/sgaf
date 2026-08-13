@@ -22,9 +22,9 @@ class EstablecimientoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Establecimiento
         fields = [
-            'id', 'rbd', 'nombre', 'tipo', 'tipo_nombre', 'director', 'direccion', 
-            'email', 'url_web', 'logo', 'activo', 'telefonos', 'latitud', 'longitud', 
-            'telefonos_json', 'telefono_principal'
+            'id', 'rbd', 'nombre', 'tipo', 'tipo_nombre', 'director', 'direccion',
+            'email', 'email_director', 'url_web', 'logo', 'activo', 'telefonos',
+            'latitud', 'longitud', 'telefonos_json', 'telefono_principal',
         ]
 
     def _handle_telefonos(self, instance, telefonos_data=None, telefono_principal=None):

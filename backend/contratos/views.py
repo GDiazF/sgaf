@@ -2,9 +2,10 @@ import datetime
 import calendar
 import logging
 from django.db import transaction
-from rest_framework import viewsets, filters, status
+from rest_framework import viewsets, filters, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from establecimientos.pagination import LargeResultsSetPagination
 
@@ -23,6 +24,10 @@ from .serializers import (
 )
 
 from core.utils.report_utils import get_report_assets
+from contratos.services.recepcion_contrato import RecepcionContratoService
+from servicios.models import FacturaAdquisicion
+from servicios.serializers import FacturaAdquisicionSerializer
+from servicios.pdf import build_rc_adq_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +75,56 @@ class ContratoViewSet(viewsets.ModelViewSet):
             detalle="Se actualizaron los datos básicos del contrato.",
             usuario=str(user)
         )
+
+
+class RecepcionContratoViewSet(viewsets.ModelViewSet):
+    """
+    Recepciones conformes vinculadas a contrato (folios ROC-).
+    Misma tabla FacturaAdquisicion; reglas separadas de factura sin OC.
+    """
+    serializer_class = FacturaAdquisicionSerializer
+    permission_classes = [permissions.DjangoModelPermissions]
+    filterset_fields = ['proveedor', 'establecimiento', 'tipo_entrega', 'cdp', 'contrato']
+    search_fields = ['descripcion', 'proveedor__nombre', 'id', 'folio', 'cdp', 'total_pagar', 'nro_oc']
+    # DjangoModelPermissions lee el modelo del queryset
+    queryset = FacturaAdquisicion.objects.filter(contrato__isnull=False)
+
+    def get_queryset(self):
+        contrato_id = self.request.query_params.get('contrato')
+        return RecepcionContratoService.queryset(contrato_id=contrato_id or None)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            data = RecepcionContratoService.prepare_payload(
+                request.data.copy() if hasattr(request.data, 'copy') else dict(request.data),
+            )
+        except DjangoValidationError as exc:
+            return Response(exc.message_dict if hasattr(exc, 'message_dict') else {'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        try:
+            data = RecepcionContratoService.prepare_payload(
+                request.data.copy() if hasattr(request.data, 'copy') else dict(request.data),
+                instance=instance,
+            )
+        except DjangoValidationError as exc:
+            return Response(exc.message_dict if hasattr(exc, 'message_dict') else {'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def generate_pdf(self, request, pk=None):
+        return build_rc_adq_pdf(self.get_object())
+
 
 # =====================================================================
 # MÓDULO DE SERVICIOS OPERATIVOS (TRANSPORTE, ETC.)

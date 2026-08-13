@@ -86,7 +86,7 @@ export default function PublicReservas() {
     return 'desktop'
   })
 
-  useEffect(() => {
+    useEffect(() => {
     const mqCompact = window.matchMedia('(max-width: 1023px)')
     const mqMobile = window.matchMedia('(max-width: 767px)')
     const sync = () => {
@@ -117,8 +117,8 @@ export default function PublicReservas() {
     try {
       const dStart = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
       const dEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 4, 0)
-      const [rRes, sRes, tRes, bRes] = await Promise.all([
-        publicApi.get('reservas/recursos/'),
+            const [rRes, sRes, tRes, bRes] = await Promise.all([
+                publicApi.get('reservas/recursos/'),
         publicApi.get(
           `reservas/solicitudes/?fecha_inicio__gte=${toDateStr(dStart)}&fecha_inicio__lte=${toDateStr(dEnd)}`,
         ),
@@ -133,7 +133,7 @@ export default function PublicReservas() {
       setReservas(sRes.data?.results || (Array.isArray(sRes.data) ? sRes.data : []))
       setBloqueos(bRes.data?.results || (Array.isArray(bRes.data) ? bRes.data : []))
       if (tRes.data) setSettings(tRes.data)
-    } catch (e) {
+        } catch (e) {
       console.error('Error fetching public data:', e)
     } finally {
       if (showSpin) {
@@ -145,7 +145,7 @@ export default function PublicReservas() {
     }
   }, [currentDate])
 
-  useEffect(() => {
+    useEffect(() => {
     fetchData()
     const interval = setInterval(() => fetchData({ silent: true }), 30000)
     return () => clearInterval(interval)
@@ -157,7 +157,7 @@ export default function PublicReservas() {
   )
   const stripDays = useMemo(() => monthDaysFrom(currentDate), [currentDate])
 
-  useEffect(() => {
+    useEffect(() => {
     if (isCompact || effectiveView !== 'week' || loading) return
     const container = weekScrollRef.current
     if (!container) return
@@ -262,7 +262,7 @@ export default function PublicReservas() {
   const recursosFiltrados = useMemo(() => {
     let list
     if (filtroRecurso === 'all') list = recursos
-    else if (filtroRecurso.startsWith('tipo_')) {
+        else if (filtroRecurso.startsWith('tipo_')) {
       const tipo = filtroRecurso.replace('tipo_', '')
       list = recursos.filter((r) => r.tipo === tipo)
     } else list = recursos.filter((r) => r.id === parseInt(filtroRecurso, 10))
@@ -313,7 +313,7 @@ export default function PublicReservas() {
     setViewMode(v)
   }
 
-  const handleSlotClick = (day, slotTime, recursoId) => {
+    const handleSlotClick = (day, slotTime, recursoId) => {
     const rec = recursos.find((r) => r.id === recursoId)
     const x = getAntelacionDays(rec)
     const limit = new Date()
@@ -321,7 +321,7 @@ export default function PublicReservas() {
     limit.setDate(limit.getDate() + x)
     const dayStr = toDateStr(day)
 
-    if (day <= limit) {
+        if (day <= limit) {
       setSlotBloqueadoMsg(
         `Este recurso requiere ${x} días de antelación. Bloqueado hasta el ${addDays(limit, 1).toLocaleDateString('es-CL')}.`,
       )
@@ -330,11 +330,11 @@ export default function PublicReservas() {
     }
 
     let actualSlot = slotTime || '09:00'
-    if (recursoId) {
+        if (recursoId) {
       const dayEvents = reservas.filter(
         (r) =>
           parseInt(r.recurso, 10) === parseInt(recursoId, 10) &&
-          r.estado === 'APROBADA' &&
+                r.estado === 'APROBADA' &&
           toDateStr(r.fecha_inicio) === dayStr,
       )
       const dayBloqueos = bloqueos.filter(
@@ -342,7 +342,7 @@ export default function PublicReservas() {
           parseInt(b.recurso, 10) === parseInt(recursoId, 10) &&
           bloqueoAppliesToDate(b, dayStr),
       )
-      const isOccupied = (time) => {
+            const isOccupied = (time) => {
         const [h, m] = time.split(':').map(Number)
         const sStart = h * 60 + m
         const sEnd = sStart + SLOT_MIN
@@ -360,7 +360,7 @@ export default function PublicReservas() {
         })
         return hasReserva || hasBloqueo
       }
-      if (isOccupied(actualSlot)) {
+            if (isOccupied(actualSlot)) {
         const firstFree = TIME_SLOTS.find((s) => !isOccupied(s))
         if (firstFree) actualSlot = firstFree
       }
@@ -370,12 +370,12 @@ export default function PublicReservas() {
     const endH = m === 30 ? h + 1 : h
     const endM = m === 30 ? 0 : 30
     setFormTipo(rec?.tipo || '')
-    setFormData({
+        setFormData({
       ...emptyForm(),
-      recurso: recursoId || '',
+            recurso: recursoId || '',
       fecha: dayStr,
-      horaInicio: actualSlot,
-      horaFin: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`,
+            horaInicio: actualSlot,
+            horaFin: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`,
     })
     setHoneypot('')
     setModalOpen(true)
@@ -390,11 +390,11 @@ export default function PublicReservas() {
 
   const handleSaveReserva = async () => {
     if (honeypot) return
-    await publicApi.post('reservas/solicitudes/', {
-      ...formData,
-      email_contacto: `${formData.email_contacto}@slepiquique.cl`,
-      fecha_inicio: `${formData.fecha}T${formData.horaInicio}:00`,
-      fecha_fin: `${formData.fecha}T${formData.horaFin}:00`,
+            await publicApi.post('reservas/solicitudes/', {
+                ...formData,
+                email_contacto: `${formData.email_contacto}@slepiquique.cl`,
+                fecha_inicio: `${formData.fecha}T${formData.horaInicio}:00`,
+                fecha_fin: `${formData.fecha}T${formData.horaFin}:00`,
       estado: 'PENDIENTE',
     })
   }
@@ -411,7 +411,7 @@ export default function PublicReservas() {
     setManageOpen(true)
   }
 
-  return (
+    return (
     <div
       className="page public-reservas-page"
       data-od-id="public-reservas-page"
@@ -458,7 +458,7 @@ export default function PublicReservas() {
             >
               <Icon name="chevron-right" size={16} />
             </IconButton>
-          </div>
+                    </div>
 
           <div className="calendar-toolbar__view-cluster">
             {!isCompact ? (
@@ -474,9 +474,9 @@ export default function PublicReservas() {
                     onClick={() => handleSetViewMode(v)}
                   >
                     {l}
-                  </button>
-                ))}
-              </div>
+                            </button>
+                        ))}
+                    </div>
             ) : null}
             <IconButton
               type="button"
@@ -488,7 +488,7 @@ export default function PublicReservas() {
             >
               <Icon name="refresh" size={16} />
             </IconButton>
-          </div>
+                </div>
 
           <span className="calendar-toolbar__spacer" />
 
@@ -499,48 +499,48 @@ export default function PublicReservas() {
             <Button type="button" variant="primary" size="sm" onClick={openNewReserva}>
               <Icon name="plus" size="sm" /> Solicitar reserva
             </Button>
-          </div>
-        </div>
+                </div>
+            </div>
 
         <div className="calendar-filters">
           <div className="calendar-filters__body is-open">
             <div className="calendar-filters__row">
               <span className="calendar-filters__label">Filtrar</span>
               <div className="filter-chips">
-                <button
+                        <button
                   type="button"
                   className={`filter-chip${filtroRecurso === 'all' ? ' is-active' : ''}`}
-                  onClick={() => setFiltroRecurso('all')}
-                >
-                  Todos
-                </button>
-                {tiposPresentes.map((tipo, tIdx) => {
+                            onClick={() => setFiltroRecurso('all')}
+                        >
+                            Todos
+                        </button>
+                        {tiposPresentes.map((tipo, tIdx) => {
                   const iconName = RECURSO_ICON_NAMES[tipo] || 'box'
                   const isTipoActive = filtroRecurso === `tipo_${tipo}`
-                  return (
+                            return (
                     <React.Fragment key={tipo}>
                       {tIdx > 0 ? <span className="calendar-filters__sep" aria-hidden /> : null}
-                      <button
+                                    <button
                         type="button"
                         className={`filter-chip${isTipoActive ? ' is-active' : ''}`}
-                        onClick={() => setFiltroRecurso(`tipo_${tipo}`)}
-                      >
+                                        onClick={() => setFiltroRecurso(`tipo_${tipo}`)}
+                                    >
                         <Icon name={iconName} size={12} />
-                        {TYPE_LABELS[tipo] || tipo}
-                      </button>
+                                        {TYPE_LABELS[tipo] || tipo}
+                                    </button>
                       {(recursosPorTipo[tipo] || []).map((rec) => {
                         const isActive = filtroRecurso === String(rec.id)
                         const color = rec.color || '#6366f1'
-                        return (
-                          <button
-                            key={rec.id}
+                                        return (
+                                            <button
+                                                key={rec.id}
                             type="button"
                             className={`filter-chip${isActive ? ' is-active' : ''}`}
-                            onClick={() => setFiltroRecurso(String(rec.id))}
-                            style={{
-                              background: isActive ? color : hexToRgba(color, 0.08),
-                              borderColor: isActive ? color : hexToRgba(color, 0.25),
-                              color: isActive ? 'white' : color,
+                                                onClick={() => setFiltroRecurso(String(rec.id))}
+                                                style={{
+                                                    background: isActive ? color : hexToRgba(color, 0.08),
+                                                    borderColor: isActive ? color : hexToRgba(color, 0.25),
+                                                    color: isActive ? 'white' : color,
                               '--resource-color': color,
                             }}
                           >
@@ -549,18 +549,18 @@ export default function PublicReservas() {
                               style={{
                                 background: isActive ? 'rgba(255,255,255,0.7)' : color,
                               }}
-                            />
-                            {rec.nombre}
-                          </button>
+                                                />
+                                                {rec.nombre}
+                                            </button>
                         )
-                      })}
-                    </React.Fragment>
+                                                                })}
+                                                        </React.Fragment>
                   )
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
+                                                })}
+                                            </div>
+                                </div>
+                            </div>
+                </div>
 
         {slotBloqueadoMsg ? (
           <Alert variant="warning" className="calendar-slot-alert">
@@ -612,10 +612,10 @@ export default function PublicReservas() {
                 onReservaClick={(ev) => openManage(ev)}
                 onSelectDate={setCurrentDate}
               />
-            )}
-          </div>
-        </div>
-      </div>
+                            )}
+                        </div>
+                    </div>
+                        </div>
 
       <div className="public-reservas-page__fab-stack">
         <Button
@@ -636,7 +636,7 @@ export default function PublicReservas() {
         >
           <Icon name="plus" size={22} />
         </Button>
-      </div>
+                                            </div>
 
       <NuevaReservaModal
         open={modalOpen}
@@ -674,6 +674,6 @@ export default function PublicReservas() {
         timeSlots={TIME_SLOTS}
         onChanged={() => fetchData({ silent: true })}
       />
-    </div>
+                                            </div>
   )
 }

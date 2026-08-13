@@ -15,9 +15,9 @@ import ServicesDashboard from './pages/services/ServicesDashboard';
 import Providers from './pages/services/Providers';
 import PaymentsDashboard from './pages/services/PaymentsDashboard';
 import PaymentsReport from './pages/services/PaymentsReport';
-import RecepcionConformeList from './pages/services/RecepcionConformeList';
 import CDPManager from './pages/services/CDPManager';
 import FacturasAdquisicionDashboard from './pages/services/FacturasAdquisicionDashboard';
+import DocumentacionServicios from './pages/services/DocumentacionServicios';
 import Contracts from './pages/contracts/Contracts';
 import ContractDetail from './pages/contracts/ContractDetail';
 import PeriodoDetallePage from './pages/contracts/PeriodoDetallePage';
@@ -62,6 +62,7 @@ import UserManagement from './pages/admin/UserManagement';
 import RolesManagement from './pages/admin/RolesManagement';
 import AuditLog from './pages/admin/AuditLog';
 import EmailSettings from './pages/admin/EmailSettings';
+import MisNotificaciones from './pages/notificaciones/MisNotificaciones';
 import ArcoManagement from './pages/admin/ArcoManagement';
 import LoginBackgroundsAdmin from './pages/admin/LoginBackgroundsAdmin';
 import CiberseguridadDashboard from './pages/ciberseguridad/CiberseguridadDashboard';
@@ -132,6 +133,7 @@ function App() {
             <Route element={<PrivateRoute />}>
               <Route path="/" element={<Layout />}>
                 <Route index element={<GlobalDashboard />} />
+                <Route path="notificaciones" element={<MisNotificaciones />} />
                 {/* Préstamo de Llaves */}
                 <Route element={<ProtectedRoute permission="prestamo_llaves.view_prestamo" />}>
                   <Route path="loans" element={<LoansDashboard />} />
@@ -167,18 +169,42 @@ function App() {
                 <Route element={<ProtectedRoute permission="servicios.view_proveedor" />}>
                   <Route path="services/providers" element={<Providers />} />
                 </Route>
-                <Route element={<ProtectedRoute permission="servicios.view_registropago" />}>
+                <Route
+                  element={
+                    <ProtectedRoute
+                      permission={[
+                        'servicios.view_registropago',
+                        'servicios.view_recepcionconforme',
+                      ]}
+                    />
+                  }
+                >
                   <Route path="services/payments" element={<PaymentsDashboard />} />
-                  <Route path="services/reporte-consumos" element={<PaymentsReport />} />
+                  <Route
+                    path="services/rc"
+                    element={<Navigate to="/services/payments?tab=recepciones" replace />}
+                  />
                 </Route>
-                <Route element={<ProtectedRoute permission="servicios.view_recepcionconforme" />}>
-                  <Route path="services/rc" element={<RecepcionConformeList />} />
+                <Route element={<ProtectedRoute permission="servicios.view_registropago" />}>
+                  <Route path="services/reporte-consumos" element={<PaymentsReport />} />
                 </Route>
                 <Route element={<ProtectedRoute permission="servicios.view_cdp" />}>
                   <Route path="services/cdp" element={<CDPManager />} />
                 </Route>
                 <Route element={<ProtectedRoute permission="servicios.view_facturaadquisicion" />}>
                   <Route path="services/adquisiciones" element={<FacturasAdquisicionDashboard />} />
+                </Route>
+                <Route
+                  element={
+                    <ProtectedRoute
+                      permission={[
+                        'documentacion_servicios.view_registroserviciodoc',
+                        'servicios.view_proveedor',
+                      ]}
+                    />
+                  }
+                >
+                  <Route path="services/documentacion" element={<DocumentacionServicios />} />
                 </Route>
                 {/* Funcionarios */}
                 <Route element={<ProtectedRoute permission="funcionarios.view_funcionario" />}>
@@ -265,7 +291,9 @@ function App() {
                   <Route element={<ProtectedRoute permission={['core.view_breachreport', 'core.view_ciberseguridadplan', 'core.view_ciberseguridadcapacitacion']} />}>
                     <Route path="ciberseguridad" element={<CiberseguridadDashboard />} />
                   </Route>
-                  <Route path="admin/email-settings" element={<EmailSettings />} />
+                  <Route path="admin/notificaciones" element={<EmailSettings />} />
+                  <Route path="admin/email-settings" element={<Navigate to="/admin/notificaciones?tab=accounts" replace />} />
+                  <Route path="admin/notification-types" element={<Navigate to="/admin/notificaciones" replace />} />
                   <Route path="admin/personalizacion/login/backgrounds" element={<LoginBackgroundsAdmin />} />
                 </Route>
               </Route>

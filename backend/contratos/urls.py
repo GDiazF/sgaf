@@ -4,7 +4,8 @@ from .views import (
     ProcesoCompraViewSet, EstadoContratoViewSet, CategoriaContratoViewSet, 
     ContratoViewSet, OrientacionLicitacionViewSet, DocumentoContratoViewSet,
     TipoServicioOperativoViewSet, ServicioContratoViewSet, RutaTransporteViewSet, 
-    PeriodoCobroViewSet, AusenciaRutaViewSet, FeriadoNacionalViewSet, GrupoPresetRutasViewSet
+    PeriodoCobroViewSet, AusenciaRutaViewSet, FeriadoNacionalViewSet, GrupoPresetRutasViewSet,
+    RecepcionContratoViewSet,
 )
 
 router = DefaultRouter()
@@ -14,6 +15,7 @@ router.register(r'categorias', CategoriaContratoViewSet)
 router.register(r'orientaciones', OrientacionLicitacionViewSet)
 router.register(r'contratos', ContratoViewSet)
 router.register(r'documentos', DocumentoContratoViewSet)
+router.register(r'recepciones-contrato', RecepcionContratoViewSet, basename='recepcion-contrato')
 
 # Operaciones / Servicios
 router.register(r'tipos-servicios', TipoServicioOperativoViewSet)

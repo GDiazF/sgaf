@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../../api'
 import { useAuth } from '../../context/AuthContext'
 import { usePermission } from '../../hooks/usePermission'
@@ -9,6 +9,7 @@ import BulkUploadModal from '../../components/common/BulkUploadModal'
 import PaymentModal from '../../components/services/PaymentModal'
 import GenerateRCModal from '../../components/services/GenerateRCModal'
 import BulkPdfUploadModal from '../../components/services/BulkPdfUploadModal'
+import RecepcionConformeList from './RecepcionConformeList'
 import {
   PageHeader,
   FiltersBar,
@@ -52,7 +53,23 @@ const mediaUrl = (path) => {
 const PaymentsDashboard = () => {
   const { user } = useAuth()
   const { can } = usePermission()
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const isPrivileged = user?.is_superuser || can('servicios.delete_recepcionconforme')
+  const canPagos = can('servicios.view_registropago')
+  const canRC = can('servicios.view_recepcionconforme')
+  const tabFromUrl = searchParams.get('tab')
+  const activeTab =
+    tabFromUrl === 'recepciones' && canRC ? 'recepciones' : canPagos ? 'pagos' : 'recepciones'
+  const showTabs = canPagos && canRC
+
+  const selectTab = (id) => {
+    if (id === 'recepciones' && canRC) {
+      setSearchParams({ tab: 'recepciones' }, { replace: true })
+    } else {
+      setSearchParams({}, { replace: true })
+    }
+  }
 
   const [payments, setPayments] = useState([])
   const [services, setServices] = useState([])
@@ -147,13 +164,16 @@ const PaymentsDashboard = () => {
   }
 
     useEffect(() => {
-    fetchLookups()
-  }, [])
+    if (canPagos) fetchLookups()
+  }, [canPagos])
 
   useEffect(() => {
+    if (activeTab !== 'pagos' || !canPagos) return
     fetchData(1, pageSize, debouncedSearch, ordering, statusFilter)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    activeTab,
+    canPagos,
     debouncedSearch,
     ordering,
     pageSize,
@@ -741,48 +761,95 @@ const PaymentsDashboard = () => {
     <div className="page" data-od-id="pagos-servicios-page" data-fill-viewport>
       <PageHeader
         icon="credit-card"
-        title="Pagos de servicios"
-        description={`Gestión y registro de consumos de servicios básicos (${totalCount})`}
-        breadcrumbs={[{ label: 'SSGG' }, { label: 'Pagos de servicios' }]}
+        title="Pagos"
+        description={
+          activeTab === 'recepciones'
+            ? 'Historial y gestión de documentos tributarios aceptados'
+            : `Gestión y registro de consumos de servicios básicos (${totalCount})`
+        }
+        breadcrumbs={[{ label: 'SSGG' }, { label: 'Pagos' }]}
         linkComponent={Link}
         split
         actions={
-          <>
-            {can('servicios.add_registropago') ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                                        onClick={() => {
-                  setBulkFilesResults(null)
-                  setShowBulkFilesModal(true)
-                }}
-              >
-                <Icon name="upload" size="sm" /> Subir boletas
-              </Button>
-            ) : null}
-            {can('servicios.add_registropago') ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setBulkErrors([])
-                  setShowBulkForm(true)
-                }}
-              >
-                <Icon name="file" size="sm" /> Carga masiva
-              </Button>
-            ) : null}
-            {can('servicios.add_registropago') ? (
-              <Button variant="primary" size="sm" onClick={handleNew}>
-                <Icon name="plus" size="sm" /> Registrar pago
-              </Button>
-            ) : null}
-          </>
+          activeTab === 'pagos' ? (
+            <>
+              {can('servicios.add_registropago') ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setBulkFilesResults(null)
+                    setShowBulkFilesModal(true)
+                  }}
+                >
+                  <Icon name="upload" size="sm" /> Subir boletas
+                </Button>
+              ) : null}
+              {can('servicios.add_registropago') ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setBulkErrors([])
+                    setShowBulkForm(true)
+                  }}
+                >
+                  <Icon name="file" size="sm" /> Carga masiva
+                </Button>
+              ) : null}
+              {can('servicios.add_registropago') ? (
+                <Button variant="primary" size="sm" onClick={handleNew}>
+                  <Icon name="plus" size="sm" /> Registrar pago
+                </Button>
+              ) : null}
+            </>
+          ) : can('servicios.view_cdp') ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate('/services/cdp')}
+            >
+              <Icon name="file-check" size="sm" /> CDPs
+            </Button>
+          ) : null
         }
       />
 
-      
+      {showTabs ? (
+        <div className="tabs">
+          <ul className="tabs__list" role="tablist" aria-label="Secciones de pagos">
+            <li>
+              <button
+                type="button"
+                role="tab"
+                className={`tabs__btn${activeTab === 'pagos' ? ' is-active' : ''}`}
+                aria-selected={activeTab === 'pagos'}
+                onClick={() => selectTab('pagos')}
+              >
+                Pagos
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                role="tab"
+                className={`tabs__btn${activeTab === 'recepciones' ? ' is-active' : ''}`}
+                aria-selected={activeTab === 'recepciones'}
+                onClick={() => selectTab('recepciones')}
+              >
+                Recepciones
+              </button>
+            </li>
+          </ul>
+        </div>
+      ) : null}
 
+      {activeTab === 'recepciones' && canRC ? (
+        <RecepcionConformeList embedded />
+      ) : null}
+
+      {activeTab === 'pagos' && canPagos ? (
+      <>
       <FiltersBar
         onSearch={() => setCurrentPage(1)}
         onClear={clearFilters}
@@ -973,6 +1040,8 @@ const PaymentsDashboard = () => {
             ) : null}
                                 </div>
                             </div>
+      ) : null}
+      </>
       ) : null}
 
       <PaymentModal

@@ -21,6 +21,7 @@ const AdquisicionModal = ({
   editingId,
   initialData,
   lookups = {},
+  variant = 'sin_oc',
 }) => {
   const {
     establishments = [],
@@ -121,13 +122,20 @@ const AdquisicionModal = ({
     }
     if (!finalData.establecimientos) finalData.establecimientos = []
 
+    const isCompraAgil = variant === 'compra_agil'
     try {
       await overlay.run(
         async () => {
           await onSave(finalData)
         },
         {
-          successDescription: editingId ? 'Factura actualizada.' : 'Factura registrada.',
+          successDescription: editingId
+            ? isCompraAgil
+              ? 'Compra ágil actualizada.'
+              : 'Factura actualizada.'
+            : isCompraAgil
+              ? 'Compra ágil registrada.'
+              : 'Factura registrada.',
           formatError: formatApiFormError,
         },
       )
@@ -151,13 +159,27 @@ const AdquisicionModal = ({
     onClose()
   }
 
+  const isCompraAgil = variant === 'compra_agil'
+
   return (
     <Modal
       open={open}
       onClose={handleClose}
       size="lg"
-      title={editingId ? 'Editar factura de adquisición' : 'Registrar adquisición directa'}
-      subheader="Compra sin número de servicio asociado"
+      title={
+        editingId
+          ? isCompraAgil
+            ? 'Editar compra ágil'
+            : 'Editar factura sin OC'
+          : isCompraAgil
+            ? 'Registrar compra ágil'
+            : 'Registrar factura sin OC'
+      }
+      subheader={
+        isCompraAgil
+          ? 'Recepción con orden de compra (folio RCA)'
+          : 'Compra sin orden de compra asociada (folio RCF)'
+      }
       {...overlay.modalProps}
       onOverlayDismiss={handleOverlayDismiss}
       footer={
@@ -183,13 +205,12 @@ const AdquisicionModal = ({
           <Field label="Folio RC" htmlFor="adq-folio">
             <Input id="adq-folio" value={formData.folio || ''} readOnly placeholder="Automático…" />
           </Field>
-          <Field label="Nº CDP" required htmlFor="adq-cdp">
+          <Field label="Nº CDP" htmlFor="adq-cdp">
             <Input
               id="adq-cdp"
-              required
               value={formData.cdp || ''}
               onChange={(e) => setFormData({ ...formData, cdp: e.target.value })}
-              placeholder="Certificado…"
+              placeholder="Opcional…"
             />
           </Field>
           <Field label="Nº Factura" htmlFor="adq-fac">
@@ -199,12 +220,13 @@ const AdquisicionModal = ({
               onChange={(e) => setFormData({ ...formData, nro_factura: e.target.value })}
             />
           </Field>
-          <Field label="Nº Orden de compra" htmlFor="adq-oc">
+          <Field label="Nº Orden de compra" required={isCompraAgil} htmlFor="adq-oc">
             <Input
               id="adq-oc"
+              required={isCompraAgil}
               value={formData.nro_oc || ''}
               onChange={(e) => setFormData({ ...formData, nro_oc: e.target.value })}
-              placeholder="Opcional…"
+              placeholder={isCompraAgil ? 'Obligatorio…' : 'Opcional…'}
             />
           </Field>
         </div>

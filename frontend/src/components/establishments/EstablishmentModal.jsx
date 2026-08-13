@@ -20,6 +20,7 @@ const emptyForm = (establishmentTypes = []) => ({
   direccion: '',
   director: '',
   email: '',
+  email_director: '',
   url_web: '',
   latitud: '',
   longitud: '',
@@ -221,6 +222,18 @@ const EstablishmentModal = ({
               placeholder="ejemplo@slep.cl"
               value={formData.email || ''}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            />
+          </Field>
+
+          <Field label="Correo del director/a" htmlFor="est-email-director">
+            <Input
+              id="est-email-director"
+              type="email"
+              placeholder="director@slep.cl"
+              value={formData.email_director || ''}
+              onChange={(e) =>
+                setFormData({ ...formData, email_director: e.target.value })
+              }
             />
           </Field>
 

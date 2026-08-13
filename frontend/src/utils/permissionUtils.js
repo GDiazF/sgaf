@@ -52,6 +52,9 @@ export const groupPermissions = (permissions) => {
                 else if (name.includes('anexo')) module = 'Telecomunicaciones';
                 else module = 'Configuración Servicios';
                 break;
+            case 'documentacion_servicios':
+                module = 'Documentación de Servicios';
+                break;
             default:
                 // Fallbacks adicionales por nombre por si hay modelos sueltos o apps genéricas
                 if (name.includes('link de interes') || name.includes('linkinteres')) module = 'Dashboard, Links y Redes';
@@ -82,6 +85,10 @@ export const groupPermissions = (permissions) => {
 export const getFriendlyPermName = (perm) => {
     const codename = perm.codename || '';
     const name = perm.name || '';
+
+    if (codename === 'configure_tiporegistroservicio') {
+        return 'Configurar tipos y campos de documentación';
+    }
 
     // Si es un permiso de módulo de Navbar, retornar el nombre directo ("Ver Módulo X") (Deprecado)
 
@@ -166,7 +173,10 @@ export const getFriendlyPermName = (perm) => {
         'ticketcategory': 'Categorías de Tickets',
         'ticketmessage': 'Mensajes y Chat de Soporte',
         'supportagent': 'Agentes de Mesa de Ayuda',
-        'ticketattachment': 'Adjuntos de Tickets'
+        'ticketattachment': 'Adjuntos de Tickets',
+        'registroserviciodoc': 'Registros de documentación',
+        'tiporegistroservicio': 'Tipos de documentación',
+        'campodefinicion': 'Campos de documentación',
     };
 
     const modelKey = codename.split('_')[1];
