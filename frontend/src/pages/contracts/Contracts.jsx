@@ -32,6 +32,7 @@ const emptyForm = (lookups = {}) => ({
   tipo_oc: 'UNICA',
   nro_oc: '',
   cdp: '',
+  plantilla_cobro: '',
   proveedores_asociados: [],
   establecimientos: [],
 })
@@ -191,6 +192,7 @@ const Contracts = () => {
       tipo_oc: item.tipo_oc || 'UNICA',
       nro_oc: item.nro_oc || '',
       cdp: item.cdp || '',
+      plantilla_cobro: item.plantilla_cobro || '',
       proveedores_asociados: item.proveedores_asociados || [],
       establecimientos: item.establecimientos || [],
     })
@@ -201,6 +203,7 @@ const Contracts = () => {
   const handleSave = async (dataToSubmit) => {
     const finalData = { ...dataToSubmit }
     if (finalData.orientacion === '') delete finalData.orientacion
+    if (finalData.plantilla_cobro === '') finalData.plantilla_cobro = null
 
     try {
       if (editingId) {

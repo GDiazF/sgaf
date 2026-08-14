@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import api from '../../api'
 import ContractModal from '../../components/contracts/ContractModal'
 import ContractReceptionModal from '../../components/contracts/ContractReceptionModal'
@@ -21,7 +21,6 @@ import {
   FileInput,
   Modal,
   ConfirmModal,
-  DetailItem,
   EmptyState,
   Icon,
   useFormOverlay,
@@ -44,9 +43,33 @@ const formatCurrency = (amount) =>
     maximumFractionDigits: 0,
   }).format(amount || 0)
 
+const MONTH_NAMES = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+]
+
 const formatDate = (value) => {
   if (!value) return '—'
   return new Date(value).toLocaleDateString('es-CL')
+}
+
+const formatPeriodo = (value) => {
+  if (!value) return '—'
+  const raw = String(value).slice(0, 10)
+  const [year, month] = raw.split('-')
+  const m = Number(month)
+  if (!year || !m || m < 1 || m > 12) return '—'
+  return `${MONTH_NAMES[m - 1]} ${year}`
 }
 
 const estadoVariant = (nombre) => {
@@ -57,16 +80,65 @@ const estadoVariant = (nombre) => {
   return 'neutral'
 }
 
+function ProviderAdjudicacionDetail({ row, catalog, establishments }) {
+  const previo = Number(row.monto_consumido_previo) || 0
+  const nombres = establishments.map((e) => e.nombre || e).filter(Boolean)
+
+  return (
+    <dl className="contracts-meta">
+      <div className="contracts-meta__item">
+        <dt>RUT</dt>
+        <dd>{catalog?.rut || '—'}</dd>
+      </div>
+      <div className="contracts-meta__item">
+        <dt>Tipo</dt>
+        <dd>{catalog?.tipo_proveedor_nombre || '—'}</dd>
+      </div>
+      <div className="contracts-meta__item">
+        <dt>Contacto</dt>
+        <dd>{catalog?.contacto || '—'}</dd>
+      </div>
+      <div className="contracts-meta__item">
+        <dt>Adjudicado</dt>
+        <dd>{formatCurrency(row.monto_adjudicado)}</dd>
+      </div>
+      <div className="contracts-meta__item">
+        <dt>Ejecutado</dt>
+        <dd>
+          {formatCurrency(row.monto_ejecutado)}
+          {previo > 0 ? ` (previo ${formatCurrency(previo)})` : ''}
+        </dd>
+      </div>
+      <div className="contracts-meta__item">
+        <dt>Saldo</dt>
+        <dd>{formatCurrency(row.monto_restante)}</dd>
+      </div>
+      <div className="contracts-meta__item contracts-meta__item--full">
+        <dt>Establecimientos</dt>
+        <dd>{nombres.length ? nombres.join(', ') : 'Sin asignaciones'}</dd>
+      </div>
+    </dl>
+  )
+}
+
 const ContractDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { can } = usePermission()
 
   const [contract, setContract] = useState(null)
   const [loading, setLoading] = useState(true)
   const [receptions, setReceptions] = useState([])
   const [history, setHistory] = useState([])
-  const [activeTab, setActiveTab] = useState('info')
+  const tabParam = searchParams.get('tab')
+  const activeTab = TABS.some((t) => t.id === tabParam) ? tabParam : 'info'
+  const setActiveTab = (tabId) => {
+    const next = new URLSearchParams(searchParams)
+    if (tabId === 'info') next.delete('tab')
+    else next.set('tab', tabId)
+    setSearchParams(next, { replace: true })
+  }
   const { notify } = useNotify()
 
   const [isEditModalOpen, setEditModalOpen] = useState(false)
@@ -86,6 +158,10 @@ const ContractDetail = () => {
   const [historyPage, setHistoryPage] = useState(1)
   const [historyPageSize, setHistoryPageSize] = useState(25)
   const debouncedHistorySearch = useDebouncedValue(historySearch)
+  const [receptionSearch, setReceptionSearch] = useState('')
+  const [receptionPage, setReceptionPage] = useState(1)
+  const [receptionPageSize, setReceptionPageSize] = useState(25)
+  const debouncedReceptionSearch = useDebouncedValue(receptionSearch)
 
   const [lookups, setLookups] = useState({
     establishments: [],
@@ -182,6 +258,7 @@ const ContractDetail = () => {
       tipo_oc: contract.tipo_oc || 'UNICA',
       nro_oc: contract.nro_oc || '',
       cdp: contract.cdp || '',
+      plantilla_cobro: contract.plantilla_cobro || '',
       proveedores_asociados: contract.proveedores_asociados || [],
       establecimientos: contract.establecimientos || [],
     }
@@ -190,6 +267,7 @@ const ContractDetail = () => {
   const handleEditSave = async (dataToSubmit) => {
     const finalData = { ...dataToSubmit }
     if (finalData.orientacion === '') delete finalData.orientacion
+    if (finalData.plantilla_cobro === '') finalData.plantilla_cobro = null
     try {
       await api.put(`contratos/contratos/${contract.id}/`, finalData)
     } catch (error) {
@@ -335,16 +413,52 @@ const ContractDetail = () => {
   }
 
   const sortedReceptions = useMemo(() => {
-    const list = [...receptions]
+    const q = debouncedReceptionSearch.toLowerCase().trim()
+    let list = [...receptions]
+    if (q) {
+      list = list.filter((rc) => {
+        const haystack = [
+          rc.folio,
+          rc.nro_oc,
+          rc.nro_factura,
+          rc.descripcion,
+          rc.proveedor_nombre,
+          formatPeriodo(rc.periodo),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        return haystack.includes(q)
+      })
+    }
     if (!sortConfig.key) return list
     return list.sort((a, b) => {
-      const valA = a[sortConfig.key]
-      const valB = b[sortConfig.key]
+      let valA = a[sortConfig.key]
+      let valB = b[sortConfig.key]
+      if (sortConfig.key === 'periodo') {
+        valA = a.periodo ? new Date(a.periodo).getTime() : 0
+        valB = b.periodo ? new Date(b.periodo).getTime() : 0
+      } else if (sortConfig.key === 'total_pagar') {
+        valA = Number(valA) || 0
+        valB = Number(valB) || 0
+      } else {
+        valA = (valA || '').toString().toLowerCase()
+        valB = (valB || '').toString().toLowerCase()
+      }
       if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1
       if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1
       return 0
     })
-  }, [receptions, sortConfig])
+  }, [receptions, sortConfig, debouncedReceptionSearch])
+
+  useEffect(() => {
+    setReceptionPage(1)
+  }, [debouncedReceptionSearch, sortConfig])
+
+  const receptionPageRows = useMemo(() => {
+    const start = (receptionPage - 1) * receptionPageSize
+    return sortedReceptions.slice(start, start + receptionPageSize)
+  }, [sortedReceptions, receptionPage, receptionPageSize])
 
   const filteredHistory = useMemo(() => {
     const q = debouncedHistorySearch.toLowerCase().trim()
@@ -586,6 +700,15 @@ const ContractDetail = () => {
       render: (rc) => rc.descripcion || '—',
     },
     {
+      key: 'periodo',
+      header: 'Periodo',
+      className: 'col--status',
+      cardRole: 'status',
+      priority: 1,
+      sortable: true,
+      render: (rc) => formatPeriodo(rc.periodo),
+    },
+    {
       key: 'total_pagar',
       header: 'Total RC',
       className: 'col--tablet-hide',
@@ -595,11 +718,11 @@ const ContractDetail = () => {
       render: (rc) => formatCurrency(rc.total_pagar),
     },
     {
-      key: 'periodo',
-      header: 'Periodo',
-      className: 'col--status',
-      cardRole: 'status',
-      priority: 1,
+      key: 'nro_factura',
+      header: 'Factura',
+      className: 'col--tablet-hide',
+      cardRole: 'field',
+      priority: 2,
       sortable: true,
       render: (rc) => (
         <Badge variant={rc.nro_factura ? 'success' : 'warning'} dot>
@@ -1068,18 +1191,38 @@ const ContractDetail = () => {
 
         {activeTab === 'servicios' ? (
           <div className="contracts-tab">
-            <ContratoServiciosTab contractId={contract.id} />
+            <ContratoServiciosTab contract={contract} />
           </div>
         ) : null}
 
         {activeTab === 'receptions' ? (
-          <div className="contracts-tab">
+          <div className="contracts-tab contracts-history-tab">
+            <FiltersBar
+              onSearch={() => setReceptionPage(1)}
+              onClear={() => {
+                setReceptionSearch('')
+                setReceptionPage(1)
+              }}
+            >
+              <Field label="Buscar" htmlFor="rc-q">
+                <div className="input-wrap">
+                  <Icon name="search" className="input-wrap__icon" size="sm" />
+                  <Input
+                    id="rc-q"
+                    type="search"
+                    placeholder="Folio, OC, factura, glosa o proveedor…"
+                    value={receptionSearch}
+                    onChange={(e) => setReceptionSearch(e.target.value)}
+                  />
+                </div>
+              </Field>
+            </FiltersBar>
             <DataTable
               columns={receptionColumns}
-              rows={sortedReceptions}
-              totalCount={receptions.length}
+              rows={receptionPageRows}
+              totalCount={sortedReceptions.length}
               emptyTitle="Sin recepciones"
-              emptyDescription="No hay recepciones conformes registradas."
+              emptyDescription="No hay recepciones conformes con los filtros actuales."
               emptyAction={
                 can('servicios.add_facturaadquisicion') ? (
                   <Button
@@ -1095,15 +1238,34 @@ const ContractDetail = () => {
                 ) : undefined
               }
               fillViewport
-              showFooter={false}
+              page={receptionPage}
+              pageSize={receptionPageSize}
+              pageSizeId="rc-page"
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageChange={setReceptionPage}
+              onPageSizeChange={(n) => {
+                setReceptionPageSize(n)
+                setReceptionPage(1)
+              }}
               sortKey={sortConfig.key}
               onSort={handleSortReceptions}
-              pageSizeId="rc-page"
+              mobileCardActions={(rc) => ({
+                primary: { label: 'PDF', onClick: () => handleDownloadPDF(rc) },
+                secondary: can('servicios.change_facturaadquisicion')
+                  ? {
+                      label: 'Editar',
+                      onClick: () => {
+                        setEditingRC(rc)
+                        setReceptionModalOpen(true)
+                      },
+                    }
+                  : undefined,
+              })}
               toolbar={
                 <>
                   <div className="table-toolbar__left">
                     <span className="table-toolbar__title">Recepciones</span>
-                    <Badge variant="neutral">{receptions.length}</Badge>
+                    <Badge variant="neutral">{sortedReceptions.length}</Badge>
                   </div>
                   {can('servicios.add_facturaadquisicion') ? (
                     <div className="table-toolbar__right">
@@ -1306,7 +1468,7 @@ const ContractDetail = () => {
         open={!!selectedProvider}
         onClose={() => setSelectedProvider(null)}
         title={selectedProvider?.proveedor_nombre || 'Proveedor'}
-        subheader="Detalle de adjudicación en este contrato"
+        subheader="Adjudicación en este contrato"
         footer={
           <Button variant="secondary" type="button" onClick={() => setSelectedProvider(null)}>
             Cerrar
@@ -1314,73 +1476,20 @@ const ContractDetail = () => {
         }
       >
         {selectedProvider ? (
-          <div className="ticket-aside__details">
-            {(() => {
-              const catalog = resolveProviderCatalog(selectedProvider)
-              const pct =
-                selectedProvider.monto_adjudicado > 0
-                  ? Math.min(
-                      100,
-                      Math.round(
-                        (selectedProvider.monto_ejecutado /
-                          selectedProvider.monto_adjudicado) *
-                          100,
-                      ),
-                    )
-                  : 0
-              const establecimientos =
-                selectedProvider.establecimientos_detalle ||
-                (selectedProvider.establecimientos || [])
-                  .map((id) =>
-                    typeof id === 'object'
-                      ? id
-                      : lookups.establishments.find((e) => e.id === id),
-                  )
-                  .filter(Boolean)
-              return (
-                <>
-                  <DetailItem label="RUT">{catalog?.rut || '—'}</DetailItem>
-                  <DetailItem label="Acrónimo">{catalog?.acronimo || '—'}</DetailItem>
-                  <DetailItem label="Tipo">
-                    {catalog?.tipo_proveedor_nombre || '—'}
-                  </DetailItem>
-                  <DetailItem label="Contacto">{catalog?.contacto || '—'}</DetailItem>
-                  <DetailItem label="Adjudicado">
-                    {formatCurrency(selectedProvider.monto_adjudicado)}
-                  </DetailItem>
-                  <DetailItem label="Ejecutado">
-                    {formatCurrency(selectedProvider.monto_ejecutado)}
-                  </DetailItem>
-                  <DetailItem label="Consumo previo">
-                    {formatCurrency(selectedProvider.monto_consumido_previo)}
-                  </DetailItem>
-                  <DetailItem label="Saldo">
-                    {formatCurrency(selectedProvider.monto_restante)}
-                  </DetailItem>
-                  <DetailItem label="Consumo">
-                    <div className="contracts-gauge__track" style={{ marginTop: '0.35rem' }}>
-                      <div
-                        className="contracts-gauge__fill"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <span>{pct}%</span>
-                  </DetailItem>
-                  <DetailItem label="Establecimientos">
-                    {establecimientos.length ? (
-                      <ul className="contracts-estab-list">
-                        {establecimientos.map((e) => (
-                          <li key={e.id || e.nombre}>{e.nombre || e}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      'Sin asignaciones'
-                    )}
-                  </DetailItem>
-                </>
-              )
-            })()}
-          </div>
+          <ProviderAdjudicacionDetail
+            row={selectedProvider}
+            catalog={resolveProviderCatalog(selectedProvider)}
+            establishments={
+              selectedProvider.establecimientos_detalle ||
+              (selectedProvider.establecimientos || [])
+                .map((id) =>
+                  typeof id === 'object'
+                    ? id
+                    : lookups.establishments.find((e) => e.id === id),
+                )
+                .filter(Boolean)
+            }
+          />
         ) : null}
       </Modal>
 

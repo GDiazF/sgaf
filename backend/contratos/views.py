@@ -1,5 +1,4 @@
 import datetime
-import calendar
 import logging
 from django.db import transaction
 from rest_framework import viewsets, filters, status, permissions
@@ -8,6 +7,7 @@ from rest_framework.decorators import action
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from establecimientos.pagination import LargeResultsSetPagination
+from establecimientos.models import Establecimiento
 
 from .models import (
     ProcesoCompra, EstadoContrato, CategoriaContrato, Contrato, 
@@ -76,6 +76,85 @@ class ContratoViewSet(viewsets.ModelViewSet):
             usuario=str(user)
         )
 
+    @action(detail=True, methods=['get'], url_path='resumen-periodo')
+    def resumen_periodo(self, request, pk=None):
+        contrato = self.get_object()
+        try:
+            mes = int(request.query_params.get('mes'))
+            anio = int(request.query_params.get('anio'))
+        except (TypeError, ValueError):
+            return Response(
+                {'detail': 'Indique mes y año del periodo.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        proveedor_id = request.query_params.get('proveedor')
+        gestion = contrato.servicios_operativos.select_related('tipo_servicio').first()
+        if not gestion:
+            return Response({
+                'tiene_gestion': False,
+                'total': 0,
+                'lineas': [],
+                'establecimientos_ids': [],
+                'faltantes': 0,
+            })
+
+        rutas = gestion.rutas.select_related('proveedor').prefetch_related(
+            'establecimientos', 'periodos'
+        )
+        if proveedor_id:
+            rutas = rutas.filter(proveedor_id=proveedor_id)
+
+        lineas = []
+        total = 0
+        establecimientos_ids = []
+        con_periodo = 0
+        for ruta in rutas:
+            periodo = next(
+                (
+                    p
+                    for p in ruta.periodos.all()
+                    if p.mes_referencia == mes and p.anio_referencia == anio
+                ),
+                None,
+            )
+            ests = list(ruta.establecimientos.values_list('id', flat=True))
+            if not periodo:
+                lineas.append({
+                    'ruta_id': ruta.id,
+                    'nombre': ruta.nombre,
+                    'proveedor_id': ruta.proveedor_id,
+                    'establecimientos': ests,
+                    'monto': 0,
+                    'tiene_periodo': False,
+                })
+                continue
+            con_periodo += 1
+            monto = periodo.monto_total or 0
+            total += monto
+            establecimientos_ids.extend(ests)
+            lineas.append({
+                'ruta_id': ruta.id,
+                'nombre': ruta.nombre,
+                'proveedor_id': ruta.proveedor_id,
+                'establecimientos': ests,
+                'monto': monto,
+                'tiene_periodo': True,
+                'periodo_id': periodo.id,
+                'estado': periodo.estado,
+            })
+
+        return Response({
+            'tiene_gestion': True,
+            'gestion_id': gestion.id,
+            'es_transporte': gestion.es_transporte,
+            'modalidad_cobro': gestion.modalidad_cobro,
+            'total': total,
+            'lineas': lineas,
+            'establecimientos_ids': list(dict.fromkeys(establecimientos_ids)),
+            'faltantes': len(lineas) - con_periodo,
+            'lineas_con_periodo': con_periodo,
+        })
+
 
 class RecepcionContratoViewSet(viewsets.ModelViewSet):
     """
@@ -133,6 +212,7 @@ class RecepcionContratoViewSet(viewsets.ModelViewSet):
 class TipoServicioOperativoViewSet(viewsets.ModelViewSet):
     queryset = TipoServicioOperativo.objects.all()
     serializer_class = TipoServicioOperativoSerializer
+    pagination_class = None
 
 class ServicioContratoViewSet(viewsets.ModelViewSet):
     queryset = ServicioContrato.objects.select_related('contrato', 'tipo_servicio').all()
@@ -352,23 +432,67 @@ class RutaTransporteViewSet(viewsets.ModelViewSet):
     pagination_class = None # Ver todas las rutas sin paginación
     filterset_fields = ['servicio', 'proveedor']
 
+    @action(detail=False, methods=['post'], url_path='bulk-crear-lineas')
+    def bulk_crear_lineas(self, request):
+        servicio_id = request.data.get('servicio')
+        proveedor_id = request.data.get('proveedor')
+        est_ids = request.data.get('establecimientos') or []
+        valor_mensual = request.data.get('valor_mensual')
+        if not servicio_id or not proveedor_id or not est_ids:
+            return Response(
+                {'detail': 'Indique proveedor y al menos un establecimiento.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not valor_mensual:
+            return Response(
+                {'valor_mensual': 'Indique el monto mensual.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        nombres = {
+            e.id: e.nombre
+            for e in Establecimiento.objects.filter(id__in=est_ids)
+        }
+        creadas = []
+        errores = []
+        incluir_fines = request.data.get('incluir_fines_semana', True)
+        excluir_fer = request.data.get('excluir_feriados', False)
+        if isinstance(incluir_fines, str):
+            incluir_fines = incluir_fines.lower() in ('true', '1', 'yes')
+        if isinstance(excluir_fer, str):
+            excluir_fer = excluir_fer.lower() in ('true', '1', 'yes')
+        with transaction.atomic():
+            for est_id in est_ids:
+                payload = {
+                    'servicio': servicio_id,
+                    'proveedor': proveedor_id,
+                    'nombre': nombres.get(int(est_id), f'Establecimiento {est_id}'),
+                    'establecimientos': [est_id],
+                    'valor_mensual': valor_mensual,
+                    'valor_diario': 0,
+                    'dia_inicio_periodo': 1,
+                    'dia_fin_periodo': 31,
+                    'incluir_fines_semana': bool(incluir_fines),
+                    'excluir_feriados': bool(excluir_fer),
+                }
+                serializer = RutaTransporteSerializer(data=payload)
+                if serializer.is_valid():
+                    serializer.save()
+                    creadas.append(serializer.data)
+                else:
+                    errores.append({'establecimiento': est_id, 'errors': serializer.errors})
+            if errores and not creadas:
+                return Response({'detail': errores}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {'creadas': len(creadas), 'omitidas': len(errores), 'lineas': creadas},
+            status=status.HTTP_201_CREATED,
+        )
+
     @action(detail=True, methods=['post'], url_path='generar-periodo')
     def generar_periodo(self, request, pk=None):
         ruta = self.get_object()
         mes = int(request.data.get('mes'))
         anio = int(request.data.get('anio'))
-        
-        # Lógica de cálculo de rango de fechas personalizada
-        if ruta.dia_inicio_periodo <= ruta.dia_fin_periodo:
-            fecha_inicio = datetime.date(anio, mes, ruta.dia_inicio_periodo)
-            fecha_fin = datetime.date(anio, mes, ruta.dia_fin_periodo)
-        else:
-            fecha_fin = datetime.date(anio, mes, ruta.dia_fin_periodo)
-            if mes == 1:
-                prev_mes, prev_anio = 12, anio - 1
-            else:
-                prev_mes, prev_anio = mes - 1, anio
-            fecha_inicio = datetime.date(prev_anio, prev_mes, ruta.dia_inicio_periodo)
+        fecha_inicio, fecha_fin = ruta.rango_periodo(mes, anio)
 
         if PeriodoCobro.objects.filter(ruta=ruta, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin).exists():
             return Response({"error": "Ya existe un periodo con este rango de fechas para esta ruta."}, status=status.HTTP_400_BAD_REQUEST)
@@ -394,18 +518,7 @@ class RutaTransporteViewSet(viewsets.ModelViewSet):
         for rid in ruta_ids:
             try:
                 ruta = RutaTransporte.objects.get(id=rid)
-                
-                # Lógica de fechas
-                if ruta.dia_inicio_periodo <= ruta.dia_fin_periodo:
-                    fecha_inicio = datetime.date(anio, mes, ruta.dia_inicio_periodo)
-                    fecha_fin = datetime.date(anio, mes, ruta.dia_fin_periodo)
-                else:
-                    fecha_fin = datetime.date(anio, mes, ruta.dia_fin_periodo)
-                    if mes == 1:
-                        prev_mes, prev_anio = 12, anio - 1
-                    else:
-                        prev_mes, prev_anio = mes - 1, anio
-                    fecha_inicio = datetime.date(prev_anio, prev_mes, ruta.dia_inicio_periodo)
+                fecha_inicio, fecha_fin = ruta.rango_periodo(mes, anio)
                 
                 # Evitar duplicados
                 if not PeriodoCobro.objects.filter(ruta=ruta, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin).exists():
@@ -435,7 +548,14 @@ class RutaTransporteViewSet(viewsets.ModelViewSet):
         if not ruta_ids:
             return Response({"detail": "No se proporcionaron IDs de rutas."}, status=status.HTTP_400_BAD_REQUEST)
             
-        allowed_fields = ['incluir_fines_semana', 'excluir_feriados', 'valor_diario', 'dia_inicio_periodo', 'dia_fin_periodo']
+        allowed_fields = [
+            'incluir_fines_semana',
+            'excluir_feriados',
+            'valor_diario',
+            'valor_mensual',
+            'dia_inicio_periodo',
+            'dia_fin_periodo',
+        ]
         update_data = {k: v for k, v in fields_to_update.items() if k in allowed_fields}
         
         if not update_data:
@@ -449,7 +569,7 @@ class RutaTransporteViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_200_OK)
 
 class PeriodoCobroViewSet(viewsets.ModelViewSet):
-    queryset = PeriodoCobro.objects.select_related('ruta').prefetch_related('ausencias').all()
+    queryset = PeriodoCobro.objects.select_related('ruta', 'ruta__servicio').prefetch_related('ausencias').all()
     serializer_class = PeriodoCobroSerializer
     filterset_fields = ['ruta', 'estado', 'anio_referencia', 'mes_referencia']
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]

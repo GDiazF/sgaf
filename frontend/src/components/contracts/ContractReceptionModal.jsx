@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import MultiSearchableSelect from '../common/MultiSearchableSelect'
+import api from '../../api'
 import {
   Modal,
   Button,
@@ -53,11 +54,16 @@ const ContractReceptionModal = ({
 
   const [formData, setFormData] = useState(buildInitial)
   const [isSplit, setIsSplit] = useState(false)
+  const [gestionResumen, setGestionResumen] = useState(null)
   const overlay = useFormOverlay()
+  const fromGestion =
+    Boolean(gestionResumen?.tiene_gestion) &&
+    Number(gestionResumen?.lineas_con_periodo || 0) > 0
 
   useEffect(() => {
     if (!open || !contract) return
     overlay.reset()
+    setGestionResumen(null)
     if (editingRC) {
       setIsSplit(false)
       setFormData({
@@ -75,6 +81,48 @@ const ContractReceptionModal = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset solo al abrir
   }, [open, contract, editingRC])
+
+  useEffect(() => {
+    if (!open || !contract?.id || editingRC || !formData.periodo || !formData.proveedor) {
+      if (!formData.periodo || !formData.proveedor) setGestionResumen(null)
+      return undefined
+    }
+    const [year, month] = formData.periodo.split('-')
+    const mes = parseInt(month, 10)
+    const anio = parseInt(year, 10)
+    if (!mes || !anio) return undefined
+
+    let cancelled = false
+    api
+      .get(`contratos/contratos/${contract.id}/resumen-periodo/`, {
+        params: { mes, anio, proveedor: formData.proveedor },
+      })
+      .then((res) => {
+        if (cancelled) return
+        const data = res.data
+        setGestionResumen(data)
+        if (data?.tiene_gestion && data.lineas_con_periodo > 0) {
+          const neto = Number(data.total) || 0
+          const iva = Math.round(neto * 0.19)
+          setIsSplit(false)
+          setFormData((prev) => ({
+            ...prev,
+            total_neto: neto,
+            iva,
+            total_pagar: neto + iva,
+            establecimientos: data.establecimientos_ids?.length
+              ? data.establecimientos_ids
+              : prev.establecimientos,
+          }))
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setGestionResumen(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, contract?.id, editingRC, formData.periodo, formData.proveedor])
 
   const allowedEstablishmentIds = formData.proveedor
     ? contract?.proveedores_asociados?.find(
@@ -316,14 +364,31 @@ const ContractReceptionModal = ({
             Limpiar
           </Button>
         </div>
-        {!editingRC && formData.establecimientos?.length > 1 ? (
-          <div className="field field--full" style={{ marginTop: '0.75rem' }}>
+        {!editingRC && formData.establecimientos?.length > 1 && !fromGestion ? (
+          <div className="field field--full">
             <Switch
               id="rc-split"
               label={`Generar recepciones individuales (${formData.establecimientos.length} RCs)`}
               checked={isSplit}
               onChange={(e) => setIsSplit(e.target.checked)}
             />
+          </div>
+        ) : null}
+        {fromGestion ? (
+          <div className="field field--full">
+            <Alert variant="info" title="Montos desde la gestión operativa">
+              {`Total del periodo: ${gestionResumen.lineas_con_periodo} línea(s)`}
+              {gestionResumen.faltantes
+                ? ` · ${gestionResumen.faltantes} sin periodo abierto`
+                : ''}
+              . IVA 19% calculado; puede editarlo. No se generan RCs por colegio.
+            </Alert>
+          </div>
+        ) : gestionResumen?.tiene_gestion && !gestionResumen.lineas_con_periodo ? (
+          <div className="field field--full">
+            <Alert variant="warning" title="Sin periodos abiertos">
+              Abra el mes en la gestión operativa para rellenar automáticamente el total.
+            </Alert>
           </div>
         ) : null}
 

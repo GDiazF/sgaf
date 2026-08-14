@@ -78,7 +78,8 @@ class ContratoSerializer(serializers.ModelSerializer):
             cp = ContratoProveedor.objects.create(contrato=contrato, **prov_data)
             if est_data:
                 cp.establecimientos.set(est_data)
-            
+
+        contrato.ensure_gestion_operativa()
         return contrato
 
     def update(self, instance, validated_data):
@@ -95,7 +96,8 @@ class ContratoSerializer(serializers.ModelSerializer):
                 cp = ContratoProveedor.objects.create(contrato=instance, **prov_data)
                 if est_data:
                     cp.establecimientos.set(est_data)
-                
+
+        instance.ensure_gestion_operativa()
         return instance
 
 # =====================================================================
@@ -118,14 +120,49 @@ class ServicioContratoSerializer(serializers.ModelSerializer):
     contrato_nombre = serializers.ReadOnlyField(source='contrato.codigo_mercado_publico')
     tipo_servicio_nombre = serializers.ReadOnlyField(source='tipo_servicio.nombre')
     tipo_servicio_icono = serializers.ReadOnlyField(source='tipo_servicio.icono')
-    
+    es_transporte = serializers.ReadOnlyField()
+    es_mensual = serializers.ReadOnlyField()
+
     class Meta:
         model = ServicioContrato
         fields = '__all__'
 
+    def validate(self, data):
+        contrato = data.get('contrato') or getattr(self.instance, 'contrato', None)
+        tipo = data.get('tipo_servicio') or getattr(self.instance, 'tipo_servicio', None)
+        if contrato:
+            qs = ServicioContrato.objects.filter(contrato=contrato)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    {'contrato': 'Este contrato ya tiene una gestión operativa.'}
+                )
+        es_transporte = False
+        if tipo:
+            es_transporte = bool(tipo.es_transporte) or 'transporte' in (tipo.nombre or '').lower()
+        if es_transporte:
+            data['modalidad_cobro'] = ServicioContrato.MODALIDAD_DIARIO
+            data['monto_mensual'] = None
+        else:
+            modalidad = data.get('modalidad_cobro')
+            if modalidad is None and self.instance:
+                modalidad = self.instance.modalidad_cobro
+            if not modalidad or modalidad == ServicioContrato.MODALIDAD_DIARIO:
+                modalidad = ServicioContrato.MODALIDAD_MENSUAL_POR_EST
+                data['modalidad_cobro'] = modalidad
+            if modalidad == ServicioContrato.MODALIDAD_MENSUAL_UNICO:
+                monto = data.get('monto_mensual', getattr(self.instance, 'monto_mensual', None))
+                if not monto:
+                    raise serializers.ValidationError(
+                        {'monto_mensual': 'Indique el monto mensual que aplica a todos los colegios.'}
+                    )
+        return data
+
 class PeriodoCobroSerializer(serializers.ModelSerializer):
     nombre_estandarizado = serializers.ReadOnlyField()
     dias_trabajados = serializers.ReadOnlyField()
+    dias_base = serializers.ReadOnlyField()
     monto_total = serializers.ReadOnlyField()
     ausencias = serializers.SerializerMethodField()
 
@@ -144,6 +181,42 @@ class RutaTransporteSerializer(serializers.ModelSerializer):
     class Meta:
         model = RutaTransporte
         fields = '__all__'
+
+    def validate(self, data):
+        servicio = data.get('servicio') or getattr(self.instance, 'servicio', None)
+        proveedor = data.get('proveedor') or getattr(self.instance, 'proveedor', None)
+        establecimientos = data.get('establecimientos')
+        if establecimientos is None and self.instance:
+            establecimientos = list(self.instance.establecimientos.all())
+        est_ids = []
+        for item in establecimientos or []:
+            est_ids.append(item.pk if hasattr(item, 'pk') else int(item))
+
+        if servicio and servicio.es_mensual:
+            if len(est_ids) != 1:
+                raise serializers.ValidationError(
+                    {'establecimientos': 'Seleccione un solo establecimiento.'}
+                )
+            if servicio.modalidad_cobro == ServicioContrato.MODALIDAD_MENSUAL_UNICO:
+                data['valor_mensual'] = servicio.monto_mensual
+            elif not (data.get('valor_mensual') or getattr(self.instance, 'valor_mensual', None)):
+                raise serializers.ValidationError(
+                    {'valor_mensual': 'Indique el monto mensual de este establecimiento.'}
+                )
+            data['valor_diario'] = data.get('valor_diario') or 0
+            if proveedor:
+                qs = RutaTransporte.objects.filter(
+                    servicio=servicio,
+                    proveedor=proveedor,
+                    establecimientos__in=est_ids,
+                )
+                if self.instance:
+                    qs = qs.exclude(pk=self.instance.pk)
+                if qs.exists():
+                    raise serializers.ValidationError(
+                        {'establecimientos': 'Este establecimiento ya está en la gestión para este proveedor.'}
+                    )
+        return data
 
 class AusenciaRutaSerializer(serializers.ModelSerializer):
     class Meta:

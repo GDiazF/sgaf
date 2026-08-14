@@ -1,9 +1,33 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
-import { Modal, Button, Field, Select, EmptyState, Icon } from '@slep/ui'
+import { Modal, Button, Field, MultiSelect, EmptyState, Icon } from '@slep/ui'
 
-export default function ConsolidadoModal({ open, onClose, rutas }) {
-  const [selectedPeriodName, setSelectedPeriodName] = useState('')
+const MONTHS = [
+  'ENERO',
+  'FEBRERO',
+  'MARZO',
+  'ABRIL',
+  'MAYO',
+  'JUNIO',
+  'JULIO',
+  'AGOSTO',
+  'SEPTIEMBRE',
+  'OCTUBRE',
+  'NOVIEMBRE',
+  'DICIEMBRE',
+]
+
+function sortPeriodNames(names) {
+  return [...names].sort((a, b) => {
+    const [mA, yA] = a.split(' ')
+    const [mB, yB] = b.split(' ')
+    if (yA !== yB) return yB - yA
+    return MONTHS.indexOf(mB) - MONTHS.indexOf(mA)
+  })
+}
+
+export default function ConsolidadoModal({ open, onClose, rutas, variant = 'ruta' }) {
+  const [selectedPeriodNames, setSelectedPeriodNames] = useState([])
 
   const availablePeriodNames = useMemo(() => {
     const names = new Set()
@@ -12,123 +36,113 @@ export default function ConsolidadoModal({ open, onClose, rutas }) {
         if (p.nombre_estandarizado) names.add(p.nombre_estandarizado)
       })
     })
-    return Array.from(names).sort((a, b) => {
-      const months = [
-        'ENERO',
-        'FEBRERO',
-        'MARZO',
-        'ABRIL',
-        'MAYO',
-        'JUNIO',
-        'JULIO',
-        'AGOSTO',
-        'SEPTIEMBRE',
-        'OCTUBRE',
-        'NOVIEMBRE',
-        'DICIEMBRE',
-      ]
-      const [mA, yA] = a.split(' ')
-      const [mB, yB] = b.split(' ')
-      if (yA !== yB) return yB - yA
-      return months.indexOf(mB) - months.indexOf(mA)
-    })
+    return sortPeriodNames(Array.from(names))
   }, [rutas])
 
+  useEffect(() => {
+    if (!open) setSelectedPeriodNames([])
+  }, [open])
+
+  const selectedSet = useMemo(() => new Set(selectedPeriodNames), [selectedPeriodNames])
+
   const consolidatedData = useMemo(() => {
-    if (!selectedPeriodName) return []
+    if (!selectedPeriodNames.length) return []
 
     const summary = {}
 
     rutas.forEach((r) => {
-      const p = r.periodos?.find((per) => per.nombre_estandarizado === selectedPeriodName)
+      const matching = (r.periodos || []).filter((p) =>
+        selectedSet.has(p.nombre_estandarizado),
+      )
+      if (!matching.length) return
 
-      if (p) {
-        const provId = r.proveedor || 'sin-prov'
-        const provNombre = r.proveedor_nombre || 'PROVEEDOR NO ASIGNADO'
+      const provId = r.proveedor || 'sin-prov'
+      const provNombre = r.proveedor_nombre || 'PROVEEDOR NO ASIGNADO'
 
-        if (!summary[provId]) {
-          summary[provId] = {
-            nombre: provNombre,
-            rutasCount: 0,
-            diasTotal: 0,
-            montoTotal: 0,
-            rutasNames: [],
-          }
+      if (!summary[provId]) {
+        summary[provId] = {
+          id: provId,
+          nombre: provNombre,
+          rutasCount: 0,
+          diasTotal: 0,
+          montoTotal: 0,
         }
-
-        const dias = parseFloat(p.dias_trabajados || 0)
-        const monto = parseFloat(p.monto_total || 0)
-
-        summary[provId].rutasCount += 1
-        summary[provId].diasTotal += dias
-        summary[provId].montoTotal += monto
-        summary[provId].rutasNames.push(r.nombre)
       }
+
+      summary[provId].rutasCount += 1
+      matching.forEach((p) => {
+        summary[provId].diasTotal += parseFloat(p.dias_trabajados || 0)
+        summary[provId].montoTotal += parseFloat(p.monto_total || 0)
+      })
     })
 
     return Object.values(summary).sort((a, b) => b.montoTotal - a.montoTotal)
-  }, [selectedPeriodName, rutas])
+  }, [selectedPeriodNames, selectedSet, rutas])
+
+  const orderedSelected = useMemo(
+    () => availablePeriodNames.filter((name) => selectedSet.has(name)),
+    [availablePeriodNames, selectedSet],
+  )
 
   const handleExportExcel = () => {
-    if (!consolidatedData.length) return
+    if (!consolidatedData.length || !orderedSelected.length) return
+
+    const lineaLabel = variant === 'establecimiento' ? 'Establecimiento' : 'Ruta'
+    const periodOrder = new Map(orderedSelected.map((name, i) => [name, i]))
 
     const rows = []
-    let grandTotal = 0
-
-    consolidatedData.forEach((prov) => {
-      rows.push({
-        'Proveedor / Ruta': prov.nombre.toUpperCase(),
-        Días: '',
-        'Monto ($)': '',
-      })
-
+    orderedSelected.forEach((periodName) => {
       rutas.forEach((r) => {
-        if (r.proveedor === prov.id || r.proveedor_nombre === prov.nombre) {
-          const p = r.periodos?.find((per) => per.nombre_estandarizado === selectedPeriodName)
-          if (p) {
-            rows.push({
-              'Proveedor / Ruta': `   - ${r.nombre}`,
-              Días: p.dias_trabajados,
-              'Monto ($)': p.monto_total,
-            })
-          }
-        }
+        const p = r.periodos?.find((per) => per.nombre_estandarizado === periodName)
+        if (!p) return
+        rows.push({
+          Periodo: periodName,
+          Proveedor: r.proveedor_nombre || 'Sin proveedor',
+          [lineaLabel]: r.nombre || '',
+          Días: Number(p.dias_trabajados) || 0,
+          Monto: Number(p.monto_total) || 0,
+        })
       })
-
-      rows.push({
-        'Proveedor / Ruta': `TOTAL ${prov.nombre}`,
-        Días: prov.diasTotal,
-        'Monto ($)': prov.montoTotal,
-      })
-
-      rows.push({ 'Proveedor / Ruta': '', Días: '', 'Monto ($)': '' })
-
-      grandTotal += prov.montoTotal
     })
 
-    rows.push({
-      'Proveedor / Ruta': 'TOTAL GENERAL CONSOLIDADO',
-      Días: '',
-      'Monto ($)': grandTotal,
+    rows.sort((a, b) => {
+      const byPeriod = (periodOrder.get(a.Periodo) ?? 0) - (periodOrder.get(b.Periodo) ?? 0)
+      if (byPeriod !== 0) return byPeriod
+      const byProv = a.Proveedor.localeCompare(b.Proveedor, 'es')
+      if (byProv !== 0) return byProv
+      return String(a[lineaLabel]).localeCompare(String(b[lineaLabel]), 'es')
     })
 
     const ws = XLSX.utils.json_to_sheet(rows)
-
     const range = XLSX.utils.decode_range(ws['!ref'])
     for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-      const cellAddress = XLSX.utils.encode_cell({ r: R, c: 2 })
-      if (ws[cellAddress] && typeof ws[cellAddress].v === 'number') {
-        ws[cellAddress].t = 'n'
-        ws[cellAddress].z = '"$"#,##0'
+      const diasCell = XLSX.utils.encode_cell({ r: R, c: 3 })
+      const montoCell = XLSX.utils.encode_cell({ r: R, c: 4 })
+      if (ws[diasCell] && typeof ws[diasCell].v === 'number') {
+        ws[diasCell].t = 'n'
+        ws[diasCell].z = '#,##0'
+      }
+      if (ws[montoCell] && typeof ws[montoCell].v === 'number') {
+        ws[montoCell].t = 'n'
+        ws[montoCell].z = '"$"#,##0'
       }
     }
+    ws['!autofilter'] = { ref: ws['!ref'] }
+    ws['!cols'] = [{ wch: 18 }, { wch: 36 }, { wch: 36 }, { wch: 10 }, { wch: 16 }]
 
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Detalle de Pagos')
-    ws['!cols'] = [{ wch: 50 }, { wch: 10 }, { wch: 20 }]
+    XLSX.utils.book_append_sheet(wb, ws, 'Consolidado')
 
-    XLSX.writeFile(wb, `Consolidado_Detallado_${selectedPeriodName.replace(' ', '_')}.xlsx`)
+    const slug =
+      orderedSelected.length === 1
+        ? orderedSelected[0].replace(/\s+/g, '_')
+        : `${orderedSelected.length}_periodos`
+    XLSX.writeFile(wb, `Consolidado_${slug}.xlsx`)
   }
+
+  const allSelected =
+    availablePeriodNames.length > 0 &&
+    selectedPeriodNames.length === availablePeriodNames.length
 
   return (
     <Modal
@@ -139,30 +153,32 @@ export default function ConsolidadoModal({ open, onClose, rutas }) {
       size="lg"
       className="rutas-detail-modal--wide"
       footer={
-        selectedPeriodName && consolidatedData.length > 0 ? (
+        selectedPeriodNames.length > 0 && consolidatedData.length > 0 ? (
           <Button variant="primary" onClick={handleExportExcel}>
             <Icon name="download" size="sm" /> Descargar resumen detallado
           </Button>
         ) : null
       }
     >
-      <Field label="Seleccionar periodo" htmlFor="consol-periodo">
-        <Select
-          id="consol-periodo"
-          value={selectedPeriodName}
-          onChange={(e) => setSelectedPeriodName(e.target.value)}
-        >
-          <option value="">— Elige un periodo —</option>
-          {availablePeriodNames.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </Select>
-      </Field>
+      <div className="rutas-detail-consol">
+        {availablePeriodNames.length > 0 ? (
+          <Field label="Seleccionar periodo" htmlFor="consol-periodo">
+            <MultiSelect
+              id="consol-periodo"
+              value={selectedPeriodNames}
+              onChange={setSelectedPeriodNames}
+              options={availablePeriodNames}
+              placeholder="— Elige uno o más periodos —"
+            />
+          </Field>
+        ) : (
+          <EmptyState
+            title="Sin periodos"
+            description="Aún no hay periodos abiertos para consolidar."
+          />
+        )}
 
-      {selectedPeriodName ? (
-        <div style={{ marginTop: 'var(--space-4)' }}>
+        {selectedPeriodNames.length > 0 ? (
           <table className="rutas-detail-consol-table">
             <thead>
               <tr>
@@ -173,8 +189,8 @@ export default function ConsolidadoModal({ open, onClose, rutas }) {
               </tr>
             </thead>
             <tbody>
-              {consolidatedData.map((d, idx) => (
-                <tr key={idx}>
+              {consolidatedData.map((d) => (
+                <tr key={d.id}>
                   <td>{d.nombre}</td>
                   <td className="is-num">{d.rutasCount}</td>
                   <td className="is-num">{d.diasTotal}</td>
@@ -186,7 +202,14 @@ export default function ConsolidadoModal({ open, onClose, rutas }) {
             </tbody>
             <tfoot>
               <tr>
-                <td>Total general</td>
+                <td>
+                  Total general
+                  {allSelected
+                    ? ''
+                    : ` · ${selectedPeriodNames.length} periodo${
+                        selectedPeriodNames.length === 1 ? '' : 's'
+                      }`}
+                </td>
                 <td className="is-num">
                   {consolidatedData.reduce((acc, curr) => acc + curr.rutasCount, 0)}
                 </td>
@@ -202,15 +225,13 @@ export default function ConsolidadoModal({ open, onClose, rutas }) {
               </tr>
             </tfoot>
           </table>
-        </div>
-      ) : (
-        <div style={{ marginTop: 'var(--space-4)' }}>
+        ) : availablePeriodNames.length > 0 ? (
           <EmptyState
             title="Esperando selección"
-            description="Elija un periodo para generar el balance financiero."
+            description="Marque uno o más periodos para generar el balance."
           />
-        </div>
-      )}
+        ) : null}
+      </div>
     </Modal>
   )
 }

@@ -6,16 +6,16 @@ from .models import (
 
 @admin.register(TipoServicioOperativo)
 class TipoServicioOperativoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'icono')
+    list_display = ('nombre', 'icono', 'es_transporte')
 
 @admin.register(ServicioContrato)
 class ServicioContratoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'contrato', 'tipo_servicio')
-    list_filter = ('tipo_servicio', 'contrato')
+    list_display = ('nombre', 'contrato', 'tipo_servicio', 'modalidad_cobro')
+    list_filter = ('tipo_servicio', 'contrato', 'modalidad_cobro')
 
 @admin.register(RutaTransporte)
 class RutaTransporteAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'servicio', 'proveedor', 'valor_diario')
+    list_display = ('nombre', 'servicio', 'proveedor', 'valor_diario', 'valor_mensual')
     list_filter = ('servicio', 'proveedor')
 
 @admin.register(FeriadoNacional)

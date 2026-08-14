@@ -22,7 +22,7 @@ import Contracts from './pages/contracts/Contracts';
 import ContractDetail from './pages/contracts/ContractDetail';
 import PeriodoDetallePage from './pages/contracts/PeriodoDetallePage';
 import ServiciosDashboard from './pages/contracts/ServiciosDashboard';
-import ServicioDetailPage from './pages/contracts/ServicioDetailPage';
+import { ServicioDetailRedirect } from './pages/contracts/ServicioDetailPage';
 import RutaDetailPage from './pages/contracts/RutaDetailPage';
 // Funcionarios
 import FuncionariosList from './pages/funcionarios/FuncionariosList';
@@ -153,7 +153,7 @@ function App() {
                 {/* Gestión de Rutas de Transporte */}
                 <Route element={<ProtectedRoute permission="contratos.view_rutatransporte" />}>
                   <Route path="contracts/servicios" element={<ServiciosDashboard />} />
-                  <Route path="contracts/servicios/:id" element={<ServicioDetailPage />} />
+                  <Route path="contracts/servicios/:id" element={<ServicioDetailRedirect />} />
                   <Route path="contracts/ruta/:id" element={<RutaDetailPage />} />
                   <Route path="contracts/periodo/:id" element={<PeriodoDetallePage />} />
                 </Route>

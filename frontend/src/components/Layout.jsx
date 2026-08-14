@@ -23,14 +23,8 @@ import UserProfileModal from './auth/UserProfileModal'
 import AboutModal from './common/AboutModal'
 import { APP_VERSION } from '../version'
 
-/** Rutas hermanas bajo /contracts que no deben marcar "Contratos" como activo. */
-const CONTRACTS_SIBLING = new Set(['servicios', 'ruta', 'periodo'])
-
 function isContractsNavActive({ pathname }) {
-  if (pathname === '/contracts') return true
-  if (!pathname.startsWith('/contracts/')) return false
-  const segment = pathname.split('/')[2]
-  return Boolean(segment) && !CONTRACTS_SIBLING.has(segment)
+  return pathname === '/contracts' || pathname.startsWith('/contracts/')
 }
 
 function ShellTopbar({
@@ -624,9 +618,6 @@ const Layout = () => {
                     isActive={isContractsNavActive}
                     onClick={closeDrawer}
                   />
-                )}
-                {can('contratos.view_rutatransporte') && (
-                  <NavItem to="/contracts/servicios" icon="rutas" label="Gestión de Rutas" onClick={closeDrawer} />
                 )}
                 {can('servicios.view_proveedor') && (
                   <NavItem to="/services/providers" icon="proveedores" label="Proveedores" onClick={closeDrawer} />

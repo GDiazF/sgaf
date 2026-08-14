@@ -175,6 +175,23 @@ const ContractModal = ({
               onChange={(e) => setFormData({ ...formData, cdp: e.target.value })}
             />
           </Field>
+          <Field
+            label="Plantilla de cobro"
+            required={!editingId}
+            htmlFor="c-plantilla"
+            className="field--full"
+          >
+            <Select
+              id="c-plantilla"
+              required={!editingId}
+              value={formData.plantilla_cobro || ''}
+              onChange={(e) => setFormData({ ...formData, plantilla_cobro: e.target.value })}
+            >
+              <option value="">{editingId ? 'Sin definir (contratos anteriores)' : 'Seleccione…'}</option>
+              <option value="TRANSPORTE">Transporte · valor diario</option>
+              <option value="OTRO">Otro · monto mensual</option>
+            </Select>
+          </Field>
         </div>
 
         <p className="contracts-section-title">2. Clasificación y plazos</p>

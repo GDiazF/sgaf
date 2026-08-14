@@ -123,6 +123,11 @@ export function FiltersPage() {
               onSearch={() => {}}
               onClear={() => {}}
               advanced={<AdvancedEstadoRubro estadoId="fd-estado" rubroId="fd-rubro" />}
+              actions={
+                <Button variant="primary" size="sm">
+                  <Icon name="plus" size="sm" /> Nuevo
+                </Button>
+              }
             >
               <SearchField id="fd-q" placeholder="Razón social, RUT o rubro…" />
             </FiltersBar>
