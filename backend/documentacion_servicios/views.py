@@ -251,6 +251,7 @@ class RegistroServicioDocViewSet(viewsets.ModelViewSet):
             migrar_configuracion_antigua,
             resolver_logo_slep,
         )
+        from establecimientos.email_utils import correos_envio_establecimiento
 
         reg = self.get_object()
         est = reg.establecimiento
@@ -260,17 +261,7 @@ class RegistroServicioDocViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        destinatarios = []
-        vistos = set()
-        for raw in (est.email, getattr(est, 'email_director', None)):
-            email = (raw or '').strip()
-            if not email:
-                continue
-            key = email.lower()
-            if key in vistos:
-                continue
-            vistos.add(key)
-            destinatarios.append(email)
+        destinatarios = correos_envio_establecimiento(est)
 
         if not destinatarios:
             return Response(
@@ -321,16 +312,36 @@ class RegistroServicioDocViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        ok = enviar_correo_maestro(
-            'DOC_SERVICIOS_ENVIO_ESTABLECIMIENTO',
-            destinatarios,
-            contexto,
-            archivo_adjunto=adjunto,
-            imagenes_inline=imagenes_inline,
-        )
-        if not ok:
+        enviados = []
+        fallidos = []
+        for email in destinatarios:
+            ok = enviar_correo_maestro(
+                'DOC_SERVICIOS_ENVIO_ESTABLECIMIENTO',
+                [email],
+                contexto,
+                archivo_adjunto=adjunto,
+                imagenes_inline=imagenes_inline,
+            )
+            if ok:
+                enviados.append(email)
+            else:
+                fallidos.append(email)
+
+        if not enviados:
             return Response(
                 {'detail': 'No se pudo enviar el correo. Revise SMTP y la plantilla.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        if fallidos:
+            return Response(
+                {
+                    'detail': (
+                        f'Se envió a {", ".join(enviados)}, pero falló para: '
+                        f'{", ".join(fallidos)}. Revise los correos del establecimiento.'
+                    ),
+                    'destinatarios': enviados,
+                    'fallidos': fallidos,
+                },
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
@@ -338,10 +349,10 @@ class RegistroServicioDocViewSet(viewsets.ModelViewSet):
 
         reg.correo_enviado_en = timezone.now()
         reg.save(update_fields=['correo_enviado_en'])
-        dest_label = ', '.join(destinatarios)
+        dest_label = ', '.join(enviados)
         return Response({
             'status': 'ok',
             'destinatario': dest_label,
-            'destinatarios': destinatarios,
+            'destinatarios': enviados,
             'correo_enviado_en': reg.correo_enviado_en,
         })

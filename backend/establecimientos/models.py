@@ -33,6 +33,13 @@ class Establecimiento(models.Model):
     )
     director = models.CharField(max_length=255, blank=True)
     direccion = models.CharField(max_length=255, blank=True)
+    ciudad = models.CharField(
+        max_length=100,
+        default='Iquique',
+        blank=True,
+        verbose_name='Ciudad',
+        help_text='Ciudad del establecimiento. Por defecto Iquique.',
+    )
     email = models.EmailField(blank=True)
     email_director = models.EmailField(
         blank=True,
@@ -49,6 +56,11 @@ class Establecimiento(models.Model):
  
     def __str__(self):
         return f"{self.nombre} ({self.rbd})"
+
+    def save(self, *args, **kwargs):
+        if not (self.ciudad or '').strip():
+            self.ciudad = 'Iquique'
+        super().save(*args, **kwargs)
 
 class TelefonoEstablecimiento(models.Model):
     establecimiento = models.ForeignKey(

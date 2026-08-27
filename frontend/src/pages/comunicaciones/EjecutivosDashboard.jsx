@@ -10,7 +10,7 @@ const EjecutivoDashboard = () => {
   const [loading, setLoading] = useState(true)
   const { notify } = useNotify()
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
 
   useEffect(() => {
     const fetchMisEstablecimientos = async () => {

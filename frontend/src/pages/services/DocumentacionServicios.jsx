@@ -132,8 +132,32 @@ function buildColumns(
     }))
 
   cols.push({
+    key: 'destinatarios',
+    header: 'Destinatarios',
+    className: 'col--tablet-hide',
+    render: (row) => {
+      const emails = emailsEnvioEstablecimiento(row)
+      if (!emails.length) {
+        return (
+          <span
+            className="field__hint"
+            title="Registre correo institucional y/o del director/a en Establecimientos"
+          >
+            Sin correo
+          </span>
+        )
+      }
+      return (
+        <span className="doc-servicios-dest" title={emails.join('\n')}>
+          {emails.join(', ')}
+        </span>
+      )
+    },
+  })
+
+  cols.push({
     key: 'correo',
-    header: 'Correo',
+    header: 'Envío',
     className: 'col--status',
     cardRole: 'status',
     render: (row) =>
@@ -220,6 +244,7 @@ export default function DocumentacionServicios() {
   const canAdd = can('documentacion_servicios.add_registroserviciodoc')
   const canChange = can('documentacion_servicios.change_registroserviciodoc')
   const canDelete = can('documentacion_servicios.delete_registroserviciodoc')
+  const canView = can('documentacion_servicios.view_registroserviciodoc')
 
   const [tipos, setTipos] = useState([])
   const [activeTipoId, setActiveTipoId] = useState(null)
@@ -232,7 +257,7 @@ export default function DocumentacionServicios() {
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [ordering, setOrdering] = useState('-fecha_servicio')
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(50)
   const [selectedKeys, setSelectedKeys] = useState([])
   const [zipBusy, setZipBusy] = useState(false)
 
@@ -634,10 +659,12 @@ export default function DocumentacionServicios() {
     try {
       const res = await api.post(`doc-servicios/registros/${emailTarget.id}/enviar-correo/`)
       const enviadoEn = res.data.correo_enviado_en || new Date().toISOString()
-      const dest =
+      const dest = (
+        (Array.isArray(res.data.destinatarios) ? res.data.destinatarios.join(', ') : null) ||
         res.data.destinatario ||
         emailsEnvioEstablecimiento(emailTarget).join(', ') ||
         'los destinatarios'
+      )
       setRows((prev) =>
         prev.map((r) =>
           r.id === emailTarget.id ? { ...r, correo_enviado_en: enviadoEn } : r,
@@ -800,7 +827,7 @@ export default function DocumentacionServicios() {
         split
         actions={
           <>
-            {selectedKeys.length > 0 ? (
+            {selectedKeys.length > 0 && canView ? (
               <Button
                 variant="secondary"
                 loading={zipBusy}

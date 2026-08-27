@@ -1,6 +1,7 @@
-from rest_framework import viewsets, status, permissions
+from rest_framework import viewsets, status, permissions, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
 from django.db import transaction
 from django.core.files.base import ContentFile
 from django.http import HttpResponse
@@ -17,6 +18,22 @@ from .serializers import (
 )
 from reportlab.lib.colors import HexColor
 from core.utils.report_utils import get_report_assets
+from core.drf_permissions import SgafModelPermissions, SgafPermissionMixin
+
+_DEFAULT_PERMS = [permissions.IsAuthenticated, SgafModelPermissions]
+
+
+class RegistroPagoSearchFilter(filters.SearchFilter):
+    """También busca montos/RBD si el término trae puntos o separadores (ej. 150.000)."""
+
+    def get_search_terms(self, request):
+        terms = super().get_search_terms(request)
+        extra = []
+        for term in terms:
+            digits = ''.join(c for c in term if c.isdigit())
+            if digits and digits != term:
+                extra.append(digits)
+        return [*terms, *extra]
 
 # Sufijo estándar para PDF corporativo en carga masiva: {nro_documento}_CORP.pdf
 PAGO_PDF_CORPORATE_SUFFIX = 'CORP'
@@ -24,10 +41,12 @@ PAGO_PDF_CORPORATE_SUFFIX = 'CORP'
 class TipoProveedorViewSet(viewsets.ModelViewSet):
     queryset = TipoProveedor.objects.all()
     serializer_class = TipoProveedorSerializer
+    permission_classes = _DEFAULT_PERMS
 
 class ProveedorViewSet(viewsets.ModelViewSet):
     queryset = Proveedor.objects.all()
     serializer_class = ProveedorSerializer
+    permission_classes = _DEFAULT_PERMS
     pagination_class = None # Desactivar paginación para ver todos los proveedores en selectores
     filterset_fields = {
         'tipo_proveedor': ['exact'],
@@ -38,8 +57,13 @@ class ProveedorViewSet(viewsets.ModelViewSet):
 class TipoDocumentoViewSet(viewsets.ModelViewSet):
     queryset = TipoDocumento.objects.all()
     serializer_class = TipoDocumentoSerializer
+    permission_classes = _DEFAULT_PERMS
 
-class ServicioViewSet(viewsets.ModelViewSet):
+class ServicioViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
+    sgaf_action_permissions = {
+        'download_template': 'servicios.add_servicio',
+        'bulk_upload': 'servicios.add_servicio',
+    }
     queryset = Servicio.objects.all()
     serializer_class = ServicioSerializer
     filterset_fields = ['proveedor', 'establecimiento', 'tipo_documento', 'numero_cliente']
@@ -150,10 +174,21 @@ class ServicioViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': f'Error al guardar en la base de datos: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class RegistroPagoViewSet(viewsets.ModelViewSet):
+class RegistroPagoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
+    sgaf_action_permissions = {
+        'export_excel': 'servicios.view_registropago',
+        'download_template': 'servicios.add_registropago',
+        'bulk_upload': 'servicios.add_registropago',
+        'bulk_upload_files': 'servicios.change_registropago',
+        'generate_pdf': 'servicios.view_registropago',
+    }
     queryset = RegistroPago.objects.all().order_by('-fecha_pago')
     serializer_class = RegistroPagoSerializer
-    permission_classes = [permissions.DjangoModelPermissions]
+    filter_backends = [
+        DjangoFilterBackend,
+        RegistroPagoSearchFilter,
+        filters.OrderingFilter,
+    ]
     filterset_fields = {
         'establecimiento': ['exact'],
         'establecimiento__tipo__area_gestion': ['exact'],
@@ -164,7 +199,32 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
         'servicio__proveedor__tipo_proveedor': ['exact']
     }
     ordering_fields = ['fecha_pago', 'fecha_emision', 'fecha_vencimiento', 'monto_total', 'nro_documento', 'establecimiento__nombre']
-    search_fields = ['nro_documento', 'servicio__numero_cliente', 'establecimiento__nombre']
+    search_fields = [
+        'nro_documento',
+        'servicio__numero_cliente',
+        'servicio__numero_servicio',
+        'establecimiento__nombre',
+        'monto_str',
+        'rbd_str',
+    ]
+
+    def get_queryset(self):
+        from django.db.models import CharField
+        from django.db.models.functions import Cast
+
+        return (
+            RegistroPago.objects.select_related(
+                'servicio',
+                'servicio__proveedor',
+                'establecimiento',
+                'recepcion_conforme',
+            )
+            .annotate(
+                monto_str=Cast('monto_total', CharField()),
+                rbd_str=Cast('establecimiento__rbd', CharField()),
+            )
+            .order_by('-fecha_pago')
+        )
 
     @action(detail=False, methods=['get'])
     def export_excel(self, request):
@@ -394,244 +454,15 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def generate_pdf(self, request, pk=None):
-        import io
-        from django.http import FileResponse
-        from reportlab.lib import colors
-        from reportlab.lib.pagesizes import letter
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import inch, mm
-        from reportlab.lib.enums import TA_CENTER
-        from reportlab.lib.colors import HexColor
-        from django.conf import settings
-        from reportlab.lib.utils import ImageReader
-        import os
+        """RC de un solo pago (unitario o Monto JUNJI) vía plantilla."""
+        from servicios.pdf import build_registro_pago_rc_pdf
 
-        # Page Size Folio (216x330mm)
-        FOLIO = (216*mm, 330*mm)
-
-        # Spanish Month Names
-        MESES = {
-            1: "enero", 2: "febrero", 3: "marzo", 4: "abril",
-            5: "mayo", 6: "junio", 7: "julio", 8: "agosto",
-            9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
-        }
-
-        pago = self.get_object()
-        rc = pago.recepcion_conforme
-        tipo = request.query_params.get('tipo', 'ESTANDAR').upper()
-        
-        buffer = io.BytesIO()
-        # Page Size Folio (216x330mm)
-        FOLIO = (216*mm, 330*mm)
-        
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=FOLIO,
-            rightMargin=50,
-            leftMargin=50,
-            topMargin=25,
-            bottomMargin=25
+        tipo = request.query_params.get('tipo', 'PAGO').upper()
+        return build_registro_pago_rc_pdf(
+            self.get_object(),
+            user=request.user,
+            tipo=tipo or None,
         )
-
-        elements = []
-        styles = getSampleStyleSheet()
-        
-        assets = get_report_assets('RC_BASIC')
-        azul_oscuro = assets['color_primario']
-        gris_claro = assets['color_secundario']
-        gris_lineas = assets['color_lineas']
-
-        styles.add(ParagraphStyle(
-            name='MainTitle', parent=styles['Heading1'], alignment=TA_CENTER,
-            fontSize=12, spaceAfter=10, spaceBefore=10, fontName='Helvetica-Bold'
-        ))
-        styles.add(ParagraphStyle(
-            name='NormalText', parent=styles['Normal'], fontSize=9, leading=11,
-            spaceBefore=5, spaceAfter=5, alignment=4
-        ))
-        # Safe style addition
-        def safe_add_style(name, **kwargs):
-            if name in styles:
-                # Update existing style if needed or just skip
-                return styles[name]
-            new_style = ParagraphStyle(name=name, **kwargs)
-            styles.add(new_style)
-            return new_style
-
-        safe_add_style('TableTableHeaderStyle', parent=styles['Normal'], fontSize=7.5, leading=7.5, alignment=TA_CENTER, spaceBefore=0, spaceAfter=0, textColor=colors.white, fontName='Helvetica-Bold')
-        safe_add_style('TableTextStyle', parent=styles['Normal'], fontSize=7.5, leading=7.5, alignment=TA_CENTER, spaceBefore=0, spaceAfter=0)
-        safe_add_style('TableTextLeft', parent=styles['Normal'], fontSize=7.5, leading=7.5, alignment=0, spaceBefore=0, spaceAfter=0, wordWrap='LTR')
-        safe_add_style('TableTextRight', parent=styles['Normal'], fontSize=7.5, leading=7.5, alignment=2, spaceBefore=0, spaceAfter=0)
-        safe_add_style('TableTextBlueRight', parent=styles['Normal'], fontSize=7.5, leading=7.5, alignment=2, spaceBefore=0, spaceAfter=0, textColor=azul_oscuro, fontName='Helvetica-Bold')
-        safe_add_style('FolioStyle', parent=styles['Normal'], alignment=2, fontSize=9, fontName='Helvetica-Bold', spaceAfter=5)
-
-        def get_scaled_image(path, max_w, max_h):
-            img_reader = ImageReader(path)
-            iw, ih = img_reader.getSize()
-            aspect = ih / float(iw)
-            w, h = max_w, max_w * aspect
-            if h > max_h:
-                h = max_h
-                w = h / aspect
-            return Image(path, width=w, height=h)
-
-        # Header Table
-        header_data = [[]]
-        if assets['logo_izquierdo'] and os.path.exists(assets['logo_izquierdo']):
-            header_data[0].append(get_scaled_image(assets['logo_izquierdo'], 1.6*inch, 0.9*inch))
-        else: header_data[0].append("")
-        header_data[0].append(Paragraph("", styles['Normal']))
-        if assets['logo_derecho'] and os.path.exists(assets['logo_derecho']):
-            header_data[0].append(get_scaled_image(assets['logo_derecho'], 1.8*inch, 1.2*inch))
-        else: header_data[0].append("")
-
-        header_table = Table(header_data, colWidths=[2.5*inch, 2.2*inch, 2.5*inch])
-        header_table.setStyle(TableStyle([
-            ('ALIGN', (0,0), (0,0), 'LEFT'), ('ALIGN', (2,0), (2,0), 'RIGHT'), ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ]))
-        elements.append(header_table)
-        elements.append(Spacer(1, 10))
-        elements.append(Paragraph("RECEPCIÓN CONFORME", styles['MainTitle']))
-
-        fecha = pago.fecha_pago
-        intro_text = (
-            f"En Iquique, a {fecha.day} de {MESES.get(fecha.month)} de {fecha.year} "
-            f"en el establecimiento {pago.establecimiento.nombre}, se procede a dar recepción conforme a la boleta "
-            f"N° {pago.nro_documento} de {pago.servicio.proveedor.nombre}."
-        )
-        elements.append(Paragraph(intro_text, styles['NormalText']))
-        
-        if rc and tipo != 'ESTANDAR':
-            elements.append(Paragraph(f"FOLIO: {rc.folio}", styles['FolioStyle']))
-        else:
-            elements.append(Spacer(1, 15))
-        
-        available_width = doc.width
-
-        if tipo == 'PAGO':
-            # Official Format (from RecepcionConformeViewSet)
-            headers = ['N° Cliente', 'RBD', 'Establecimiento', 'Factura', 'Fecha Venc.', 'Interés', 'Monto Total']
-            data_body = [[Paragraph(h, styles['TableTableHeaderStyle']) for h in headers]]
-            data_body.append([
-                Paragraph(str(pago.servicio.numero_cliente), styles['TableTextStyle']),
-                Paragraph(str(pago.establecimiento.rbd), styles['TableTextStyle']),
-                Paragraph(pago.establecimiento.nombre, styles['TableTextLeft']),
-                Paragraph(str(pago.nro_documento), styles['TableTextStyle']),
-                Paragraph(pago.fecha_vencimiento.strftime("%d-%m-%Y"), styles['TableTextStyle']),
-                Paragraph(f"${pago.monto_interes:,}".replace(",", "."), styles['TableTextRight']),
-                Paragraph(f"${pago.monto_total:,}".replace(",", "."), styles['TableTextRight'])
-            ])
-            # Totals Row
-            data_body.append([
-                '', '', '', '', '',
-                Paragraph(f"${pago.monto_interes:,}".replace(",", "."), styles['TableTextBlueRight']),
-                Paragraph(f"${pago.monto_total:,}".replace(",", "."), styles['TableTextBlueRight'])
-            ])
-            col_widths = [
-                available_width * 0.14, available_width * 0.08, available_width * 0.32,
-                available_width * 0.12, available_width * 0.12, available_width * 0.11, available_width * 0.11
-            ]
-            t_body = Table(data_body, colWidths=col_widths)
-            t_body_style = [
-                ('ALIGN', (0,0), (-1,0), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'), 
-                ('FONTNAME', (0,0), (-1,-1), 'Helvetica'), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), 
-                ('FONTSIZE', (0,0), (-1,-1), 7.5),
-                ('BACKGROUND', (0,0), (-1,0), azul_oscuro), ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-                ('BACKGROUND', (0,1), (-1,-1), gris_claro), ('GRID', (0,0), (-1,-1), 0.5, gris_lineas),
-                ('BOX', (0,0), (-1,-1), 1, azul_oscuro), ('TOPPADDING', (0,0), (-1,0), 6), ('BOTTOMPADDING', (0,0), (-1,0), 6),
-                ('LEFTPADDING', (0,0), (-1,-1), 3), ('RIGHTPADDING', (0,0), (-1,-1), 3),
-            ]
-            # Footer style
-            t_body_style.append(('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'))
-            t_body_style.append(('BACKGROUND', (0, -1), (-1, -1), colors.white))
-            t_body_style.append(('TEXTCOLOR', (5, -1), (-1, -1), azul_oscuro))
-            t_body.setStyle(TableStyle(t_body_style))
-        else:
-            # Standard Format (with Monto JUNJI, Monto Final)
-            headers = ['N° Cliente', 'RBD', 'Establecimiento', 'Factura', 'Monto JUNJI', 'Monto Final']
-            data_body = [[Paragraph(h, styles['TableTableHeaderStyle']) for h in headers]]
-            monto_junji = pago.monto_total - pago.monto_interes
-            data_body.append([
-                Paragraph(str(pago.servicio.numero_cliente), styles['TableTextStyle']),
-                Paragraph(str(pago.establecimiento.rbd), styles['TableTextStyle']),
-                Paragraph(pago.establecimiento.nombre, styles['TableTextLeft']),
-                Paragraph(str(pago.nro_documento), styles['TableTextStyle']),
-                Paragraph(f"${monto_junji:,}".replace(",", "."), styles['TableTextRight']),
-                Paragraph(f"${pago.monto_total:,}".replace(",", "."), styles['TableTextRight'])
-            ])
-            col_widths = [
-                available_width * 0.14, available_width * 0.08, available_width * 0.40,
-                available_width * 0.12, available_width * 0.13, available_width * 0.13
-            ]
-            t_body = Table(data_body, colWidths=col_widths)
-            t_body.setStyle(TableStyle([
-                ('ALIGN', (0,0), (-1,0), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'), 
-                ('FONTNAME', (0,0), (-1,-1), 'Helvetica'), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), 
-                ('FONTSIZE', (0,0), (-1,-1), 7.5),
-                ('BACKGROUND', (0,0), (-1,0), azul_oscuro), ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-                ('BACKGROUND', (0,1), (-1,-1), gris_claro), ('GRID', (0,0), (-1,-1), 0.5, gris_lineas),
-                ('BOX', (0,0), (-1,-1), 1, azul_oscuro), ('TOPPADDING', (0,0), (-1,0), 6), ('BOTTOMPADDING', (0,0), (-1,0), 6),
-                ('LEFTPADDING', (0,0), (-1,-1), 3), ('RIGHTPADDING', (0,0), (-1,-1), 3),
-            ]))
-
-        elements.append(t_body)
-        elements.append(Spacer(1, 20))
-
-        # Signatures
-        sig_p_style = ParagraphStyle(
-            'SigText', parent=styles['Normal'], fontSize=8.5, alignment=TA_CENTER, fontName='Helvetica-Bold', leading=10
-        )
-
-        if tipo == 'PAGO':
-            # Official Dual Signature
-            left_sig = [[Spacer(1, 20)], [Paragraph("_________________________________", sig_p_style)], [Paragraph("RECIBE CONFORME", sig_p_style)]]
-            t_left = Table(left_sig, colWidths=[3*inch])
-            t_left.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'BOTTOM')]))
-
-            firmante = rc.firmante if rc else None
-            if firmante:
-                name = firmante.nombre_funcionario.upper()
-                cargo = firmante.cargo.upper() if firmante.cargo else ""
-                org_unit = ""
-                if firmante.departamento:
-                    d_name = firmante.departamento.nombre.upper()
-                    org_unit = f"DEPARTAMENTO {d_name}" if "DEPARTAMENTO" not in d_name else d_name
-                elif firmante.subdireccion:
-                    s_name = firmante.subdireccion.nombre.upper()
-                    org_unit = s_name if "SUBDIRECCIÓN" in s_name else f"SUBDIRECCIÓN {s_name}"
-                else:
-                    org_unit = "DIRECCIÓN"
-                
-                cargo_line = f"{cargo} DE {org_unit}" if cargo and org_unit else (cargo or org_unit)
-                
-                right_sig = [
-                    [Spacer(1, 20)],
-                    [Paragraph("_________________________________", sig_p_style)],
-                    [Paragraph(name, sig_p_style)],
-                    [Paragraph(cargo_line, sig_p_style)]
-                ]
-            else:
-                right_sig = [[Spacer(1, 20)], [Paragraph("_________________________________", sig_p_style)], [Paragraph("FIRMANTE DEL DOCUMENTO", sig_p_style)]]
-            
-            t_right = Table(right_sig, colWidths=[3*inch])
-            t_right.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'BOTTOM')]))
-
-            sig_table = Table([[t_right, t_left]], colWidths=[3.5*inch, 3.5*inch])
-            sig_table.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
-            elements.append(sig_table)
-        else:
-            # Standard Centered Signature
-            signature_block = [[Spacer(1, 20)], [Paragraph("_________________________________", sig_p_style)], [Paragraph("RECIBE CONFORME", sig_p_style)]]
-            t_sig = Table(signature_block, colWidths=[3*inch])
-            t_sig.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'BOTTOM')]))
-            sig_table = Table([[t_sig]], colWidths=[available_width])
-            sig_table.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
-            elements.append(sig_table)
-
-        doc.build(elements)
-        buffer.seek(0)
-        return FileResponse(buffer, as_attachment=True, filename=f'RC_{pago.nro_documento}.pdf')
 
     @staticmethod
     def _parse_pago_pdf_filename(filename):
@@ -730,9 +561,15 @@ class RegistroPagoViewSet(viewsets.ModelViewSet):
 
         return Response(results, status=status.HTTP_200_OK)
 
-class RecepcionConformeViewSet(viewsets.ModelViewSet):
+class RecepcionConformeViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
+    sgaf_action_permissions = {
+        'create_historical': 'servicios.add_recepcionconforme',
+        'generate_pdf': 'servicios.view_recepcionconforme',
+        'anular': 'servicios.delete_recepcionconforme',
+    }
     queryset = RecepcionConforme.objects.all().order_by('-fecha_emision', '-id')
     serializer_class = RecepcionConformeSerializer
+    permission_classes = _DEFAULT_PERMS
     filterset_fields = {
         'proveedor': ['exact'],
         'estado': ['exact', 'in'],
@@ -780,331 +617,14 @@ class RecepcionConformeViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def generate_pdf(self, request, pk=None):
-        import io
-        from django.http import FileResponse
-        from reportlab.lib import colors
-        from reportlab.lib.pagesizes import letter
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import inch, mm
-        from reportlab.lib.enums import TA_CENTER
-        from reportlab.lib.colors import HexColor
-        from django.conf import settings
-        from reportlab.lib.utils import ImageReader
-        import os
+        from servicios.pdf import build_recepcion_conforme_pdf
 
-        # Page Size Folio (216x330mm)
-        FOLIO = (216*mm, 330*mm)
-
-        # Spanish Month Names
-        MESES = {
-            1: "enero", 2: "febrero", 3: "marzo", 4: "abril",
-            5: "mayo", 6: "junio", 7: "julio", 8: "agosto",
-            9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
-        }
-
-        rc = self.get_object()
-        
-        # Get tipo from query params if available, otherwise use model default or ESTANDAR
-        tipo_param = request.query_params.get('tipo', '').upper()
-        if tipo_param in ['PAGO', 'ESTANDAR']:
-            current_tipo = tipo_param
-        else:
-            current_tipo = getattr(rc, 'tipo_rc', 'ESTANDAR')
-
-        buffer = io.BytesIO()
-        
-        # Custom margins
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=FOLIO,
-            rightMargin=50,
-            leftMargin=50,
-            topMargin=25,
-            bottomMargin=25
+        tipo = request.query_params.get('tipo', '').upper()
+        return build_recepcion_conforme_pdf(
+            self.get_object(),
+            user=request.user,
+            tipo=tipo or None,
         )
-
-        # Container for elements
-        elements = []
-        
-        # Styles from reference code
-        styles = getSampleStyleSheet()
-        
-        # Get dynamic configuration
-        assets = get_report_assets('RC_BASIC')
-        azul_oscuro = assets['color_primario']
-        gris_claro = assets['color_secundario']
-        gris_lineas = assets['color_lineas']
-
-        styles.add(ParagraphStyle(
-            name='MainTitle', parent=styles['Heading1'], alignment=TA_CENTER,
-            fontSize=12, spaceAfter=10, spaceBefore=10, fontName='Helvetica-Bold'
-        ))
-        
-        styles.add(ParagraphStyle(
-            name='SignatureTitle',
-            parent=styles['Heading1'],
-            alignment=TA_CENTER,
-            fontSize=10,
-            spaceAfter=4,
-            spaceBefore=4,
-            fontName='Helvetica-Bold'
-        ))
-        
-        styles.add(ParagraphStyle(
-            name='NormalText', parent=styles['Normal'], fontSize=9, leading=11,
-            spaceBefore=5, spaceAfter=5, alignment=4
-        ))
-
-        styles.add(ParagraphStyle(
-            name='FolioStyle',
-            parent=styles['Normal'],
-            alignment=2, # Right
-            fontSize=9,
-            fontName='Helvetica-Bold', # Restored to Bold
-            spaceAfter=5
-        ))
-
-        # Helper for proportional scaling (Manually fixed for ReportLab Image)
-        def get_scaled_image(path, max_w, max_h):
-            img_reader = ImageReader(path)
-            iw, ih = img_reader.getSize()
-            aspect = ih / float(iw)
-            
-            w = max_w
-            h = w * aspect
-            
-            if h > max_h:
-                h = max_h
-                w = h / aspect
-                
-            return Image(path, width=w, height=h)
-
-        header_data = [[]]
-        
-        # Logo Izquierdo
-        if assets['logo_izquierdo'] and os.path.exists(assets['logo_izquierdo']):
-            header_data[0].append(get_scaled_image(assets['logo_izquierdo'], 1.6*inch, 0.9*inch))
-        else:
-            header_data[0].append("")
-            
-        header_data[0].append(Paragraph("", styles['Normal']))
-        
-        # Logo Derecho
-        if assets['logo_derecho'] and os.path.exists(assets['logo_derecho']):
-            header_data[0].append(get_scaled_image(assets['logo_derecho'], 1.8*inch, 1.2*inch))
-        else:
-            header_data[0].append("")
-
-        header_table = Table(header_data, colWidths=[2.5*inch, 2.2*inch, 2.5*inch])
-        header_table.setStyle(TableStyle([
-            ('ALIGN', (0,0), (0,0), 'LEFT'),
-            ('ALIGN', (2,0), (2,0), 'RIGHT'),
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ]))
-        elements.append(header_table)
-        elements.append(Spacer(1, 10))
-        elements.append(Paragraph("RECEPCIÓN CONFORME", styles['MainTitle']))
-
-        # Intro Paragraph
-        establecimientos_count = rc.registros.values('establecimiento').distinct().count()
-        prov_name = rc.proveedor.nombre
-        fecha = rc.fecha_emision
-        
-        if establecimientos_count > 1:
-            intro_text = (
-                f"En Iquique, a {fecha.day} de {MESES.get(fecha.month)} de {fecha.year} "
-                f"se procede a dar recepción conforme a las boletas "
-                f"de {prov_name}, se adjunta listado."
-            )
-        else:
-            first_pago = rc.registros.first()
-            est_name = first_pago.establecimiento.nombre if first_pago else "Establecimiento no definido"
-            intro_text = (
-                f"En Iquique, a {fecha.day} de {MESES.get(fecha.month)} de {fecha.year} "
-                f"en el establecimiento {est_name}, se procede a dar recepción conforme a las boletas "
-                f"de {prov_name}, se adjunta listado."
-            )
-        elements.append(Paragraph(intro_text, styles['NormalText']))
-        
-        # Folio Right Aligned above table
-        if current_tipo != 'ESTANDAR':
-            elements.append(Paragraph(f"FOLIO: {rc.folio}", styles['FolioStyle']))
-        else:
-            elements.append(Spacer(1, 15))
-
-        rc = self.get_object()
-        current_tipo = request.query_params.get('tipo', 'ESTANDAR').upper()
-
-        # Safe style addition
-        def safe_add_style(name, **kwargs):
-            if name in styles: return styles[name]
-            new_style = ParagraphStyle(name=name, **kwargs)
-            styles.add(new_style)
-            return new_style
-
-        safe_add_style('TableTableHeaderStyle', parent=styles['Normal'], fontSize=7.5, leading=7.5, alignment=TA_CENTER, spaceBefore=0, spaceAfter=0, textColor=colors.white, fontName='Helvetica-Bold')
-        safe_add_style('TableTextStyle', parent=styles['Normal'], fontSize=7.5, leading=7.5, alignment=TA_CENTER, spaceBefore=0, spaceAfter=0)
-        safe_add_style('TableTextLeft', parent=styles['Normal'], fontSize=7.5, leading=7.5, alignment=0, spaceBefore=0, spaceAfter=0, wordWrap='LTR')
-        safe_add_style('TableTextRight', parent=styles['Normal'], fontSize=7.5, leading=7.5, alignment=2, spaceBefore=0, spaceAfter=0)
-        safe_add_style('TableTextBlueRight', parent=styles['Normal'], fontSize=7.5, leading=7.5, alignment=2, spaceBefore=0, spaceAfter=0, textColor=azul_oscuro, fontName='Helvetica-Bold')
-
-        # Detail Table
-        if current_tipo == 'ESTANDAR':
-            headers = ['N° Cliente', 'Establecimiento', 'Factura', 'Monto JUNJI', 'Monto Total']
-        else:
-            headers = ['N° Cliente', 'RBD', 'Establecimiento', 'Factura', 'Fecha Venc.', 'Interés', 'Monto Total']
-        
-        data_body = [[Paragraph(h, styles['TableTableHeaderStyle']) for h in headers]]
-        total_interes = 0
-        total_monto = 0
-        
-        for p in rc.registros.all():
-            total_interes += p.monto_interes
-            total_monto += p.monto_total
-            
-            if current_tipo == 'ESTANDAR':
-                monto_junji = p.monto_total - p.monto_interes
-                row = [
-                    p.servicio.numero_cliente,
-                    Paragraph(p.establecimiento.nombre, styles['TableTextLeft']),
-                    p.nro_documento,
-                    f"${monto_junji:,}".replace(",", "."),
-                    f"${p.monto_total:,}".replace(",", ".")
-                ]
-            else:
-                row = [
-                    p.servicio.numero_cliente,
-                    str(p.establecimiento.rbd),
-                    Paragraph(p.establecimiento.nombre, styles['TableTextLeft']),
-                    p.nro_documento,
-                    p.fecha_vencimiento.strftime("%d-%m-%Y"),
-                    f"${p.monto_interes:,}".replace(",", "."),
-                    f"${p.monto_total:,}".replace(",", ".")
-                ]
-            data_body.append(row)
-        
-        # Add Totals Row for PAGO type
-        if current_tipo == 'PAGO':
-            footer_row = [
-                '', '', '', '', '',
-                Paragraph(f"${total_interes:,}".replace(",", "."), styles['TableTextBlueRight']),
-                Paragraph(f"${total_monto:,}".replace(",", "."), styles['TableTextBlueRight'])
-            ]
-            data_body.append(footer_row)
-        
-        # Calculate available width (8.5 inch - 100 points margins)
-        available_width = FOLIO[0] - 100
-        if current_tipo == 'ESTANDAR':
-            col_widths = [
-                available_width * 0.14, available_width * 0.40, available_width * 0.12,
-                available_width * 0.17, available_width * 0.17
-            ]
-        else:
-            col_widths = [
-                available_width * 0.14, available_width * 0.08, available_width * 0.32,
-                available_width * 0.12, available_width * 0.12, available_width * 0.11, available_width * 0.11
-            ]
-
-        t_body = Table(data_body, colWidths=col_widths)
-        t_body_style = [
-            ('ALIGN', (0,0), (-1,0), 'CENTER'),
-            ('ALIGN', (0,1), (1,-1), 'CENTER'),
-            ('ALIGN', (2,1), (2,-1), 'LEFT'),
-            ('ALIGN', (3,1), (4,-1), 'CENTER'),
-            ('ALIGN', (5,1), (-1,-1), 'RIGHT'),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,-1), 7.5),
-            ('BACKGROUND', (0,0), (-1,0), azul_oscuro),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-            ('BACKGROUND', (0,1), (-1,-1), gris_claro),
-            ('GRID', (0,0), (-1,-1), 0.5, gris_lineas),
-            ('BOX', (0,0), (-1,-1), 0.8, azul_oscuro),
-            ('TOPPADDING', (0,0), (-1,0), 6),
-            ('BOTTOMPADDING', (0,0), (-1,0), 6),
-            ('LEFTPADDING', (0,0), (-1,-1), 3),
-            ('RIGHTPADDING', (0,0), (-1,-1), 3),
-        ]
-        
-        # Style for the footer row if it exists
-        if current_tipo == 'PAGO':
-            t_body_style.append(('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'))
-            t_body_style.append(('BACKGROUND', (0, -1), (-1, -1), colors.white))
-            t_body_style.append(('TEXTCOLOR', (4, -1), (-1, -1), azul_oscuro))
-
-        t_body.setStyle(TableStyle(t_body_style))
-        elements.append(t_body)
-        elements.append(Spacer(1, 20)) 
-
-        # Dual Signature Section
-        firmante = rc.firmante
-        sig_p_style = ParagraphStyle(
-            'SigText', parent=styles['Normal'], fontSize=8.5, alignment=TA_CENTER, fontName='Helvetica-Bold', leading=10,
-            spaceBefore=0, spaceAfter=0
-        )
-
-        # 1. Signature Box for "RECIBE CONFORME" (Now on the Right)
-        left_signature = [
-            [Spacer(1, 20)], # Signature space
-            [Paragraph("_________________________________", sig_p_style)],
-            [Paragraph("RECIBE CONFORME", sig_p_style)]
-        ]
-        t_left = Table(left_signature, colWidths=[3*inch])
-        t_left.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'BOTTOM'),
-        ]))
-
-        # 2. Signature Box for "FIRMANTE" (Now on the Left)
-        firmante_details = []
-        if firmante:
-            name = firmante.nombre_funcionario.upper() # Explicitly uppercase
-            cargo = firmante.cargo.upper() if firmante.cargo else "" # Explicitly uppercase
-            org_unit = ""
-            if firmante.departamento:
-                d_name = firmante.departamento.nombre.upper()
-                org_unit = f"DEPARTAMENTO {d_name}" if "DEPARTAMENTO" not in d_name else d_name
-            elif firmante.subdireccion:
-                s_name = firmante.subdireccion.nombre.upper()
-                org_unit = s_name if "SUBDIRECCIÓN" in s_name else f"SUBDIRECCIÓN {s_name}"
-            else:
-                org_unit = "DIRECCIÓN"
-            
-            cargo_line = f"{cargo} DE {org_unit}" if cargo and org_unit else (cargo or org_unit)
-            
-            firmante_details = [
-                [Spacer(1, 20)], # Signature space
-                [Paragraph("_________________________________", sig_p_style)],
-                [Paragraph(name, sig_p_style)],
-                [Paragraph(cargo_line, sig_p_style)]
-            ]
-        else:
-            firmante_details = [
-                [Spacer(1, 40)],
-                [Paragraph("_________________________________", sig_p_style)],
-                [Paragraph("FIRMANTE DEL DOCUMENTO", sig_p_style)]
-            ]
-
-        t_right = Table(firmante_details, colWidths=[3*inch])
-        t_right.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'BOTTOM'),
-        ]))
-
-        # Main Signature Table (Swapped: Firmante on the Left, Recibe Conforme on the Right)
-        sig_table = Table([[t_right, t_left]], colWidths=[3.5*inch, 3.5*inch])
-        sig_table.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ]))
-        elements.append(sig_table)
-
-        # Build without strips for RC
-        doc.build(elements)
-        buffer.seek(0)
-        return FileResponse(buffer, as_attachment=True, filename=f'{rc.folio}.pdf')
 
     @action(detail=True, methods=['post'])
     def anular(self, request, pk=None):
@@ -1138,12 +658,17 @@ class CDPViewSet(viewsets.ModelViewSet):
     serializer_class = CDPSerializer
     filterset_fields = ['nombre'] # Add more if needed
     search_fields = ['nombre', 'descripcion']
+    permission_classes = _DEFAULT_PERMS
 
 class TipoEntregaViewSet(viewsets.ModelViewSet):
     queryset = TipoEntrega.objects.all()
     serializer_class = TipoEntregaSerializer
+    permission_classes = _DEFAULT_PERMS
 
-class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
+class FacturaAdquisicionViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
+    sgaf_action_permissions = {
+        'generate_pdf': 'servicios.view_facturaadquisicion',
+    }
     """
     Facturas sin OC (RCF). Solo filas con contrato=null y modalidad SIN_OC.
     Compra ágil → /api/compras-agiles/
@@ -1154,7 +679,7 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
         modalidad=FacturaAdquisicion.MODALIDAD_SIN_OC,
     )
     serializer_class = FacturaAdquisicionSerializer
-    permission_classes = [permissions.DjangoModelPermissions]
+    permission_classes = _DEFAULT_PERMS
     filterset_fields = ['proveedor', 'establecimiento', 'tipo_entrega', 'cdp']
     search_fields = ['descripcion', 'proveedor__nombre', 'id', 'folio', 'cdp', 'total_pagar']
 
@@ -1200,10 +725,13 @@ class FacturaAdquisicionViewSet(viewsets.ModelViewSet):
     def generate_pdf(self, request, pk=None):
         from servicios.pdf import build_rc_adq_pdf
 
-        return build_rc_adq_pdf(self.get_object())
+        return build_rc_adq_pdf(self.get_object(), user=request.user)
 
 
-class CompraAgilViewSet(viewsets.ModelViewSet):
+class CompraAgilViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
+    sgaf_action_permissions = {
+        'generate_pdf': 'servicios.view_facturaadquisicion',
+    }
     """
     Recepciones de compra ágil (RCA). Sin contrato, modalidad COMPRA_AGIL, OC obligatoria.
     """
@@ -1212,7 +740,7 @@ class CompraAgilViewSet(viewsets.ModelViewSet):
         modalidad=FacturaAdquisicion.MODALIDAD_COMPRA_AGIL,
     )
     serializer_class = CompraAgilSerializer
-    permission_classes = [permissions.DjangoModelPermissions]
+    permission_classes = _DEFAULT_PERMS
     filterset_fields = ['proveedor', 'establecimiento', 'tipo_entrega', 'cdp']
     search_fields = [
         'descripcion', 'proveedor__nombre', 'id', 'folio', 'cdp',
@@ -1265,4 +793,4 @@ class CompraAgilViewSet(viewsets.ModelViewSet):
     def generate_pdf(self, request, pk=None):
         from servicios.pdf import build_rc_adq_pdf
 
-        return build_rc_adq_pdf(self.get_object())
+        return build_rc_adq_pdf(self.get_object(), user=request.user)

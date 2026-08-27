@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'ejecutivos',
     'personalizacion_sistema',
     'arco',
+    'documentos.apps.DocumentosConfig',
 ]
 
 MIDDLEWARE = [
@@ -137,7 +138,7 @@ REST_FRAMEWORK = {
         'rest_framework.filters.OrderingFilter',
     ),
     'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardResultsSetPagination',
-    'PAGE_SIZE': 10,
+    'PAGE_SIZE': 50,
 }
 
 SIMPLE_JWT = {

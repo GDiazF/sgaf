@@ -541,6 +541,16 @@ const Layout = () => {
                           <Icon name="bell" size={16} />
                           Notificaciones
                         </DropdownItem>
+                        {(can('documentos.view_plantilladocumento') || user?.is_superuser) ? (
+                          <DropdownItem
+                            as={Link}
+                            to="/admin/documentos"
+                            onClick={() => setIsProfileOpen(false)}
+                          >
+                            <Icon name="procedimientos" size={16} />
+                            Plantillas de documentos
+                          </DropdownItem>
+                        ) : null}
                       </>
                     )}
                     <DropdownDivider />

@@ -122,7 +122,7 @@ class RegistroServicioDoc(models.Model):
     correo_enviado_en = models.DateTimeField(
         null=True,
         blank=True,
-        help_text='Última vez que se envió el documento al correo del establecimiento.',
+        help_text='Última vez que se envió el documento al correo institucional y/o del director/a.',
     )
     creado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,

@@ -26,7 +26,17 @@ function sortPeriodNames(names) {
   })
 }
 
-export default function ConsolidadoModal({ open, onClose, rutas, variant = 'ruta' }) {
+function formatClp(value) {
+  return `$${new Intl.NumberFormat('es-CL').format(value || 0)}`
+}
+
+export default function ConsolidadoModal({
+  open,
+  onClose,
+  rutas,
+  variant = 'ruta',
+  esMensualMixto = false,
+}) {
   const [selectedPeriodNames, setSelectedPeriodNames] = useState([])
 
   const availablePeriodNames = useMemo(() => {
@@ -65,6 +75,8 @@ export default function ConsolidadoModal({ open, onClose, rutas, variant = 'ruta
           nombre: provNombre,
           rutasCount: 0,
           diasTotal: 0,
+          montoFijo: 0,
+          montoVariable: 0,
           montoTotal: 0,
         }
       }
@@ -72,12 +84,20 @@ export default function ConsolidadoModal({ open, onClose, rutas, variant = 'ruta
       summary[provId].rutasCount += 1
       matching.forEach((p) => {
         summary[provId].diasTotal += parseFloat(p.dias_trabajados || 0)
-        summary[provId].montoTotal += parseFloat(p.monto_total || 0)
+        const fijo = Number(p.monto_fijo) || 0
+        const variable = Number(p.monto_variable) || 0
+        if (esMensualMixto) {
+          summary[provId].montoFijo += fijo
+          summary[provId].montoVariable += variable
+          summary[provId].montoTotal += fijo + variable
+        } else {
+          summary[provId].montoTotal += parseFloat(p.monto_total || 0)
+        }
       })
     })
 
     return Object.values(summary).sort((a, b) => b.montoTotal - a.montoTotal)
-  }, [selectedPeriodNames, selectedSet, rutas])
+  }, [selectedPeriodNames, selectedSet, rutas, esMensualMixto])
 
   const orderedSelected = useMemo(
     () => availablePeriodNames.filter((name) => selectedSet.has(name)),
@@ -95,13 +115,26 @@ export default function ConsolidadoModal({ open, onClose, rutas, variant = 'ruta
       rutas.forEach((r) => {
         const p = r.periodos?.find((per) => per.nombre_estandarizado === periodName)
         if (!p) return
-        rows.push({
-          Periodo: periodName,
-          Proveedor: r.proveedor_nombre || 'Sin proveedor',
-          [lineaLabel]: r.nombre || '',
-          Días: Number(p.dias_trabajados) || 0,
-          Monto: Number(p.monto_total) || 0,
-        })
+        if (esMensualMixto) {
+          const fijo = Number(p.monto_fijo) || 0
+          const variable = Number(p.monto_variable) || 0
+          rows.push({
+            Periodo: periodName,
+            Proveedor: r.proveedor_nombre || 'Sin proveedor',
+            [lineaLabel]: r.nombre || '',
+            'Monto fijo': fijo,
+            'Monto variable': variable,
+            'Monto total': fijo + variable,
+          })
+        } else {
+          rows.push({
+            Periodo: periodName,
+            Proveedor: r.proveedor_nombre || 'Sin proveedor',
+            [lineaLabel]: r.nombre || '',
+            Días: Number(p.dias_trabajados) || 0,
+            Monto: Number(p.monto_total) || 0,
+          })
+        }
       })
     })
 
@@ -115,20 +148,29 @@ export default function ConsolidadoModal({ open, onClose, rutas, variant = 'ruta
 
     const ws = XLSX.utils.json_to_sheet(rows)
     const range = XLSX.utils.decode_range(ws['!ref'])
+    const moneyCols = esMensualMixto ? [3, 4, 5] : [4]
+    const numberCols = esMensualMixto ? [] : [3]
+
     for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-      const diasCell = XLSX.utils.encode_cell({ r: R, c: 3 })
-      const montoCell = XLSX.utils.encode_cell({ r: R, c: 4 })
-      if (ws[diasCell] && typeof ws[diasCell].v === 'number') {
-        ws[diasCell].t = 'n'
-        ws[diasCell].z = '#,##0'
-      }
-      if (ws[montoCell] && typeof ws[montoCell].v === 'number') {
-        ws[montoCell].t = 'n'
-        ws[montoCell].z = '"$"#,##0'
-      }
+      numberCols.forEach((c) => {
+        const cellRef = XLSX.utils.encode_cell({ r: R, c })
+        if (ws[cellRef] && typeof ws[cellRef].v === 'number') {
+          ws[cellRef].t = 'n'
+          ws[cellRef].z = '#,##0'
+        }
+      })
+      moneyCols.forEach((c) => {
+        const cellRef = XLSX.utils.encode_cell({ r: R, c })
+        if (ws[cellRef] && typeof ws[cellRef].v === 'number') {
+          ws[cellRef].t = 'n'
+          ws[cellRef].z = '"$"#,##0'
+        }
+      })
     }
     ws['!autofilter'] = { ref: ws['!ref'] }
-    ws['!cols'] = [{ wch: 18 }, { wch: 36 }, { wch: 36 }, { wch: 10 }, { wch: 16 }]
+    ws['!cols'] = esMensualMixto
+      ? [{ wch: 18 }, { wch: 36 }, { wch: 36 }, { wch: 14 }, { wch: 16 }, { wch: 14 }]
+      : [{ wch: 18 }, { wch: 36 }, { wch: 36 }, { wch: 10 }, { wch: 16 }]
 
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Consolidado')
@@ -138,11 +180,18 @@ export default function ConsolidadoModal({ open, onClose, rutas, variant = 'ruta
         ? orderedSelected[0].replace(/\s+/g, '_')
         : `${orderedSelected.length}_periodos`
     XLSX.writeFile(wb, `Consolidado_${slug}.xlsx`)
+    onClose?.()
   }
 
   const allSelected =
     availablePeriodNames.length > 0 &&
     selectedPeriodNames.length === availablePeriodNames.length
+
+  const totalFijo = consolidatedData.reduce((acc, curr) => acc + curr.montoFijo, 0)
+  const totalVariable = consolidatedData.reduce((acc, curr) => acc + curr.montoVariable, 0)
+  const totalMonto = consolidatedData.reduce((acc, curr) => acc + curr.montoTotal, 0)
+  const totalDias = consolidatedData.reduce((acc, curr) => acc + curr.diasTotal, 0)
+  const totalRutas = consolidatedData.reduce((acc, curr) => acc + curr.rutasCount, 0)
 
   return (
     <Modal
@@ -183,9 +232,19 @@ export default function ConsolidadoModal({ open, onClose, rutas, variant = 'ruta
             <thead>
               <tr>
                 <th>Proveedor</th>
-                <th className="is-num">Rutas</th>
-                <th className="is-num">Días</th>
-                <th className="is-num">Monto total</th>
+                <th className="is-num">{variant === 'establecimiento' ? 'Líneas' : 'Rutas'}</th>
+                {esMensualMixto ? (
+                  <>
+                    <th className="is-num">Monto fijo</th>
+                    <th className="is-num">Monto variable</th>
+                    <th className="is-num">Monto total</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="is-num">Días</th>
+                    <th className="is-num">Monto total</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -193,10 +252,18 @@ export default function ConsolidadoModal({ open, onClose, rutas, variant = 'ruta
                 <tr key={d.id}>
                   <td>{d.nombre}</td>
                   <td className="is-num">{d.rutasCount}</td>
-                  <td className="is-num">{d.diasTotal}</td>
-                  <td className="is-num">
-                    ${new Intl.NumberFormat('es-CL').format(d.montoTotal)}
-                  </td>
+                  {esMensualMixto ? (
+                    <>
+                      <td className="is-num">{formatClp(d.montoFijo)}</td>
+                      <td className="is-num">{formatClp(d.montoVariable)}</td>
+                      <td className="is-num">{formatClp(d.montoTotal)}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="is-num">{d.diasTotal}</td>
+                      <td className="is-num">{formatClp(d.montoTotal)}</td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -210,18 +277,19 @@ export default function ConsolidadoModal({ open, onClose, rutas, variant = 'ruta
                         selectedPeriodNames.length === 1 ? '' : 's'
                       }`}
                 </td>
-                <td className="is-num">
-                  {consolidatedData.reduce((acc, curr) => acc + curr.rutasCount, 0)}
-                </td>
-                <td className="is-num">
-                  {consolidatedData.reduce((acc, curr) => acc + curr.diasTotal, 0)}
-                </td>
-                <td className="is-num">
-                  $
-                  {new Intl.NumberFormat('es-CL').format(
-                    consolidatedData.reduce((acc, curr) => acc + curr.montoTotal, 0),
-                  )}
-                </td>
+                <td className="is-num">{totalRutas}</td>
+                {esMensualMixto ? (
+                  <>
+                    <td className="is-num">{formatClp(totalFijo)}</td>
+                    <td className="is-num">{formatClp(totalVariable)}</td>
+                    <td className="is-num">{formatClp(totalMonto)}</td>
+                  </>
+                ) : (
+                  <>
+                    <td className="is-num">{totalDias}</td>
+                    <td className="is-num">{formatClp(totalMonto)}</td>
+                  </>
+                )}
               </tr>
             </tfoot>
           </table>

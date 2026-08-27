@@ -137,6 +137,49 @@ const ContratoServiciosTab = ({ contract }) => {
           >
             Otro · monto mensual
           </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!!initId || !tipoOtro}
+            loading={initId === `${tipoOtro?.id}-mixto`}
+            onClick={async () => {
+              if (!tipoOtro || !contractId) return
+              setInitId(`${tipoOtro.id}-mixto`)
+              try {
+                await api.patch(`contratos/contratos/${contractId}/`, {
+                  plantilla_cobro: 'OTRO',
+                })
+                const servRes = await api.get(`contratos/servicios/?contrato=${contractId}`)
+                const list = servRes.data.results || servRes.data || []
+                if (list[0]) {
+                  const patched = await api.patch(`contratos/servicios/${list[0].id}/`, {
+                    modalidad_cobro: 'MENSUAL_FIJO_VARIABLE',
+                  })
+                  setGestion(patched.data)
+                  return
+                }
+                const res = await api.post('contratos/servicios/', {
+                  contrato: contractId,
+                  nombre:
+                    contract.codigo_mercado_publico ||
+                    contract.descripcion ||
+                    'Gestión operativa',
+                  tipo_servicio: tipoOtro.id,
+                  modalidad_cobro: 'MENSUAL_FIJO_VARIABLE',
+                })
+                setGestion(res.data)
+              } catch (err) {
+                notify({
+                  variant: 'danger',
+                  text: formatApiFormError(err, 'No se pudo abrir la gestión.'),
+                })
+              } finally {
+                setInitId(null)
+              }
+            }}
+          >
+            Otro · fijo y/o variable
+          </Button>
         </>
       }
     />

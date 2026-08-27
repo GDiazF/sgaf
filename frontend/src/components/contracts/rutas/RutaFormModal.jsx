@@ -38,6 +38,7 @@ export default function RutaFormModal({
   showEditWarning = false,
   variant = 'ruta',
   lineasExistentes = [],
+  montoMensualOpcional = false,
 }) {
   const [searchTermEst, setSearchTermEst] = useState('')
   const overlay = useFormOverlay()
@@ -316,14 +317,25 @@ export default function RutaFormModal({
 
           {esLinea ? (
             <Field
-              label={mode === 'edit' ? 'Monto mensual' : 'Monto mensual (igual para los seleccionados)'}
-              required
+              label={
+                montoMensualOpcional
+                  ? 'Monto fijo sugerido (opcional)'
+                  : mode === 'edit'
+                    ? 'Monto mensual'
+                    : 'Monto mensual (igual para los seleccionados)'
+              }
+              required={!montoMensualOpcional}
               htmlFor={`${formId}-valor-mensual`}
               className="field--full"
+              hint={
+                montoMensualOpcional
+                  ? 'En fijo y/o variable el monto real se define en cada periodo.'
+                  : undefined
+              }
             >
               <CurrencyInput
                 id={`${formId}-valor-mensual`}
-                required
+                required={!montoMensualOpcional}
                 value={formData.valor_mensual}
                 onChange={(val) => setFormData({ ...formData, valor_mensual: val })}
               />

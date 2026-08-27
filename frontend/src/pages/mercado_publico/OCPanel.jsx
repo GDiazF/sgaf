@@ -63,7 +63,7 @@ const OCPanel = ({ isNarrow: isNarrowProp } = {}) => {
   const [detailLoading, setDetailLoading] = useState(false)
 
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
 
   const [ticket] = useState(() => localStorage.getItem('mp_ticket') || DEFAULT_TICKET)
   const [favStore, setFavStore] = useState(loadMpFavorites)

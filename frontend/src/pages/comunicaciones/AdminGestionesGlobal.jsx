@@ -36,7 +36,7 @@ const AdminGestionesGlobal = () => {
   const [sortKey, setSortKey] = useState('fecha')
   const [sortDir, setSortDir] = useState('desc')
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
   const { notify } = useNotify()
   const [selected, setSelected] = useState(null)
   const debouncedSearch = useDebouncedValue(searchQuery)

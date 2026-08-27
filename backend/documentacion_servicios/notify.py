@@ -195,6 +195,7 @@ def handler_doc_servicios_avisos(*, stdout=None):
     from django.utils import timezone
 
     from documentacion_servicios.models import CampoDefinicion, RegistroServicioDoc
+    from establecimientos.email_utils import correos_envio_establecimiento
     from notificaciones.services import notificar
 
     def _log(msg):
@@ -264,6 +265,11 @@ def handler_doc_servicios_avisos(*, stdout=None):
             )
             if label:
                 mensaje = f'{mensaje} · Folio {label}'
+            email_dest = (
+                correos_envio_establecimiento(reg.establecimiento)
+                if reg.establecimiento_id
+                else []
+            )
             try:
                 notificar(
                     modulo=MODULO,
@@ -272,6 +278,7 @@ def handler_doc_servicios_avisos(*, stdout=None):
                     mensaje=mensaje,
                     tipo='WARNING',
                     link='/services/documentacion',
+                    email_destinatarios=email_dest,
                     contexto={
                         'registro_id': reg.pk,
                         'tipo_codigo': tipo.codigo,

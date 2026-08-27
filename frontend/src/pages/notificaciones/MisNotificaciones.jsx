@@ -34,7 +34,7 @@ export default function MisNotificaciones() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(50)
   const [totalCount, setTotalCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [leidaFilter, setLeidaFilter] = useState('all')

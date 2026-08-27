@@ -68,6 +68,15 @@ import LoginBackgroundsAdmin from './pages/admin/LoginBackgroundsAdmin';
 import CiberseguridadDashboard from './pages/ciberseguridad/CiberseguridadDashboard';
 import LegalPage from './pages/LegalPage';
 
+const PlantillasDocumentosPage = React.lazy(
+  () => import('./pages/admin/documentos/PlantillasDocumentosPage'),
+)
+const PlantillaDocumentoEditorPage = React.lazy(
+  () => import('./pages/admin/documentos/PlantillaDocumentoEditorPage'),
+)
+
+const PageFallback = () => <div className="app-boot-screen">Cargando…</div>
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -196,12 +205,7 @@ function App() {
                 </Route>
                 <Route
                   element={
-                    <ProtectedRoute
-                      permission={[
-                        'documentacion_servicios.view_registroserviciodoc',
-                        'servicios.view_proveedor',
-                      ]}
-                    />
+                    <ProtectedRoute permission="documentacion_servicios.view_registroserviciodoc" />
                   }
                 >
                   <Route path="services/documentacion" element={<DocumentacionServicios />} />
@@ -295,6 +299,24 @@ function App() {
                   <Route path="admin/email-settings" element={<Navigate to="/admin/notificaciones?tab=accounts" replace />} />
                   <Route path="admin/notification-types" element={<Navigate to="/admin/notificaciones" replace />} />
                   <Route path="admin/personalizacion/login/backgrounds" element={<LoginBackgroundsAdmin />} />
+                </Route>
+                <Route element={<ProtectedRoute permission="documentos.view_plantilladocumento" />}>
+                  <Route
+                    path="admin/documentos"
+                    element={
+                      <React.Suspense fallback={<PageFallback />}>
+                        <PlantillasDocumentosPage />
+                      </React.Suspense>
+                    }
+                  />
+                  <Route
+                    path="admin/documentos/:id"
+                    element={
+                      <React.Suspense fallback={<PageFallback />}>
+                        <PlantillaDocumentoEditorPage />
+                      </React.Suspense>
+                    }
+                  />
                 </Route>
               </Route>
             </Route>

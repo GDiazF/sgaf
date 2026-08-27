@@ -1,6 +1,12 @@
 /**
  * Groups Django permissions by their application label.
  */
+
+const codenameIncludes = (perm, ...needles) => {
+    const codename = (perm.codename || '').toLowerCase();
+    return needles.some((n) => codename.includes(n.toLowerCase()));
+};
+
 export const groupPermissions = (permissions) => {
     const groups = {};
 
@@ -17,7 +23,33 @@ export const groupPermissions = (permissions) => {
             case 'prestamo_llaves': module = 'Préstamo de Llaves'; break;
             case 'establecimientos': module = 'Establecimientos'; break;
             case 'contratos':
-            case 'licitaciones': module = 'Contratos y Licitaciones'; break;
+            case 'licitaciones':
+                if (
+                    name.includes('ampliacion')
+                    || codenameIncludes(perm, 'ampliacioncontrato')
+                ) {
+                    module = 'Contratos — Ampliaciones';
+                } else if (
+                    name.includes('ruta')
+                    || name.includes('periodo de cobro')
+                    || name.includes('periodo cobro')
+                    || name.includes('ausencia')
+                    || name.includes('feriado')
+                    || name.includes('preset')
+                    || name.includes('servicio operativo')
+                    || name.includes('serviciocontrato')
+                    || codenameIncludes(perm, 'rutatransporte', 'periodocobro', 'ausenciaruta', 'feriadonacional', 'grupopresetrutas', 'tiposerviciooperativo', 'serviciocontrato')
+                ) {
+                    module = 'Contratos — Gestión operativa';
+                } else if (
+                    name.includes('documento contrato')
+                    || codenameIncludes(perm, 'documentocontrato')
+                ) {
+                    module = 'Contratos — Documentación';
+                } else {
+                    module = 'Contratos y Licitaciones';
+                }
+                break;
             case 'orden_compra': module = 'Órdenes de Compra'; break;
             case 'solicitudes_reservas': module = 'Reservas de Espacios'; break;
             case 'personal_ti': module = 'Funcionarios TI'; break;
@@ -47,13 +79,16 @@ export const groupPermissions = (permissions) => {
                 if (name.includes('ruta') || name.includes('periodo de cobro') || name.includes('ausencia') || name.includes('feriado') || name.includes('servicio operativo')) module = 'Gestión de Rutas';
                 else if (name.includes('registro de pago') || name.includes('pago')) module = 'Pagos de Servicios';
                 else if (name.includes('recepcion conforme')) module = 'Recepciones Conformes';
-                else if (name.includes('factura adquisicion') || name.includes('adquisicion')) module = 'Adquisiciones';
+                else if (name.includes('factura adquisicion') || name.includes('adquisicion') || name.includes('compra agil')) module = 'Adquisiciones (ROC / RCF / RCA)';
                 else if (name.includes('proveedor')) module = 'Proveedores';
                 else if (name.includes('anexo')) module = 'Telecomunicaciones';
                 else module = 'Configuración Servicios';
                 break;
             case 'documentacion_servicios':
                 module = 'Documentación de Servicios';
+                break;
+            case 'documentos':
+                module = 'Plantillas de documentos';
                 break;
             default:
                 // Fallbacks adicionales por nombre por si hay modelos sueltos o apps genéricas
@@ -138,6 +173,7 @@ export const getFriendlyPermName = (perm) => {
         'vehiculo': 'Vehículos y Flota',
         'registromensual': 'Bitácora / Estadísticas de Vehículos',
         'contrato': 'Contratos y Licitaciones',
+        'ampliacioncontrato': 'Ampliaciones de contrato',
         'procesocompra': 'Procesos de Compra',
         'estadocontrato': 'Estados de Contrato',
         'categoriacontrato': 'Categorías de Contrato',
@@ -159,6 +195,8 @@ export const getFriendlyPermName = (perm) => {
         'logentry': 'Logs de Auditoría',
         'emailconfiguration': 'Configuración Global de Correo',
         'plantillacorreo': 'Plantillas de Correo',
+        'plantilladocumento': 'Plantillas de documentos',
+        'compraagil': 'Compras ágiles (RCA)',
         'cuentasmtp': 'Cuentas SMTP (Servidores)',
         'destinatarioscorreooperativo': 'Destinatarios de Correos Operativos',
         'rutatransporte': 'Rutas de Transporte',

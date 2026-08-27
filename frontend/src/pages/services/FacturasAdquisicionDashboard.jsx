@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import api from '../../api'
 import useDebouncedValue from '../../hooks/useDebouncedValue'
 import { useNotify } from '../../hooks/useNotify'
+import { usePermission } from '../../hooks/usePermission'
 import AdquisicionModal from '../../components/services/AdquisicionModal'
 import {
   PageHeader,
@@ -49,6 +50,12 @@ const TABS = [
 ]
 
 const FacturasAdquisicionDashboard = () => {
+  const { can } = usePermission()
+  const canView = can('servicios.view_facturaadquisicion')
+  const canAdd = can('servicios.add_facturaadquisicion')
+  const canChange = can('servicios.change_facturaadquisicion')
+  const canDelete = can('servicios.delete_facturaadquisicion')
+
   const [activeTab, setActiveTab] = useState('sin_oc')
   const [facturas, setFacturas] = useState([])
   const [lookups, setLookups] = useState({
@@ -71,7 +78,7 @@ const FacturasAdquisicionDashboard = () => {
   const [totalCount, setTotalCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [ordering, setOrdering] = useState('-fecha_recepcion')
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
   const debouncedSearch = useDebouncedValue(searchQuery)
   const isCompraAgil = activeTab === 'compra_agil'
   const apiBase = isCompraAgil ? 'compras-agiles' : 'facturas-adquisicion'
@@ -223,7 +230,7 @@ const FacturasAdquisicionDashboard = () => {
       const response = await api.get(`${apiBase}/${item.id}/generate_pdf/`, {
         responseType: 'blob',
       })
-      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
       const rawFilename = item.nro_oc
         ? `RC ${item.nro_oc}.pdf`
         : `RC_Adquisicion_${item.folio || item.id}.pdf`
@@ -237,7 +244,19 @@ const FacturasAdquisicionDashboard = () => {
       window.URL.revokeObjectURL(url)
     } catch (error) {
       console.error(error)
-      notify({ variant: 'danger', text: 'Error al generar el PDF.' })
+      let message = 'Error al generar el PDF.'
+      const data = error?.response?.data
+      if (data instanceof Blob) {
+        try {
+          const payload = JSON.parse(await data.text())
+          message = payload.hint || payload.error || message
+        } catch {
+          // ignore
+        }
+      } else if (data?.hint || data?.error) {
+        message = data.hint || data.error
+      }
+      notify({ variant: 'danger', text: message })
     }
   }
 
@@ -333,25 +352,31 @@ const FacturasAdquisicionDashboard = () => {
         className: 'col--actions',
         render: (item) => (
           <div className="data-table__actions" onClick={(e) => e.stopPropagation()}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDownloadPDF(item)}
-              title="Generar recepción conforme"
-            >
-              <Icon name="download" size="sm" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
-              <Icon name="edit" size="sm" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(item)}>
-              <Icon name="trash" size="sm" />
-            </Button>
+            {canView ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDownloadPDF(item)}
+                title="Generar recepción conforme"
+              >
+                <Icon name="download" size="sm" />
+              </Button>
+            ) : null}
+            {canChange ? (
+              <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
+                <Icon name="edit" size="sm" />
+              </Button>
+            ) : null}
+            {canDelete ? (
+              <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(item)}>
+                <Icon name="trash" size="sm" />
+              </Button>
+            ) : null}
           </div>
         ),
       },
     ],
-    [apiBase],
+    [apiBase, canView, canChange, canDelete],
   )
 
   return (
@@ -363,10 +388,12 @@ const FacturasAdquisicionDashboard = () => {
         linkComponent={Link}
         split
         actions={
-          <Button variant="primary" size="sm" onClick={handleNew}>
-            <Icon name="plus" size="sm" />
-            {isCompraAgil ? 'Registrar compra ágil' : 'Registrar factura'}
-          </Button>
+          canAdd ? (
+            <Button variant="primary" size="sm" onClick={handleNew}>
+              <Icon name="plus" size="sm" />
+              {isCompraAgil ? 'Registrar compra ágil' : 'Registrar factura'}
+            </Button>
+          ) : null
         }
       />
 
@@ -415,10 +442,12 @@ const FacturasAdquisicionDashboard = () => {
             : 'No hay facturas sin OC con la búsqueda actual.'
         }
         emptyAction={
-          <Button variant="primary" size="sm" onClick={handleNew}>
-            <Icon name="plus" size="sm" />
-            {isCompraAgil ? 'Registrar compra ágil' : 'Registrar factura'}
-          </Button>
+          canAdd ? (
+            <Button variant="primary" size="sm" onClick={handleNew}>
+              <Icon name="plus" size="sm" />
+              {isCompraAgil ? 'Registrar compra ágil' : 'Registrar factura'}
+            </Button>
+          ) : null
         }
         fillViewport
         page={currentPage}
@@ -433,8 +462,17 @@ const FacturasAdquisicionDashboard = () => {
         sortKey={activeSortKey}
         onSort={handleSort}
         mobileCardActions={(item) => ({
-          primary: { label: 'Editar', onClick: () => handleEdit(item) },
-          secondary: { label: 'PDF', onClick: () => handleDownloadPDF(item) },
+          primary: canChange
+            ? { label: 'Editar', onClick: () => handleEdit(item) }
+            : canView
+              ? { label: 'PDF', onClick: () => handleDownloadPDF(item) }
+              : undefined,
+          secondary:
+            canView && canChange
+              ? { label: 'PDF', onClick: () => handleDownloadPDF(item) }
+              : canDelete
+                ? { label: 'Eliminar', onClick: () => setDeleteTarget(item) }
+                : undefined,
         })}
         toolbar={
           <div className="table-toolbar__left">

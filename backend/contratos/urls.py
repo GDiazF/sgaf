@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     ProcesoCompraViewSet, EstadoContratoViewSet, CategoriaContratoViewSet, 
     ContratoViewSet, OrientacionLicitacionViewSet, DocumentoContratoViewSet,
+    AmpliacionContratoViewSet,
     TipoServicioOperativoViewSet, ServicioContratoViewSet, RutaTransporteViewSet, 
     PeriodoCobroViewSet, AusenciaRutaViewSet, FeriadoNacionalViewSet, GrupoPresetRutasViewSet,
     RecepcionContratoViewSet,
@@ -15,6 +16,7 @@ router.register(r'categorias', CategoriaContratoViewSet)
 router.register(r'orientaciones', OrientacionLicitacionViewSet)
 router.register(r'contratos', ContratoViewSet)
 router.register(r'documentos', DocumentoContratoViewSet)
+router.register(r'ampliaciones', AmpliacionContratoViewSet)
 router.register(r'recepciones-contrato', RecepcionContratoViewSet, basename='recepcion-contrato')
 
 # Operaciones / Servicios

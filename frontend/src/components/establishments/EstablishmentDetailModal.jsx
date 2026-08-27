@@ -1,6 +1,5 @@
-import React, { useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
-import L from 'leaflet'
+import React, { useEffect, useState } from 'react'
+import { MapContainer, Marker, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import {
   Modal,
@@ -8,18 +7,15 @@ import {
   Button,
   Icon,
   DetailView,
-  DetailGrid,
-  DetailItem,
-  FormSection,
   EmptyState,
 } from '@slep/ui'
+import {
+  MapBasemapTileLayer,
+  MapBasemapSwitcher,
+} from '../maps/MapBasemapLayers'
+import { MAP_MARKER_ICONS } from '../maps/mapMarkers'
 
-const markerIcon = L.divIcon({
-  className: 'map-marker-icon',
-  html: '<div class="map-marker is-active" style="--marker:#1a6f9a"><span></span></div>',
-  iconSize: [32, 32],
-  iconAnchor: [16, 32],
-})
+const markerIcon = MAP_MARKER_ICONS.active
 
 function MapReady({ center }) {
   const map = useMap()
@@ -37,16 +33,50 @@ function MapReady({ center }) {
   return null
 }
 
-const EstablishmentDetailModal = ({
-  isOpen,
-  onClose,
-  establishment,
-}) => {
+function ContactRow({ icon, label, value, href }) {
+  if (!value) return null
+
+  const content = (
+    <>
+      <span className="est-detail-view__contact-icon" aria-hidden="true">
+        <Icon name={icon} size={16} />
+      </span>
+      <span className="est-detail-view__contact-body">
+        <span className="est-detail-view__contact-label">{label}</span>
+        <span className="est-detail-view__contact-value">{value}</span>
+      </span>
+    </>
+  )
+
+  if (href) {
+    return (
+      <li className="est-detail-view__contact-item">
+        <a
+          href={href}
+          className="est-detail-view__contact-row est-detail-view__contact-row--link"
+        >
+          {content}
+        </a>
+      </li>
+    )
+  }
+
+  return (
+    <li className="est-detail-view__contact-item">
+      <div className="est-detail-view__contact-row">{content}</div>
+    </li>
+  )
+}
+
+const EstablishmentDetailModal = ({ isOpen, onClose, establishment }) => {
+  const [basemap, setBasemap] = useState('street')
+
   if (!establishment) return null
 
   const {
     nombre,
     direccion,
+    ciudad,
     latitud,
     longitud,
     director,
@@ -59,9 +89,11 @@ const EstablishmentDetailModal = ({
     activo,
   } = establishment
 
-  const phones = establishment.telefonos || []
-  const principalPhone = phones.find((p) => p.es_principal) || phones[0]
-  const otherPhones = phones.filter((p) => p.id !== principalPhone?.id)
+  const phones = [...(establishment.telefonos || [])].sort((a, b) => {
+    if (a.es_principal && !b.es_principal) return -1
+    if (!a.es_principal && b.es_principal) return 1
+    return 0
+  })
 
   const hasCoordinates =
     latitud && longitud && !Number.isNaN(parseFloat(latitud))
@@ -77,11 +109,16 @@ const EstablishmentDetailModal = ({
     .filter(Boolean)
     .join(' · ')
 
+  const addressLine =
+    [direccion, ciudad].filter(Boolean).join(', ') ||
+    'Sin dirección registrada'
+
   return (
     <Modal
       open={isOpen}
       onClose={onClose}
       size="lg"
+      className="est-detail-modal"
       title={nombre}
       subheader={subheader || 'Detalle del establecimiento'}
       footerClassName="modal__footer--split"
@@ -118,139 +155,147 @@ const EstablishmentDetailModal = ({
       }
     >
       <DetailView className="est-detail-view">
-        <FormSection
-          asGrid={false}
-          headerExtra={
-            <div className="est-detail-view__hero">
-              <div className="est-detail-view__logo" aria-hidden="true">
-                {logo ? (
-                  <img src={logo} alt="" />
-                ) : (
-                  <Icon name="establecimientos" size={28} />
-                )}
-              </div>
-              <div className="est-detail-view__hero-text">
-                <div className="est-detail-view__badges">
-                  <Badge variant={activo ? 'success' : 'neutral'} dot>
-                    {activo ? 'Activo' : 'Inactivo'}
-                  </Badge>
-                  {tipo_nombre ? <Badge variant="accent">{tipo_nombre}</Badge> : null}
-                </div>
-                <p className="est-detail-view__lead">
-                  {direccion || 'Sin dirección registrada'}
-                </p>
-              </div>
-            </div>
-          }
-        >
-          <DetailGrid>
-            <DetailItem label="RBD" mono>
-              {rbd || '—'}
-            </DetailItem>
-            <DetailItem label="Tipo">{tipo_nombre || '—'}</DetailItem>
-            <DetailItem label="Director/a">{director || '—'}</DetailItem>
-            <DetailItem label="Correo institucional">
-              {email ? (
-                <a href={`mailto:${email}`} className="est-detail-view__link">
-                  {email}
-                </a>
-              ) : (
-                '—'
-              )}
-            </DetailItem>
-            <DetailItem label="Correo del director/a">
-              {email_director ? (
-                <a href={`mailto:${email_director}`} className="est-detail-view__link">
-                  {email_director}
-                </a>
-              ) : (
-                '—'
-              )}
-            </DetailItem>
-            <DetailItem label="Teléfono principal">
-              {principalPhone ? (
-                <>
-                  {principalPhone.numero}
-                  {principalPhone.etiqueta ? (
-                    <span className="est-detail-view__muted">
-                      {' '}
-                      · {principalPhone.etiqueta}
-                    </span>
-                  ) : null}
-                </>
-              ) : (
-                '—'
-              )}
-            </DetailItem>
-            <DetailItem label="Ubicación GPS">
-              {hasCoordinates ? (
-                <span className="mono">
-                  {latitud}, {longitud}
-                </span>
-              ) : (
-                'Sin coordenadas'
-              )}
-            </DetailItem>
-            <DetailItem label="Dirección" full>
-              {direccion || '—'}
-            </DetailItem>
-          </DetailGrid>
-        </FormSection>
-
-        <FormSection
-          title="Ubicación"
-          description={
-            hasCoordinates
-              ? 'Vista previa del establecimiento en el mapa'
-              : 'Sin coordenadas GPS registradas'
-          }
-          asGrid={false}
-        >
-          <div className="est-detail-view__map">
-            {isOpen && hasCoordinates ? (
-              <MapContainer
-                key={`detail-map-${establishment.id}`}
-                center={position}
-                zoom={16}
-                className="est-detail-view__map-canvas"
-                scrollWheelZoom
-                dragging
-                zoomControl
-                attributionControl={false}
-              >
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                <Marker position={position} icon={markerIcon} />
-                <MapReady center={position} />
-              </MapContainer>
+        <header className="est-detail-view__hero">
+          <div className="est-detail-view__logo" aria-hidden="true">
+            {logo ? (
+              <img src={logo} alt="" />
             ) : (
-              <EmptyState
-                variant="compact"
-                title="Sin mapa disponible"
-                description="Registre latitud y longitud al editar el establecimiento."
-              />
+              <Icon name="establecimientos" size={28} />
             )}
           </div>
-        </FormSection>
+          <div className="est-detail-view__hero-body">
+            <div className="est-detail-view__meta">
+              <Badge variant={activo ? 'success' : 'neutral'} dot>
+                {activo ? 'Activo' : 'Inactivo'}
+              </Badge>
+              {rbd ? (
+                <span className="est-detail-view__chip est-detail-view__chip--mono">
+                  RBD {rbd}
+                </span>
+              ) : null}
+              {tipo_nombre ? (
+                <span className="est-detail-view__chip">{tipo_nombre}</span>
+              ) : null}
+            </div>
+            <p className="est-detail-view__address">
+              <Icon name="establecimientos" size={14} />
+              {addressLine}
+            </p>
+          </div>
+        </header>
 
-        {otherPhones.length > 0 ? (
-          <FormSection
-            title="Otros teléfonos"
-            description="Números adicionales del establecimiento"
-            asGrid={false}
-          >
-            <ul className="est-detail-view__phones">
-              {otherPhones.map((phone) => (
-                <li key={phone.id || phone.numero} className="est-detail-view__phone">
-                  <Icon name="telefonos" size={16} />
-                  <span className="est-detail-view__phone-num">{phone.numero}</span>
-                  {phone.etiqueta ? (
-                    <span className="est-detail-view__muted">{phone.etiqueta}</span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </FormSection>
-        ) : null}
+        <div className="est-detail-view__layout">
+          <div className="est-detail-view__col">
+            <section className="est-detail-view__panel">
+              <h3 className="est-detail-view__panel-title">
+                <Icon name="building" size={14} />
+                Identificación
+              </h3>
+              <dl className="est-detail-view__facts">
+                <div className="est-detail-view__fact">
+                  <dt>RBD</dt>
+                  <dd className="est-detail-view__mono">{rbd || '—'}</dd>
+                </div>
+                <div className="est-detail-view__fact">
+                  <dt>Tipo</dt>
+                  <dd>{tipo_nombre || '—'}</dd>
+                </div>
+                <div className="est-detail-view__fact">
+                  <dt>Ciudad</dt>
+                  <dd>{ciudad || '—'}</dd>
+                </div>
+                <div className="est-detail-view__fact est-detail-view__fact--full">
+                  <dt>Dirección</dt>
+                  <dd>{direccion || '—'}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section className="est-detail-view__panel">
+              <h3 className="est-detail-view__panel-title">
+                <Icon name="user" size={14} />
+                Contacto
+              </h3>
+              <ul className="est-detail-view__contact-list">
+                <ContactRow icon="user" label="Director/a" value={director} />
+                {phones.map((phone) => (
+                  <ContactRow
+                    key={phone.id || phone.numero}
+                    icon="telefonos"
+                    label={
+                      phone.es_principal
+                        ? phone.etiqueta
+                          ? `Teléfono principal · ${phone.etiqueta}`
+                          : 'Teléfono principal'
+                        : phone.etiqueta || 'Teléfono'
+                    }
+                    value={phone.numero}
+                    href={`tel:${phone.numero.replace(/\s/g, '')}`}
+                  />
+                ))}
+                <ContactRow
+                  icon="message"
+                  label="Correo institucional"
+                  value={email}
+                  href={email ? `mailto:${email}` : undefined}
+                />
+                <ContactRow
+                  icon="message"
+                  label="Correo director/a"
+                  value={email_director}
+                  href={
+                    email_director ? `mailto:${email_director}` : undefined
+                  }
+                />
+              </ul>
+            </section>
+          </div>
+
+          <aside className="est-detail-view__aside">
+            <div className="est-detail-view__map-card">
+              <div className="est-detail-view__map-head">
+                <span className="est-detail-view__map-label">
+                  <Icon name="establecimientos" size={14} />
+                  Ubicación
+                </span>
+                {hasCoordinates ? (
+                  <span className="est-detail-view__coords-pill est-detail-view__mono">
+                    {Number(latitud).toFixed(5)}, {Number(longitud).toFixed(5)}
+                  </span>
+                ) : null}
+              </div>
+              <div className="est-detail-view__map">
+                {isOpen && hasCoordinates ? (
+                  <>
+                    <MapContainer
+                      key={`detail-map-${establishment.id}`}
+                      center={position}
+                      zoom={16}
+                      className="est-detail-view__map-canvas"
+                      scrollWheelZoom
+                      dragging
+                      zoomControl
+                    >
+                      <MapBasemapTileLayer basemap={basemap} />
+                      <Marker position={position} icon={markerIcon} />
+                      <MapReady center={position} />
+                    </MapContainer>
+                    <MapBasemapSwitcher
+                      value={basemap}
+                      onChange={setBasemap}
+                    />
+                  </>
+                ) : (
+                  <EmptyState
+                    variant="compact"
+                    title="Sin coordenadas"
+                    description="Registre latitud y longitud al editar."
+                  />
+                )}
+              </div>
+            </div>
+          </aside>
+        </div>
       </DetailView>
     </Modal>
   )

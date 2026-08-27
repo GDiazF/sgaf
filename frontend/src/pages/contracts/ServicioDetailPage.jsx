@@ -16,6 +16,8 @@ import {
   EmptyState,
   Icon,
   IconButton,
+  CurrencyInput,
+  Switch,
   useFormOverlay,
   formatApiFormError,
 } from '@slep/ui'
@@ -52,6 +54,8 @@ const ServicioDetailPage = ({
   const params = useParams()
   const id = servicioIdProp || params.id
   const { can } = usePermission()
+  const canViewRuta = can('contratos.view_rutatransporte')
+  const canViewServicioOp = can('contratos.view_serviciocontrato')
   const [servicio, setServicio] = useState(null)
   const [contrato, setContrato] = useState(null)
   const [rutas, setRutas] = useState([])
@@ -61,7 +65,7 @@ const ServicioDetailPage = ({
   const [selectedProvider, setSelectedProvider] = useState('all')
   const [selectedRutasTable, setSelectedRutasTable] = useState([])
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(25)
+  const [pageSize, setPageSize] = useState(50)
 
   const [selectedRoute, setSelectedRoute] = useState(null)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
@@ -111,8 +115,22 @@ const ServicioDetailPage = ({
   const [deleting, setDeleting] = useState(false)
   const [deletePresetId, setDeletePresetId] = useState(null)
   const [isFeriadosModalOpen, setIsFeriadosModalOpen] = useState(false)
+  const [generatingRecepcionId, setGeneratingRecepcionId] = useState(null)
+  const [savingModalidad, setSavingModalidad] = useState(false)
+  const [isModalidadModalOpen, setIsModalidadModalOpen] = useState(false)
+  const [modalidadDraft, setModalidadDraft] = useState('MENSUAL_POR_EST')
+  const [montoUnicoDraft, setMontoUnicoDraft] = useState('')
+  const [recepcionTarget, setRecepcionTarget] = useState(null)
+  const [recepcionPeriodoId, setRecepcionPeriodoId] = useState('')
+  const [recepcionIncluirPeriodo, setRecepcionIncluirPeriodo] = useState(true)
+  const [generatingRecepcion, setGeneratingRecepcion] = useState(false)
 
   const esMensual = Boolean(servicio?.es_mensual)
+  const esMensualMixto = Boolean(servicio?.es_mensual_mixto)
+  const esMensualPorColegio = servicio?.modalidad_cobro === 'MENSUAL_POR_EST'
+  /** Asistencia / feriados / config masiva: diario o mensual por colegio. */
+  const usaAsistenciaYFeriados = !esMensual || esMensualPorColegio
+  const permiteRecepcionServicio = Boolean(servicio?.permite_recepcion_servicio)
   const lineaFormDefaults = {
     ...EMPTY_FORM,
     valor_diario: 0,
@@ -128,6 +146,141 @@ const ServicioDetailPage = ({
     setActaSelection({ rutas: [], periodos: [], establecimientos: [] })
     setShowSavePresetInput(false)
     setNewPresetName('')
+  }
+
+  const pickDefaultPeriodoId = (periodos = []) => {
+    if (!periodos.length) return ''
+    const abiertos = periodos.filter((p) => p.estado === 'ABIERTO')
+    const pool = abiertos.length ? abiertos : periodos
+    const sorted = [...pool].sort((a, b) => {
+      if (b.anio_referencia !== a.anio_referencia) {
+        return (b.anio_referencia || 0) - (a.anio_referencia || 0)
+      }
+      return (b.mes_referencia || 0) - (a.mes_referencia || 0)
+    })
+    return String(sorted[0]?.id || '')
+  }
+
+  const syncRecepcionIncluirFromPeriodo = (ruta, periodoId) => {
+    const p = (ruta?.periodos || []).find((item) => String(item.id) === String(periodoId))
+    setRecepcionIncluirPeriodo(p?.incluir_periodo_en_rc !== false)
+  }
+
+  const openRecepcionModal = (ruta) => {
+    if (!permiteRecepcionServicio || !ruta?.id) return
+    const periodos = ruta.periodos || []
+    if (!periodos.length) {
+      notify({
+        variant: 'warning',
+        text: 'Genera un periodo antes de descargar la recepción de servicio.',
+      })
+      return
+    }
+    const defaultId = pickDefaultPeriodoId(periodos)
+    setRecepcionTarget(ruta)
+    setRecepcionPeriodoId(defaultId)
+    syncRecepcionIncluirFromPeriodo(ruta, defaultId)
+  }
+
+  const closeRecepcionModal = () => {
+    setRecepcionTarget(null)
+    setRecepcionPeriodoId('')
+    setRecepcionIncluirPeriodo(true)
+  }
+
+  const handleGenerateRecepcionServicio = async () => {
+    const ruta = recepcionTarget
+    if (!permiteRecepcionServicio || !ruta?.id || !recepcionPeriodoId) {
+      notify({ variant: 'warning', text: 'Selecciona el periodo de la recepción.' })
+      return
+    }
+    setGeneratingRecepcion(true)
+    setGeneratingRecepcionId(ruta.id)
+    try {
+      // Persistir preferencia del booleano en el periodo antes de generar
+      try {
+        await api.patch(`contratos/periodos/${recepcionPeriodoId}/datos-recepcion/`, {
+          incluir_periodo_en_rc: recepcionIncluirPeriodo,
+        })
+      } catch {
+        /* si el periodo está cerrado, igual generamos con el query param */
+      }
+      const estId = (ruta.establecimientos || [])[0]
+      const params = {
+        periodo_id: recepcionPeriodoId,
+        incluir_periodo: recepcionIncluirPeriodo ? '1' : '0',
+      }
+      if (estId) params.establecimiento_id = estId
+      const res = await api.get(`contratos/rutas/${ruta.id}/recepcion-servicio/`, {
+        params,
+        responseType: 'blob',
+      })
+      const url = window.URL.createObjectURL(new Blob([res.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `Recepcion_Servicio_${ruta.nombre || ruta.id}.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+      closeRecepcionModal()
+      fetchData()
+    } catch (err) {
+      let text = 'No se pudo generar la recepción de servicio.'
+      const data = err?.response?.data
+      if (data instanceof Blob) {
+        try {
+          const parsed = JSON.parse(await data.text())
+          text = parsed.error || parsed.detail || text
+        } catch {
+          /* ignore */
+        }
+      } else if (data?.error || data?.detail) {
+        text = data.error || data.detail
+      }
+      notify({ variant: 'danger', text })
+    } finally {
+      setGeneratingRecepcion(false)
+      setGeneratingRecepcionId(null)
+    }
+  }
+
+  const openModalidadModal = () => {
+    setModalidadDraft(servicio?.modalidad_cobro || 'MENSUAL_POR_EST')
+    setMontoUnicoDraft(servicio?.monto_mensual || '')
+    setIsModalidadModalOpen(true)
+  }
+
+  const handleSaveModalidad = async () => {
+    if (!id || !modalidadDraft) return
+    if (modalidadDraft === 'MENSUAL_UNICO' && !montoUnicoDraft) {
+      notify({
+        variant: 'warning',
+        text: 'Indica el monto mensual que se aplicará a todos los colegios.',
+      })
+      return
+    }
+    setSavingModalidad(true)
+    try {
+      const payload = { modalidad_cobro: modalidadDraft }
+      if (modalidadDraft === 'MENSUAL_UNICO') {
+        payload.monto_mensual = Number(montoUnicoDraft) || 0
+      } else if (modalidadDraft !== 'MENSUAL_UNICO') {
+        payload.monto_mensual = null
+      }
+      const res = await api.patch(`contratos/servicios/${id}/`, payload)
+      setServicio(res.data)
+      setIsModalidadModalOpen(false)
+      notify({ variant: 'success', text: 'Modalidad de cobro actualizada.' })
+      fetchData()
+    } catch (err) {
+      notify({
+        variant: 'danger',
+        text: formatApiFormError(err, 'No se pudo actualizar la modalidad.'),
+      })
+    } finally {
+      setSavingModalidad(false)
+    }
   }
 
   const handleGenerateActa = async () => {
@@ -650,7 +803,7 @@ const ServicioDetailPage = ({
     },
     {
       key: esMensual ? 'valor_mensual' : 'valor_diario',
-      header: esMensual ? 'Monto mensual' : 'Valor diario',
+      header: esMensualMixto ? 'Monto sugerido' : esMensual ? 'Monto mensual' : 'Valor diario',
       className: 'col--status',
       cardRole: 'status',
       priority: 1,
@@ -680,6 +833,18 @@ const ServicioDetailPage = ({
           >
             <Icon name="info" size="sm" />
           </Button>
+          {permiteRecepcionServicio && canViewRuta ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Recepción de servicio (PDF)"
+              loading={generatingRecepcionId === ruta.id}
+              disabled={generatingRecepcionId === ruta.id}
+              onClick={() => openRecepcionModal(ruta)}
+            >
+              <Icon name="file" size="sm" />
+            </Button>
+          ) : null}
           {can('contratos.change_rutatransporte') ? (
             <Button variant="ghost" size="sm" onClick={() => openEditRutaModal(ruta)}>
               <Icon name="edit" size="sm" />
@@ -695,9 +860,26 @@ const ServicioDetailPage = ({
     },
   ]
 
+  const modalidadLabel =
+    servicio?.modalidad_cobro === 'MENSUAL_UNICO'
+      ? 'Mensual único'
+      : servicio?.modalidad_cobro === 'MENSUAL_FIJO_VARIABLE'
+        ? 'Fijo y/o variable'
+        : 'Mensual por colegio'
+
   const toolbarActions = (
     <>
-      {can('contratos.change_rutatransporte') ? (
+      {esMensual && can('contratos.change_serviciocontrato') ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={openModalidadModal}
+          title="Cómo se calcula el cobro de esta gestión"
+        >
+          <Icon name="procedimientos" size="sm" /> Modalidad · {modalidadLabel}
+        </Button>
+      ) : null}
+      {usaAsistenciaYFeriados && can('contratos.change_rutatransporte') ? (
         <Button
           variant="secondary"
           size="sm"
@@ -718,13 +900,15 @@ const ServicioDetailPage = ({
           <Icon name="info" size="sm" /> Info contrato
         </Button>
       ) : null}
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={() => setIsConsolidadoModalOpen(true)}
-      >
-        <Icon name="file" size="sm" /> Consolidado
-      </Button>
+      {canViewRuta ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setIsConsolidadoModalOpen(true)}
+        >
+          <Icon name="file" size="sm" /> Consolidado
+        </Button>
+      ) : null}
       {can('contratos.add_rutatransporte') ? (
         <Button variant="primary" size="sm" onClick={openCreateLinea}>
           <Icon name="plus" size="sm" />{' '}
@@ -797,7 +981,11 @@ const ServicioDetailPage = ({
       )}
 
       <FiltersBar
-        actions={embedded ? toolbarActions : undefined}
+        actions={
+          embedded ? (
+            <div className="rutas-detail-toolbar">{toolbarActions}</div>
+          ) : undefined
+        }
         onSearch={() => setPage(1)}
         onClear={() => {
           setSearchTerm('')
@@ -888,7 +1076,7 @@ const ServicioDetailPage = ({
                 {selectedRutasTable.length})
               </Button>
             ) : null}
-            {can('contratos.change_ausenciaruta') ? (
+            {usaAsistenciaYFeriados && can('contratos.change_ausenciaruta') ? (
               <Button
                 variant="secondary"
                 size="sm"
@@ -897,7 +1085,7 @@ const ServicioDetailPage = ({
                 <Icon name="reservas" size="sm" /> Gestión asistencia
               </Button>
             ) : null}
-            {can('contratos.change_rutatransporte') ? (
+            {usaAsistenciaYFeriados && can('contratos.change_rutatransporte') ? (
               <Button
                 variant="secondary"
                 size="sm"
@@ -906,7 +1094,7 @@ const ServicioDetailPage = ({
                 <Icon name="procedimientos" size="sm" /> Config. masiva
               </Button>
             ) : null}
-            {!esMensual ? (
+            {!esMensual && canViewServicioOp ? (
               <Button variant="secondary" size="sm" onClick={() => setIsActaModalOpen(true)}>
                 <Icon name="file" size="sm" /> Acta
               </Button>
@@ -1035,6 +1223,7 @@ const ServicioDetailPage = ({
                   ['Categoría', contrato?.categoria_nombre],
                   ['Proceso', contrato?.proceso_nombre],
                   ['Orientación', contrato?.orientacion_nombre],
+                  ['IVA', contrato?.aplica_iva === false ? 'No aplica' : 'Aplica (19%)'],
                 ].map(([label, value]) => (
                   <div
                     key={label}
@@ -1053,6 +1242,11 @@ const ServicioDetailPage = ({
               <p style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)', margin: 0 }}>
                 {contrato?.descripcion || '—'}
               </p>
+              {contrato?.detalle ? (
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--fg)', margin: 'var(--space-2) 0 0' }}>
+                  Detalle: {contrato.detalle}
+                </p>
+              ) : null}
             </div>
 
             <div>
@@ -1268,6 +1462,7 @@ const ServicioDetailPage = ({
         onClose={() => setIsConsolidadoModalOpen(false)}
         rutas={rutas}
         variant={esMensual ? 'establecimiento' : 'ruta'}
+        esMensualMixto={esMensualMixto}
       />
 
       <RutaFormModal
@@ -1280,6 +1475,7 @@ const ServicioDetailPage = ({
         contrato={contrato}
         variant={esMensual ? 'establecimiento' : 'ruta'}
         lineasExistentes={rutas}
+        montoMensualOpcional={esMensualMixto}
       />
 
       <RutaFormModal
@@ -1293,12 +1489,164 @@ const ServicioDetailPage = ({
         showEditWarning
         variant={esMensual ? 'establecimiento' : 'ruta'}
         lineasExistentes={rutas}
+        montoMensualOpcional={esMensualMixto}
       />
 
       <FeriadosModal
         open={isFeriadosModalOpen}
         onClose={() => setIsFeriadosModalOpen(false)}
       />
+
+      <Modal
+        open={!!recepcionTarget}
+        onClose={closeRecepcionModal}
+        title="Recepción de servicio"
+        subheader={
+          recepcionTarget
+            ? `Establecimiento: ${recepcionTarget.nombre}. Elige el periodo a incluir en el PDF.`
+            : undefined
+        }
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              disabled={generatingRecepcion}
+              onClick={closeRecepcionModal}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              loading={generatingRecepcion}
+              disabled={generatingRecepcion || !recepcionPeriodoId}
+              onClick={handleGenerateRecepcionServicio}
+            >
+              Descargar PDF
+            </Button>
+          </>
+        }
+      >
+        <Field label="Periodo" htmlFor="recepcion-periodo" required>
+          <Select
+            id="recepcion-periodo"
+            value={recepcionPeriodoId}
+            disabled={generatingRecepcion}
+            onChange={(e) => {
+              const nextId = e.target.value
+              setRecepcionPeriodoId(nextId)
+              syncRecepcionIncluirFromPeriodo(recepcionTarget, nextId)
+            }}
+          >
+            <option value="">Seleccione…</option>
+            {(recepcionTarget?.periodos || [])
+              .slice()
+              .sort((a, b) => {
+                if (b.anio_referencia !== a.anio_referencia) {
+                  return (b.anio_referencia || 0) - (a.anio_referencia || 0)
+                }
+                return (b.mes_referencia || 0) - (a.mes_referencia || 0)
+              })
+              .map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre_estandarizado}
+                  {p.estado === 'ABIERTO' ? ' · abierto' : ' · cerrado'}
+                </option>
+              ))}
+          </Select>
+        </Field>
+        <div className="field">
+          <Switch
+            label="Incluir periodo escrito en la RC"
+            checked={recepcionIncluirPeriodo}
+            disabled={generatingRecepcion}
+            onChange={(e) => setRecepcionIncluirPeriodo(e.target.checked)}
+          />
+          <p className="field__hint">
+            Apágalo si en la plantilla usas fecha del servicio y no quieres que aparezca el
+            mes del periodo (pueden no coincidir).
+          </p>
+        </div>
+        <p className="field__hint">
+          Se preselecciona el último periodo abierto. Los montos, factura y fecha de servicio
+          salen de ese periodo.
+        </p>
+      </Modal>
+
+      <Modal
+        open={isModalidadModalOpen}
+        onClose={() => !savingModalidad && setIsModalidadModalOpen(false)}
+        title="Modalidad de cobro"
+        subheader="Define cómo se calcula el monto de cada periodo. No hace falta tener establecimientos aún."
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              disabled={savingModalidad}
+              onClick={() => setIsModalidadModalOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              loading={savingModalidad}
+              disabled={savingModalidad}
+              onClick={handleSaveModalidad}
+            >
+              Guardar modalidad
+            </Button>
+          </>
+        }
+      >
+        <Field label="Tipo de cobro" htmlFor="gestion-modalidad" required>
+          <Select
+            id="gestion-modalidad"
+            value={modalidadDraft}
+            disabled={savingModalidad}
+            onChange={(e) => setModalidadDraft(e.target.value)}
+          >
+            <option value="MENSUAL_POR_EST">Mensual por colegio</option>
+            <option value="MENSUAL_UNICO">Mensual único (todos igual)</option>
+            <option value="MENSUAL_FIJO_VARIABLE">Fijo y/o variable por periodo</option>
+          </Select>
+        </Field>
+
+        {modalidadDraft === 'MENSUAL_POR_EST' ? (
+          <Alert variant="info" title="Mensual por colegio">
+            Cada establecimiento tiene su propio monto mensual. Al agregarlo indicas el valor.
+            En el periodo, si hay ausencias, el cobro se prorratea por días trabajados.
+          </Alert>
+        ) : null}
+
+        {modalidadDraft === 'MENSUAL_UNICO' ? (
+          <>
+            <Alert variant="info" title="Mensual único">
+              Un solo monto para todos los colegios de esta gestión. Se define aquí (a nivel
+              gestión); al agregar establecimientos se copia automáticamente.
+            </Alert>
+            <Field
+              label="Monto mensual (todos los colegios)"
+              htmlFor="gestion-monto-unico"
+              required
+              hint="Obligatorio aunque aún no hayas agregado establecimientos."
+            >
+              <CurrencyInput
+                id="gestion-monto-unico"
+                value={montoUnicoDraft}
+                disabled={savingModalidad}
+                onChange={(val) => setMontoUnicoDraft(val)}
+              />
+            </Field>
+          </>
+        ) : null}
+
+        {modalidadDraft === 'MENSUAL_FIJO_VARIABLE' ? (
+          <Alert variant="info" title="Fijo y/o variable por periodo">
+            En cada periodo ingresas un monto fijo y/o uno variable (ambos opcionales; el total
+            es la suma). Útil si un mes cobras solo variable (p. ej. fumigación) o una mezcla.
+            No prorratea por ausencias.
+          </Alert>
+        ) : null}
+      </Modal>
 
       <Modal
         open={isPeriodoModalOpen}

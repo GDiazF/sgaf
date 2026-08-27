@@ -16,6 +16,23 @@ import {
   formatApiFormError,
 } from '@slep/ui'
 
+const calcMontos = (neto, aplicaIva) => {
+  const n = Math.round(Number(neto) || 0)
+  const iva = aplicaIva ? Math.round(n * 0.19) : 0
+  return { total_neto: n, iva, total_pagar: n + iva }
+}
+
+/** Gestión opera con monto total; en la ROC se desglosa neto + IVA. */
+const calcMontosDesdeTotal = (total, aplicaIva) => {
+  const t = Math.round(Number(total) || 0)
+  if (!aplicaIva) {
+    return { total_neto: t, iva: 0, total_pagar: t }
+  }
+  const neto = Math.round(t / 1.19)
+  const iva = t - neto
+  return { total_neto: neto, iva, total_pagar: t }
+}
+
 const ContractReceptionModal = ({
   open,
   onClose,
@@ -102,14 +119,15 @@ const ContractReceptionModal = ({
         const data = res.data
         setGestionResumen(data)
         if (data?.tiene_gestion && data.lineas_con_periodo > 0) {
-          const neto = Number(data.total) || 0
-          const iva = Math.round(neto * 0.19)
+          const totalGestion = Number(data.total) || 0
+          const montos = calcMontosDesdeTotal(
+            totalGestion,
+            contract?.aplica_iva !== false,
+          )
           setIsSplit(false)
           setFormData((prev) => ({
             ...prev,
-            total_neto: neto,
-            iva,
-            total_pagar: neto + iva,
+            ...montos,
             establecimientos: data.establecimientos_ids?.length
               ? data.establecimientos_ids
               : prev.establecimientos,
@@ -122,7 +140,7 @@ const ContractReceptionModal = ({
     return () => {
       cancelled = true
     }
-  }, [open, contract?.id, editingRC, formData.periodo, formData.proveedor])
+  }, [open, contract?.id, contract?.aplica_iva, editingRC, formData.periodo, formData.proveedor])
 
   const allowedEstablishmentIds = formData.proveedor
     ? contract?.proveedores_asociados?.find(
@@ -381,7 +399,9 @@ const ContractReceptionModal = ({
               {gestionResumen.faltantes
                 ? ` · ${gestionResumen.faltantes} sin periodo abierto`
                 : ''}
-              . IVA 19% calculado; puede editarlo. No se generan RCs por colegio.
+              . Ese total ya incluye IVA si el contrato lo aplica; aquí se desglosa en neto e IVA
+              {contract?.aplica_iva === false ? ' (exento: neto = total)' : ''}. Puede editarlo. No se
+              generan RCs por colegio.
             </Alert>
           </div>
         ) : gestionResumen?.tiene_gestion && !gestionResumen.lineas_con_periodo ? (
@@ -455,23 +475,61 @@ const ContractReceptionModal = ({
               id="rc-neto"
               required
               value={formData.total_neto ?? ''}
-              onChange={(val) => setFormData({ ...formData, total_neto: val })}
+              onChange={(val) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  ...calcMontos(val, contract?.aplica_iva !== false),
+                }))
+              }
             />
           </Field>
-          <Field label="IVA" required htmlFor="rc-iva">
+          <Field
+            label="IVA"
+            required
+            htmlFor="rc-iva"
+            hint={
+              contract?.aplica_iva === false
+                ? 'Este contrato no aplica IVA.'
+                : fromGestion
+                  ? 'Desglosado del total de gestión (editable).'
+                  : '19% del neto (editable).'
+            }
+          >
             <CurrencyInput
               id="rc-iva"
               required
               value={formData.iva ?? ''}
-              onChange={(val) => setFormData({ ...formData, iva: val })}
+              onChange={(val) => {
+                const neto = Number(formData.total_neto) || 0
+                const iva = Number(val) || 0
+                setFormData({
+                  ...formData,
+                  iva,
+                  total_pagar: neto + iva,
+                })
+              }}
             />
           </Field>
-          <Field label="Total a pagar" required htmlFor="rc-total">
+          <Field
+            label="Total a pagar"
+            required
+            htmlFor="rc-total"
+            hint={
+              fromGestion
+                ? 'Monto de gestión. Al editarlo se recalcula neto e IVA.'
+                : undefined
+            }
+          >
             <CurrencyInput
               id="rc-total"
               required
               value={formData.total_pagar ?? ''}
-              onChange={(val) => setFormData({ ...formData, total_pagar: val })}
+              onChange={(val) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  ...calcMontosDesdeTotal(val, contract?.aplica_iva !== false),
+                }))
+              }}
             />
           </Field>
         </div>

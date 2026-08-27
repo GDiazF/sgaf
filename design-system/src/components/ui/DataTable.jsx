@@ -160,7 +160,7 @@ export function DataTable({
   toolbar,
   totalCount,
   page = 1,
-  pageSize = 10,
+  pageSize = 50,
   onPageChange,
   onPageSizeChange,
   pageSizeOptions = [10, 25, 50, 100],

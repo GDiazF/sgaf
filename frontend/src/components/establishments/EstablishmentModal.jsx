@@ -18,6 +18,7 @@ const emptyForm = (establishmentTypes = []) => ({
   nombre: '',
   tipo: establishmentTypes.length > 0 ? establishmentTypes[0].id : '',
   direccion: '',
+  ciudad: 'Iquique',
   director: '',
   email: '',
   email_director: '',
@@ -269,9 +270,18 @@ const EstablishmentModal = ({
           <Field label="Dirección física" htmlFor="est-dir" className="field--full">
             <Input
               id="est-dir"
-              placeholder="Calle, número, comuna"
+              placeholder="Calle, número"
               value={formData.direccion || ''}
               onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+            />
+          </Field>
+
+          <Field label="Ciudad" htmlFor="est-ciudad">
+            <Input
+              id="est-ciudad"
+              placeholder="Iquique"
+              value={formData.ciudad || ''}
+              onChange={(e) => setFormData({ ...formData, ciudad: e.target.value })}
             />
           </Field>
 

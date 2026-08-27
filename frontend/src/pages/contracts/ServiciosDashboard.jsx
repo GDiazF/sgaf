@@ -51,7 +51,7 @@ const ServiciosDashboard = () => {
   const { notify } = useNotify()
 
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(25)
+  const [pageSize, setPageSize] = useState(50)
 
   const fetchData = async () => {
     try {

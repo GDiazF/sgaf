@@ -163,6 +163,46 @@ const ICONS = {
     '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
   clock:
     '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  bold:
+    '<path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/>',
+  italic:
+    '<line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/>',
+  underline:
+    '<path d="M6 4v7a6 6 0 0 0 12 0V4"/><line x1="4" y1="21" x2="20" y2="21"/>',
+  'align-left':
+    '<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/>',
+  'align-center':
+    '<line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>',
+  'align-right':
+    '<line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/>',
+  'align-justify':
+    '<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>',
+  'align-top':
+    '<rect x="5" y="4" width="14" height="16" rx="1"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="11" x2="16" y2="11"/>',
+  'align-middle':
+    '<rect x="5" y="4" width="14" height="16" rx="1"/><line x1="8" y1="10.5" x2="16" y2="10.5"/><line x1="8" y1="13.5" x2="16" y2="13.5"/>',
+  'align-bottom':
+    '<rect x="5" y="4" width="14" height="16" rx="1"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="16" x2="16" y2="16"/>',
+  list:
+    '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/>',
+  'list-ordered':
+    '<line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1V4H3"/><path d="M3 12h2l-2 2h2"/><path d="M3 16h2v4H3"/>',
+  table:
+    '<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>',
+  'table-row-plus':
+    '<rect x="3" y="4" width="18" height="12" rx="1"/><path d="M3 8h18M9 4v12M15 4v12"/><path d="M12 18v4M10 20h4"/>',
+  'table-col-plus':
+    '<rect x="4" y="3" width="12" height="18" rx="1"/><path d="M8 3v18M4 9h12M4 15h12"/><path d="M18 12h4M20 10v4"/>',
+  'table-borders':
+    '<rect x="3" y="3" width="18" height="18" rx="1" stroke-width="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18" opacity="0.45"/>',
+  'text-color':
+    '<path d="M4 20h16"/><path d="M9.5 4h5L18 16h-2.2l-.8-2.4H9l-.8 2.4H6z"/><path d="M10.2 11.2h3.6L12 6.2z"/>',
+  highlight:
+    '<path d="M4 20h16" stroke-width="3"/><path d="M9 4h6l2 9H7z" fill="currentColor" fill-opacity="0.22"/><path d="M9.5 4h5L16 13H8z"/>',
+  'cell-color':
+    '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 14h18v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor"/>',
+  'page-break':
+    '<path d="M7 3h10v7H7z"/><path d="M7 14h10v7H7z"/><path d="M3 12h18" stroke-dasharray="3 2"/>',
 }
 
 /** Nombres Lucide legados (BD / formularios antiguos) → id canónico del DS */
@@ -277,6 +317,26 @@ const LABELS = {
   server: 'Servidor / SMTP',
   refresh: 'Actualizar',
   clock: 'Horario',
+  bold: 'Negrita',
+  italic: 'Cursiva',
+  underline: 'Subrayado',
+  'align-left': 'Alinear a la izquierda',
+  'align-center': 'Centrar',
+  'align-right': 'Alinear a la derecha',
+  'align-justify': 'Justificar',
+  'align-top': 'Alinear arriba',
+  'align-middle': 'Centrar verticalmente',
+  'align-bottom': 'Alinear abajo',
+  list: 'Lista con viñetas',
+  'list-ordered': 'Lista numerada',
+  table: 'Tabla',
+  'table-row-plus': 'Agregar fila',
+  'table-col-plus': 'Agregar columna',
+  'table-borders': 'Bordes de tabla',
+  'text-color': 'Color de texto',
+  highlight: 'Color de fondo',
+  'cell-color': 'Color de celda',
+  'page-break': 'Salto de página',
 }
 
 /** Resuelve id de icono (canónico o alias legado). */

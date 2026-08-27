@@ -71,12 +71,26 @@ export function MultiSelect({
     const onReposition = () => updatePos()
     window.addEventListener('resize', onReposition)
     window.addEventListener('scroll', onReposition, true)
+
+    let ro = null
+    if (typeof ResizeObserver !== 'undefined' && triggerRef.current) {
+      ro = new ResizeObserver(onReposition)
+      const trigger = triggerRef.current
+      ro.observe(trigger)
+      const dialog = trigger.closest(
+        '.modal, .modal__panel, .modal__dialog, .modal__body, [role="dialog"]',
+      )
+      if (dialog) ro.observe(dialog)
+    }
+
     return () => {
       window.removeEventListener('resize', onReposition)
       window.removeEventListener('scroll', onReposition, true)
+      ro?.disconnect()
     }
+    // value: al elegir opciones el modal puede crecer/recentrarse y el trigger se mueve
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, items.length])
+  }, [open, items.length, value])
 
   useEffect(() => {
     if (allRef.current) {

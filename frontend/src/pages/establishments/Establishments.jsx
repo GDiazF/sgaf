@@ -44,7 +44,7 @@ const Establishments = () => {
   const [totalCount, setTotalCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [ordering, setOrdering] = useState('nombre')
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
   const debouncedSearchQuery = useDebouncedValue(searchQuery)
 
   const [editingId, setEditingId] = useState(null)
@@ -63,6 +63,7 @@ const Establishments = () => {
     tipo: '',
     director: '',
     direccion: '',
+    ciudad: 'Iquique',
     email: '',
     email_director: '',
     url_web: '',
@@ -201,6 +202,7 @@ const Establishments = () => {
         Email: est.email || 'Sin email',
         'Email director/a': est.email_director || 'Sin email',
         Dirección: est.direccion || 'Sin dirección',
+        Ciudad: est.ciudad || 'Iquique',
         Teléfonos: (est.telefonos || []).map((t) => t.numero).join(', '),
         Latitud: est.latitud || '',
         Longitud: est.longitud || '',
@@ -224,6 +226,7 @@ const Establishments = () => {
       tipo: establishmentTypes.length > 0 ? establishmentTypes[0].id : '',
       director: '',
       direccion: '',
+      ciudad: 'Iquique',
       email: '',
       email_director: '',
       url_web: '',
