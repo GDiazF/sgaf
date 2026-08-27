@@ -58,6 +58,7 @@ urlpatterns = [
     path('api/', include(router.urls)),
     path('api/', include('prestamo_llaves.urls')),
     path('api/', include('establecimientos.urls')),
+    path('api/doc-servicios/', include('documentacion_servicios.urls')),
     path('api/', include('servicios.urls')),
     path('api/contratos/', include('contratos.urls')),
     path('api/', include('funcionarios.urls')),
@@ -77,6 +78,7 @@ urlpatterns = [
     path('api/ejecutivos/', include('ejecutivos.urls')),
     path('api/personalizacion/', include('personalizacion_sistema.urls')),
     path('api/', include('arco.urls')),
+    path('api/documentos/', include('documentos.urls')),
 ]
 
 from django.conf import settings

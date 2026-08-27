@@ -36,12 +36,13 @@ INSTALLED_APPS = [
     'funcionarios',
     'insights',
     'licitaciones',
-    'notificaciones',
+    'notificaciones.apps.NotificacionesConfig',
     'orden_compra',
     'personal_ti',
     'prestamo_llaves',
     'procedimientos',
     'remuneraciones',
+    'documentacion_servicios.apps.DocumentacionServiciosConfig',
     'servicios',
     'solicitudes_reservas',
     'tesoreria',
@@ -50,6 +51,7 @@ INSTALLED_APPS = [
     'ejecutivos',
     'personalizacion_sistema',
     'arco',
+    'documentos.apps.DocumentosConfig',
 ]
 
 MIDDLEWARE = [
@@ -136,7 +138,7 @@ REST_FRAMEWORK = {
         'rest_framework.filters.OrderingFilter',
     ),
     'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardResultsSetPagination',
-    'PAGE_SIZE': 10,
+    'PAGE_SIZE': 50,
 }
 
 SIMPLE_JWT = {

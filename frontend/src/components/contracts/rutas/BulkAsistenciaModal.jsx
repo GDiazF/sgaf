@@ -6,7 +6,7 @@ import { usePermission } from '../../../hooks/usePermission'
 import { useNotify } from '../../../hooks/useNotify'
 import api from '../../../api'
 
-export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate }) {
+export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, rowLabel = 'Rutas' }) {
   const { can } = usePermission()
   const [selectedPeriodName, setSelectedPeriodName] = useState('')
   const [feriados, setFeriados] = useState([])
@@ -194,7 +194,7 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate }) 
               <tr>
                 <th className="rutas-detail-matrix__sticky">
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>
-                    Rutas
+                    {rowLabel}
                   </span>
                 </th>
                 {diasGrid.map((fecha) => {

@@ -13,6 +13,7 @@ import {
 import { format, eachDayOfInterval, parseISO, isWeekend } from 'date-fns'
 import { es } from 'date-fns/locale'
 import api from '../../api'
+import { usePermission } from '../../hooks/usePermission'
 
 const DiaCelda = ({ fecha, isTrabajado, isFeriado, isFinDeSemana, onClick, disabled }) => {
   let modifier = 'is-trabajado'
@@ -38,7 +39,8 @@ const DiaCelda = ({ fecha, isTrabajado, isFeriado, isFinDeSemana, onClick, disab
 const ResumenPeriodo = ({ totalData, loadingTotal }) => {
   if (!totalData) return null
 
-  const { total, dias_base, ausencias, dias_cobrar, estado } = totalData
+  const { total, dias_base, ausencias, dias_cobrar, estado, es_mensual_mixto, monto_fijo, monto_variable } =
+    totalData
 
   return (
     <Card className="contratos-periodo-resumen">
@@ -46,18 +48,41 @@ const ResumenPeriodo = ({ totalData, loadingTotal }) => {
         <Icon name="info" size={16} /> Resumen del periodo
       </p>
       <dl className="contratos-periodo-resumen__list">
-        <div>
-          <dt>Días base (hábiles)</dt>
-          <dd>{dias_base}</dd>
-        </div>
-        <div>
-          <dt>Días no realizados</dt>
-          <dd className="is-danger">-{ausencias}</dd>
-        </div>
-        <div className="is-total">
-          <dt>Días a cobrar</dt>
-          <dd>{dias_cobrar}</dd>
-        </div>
+        {es_mensual_mixto ? (
+          <>
+            <div>
+              <dt>Monto fijo</dt>
+              <dd>
+                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(
+                  monto_fijo || 0,
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>Monto variable</dt>
+              <dd>
+                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(
+                  monto_variable || 0,
+                )}
+              </dd>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <dt>Días base (hábiles)</dt>
+              <dd>{dias_base}</dd>
+            </div>
+            <div>
+              <dt>Días no realizados</dt>
+              <dd className="is-danger">-{ausencias}</dd>
+            </div>
+            <div className="is-total">
+              <dt>Días a cobrar</dt>
+              <dd>{dias_cobrar}</dd>
+            </div>
+          </>
+        )}
       </dl>
       <div className="contratos-periodo-resumen__footer">
         <div>
@@ -77,6 +102,9 @@ const ResumenPeriodo = ({ totalData, loadingTotal }) => {
 const PeriodoDetallePage = () => {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { can } = usePermission()
+  const canToggleAsistencia = can('contratos.change_ausenciaruta')
+  const canCerrarPeriodo = can('contratos.change_periodocobro')
 
   const [loading, setLoading] = useState(true)
   const [loadingTotal, setLoadingTotal] = useState(false)
@@ -129,7 +157,7 @@ const PeriodoDetallePage = () => {
   const isClosed = calendario?.estado === 'CERRADO'
 
   const handleToggleDia = async (fechaDate) => {
-    if (isClosed) return
+    if (isClosed || !canToggleAsistencia) return
 
     const fechaStr = format(fechaDate, 'yyyy-MM-dd')
     const isCurrentlyAusente = calendario.ausencias.includes(fechaStr)
@@ -219,7 +247,7 @@ const PeriodoDetallePage = () => {
               <Icon name="refresh" size={16} />
               Refrescar
             </Button>
-            {!isClosed ? (
+            {!isClosed && canCerrarPeriodo ? (
               <Button
                 type="button"
                 variant="primary"
@@ -268,6 +296,7 @@ const PeriodoDetallePage = () => {
 
               let disabledForInteraction = false
               if (isClosed) disabledForInteraction = true
+              if (!canToggleAsistencia) disabledForInteraction = true
               if (!calendario.regla.incluir_fines_semana && isFinSemana) disabledForInteraction = true
               if (calendario.regla.excluir_feriados && isFeriado) disabledForInteraction = true
 

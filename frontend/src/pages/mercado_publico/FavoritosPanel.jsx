@@ -31,7 +31,7 @@ const FavoritosPanel = ({ isNarrow = false }) => {
   const [store, setStore] = useState(loadMpFavorites)
   const [filter, setFilter] = useState('todos') // todos | oc | licitaciones
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
 
   const [selected, setSelected] = useState(null)
   const [detailType, setDetailType] = useState(null)

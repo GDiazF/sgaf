@@ -1,0 +1,31 @@
+---
+description: Plantillas TipTap — propósitos, variables y cómo extender el catálogo PDF
+globs: backend/documentos/**/*,frontend/src/pages/admin/documentos/**/*,frontend/src/components/documentos/**/*,backend/servicios/pdf/**
+alwaysApply: false
+---
+
+# Documentos / plantillas PDF
+
+Fuente de verdad ampliada: `docs/documentos-plantillas.md`.
+
+## Modelo
+
+- Un **propósito** (`propositos.py`) = un tipo de PDF. Una sola plantilla asignada por propósito (excepto `borrador`).
+- `borrador` → todas las variables; no se usa al descargar.
+- Variables por **grupos** en `variables.py`; el propósito declara qué grupos ve.
+- Descarga: resolver propósito → `get_plantilla_activa` → context builder → `render_pdf_bytes`.
+
+## Agregar propósito (checklist)
+
+1. Entrada en `PROPOSITOS` (+ alias si aplica).
+2. Grupos: reutilizar o nuevo bloque en `VARIABLE_GROUPS` + `SAMPLE_CONTEXT`.
+3. `context_from_*` en `context_builders.py` (incluir `_pagos_rows` si hay filas `pago_*`).
+4. `proposito_from_*` y cablear `generate_pdf` (ver `servicios/pdf/rc_adq.py` / `rc_rlb.py`).
+5. Migración de `choices` del campo `proposito`.
+6. Fallbacks del Select en páginas admin de plantillas si hace falta.
+
+## No hacer
+
+- Hardcodear el catálogo completo en el frontend.
+- Usar ReportLab para RC que ya van por plantilla.
+- Asumir que ROC/RCF/RCA/RLB muestran las mismas variables (ya no: RCF sin contrato; RLB usa `recepcion_pagos`).

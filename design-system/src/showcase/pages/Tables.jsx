@@ -50,7 +50,7 @@ function StatusBadge({ status }) {
 export function TablesPage() {
   const [mode, setMode] = useState('data') // data | loading | empty
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
 
   const columns = useMemo(
     () => [
@@ -123,7 +123,7 @@ export function TablesPage() {
 
       <ShowcaseBlock
         title="Tabla estándar con toolbar"
-        rule=".table-toolbar + .table-wrap + .data-table + .table-footer · .page-size (default 10) + paginación · data-sortable en th"
+        rule=".table-toolbar + .table-wrap + .data-table + .table-footer · .page-size (default 50) + paginación · data-sortable en th"
       >
         <div className="showcase-demo-controls">
           <Button size="sm" variant={mode === 'data' ? 'primary' : 'secondary'} onClick={() => setMode('data')}>
@@ -205,7 +205,7 @@ export function TablesPage() {
 
       <ShowcaseBlock
         title="Tabla compacta"
-        rule=".data-table.data-table--compact — mayor densidad para listados largos"
+        rule=".data-table.data-table--compact — densidad extra (el default del sistema ya es acotado)"
       >
         <div className="table-wrap">
           <table className="data-table data-table--compact">

@@ -218,4 +218,22 @@ class FacturaAdquisicionSerializer(serializers.ModelSerializer):
     class Meta:
         model = FacturaAdquisicion
         fields = '__all__'
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'folio', 'modalidad']
+        extra_kwargs = {
+            'cdp': {'required': False, 'allow_blank': True},
+        }
+
+
+class CompraAgilSerializer(FacturaAdquisicionSerializer):
+    """Misma forma que FacturaAdquisicion; exige nro_oc."""
+
+    class Meta(FacturaAdquisicionSerializer.Meta):
+        extra_kwargs = {
+            'nro_oc': {'required': True, 'allow_blank': False},
+            'cdp': {'required': False, 'allow_blank': True},
+        }
+
+    def validate_nro_oc(self, value):
+        if not (value or '').strip():
+            raise serializers.ValidationError('La compra ágil requiere número de orden de compra.')
+        return value.strip()

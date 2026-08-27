@@ -42,7 +42,7 @@ function TriToggle({ value, onChange, yesVariant = 'primary' }) {
   )
 }
 
-export default function BulkRouteSettingsModal({ open, onClose, rutas }) {
+export default function BulkRouteSettingsModal({ open, onClose, rutas, variant = 'ruta' }) {
   const { can } = usePermission()
   const [selectedIds, setSelectedIds] = useState([])
   const [confirmApply, setConfirmApply] = useState(false)
@@ -54,6 +54,7 @@ export default function BulkRouteSettingsModal({ open, onClose, rutas }) {
     dia_inicio_periodo: '',
     dia_fin_periodo: '',
     valor_diario: '',
+    valor_mensual: '',
   })
 
   useEffect(() => {
@@ -66,6 +67,7 @@ export default function BulkRouteSettingsModal({ open, onClose, rutas }) {
         dia_inicio_periodo: '',
         dia_fin_periodo: '',
         valor_diario: '',
+        valor_mensual: '',
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset solo al abrir
@@ -74,9 +76,15 @@ export default function BulkRouteSettingsModal({ open, onClose, rutas }) {
   const buildPayload = () => {
     const dataToUpdate = {}
     if (fields.incluir_fines_semana !== null) {
-      dataToUpdate.incluir_fines_semana = !fields.incluir_fines_semana
+      dataToUpdate.incluir_fines_semana =
+        variant === 'establecimiento'
+          ? fields.incluir_fines_semana
+          : !fields.incluir_fines_semana
     }
-    if (fields.excluir_feriados !== null) dataToUpdate.excluir_feriados = fields.excluir_feriados
+    if (fields.excluir_feriados !== null) {
+      dataToUpdate.excluir_feriados =
+        variant === 'establecimiento' ? !fields.excluir_feriados : fields.excluir_feriados
+    }
     if (fields.dia_inicio_periodo !== '') {
       dataToUpdate.dia_inicio_periodo = parseInt(fields.dia_inicio_periodo, 10)
     }
@@ -86,13 +94,22 @@ export default function BulkRouteSettingsModal({ open, onClose, rutas }) {
     if (fields.valor_diario !== '') {
       dataToUpdate.valor_diario = parseFloat(fields.valor_diario)
     }
+    if (fields.valor_mensual !== '') {
+      dataToUpdate.valor_mensual = parseFloat(fields.valor_mensual)
+    }
     return dataToUpdate
   }
 
   const requestApply = () => {
     if (!can('contratos.change_rutatransporte')) return
     if (selectedIds.length === 0) {
-      notify({ variant: 'warning', text: 'Seleccione al menos una ruta.' })
+      notify({
+        variant: 'warning',
+        text:
+          variant === 'establecimiento'
+            ? 'Seleccione al menos un establecimiento.'
+            : 'Seleccione al menos una ruta.',
+      })
       return
     }
     const dataToUpdate = buildPayload()
@@ -118,7 +135,15 @@ export default function BulkRouteSettingsModal({ open, onClose, rutas }) {
           })
         },
         {
-          successDescription: `Configuración aplicada a ${selectedIds.length} ruta${selectedIds.length === 1 ? '' : 's'}.`,
+          successDescription: `Configuración aplicada a ${selectedIds.length} ${
+            variant === 'establecimiento'
+              ? selectedIds.length === 1
+                ? 'establecimiento'
+                : 'establecimientos'
+              : selectedIds.length === 1
+                ? 'ruta'
+                : 'rutas'
+          }.`,
           formatError: (err) => formatApiFormError(err),
         },
       )
@@ -147,8 +172,12 @@ export default function BulkRouteSettingsModal({ open, onClose, rutas }) {
       <Modal
         open={open}
         onClose={handleClose}
-        title="Configuración masiva de rutas"
-        subheader="Afecta a múltiples rutas operativas de forma simultánea"
+        title={
+          variant === 'establecimiento'
+            ? 'Configuración masiva de establecimientos'
+            : 'Configuración masiva de rutas'
+        }
+        subheader="Afecta a varios registros de forma simultánea"
         size="lg"
         className="rutas-detail-modal--wide modal--shell"
         {...overlay.modalProps}
@@ -164,7 +193,8 @@ export default function BulkRouteSettingsModal({ open, onClose, rutas }) {
               loading={overlay.busy}
               disabled={overlay.busy || overlay.active || !can('contratos.change_rutatransporte')}
             >
-              <Icon name="check" size="sm" /> Aplicar a {selectedIds.length} rutas
+              <Icon name="check" size="sm" /> Aplicar a {selectedIds.length}{' '}
+              {variant === 'establecimiento' ? 'establecimientos' : 'rutas'}
             </Button>
           </>
         }
@@ -180,7 +210,7 @@ export default function BulkRouteSettingsModal({ open, onClose, rutas }) {
               }}
             >
               <h4 className="rutas-detail-section-title" style={{ margin: 0 }}>
-                1. Rutas a modificar ({selectedIds.length})
+                1. {variant === 'establecimiento' ? 'Establecimientos' : 'Rutas'} a modificar ({selectedIds.length})
               </h4>
               <div className="rutas-detail-est-actions">
                 <button type="button" onClick={() => setSelectedIds(rutas.map((r) => r.id))}>
@@ -219,21 +249,27 @@ export default function BulkRouteSettingsModal({ open, onClose, rutas }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               <div className="rutas-detail-field-row">
                 <div>
-                  <strong style={{ fontSize: 'var(--text-xs)' }}>Excluir fines de semana</strong>
+                  <strong style={{ fontSize: 'var(--text-xs)' }}>
+                    {variant === 'establecimiento'
+                      ? 'Incluir fines de semana'
+                      : 'Excluir fines de semana'}
+                  </strong>
                   <div style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>
                     Sábados y domingos
                   </div>
                 </div>
                 <TriToggle
                   value={fields.incluir_fines_semana}
-                  yesVariant="warn"
+                  yesVariant={variant === 'establecimiento' ? 'primary' : 'warn'}
                   onChange={(v) => setFields({ ...fields, incluir_fines_semana: v })}
                 />
               </div>
 
               <div className="rutas-detail-field-row">
                 <div>
-                  <strong style={{ fontSize: 'var(--text-xs)' }}>Excluir feriados</strong>
+                  <strong style={{ fontSize: 'var(--text-xs)' }}>
+                    {variant === 'establecimiento' ? 'Incluir feriados' : 'Excluir feriados'}
+                  </strong>
                   <div style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>
                     Días nacionales
                   </div>
@@ -244,36 +280,47 @@ export default function BulkRouteSettingsModal({ open, onClose, rutas }) {
                 />
               </div>
 
-              <div className="form-grid">
-                <Field label="Día inicio" htmlFor="bulk-dia-inicio">
-                  <Input
-                    id="bulk-dia-inicio"
-                    type="number"
-                    placeholder="No cambiar"
-                    value={fields.dia_inicio_periodo}
-                    onChange={(e) =>
-                      setFields({ ...fields, dia_inicio_periodo: e.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Día fin" htmlFor="bulk-dia-fin">
-                  <Input
-                    id="bulk-dia-fin"
-                    type="number"
-                    placeholder="No cambiar"
-                    value={fields.dia_fin_periodo}
-                    onChange={(e) => setFields({ ...fields, dia_fin_periodo: e.target.value })}
-                  />
-                </Field>
-                <Field label="Valor diario" htmlFor="bulk-valor" className="field--full">
+              {variant === 'establecimiento' ? (
+                <Field label="Monto mensual" htmlFor="bulk-valor-mensual">
                   <CurrencyInput
-                    id="bulk-valor"
+                    id="bulk-valor-mensual"
                     placeholder="No cambiar"
-                    value={fields.valor_diario}
-                    onChange={(val) => setFields({ ...fields, valor_diario: val })}
+                    value={fields.valor_mensual}
+                    onChange={(val) => setFields({ ...fields, valor_mensual: val })}
                   />
                 </Field>
-              </div>
+              ) : (
+                <div className="form-grid">
+                  <Field label="Día inicio" htmlFor="bulk-dia-inicio">
+                    <Input
+                      id="bulk-dia-inicio"
+                      type="number"
+                      placeholder="No cambiar"
+                      value={fields.dia_inicio_periodo}
+                      onChange={(e) =>
+                        setFields({ ...fields, dia_inicio_periodo: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="Día fin" htmlFor="bulk-dia-fin">
+                    <Input
+                      id="bulk-dia-fin"
+                      type="number"
+                      placeholder="No cambiar"
+                      value={fields.dia_fin_periodo}
+                      onChange={(e) => setFields({ ...fields, dia_fin_periodo: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Valor diario" htmlFor="bulk-valor" className="field--full">
+                    <CurrencyInput
+                      id="bulk-valor"
+                      placeholder="No cambiar"
+                      value={fields.valor_diario}
+                      onChange={(val) => setFields({ ...fields, valor_diario: val })}
+                    />
+                  </Field>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -284,7 +331,7 @@ export default function BulkRouteSettingsModal({ open, onClose, rutas }) {
         onClose={() => setConfirmApply(false)}
         onConfirm={handleApply}
         title="Aplicar cambios"
-        description={`¿Está seguro de aplicar estos cambios a ${selectedIds.length} rutas?`}
+        description={`¿Está seguro de aplicar estos cambios a ${selectedIds.length} ${variant === 'establecimiento' ? 'establecimientos' : 'rutas'}?`}
         confirmLabel="Aplicar"
         danger={false}
       />

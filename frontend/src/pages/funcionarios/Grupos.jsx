@@ -44,7 +44,7 @@ const Grupos = () => {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
   const [totalResults, setTotalResults] = useState(0)
 
   const [modalOpen, setModalOpen] = useState(false)

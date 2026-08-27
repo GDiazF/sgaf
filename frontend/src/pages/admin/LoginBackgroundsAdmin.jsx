@@ -428,6 +428,7 @@ const LoginBackgroundsAdmin = () => {
       </Card>
 
       <DataTable
+        compact
         columns={columns}
         rows={ordered}
         loading={loading}

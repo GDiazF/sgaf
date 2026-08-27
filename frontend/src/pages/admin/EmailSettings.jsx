@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import api from '../../api'
 import { useNotify } from '../../hooks/useNotify'
+import NotificationTypesAdmin from './NotificationTypesAdmin'
 import {
   PageHeader,
   Card,
@@ -11,7 +12,6 @@ import {
   Field,
   Input,
   Select,
-  Switch,
   Textarea,
   Button,
   Icon,
@@ -22,41 +22,36 @@ import {
   formatApiFormError,
 } from '@slep/ui'
 
-const DEFAULT_OPERATIONAL_PURPOSE = 'ALERTA_VENCIMIENTO_VEHICULO'
-const EXCLUDED_OPERATIONAL_PURPOSES = new Set([
-  'MFA',
-  'RESET_PASSWORD',
-  'RESERVA_SOLICITUD',
-  'RESERVA_APROBACION',
-  'RESERVA_RECORDATORIO',
-  'TEST',
-])
-
-const EMAIL_TABS = [
+const NOTIF_TABS = [
+  { id: 'tipos', label: 'Tipos' },
   { id: 'accounts', label: 'Cuentas' },
   { id: 'templates', label: 'Editor' },
-  { id: 'recipients', label: 'Destinatarios' },
 ]
 
-const createEmptyRecipientConfig = (proposito = DEFAULT_OPERATIONAL_PURPOSE) => ({
-  proposito,
-  grupos: [],
-  usuarios: [],
-  emails_adicionales: '',
-  activo: true,
-})
+const TAB_IDS = new Set(NOTIF_TABS.map((t) => t.id))
 
 const EmailSettings = () => {
   const overlay = useFormOverlay()
   const { notify } = useNotify()
-  const [activeTab, setActiveTab] = useState('accounts')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabFromUrl = searchParams.get('tab')
+  const [activeTab, setActiveTab] = useState(
+    TAB_IDS.has(tabFromUrl) ? tabFromUrl : 'tipos',
+  )
+
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (TAB_IDS.has(t)) setActiveTab(t)
+    else setActiveTab('tipos')
+  }, [searchParams])
+
+  const selectTab = (id) => {
+    setActiveTab(id)
+    setSearchParams(id === 'tipos' ? {} : { tab: id }, { replace: true })
+  }
+
   const [accounts, setAccounts] = useState([])
   const [templates, setTemplates] = useState([])
-  const [operationalRecipients, setOperationalRecipients] = useState([])
-  const [selectedRecipientPurpose, setSelectedRecipientPurpose] = useState(DEFAULT_OPERATIONAL_PURPOSE)
-  const [groups, setGroups] = useState([])
-  const [users, setUsers] = useState([])
-  const [recipientForm, setRecipientForm] = useState(createEmptyRecipientConfig())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -104,51 +99,6 @@ const EmailSettings = () => {
       const templatesData = tempRes.data.results || tempRes.data
       setTemplates(templatesData)
       if (templatesData.length > 0) handleSelectTemplate(templatesData[0])
-
-      const [recipientsResult, groupsResult, usersResult] = await Promise.allSettled([
-        api.get('comunicaciones/destinatarios-operativos/'),
-        api.get('grupos/', { params: { page_size: 1000 } }),
-        api.get('admin/users/'),
-      ])
-
-      let recipientsData = []
-      if (recipientsResult.status === 'fulfilled') {
-        recipientsData = recipientsResult.value.data.results || recipientsResult.value.data
-        setOperationalRecipients(recipientsData)
-      } else {
-        console.error('No se pudieron cargar destinatarios operativos:', recipientsResult.reason)
-        setOperationalRecipients([])
-      }
-
-      if (groupsResult.status === 'fulfilled') {
-        setGroups(groupsResult.value.data.results || groupsResult.value.data)
-      } else {
-        console.error('No se pudieron cargar grupos de funcionarios:', groupsResult.reason)
-        setGroups([])
-      }
-
-      if (usersResult.status === 'fulfilled') {
-        setUsers(
-          (usersResult.value.data.results || usersResult.value.data).filter(
-            (user) => user.is_active && user.email,
-          ),
-        )
-      } else {
-        console.error('No se pudieron cargar usuarios:', usersResult.reason)
-        setUsers([])
-      }
-
-      const firstOperationalPurpose =
-        templatesData.find((item) => !EXCLUDED_OPERATIONAL_PURPOSES.has(item.proposito))?.proposito ||
-        DEFAULT_OPERATIONAL_PURPOSE
-      const nextPurpose =
-        recipientsData.find((item) => item.proposito === selectedRecipientPurpose)?.proposito ||
-        firstOperationalPurpose
-      const nextRecipientConfig =
-        recipientsData.find((item) => item.proposito === nextPurpose) ||
-        createEmptyRecipientConfig(nextPurpose)
-      setSelectedRecipientPurpose(nextPurpose)
-      setRecipientForm(nextRecipientConfig)
     } catch (error) {
       console.error('Error loading email settings:', error)
       notify({ variant: 'danger', text: 'Error al cargar datos del servidor.' })
@@ -203,21 +153,30 @@ const EmailSettings = () => {
         '{{ estado }}',
         '{{ codigo_reserva }}',
       ]
+    if (purpose.startsWith('DOC_SERVICIOS'))
+      return [
+        ...common,
+        '{{ titulo }}',
+        '{{ mensaje }}',
+        '{{ link }}',
+        '{{ tipo_nombre }}',
+        '{{ establecimiento }}',
+        '{{ fecha_servicio }}',
+        '{{ folio }}',
+        '{{ logo_cid }}',
+        '{{ modulo }}',
+        '{{ evento }}',
+      ]
+    if (purpose === 'ALERTA_VENCIMIENTO_VEHICULO')
+      return [
+        ...common,
+        '{{ patente }}',
+        '{{ vehiculo }}',
+        '{{ documento }}',
+        '{{ fecha_vencimiento }}',
+        '{{ dias_restantes }}',
+      ]
     return common
-  }
-
-  const getOperationalTemplates = () =>
-    templates.filter((item) => !EXCLUDED_OPERATIONAL_PURPOSES.has(item.proposito))
-
-  const getPurposeLabel = (purpose) => {
-    const template = templates.find((item) => item.proposito === purpose)
-    return template?.proposito_display || template?.nombre || purpose
-  }
-
-  const handleRecipientPurposeChange = (purpose) => {
-    setSelectedRecipientPurpose(purpose)
-    const existingConfig = operationalRecipients.find((item) => item.proposito === purpose)
-    setRecipientForm(existingConfig || createEmptyRecipientConfig(purpose))
   }
 
   const handleSelectTemplate = async (template) => {
@@ -238,60 +197,6 @@ const EmailSettings = () => {
     const updated = { ...selectedTemplate, [field]: value }
     setSelectedTemplate(updated)
     if (field === 'cuerpo_html') updatePreview(value)
-  }
-
-  const toggleRecipientSelection = (field, id) => {
-    const current = recipientForm[field] || []
-    const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
-    setRecipientForm({ ...recipientForm, [field]: next })
-  }
-
-  const handleSaveOperationalRecipients = async () => {
-    setSaving(true)
-    try {
-      const hasRecipients = Boolean(
-        (recipientForm.grupos || []).length ||
-          (recipientForm.usuarios || []).length ||
-          (recipientForm.emails_adicionales || '').trim(),
-      )
-
-      if (recipientForm.activo && !hasRecipients) {
-        notify({ variant: 'danger', text: 'Selecciona al menos un grupo, usuario o email adicional.' })
-        setSaving(false)
-        return
-      }
-
-      const payload = {
-        ...recipientForm,
-        proposito: selectedRecipientPurpose,
-      }
-      let response
-      if (recipientForm.id) {
-        response = await api.patch(
-          `comunicaciones/destinatarios-operativos/${recipientForm.id}/`,
-          payload,
-        )
-      } else {
-        response = await api.post('comunicaciones/destinatarios-operativos/', payload)
-      }
-      const saved = response.data
-      setRecipientForm(saved)
-      setOperationalRecipients((prev) => {
-        const exists = prev.some((item) => item.id === saved.id)
-        return exists
-          ? prev.map((item) => (item.id === saved.id ? saved : item))
-          : [...prev, saved]
-      })
-      notify({ variant: 'success', text: 'Destinatarios actualizados.' })
-    } catch (error) {
-      console.error('Error al guardar destinatarios:', error)
-      notify({
-        variant: 'danger',
-        text: formatApiFormError(error, 'Error al guardar destinatarios.'),
-      })
-    } finally {
-      setSaving(false)
-    }
   }
 
   const handleOpenAccountModal = (acc = null) => {
@@ -403,17 +308,17 @@ const EmailSettings = () => {
     handleTemplateChange('cuerpo_html', newText)
   }
 
-  if (loading) {
+  if (loading && activeTab !== 'tipos') {
     return (
-      <div className="page" data-od-id="email-settings-page" data-fill-viewport>
+      <div className="page" data-od-id="notificaciones-admin-page" data-fill-viewport>
         <PageHeader
-          icon="message"
-          title="Comunicaciones y Notificaciones"
-          description="Cuentas SMTP, plantillas y destinatarios operativos"
+          icon="bell"
+          title="Notificaciones"
+          description="Tipos de evento, canales, SMTP y plantillas"
           breadcrumbs={[
             { label: 'Inicio', to: '/' },
             { label: 'Administración' },
-            { label: 'Email' },
+            { label: 'Notificaciones' },
           ]}
           linkComponent={Link}
         />
@@ -423,31 +328,31 @@ const EmailSettings = () => {
   }
 
   return (
-    <div className="page" data-od-id="email-settings-page" data-fill-viewport>
+    <div className="page" data-od-id="notificaciones-admin-page" data-fill-viewport>
       <PageHeader
-        icon="message"
-        title="Comunicaciones y Notificaciones"
-        description="Cuentas SMTP, plantillas y destinatarios operativos"
+        icon="bell"
+        title="Notificaciones"
+        description="Tipos de evento, canales (campana/email), SMTP y plantillas"
         breadcrumbs={[
           { label: 'Inicio', to: '/' },
           { label: 'Administración' },
-          { label: 'Email' },
+          { label: 'Notificaciones' },
         ]}
         linkComponent={Link}
       />
 
       <div className="tabs">
-        <ul className="tabs__list" role="tablist" aria-label="Secciones de email">
-          {EMAIL_TABS.map((tab) => (
+        <ul className="tabs__list" role="tablist" aria-label="Secciones de notificaciones">
+          {NOTIF_TABS.map((tab) => (
             <li key={tab.id}>
               <button
                 type="button"
                 role="tab"
-                id={`email-tab-${tab.id}`}
+                id={`notif-tab-${tab.id}`}
                 aria-selected={activeTab === tab.id}
-                aria-controls={`email-panel-${tab.id}`}
+                aria-controls={`notif-panel-${tab.id}`}
                 className={`tabs__btn${activeTab === tab.id ? ' is-active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => selectTab(tab.id)}
               >
                 {tab.label}
               </button>
@@ -457,11 +362,12 @@ const EmailSettings = () => {
       </div>
 
       <div
-        id={`email-panel-${activeTab}`}
+        id={`notif-panel-${activeTab}`}
         role="tabpanel"
-        aria-labelledby={`email-tab-${activeTab}`}
+        aria-labelledby={`notif-tab-${activeTab}`}
         className="tabs__panel is-active email-settings-tab-panel"
       >
+        {activeTab === 'tipos' ? <NotificationTypesAdmin embedded /> : null}
         {activeTab === 'templates' ? (
           <div className="email-templates-layout">
             <Card className="email-templates-sidebar">
@@ -593,166 +499,7 @@ const EmailSettings = () => {
               </div>
             </Card>
           </div>
-        ) : activeTab === 'recipients' ? (
-          <div className="email-recipients-layout">
-            <div className="email-recipients-head">
-              <div>
-                <h3 className="email-section-title">Destinatarios operativos</h3>
-                <p className="email-section-desc">
-                  Define quién recibe correos por propósito usando grupos de funcionarios, usuarios
-                  puntuales o correos externos.
-                </p>
-              </div>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleSaveOperationalRecipients}
-                loading={saving}
-                disabled={saving}
-              >
-                <Icon name="check" size="sm" /> Guardar configuración
-              </Button>
-            </div>
-
-            <div className="email-recipients-grid">
-              <Card className="email-recipients-sidebar">
-                <CardHeader title="Propósitos" />
-                <div className="email-sidebar-list">
-                  {getOperationalTemplates().map((template) => (
-                    <button
-                      key={template.proposito}
-                      type="button"
-                      className={`email-sidebar-list__btn${selectedRecipientPurpose === template.proposito ? ' is-active' : ''}`}
-                      onClick={() => handleRecipientPurposeChange(template.proposito)}
-                    >
-                      <span className="email-sidebar-list__primary">
-                        {template.proposito_display || template.nombre}
-                      </span>
-                      <span className="email-sidebar-list__secondary">{template.proposito}</span>
-                    </button>
-                  ))}
-                  {getOperationalTemplates().length === 0 ? (
-                    <EmptyState
-                      title="Sin plantillas operativas"
-                      description="No hay plantillas disponibles para configurar destinatarios."
-                    />
-                  ) : null}
-                </div>
-              </Card>
-
-              <div className="email-recipients-main">
-                <Card className="email-recipients-summary">
-                  <div className="email-recipients-summary__info">
-                    <p className="email-recipients-summary__label">Propósito seleccionado</p>
-                    <h3 className="email-recipients-summary__title">
-                      {getPurposeLabel(selectedRecipientPurpose)}
-                    </h3>
-                    <p className="email-recipients-summary__code">{selectedRecipientPurpose}</p>
-                  </div>
-                  <Switch
-                    checked={recipientForm.activo}
-                    onChange={(e) =>
-                      setRecipientForm({ ...recipientForm, activo: e.target.checked })
-                    }
-                    label="Activo"
-                  />
-                </Card>
-
-                <div className="email-recipients-panels">
-                  <Card className="email-recipients-panel">
-                    <CardHeader
-                      title="Grupos de funcionarios"
-                      subtitle="Tomados desde Funcionarios › Grupos."
-                    />
-                    <ul className="func-grupos email-recipients-checklist">
-                      {groups.map((group) => {
-                        const checked = (recipientForm.grupos || []).includes(group.id)
-                        return (
-                          <li key={group.id}>
-                            <label
-                              className={`func-grupos__item${checked ? ' is-selected' : ''}`}
-                              htmlFor={`recipient-group-${group.id}`}
-                            >
-                              <input
-                                id={`recipient-group-${group.id}`}
-                                type="checkbox"
-                                className="no-global"
-                                checked={checked}
-                                onChange={() => toggleRecipientSelection('grupos', group.id)}
-                              />
-                              <span>
-                                <strong>{group.nombre}</strong>
-                                <small>{group.total_miembros || 0} miembros</small>
-                              </span>
-                            </label>
-                          </li>
-                        )
-                      })}
-                      {groups.length === 0 ? (
-                        <li className="email-recipients-empty">No hay grupos disponibles.</li>
-                      ) : null}
-                    </ul>
-                  </Card>
-
-                  <Card className="email-recipients-panel">
-                    <CardHeader
-                      title="Usuarios específicos"
-                      subtitle="Opcional para casos fuera del grupo."
-                    />
-                    <ul className="func-grupos email-recipients-checklist">
-                      {users.map((user) => {
-                        const checked = (recipientForm.usuarios || []).includes(user.id)
-                        return (
-                          <li key={user.id}>
-                            <label
-                              className={`func-grupos__item${checked ? ' is-selected' : ''}`}
-                              htmlFor={`recipient-user-${user.id}`}
-                            >
-                              <input
-                                id={`recipient-user-${user.id}`}
-                                type="checkbox"
-                                className="no-global"
-                                checked={checked}
-                                onChange={() => toggleRecipientSelection('usuarios', user.id)}
-                              />
-                              <span>
-                                <strong>
-                                  {user.first_name || user.username} {user.last_name || ''}
-                                </strong>
-                                <small>{user.email}</small>
-                              </span>
-                            </label>
-                          </li>
-                        )
-                      })}
-                      {users.length === 0 ? (
-                        <li className="email-recipients-empty">No hay usuarios con email disponibles.</li>
-                      ) : null}
-                    </ul>
-                  </Card>
-                </div>
-
-                <Card className="email-recipients-emails">
-                  <Field
-                    label="Emails adicionales"
-                    htmlFor="recipient-emails"
-                    hint="Separados por coma, punto y coma o salto de línea."
-                  >
-                    <Textarea
-                      id="recipient-emails"
-                      rows={3}
-                      placeholder="flota@slepiquique.cl"
-                      value={recipientForm.emails_adicionales || ''}
-                      onChange={(e) =>
-                        setRecipientForm({ ...recipientForm, emails_adicionales: e.target.value })
-                      }
-                    />
-                  </Field>
-                </Card>
-              </div>
-            </div>
-          </div>
-        ) : (
+        ) : activeTab === 'accounts' ? (
           <div className="email-accounts-layout">
             <div className="email-accounts-head">
               <div>
@@ -828,7 +575,7 @@ const EmailSettings = () => {
               ) : null}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
       <Modal

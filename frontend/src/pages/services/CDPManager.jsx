@@ -53,7 +53,7 @@ const CDPManager = () => {
   const [cdps, setCdps] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
   const [totalCount, setTotalCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [ordering, setOrdering] = useState('-anio,-fecha_subida')
@@ -319,7 +319,11 @@ const CDPManager = () => {
         icon="file-check"
         title="Repositorio CDPs"
         description={`Certificados de disponibilidad presupuestaria (${totalCount})`}
-        breadcrumbs={[{ label: 'SSGG' }, { label: 'CDPs' }]}
+        breadcrumbs={[
+          { label: 'SSGG' },
+          { label: 'Pagos', to: '/services/payments?tab=recepciones' },
+          { label: 'CDPs' },
+        ]}
         linkComponent={Link}
         split
         actions={

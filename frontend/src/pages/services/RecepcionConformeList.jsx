@@ -16,6 +16,7 @@ import {
   Textarea,
   Modal,
   ConfirmModal,
+  EmptyState,
   Icon,
   useFormOverlay,
   formatApiFormError,
@@ -48,13 +49,14 @@ const ESTADO_BADGE = {
   HISTORICA: { variant: 'neutral', label: 'Histórica' },
 }
 
-const RecepcionConformeList = () => {
+const RecepcionConformeList = ({ embedded = false }) => {
   const { can } = usePermission()
+  const canView = can('servicios.view_recepcionconforme')
 
   const [rcs, setRcs] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
   const [totalCount, setTotalCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [ordering, setOrdering] = useState('-fecha_emision')
@@ -175,7 +177,17 @@ const RecepcionConformeList = () => {
         `recepciones-conformes/${item.id}/generate_pdf/?tipo=${tipo}`,
         { responseType: 'blob' },
       )
-      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const contentType = response.headers?.['content-type'] || ''
+      if (contentType.includes('application/json')) {
+        const text = await response.data.text()
+        const payload = JSON.parse(text)
+        notify({
+          variant: 'danger',
+          text: payload.hint || payload.error || 'No se pudo generar el PDF.',
+        })
+        return
+      }
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
       const filename = `RC_${item.folio || item.id}.pdf`.replace(/[/\\?%*:|"<>]/g, '-')
       const link = document.createElement('a')
       link.href = url
@@ -186,7 +198,19 @@ const RecepcionConformeList = () => {
       window.URL.revokeObjectURL(url)
     } catch (error) {
       console.error('Error downloading PDF:', error)
-      notify({ variant: 'danger', text: 'Error al generar el PDF.' })
+      let message = 'Error al generar el PDF.'
+      const data = error?.response?.data
+      if (data instanceof Blob) {
+        try {
+          const payload = JSON.parse(await data.text())
+          message = payload.hint || payload.error || message
+        } catch {
+          // ignore
+        }
+      } else if (data?.hint || data?.error) {
+        message = data.hint || data.error
+      }
+      notify({ variant: 'danger', text: message })
     }
   }
 
@@ -376,11 +400,12 @@ const RecepcionConformeList = () => {
         cardRole: 'title',
         priority: 1,
         sortable: true,
-        render: (item) => (
-          <span style={item.estado === 'ANULADA' ? { color: 'var(--danger)', textDecoration: 'line-through' } : undefined}>
-            {item.folio || 'Sin folio'}
-          </span>
-        ),
+        render: (item) =>
+          item.estado === 'ANULADA' ? (
+            <s>{item.folio || 'Sin folio'}</s>
+          ) : (
+            item.folio || 'Sin folio'
+          ),
       },
       {
         key: 'estado',
@@ -408,13 +433,9 @@ const RecepcionConformeList = () => {
         priority: 4,
         sortable: true,
         render: (item) => (
-          <div>
-            <div>{item.proveedor_nombre || 'S/P'}</div>
-            {item.tipo_proveedor_nombre ? (
-              <div style={{ color: 'var(--muted)', fontSize: 'var(--text-xs)' }}>
-                {item.tipo_proveedor_nombre}
-              </div>
-            ) : null}
+          <div className="contracts-cat">
+            <strong>{item.proveedor_nombre || 'S/P'}</strong>
+            {item.tipo_proveedor_nombre ? <span>{item.tipo_proveedor_nombre}</span> : null}
           </div>
         ),
       },
@@ -437,28 +458,32 @@ const RecepcionConformeList = () => {
           const isAnulada = item.estado === 'ANULADA'
           return (
             <div className="data-table__actions" onClick={(e) => e.stopPropagation()}>
-              <Button
-                variant="ghost"
-                size="sm"
-                title="Historial"
-                onClick={() => setHistoryRC(item)}
-              >
-                <Icon name="activity" size="sm" />
-              </Button>
+              {canView ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Historial"
+                  onClick={() => setHistoryRC(item)}
+                >
+                  <Icon name="activity" size="sm" />
+                </Button>
+              ) : null}
 
               {!isAnulada ? (
                 <>
                   {item.archivo_escaneado ? (
                     <>
-                      <a
-                        href={mediaUrl(item.archivo_escaneado)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn--ghost btn--sm"
-                        title="Ver recepción escaneada"
-                      >
-                        <Icon name="file" size="sm" />
-                      </a>
+                      {canView ? (
+                        <a
+                          href={mediaUrl(item.archivo_escaneado)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn--ghost btn--sm"
+                          title="Ver recepción escaneada"
+                        >
+                          <Icon name="file" size="sm" />
+                        </a>
+                      ) : null}
                       {can('servicios.change_recepcionconforme') ? (
                         <Button
                           variant="ghost"
@@ -499,14 +524,26 @@ const RecepcionConformeList = () => {
                     </label>
                   ) : null}
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    title="Descargar PDF"
-                    onClick={() => handleDownloadPDF(item, 'PAGO')}
-                  >
-                    <Icon name="download" size="sm" />
-                  </Button>
+                  {canView ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Descargar RLB (recepción)"
+                        onClick={() => handleDownloadPDF(item, 'PAGO')}
+                      >
+                        <Icon name="download" size="sm" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Descargar RLB Monto JUNJI"
+                        onClick={() => handleDownloadPDF(item, 'ESTANDAR')}
+                      >
+                        <Icon name="file" size="sm" />
+                      </Button>
+                    </>
+                  ) : null}
 
                   {can('servicios.change_recepcionconforme') ? (
                     <Button
@@ -540,21 +577,21 @@ const RecepcionConformeList = () => {
     [can, processingIds],
   )
 
-  return (
-    <div className="page" data-od-id="recepciones-conformes-page" data-fill-viewport>
-      <PageHeader
-        icon="clipboard-check"
-        title="Recepciones conformes"
-        description={`Historial y gestión de documentos tributarios aceptados (${totalCount})`}
-        breadcrumbs={[
-          { label: 'SSGG' },
-          { label: 'Recepciones conformes' },
-        ]}
-        linkComponent={Link}
-        split
-      />
-
-      
+  const list = (
+    <>
+      {!embedded ? (
+        <PageHeader
+          icon="clipboard-check"
+          title="Recepciones conformes"
+          description={`Historial y gestión de documentos tributarios aceptados (${totalCount})`}
+          breadcrumbs={[
+            { label: 'SSGG' },
+            { label: 'Recepciones conformes' },
+          ]}
+          linkComponent={Link}
+          split
+        />
+      ) : null}
 
       <FiltersBar
         onSearch={() => setCurrentPage(1)}
@@ -623,12 +660,14 @@ const RecepcionConformeList = () => {
         mobileCardActions={(item) => {
           const isAnulada = item.estado === 'ANULADA'
           if (isAnulada) {
-            return {
-              primary: {
-                label: 'Historial',
-                onClick: () => setHistoryRC(item),
-              },
-            }
+            return canView
+              ? {
+                  primary: {
+                    label: 'Historial',
+                    onClick: () => setHistoryRC(item),
+                  },
+                }
+              : {}
           }
           return {
             primary: can('servicios.change_recepcionconforme')
@@ -636,14 +675,18 @@ const RecepcionConformeList = () => {
                   label: 'Editar',
                   onClick: () => handleEdit(item),
                 }
-              : {
-                  label: 'Descargar',
-                  onClick: () => handleDownloadPDF(item, 'PAGO'),
-                },
-            secondary: {
-              label: 'Historial',
-              onClick: () => setHistoryRC(item),
-            },
+              : canView
+                ? {
+                    label: 'Descargar',
+                    onClick: () => handleDownloadPDF(item, 'PAGO'),
+                  }
+                : undefined,
+            secondary: canView
+              ? {
+                  label: 'Historial',
+                  onClick: () => setHistoryRC(item),
+                }
+              : undefined,
           }
         }}
         toolbar={
@@ -692,7 +735,7 @@ const RecepcionConformeList = () => {
               </div>
             ))
           ) : (
-            <p style={{ color: 'var(--muted)', margin: 0 }}>Sin registros históricos.</p>
+            <EmptyState title="Sin registros históricos." />
           )}
         </div>
       </Modal>
@@ -865,6 +908,14 @@ const RecepcionConformeList = () => {
         confirmLabel={activeConfirm?.confirmLabel}
         danger={activeConfirm?.danger}
       />
+    </>
+  )
+
+  if (embedded) return list
+
+  return (
+    <div className="page" data-od-id="recepciones-conformes-page" data-fill-viewport>
+      {list}
     </div>
   )
 }
