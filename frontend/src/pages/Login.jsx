@@ -113,12 +113,24 @@ const Login = () => {
     return loginBackgrounds[backgroundIndex] || null
   }, [loginBackgrounds, backgroundIndex])
 
+  const handleLoginEnter = (e) => {
+    if (e.key !== 'Enter' || isLoading) return
+    e.preventDefault()
+    e.currentTarget.form?.requestSubmit()
+  }
+
   const handleLoginSubmit = async (e) => {
     e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    const submittedUsername = String(formData.get('username') || '')
+    const submittedPassword = String(formData.get('password') || '')
+
+    setUsername(submittedUsername)
+    setPassword(submittedPassword)
     setError('')
     setIsLoading(true)
     try {
-      const result = await login(username, password)
+      const result = await login(submittedUsername, submittedPassword)
       if (result?.mfa_required) {
         setMfaState({
           required: true,
@@ -324,6 +336,7 @@ const Login = () => {
                       placeholder="usuario institucional"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
+                      onKeyDown={handleLoginEnter}
                       disabled={isLoading}
                       required
                     />
@@ -345,6 +358,7 @@ const Login = () => {
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      onKeyDown={handleLoginEnter}
                       disabled={isLoading}
                       required
                     />

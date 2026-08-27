@@ -48,7 +48,8 @@ const GenerateRCModal = ({
           await onSave(form)
         },
         {
-          successDescription: 'Recepción conforme generada.',
+          successDescription:
+            'Recepción conforme generada y enviada a la bandeja de firmas del firmante.',
           formatError: (err) => formatApiFormError(err),
         },
       )

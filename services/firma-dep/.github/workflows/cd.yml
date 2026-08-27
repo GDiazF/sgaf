@@ -1,0 +1,124 @@
+name: CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target Environment'
+        required: true
+        type: choice
+        options:
+          - PRD
+          - QA
+      image_tag:
+        description: 'Image Tag to Deploy'
+        required: true
+        default: 'QA-latest'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Verify Deployment Constraints
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          TAG="${{ github.event.inputs.image_tag }}"
+          
+          if [ "$BRANCH" != "main" ] && [ "$BRANCH" != "develop" ]; then
+            echo "Error: Deployments are only allowed from 'main' or 'develop' branches."
+            exit 1
+          fi
+          
+          if [ "$BRANCH" = "main" ] && [[ "$TAG" != *PRD* ]]; then
+            echo "Error: The 'main' branch must use an image tag containing 'PRD'."
+            exit 1
+          fi
+          
+          if [ "$BRANCH" = "develop" ] && [[ "$TAG" != *QA* ]]; then
+            echo "Error: The 'develop' branch must use an image tag containing 'QA'."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Lowercase Repository Name
+        run: |
+          echo "IMAGE_NAME=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Inject Static Image into Compose File
+        run: |
+          STATIC_IMAGE="ghcr.io/${IMAGE_NAME}:${{ github.event.inputs.image_tag }}"
+          sed -i "s|image: .*|image: $STATIC_IMAGE|g" .github/deploy/docker-compose.yml
+
+      - name: Azure Login
+        uses: azure/login@v3
+        with:
+          creds: ${{ secrets.AZURE_SERVICE_PRINCIPAL }}
+
+      - name: Deploy via Azure Run Command
+        uses: azure/cli@v3
+        env:
+          API_CLIENT_KEYS: ${{ secrets.API_CLIENT_KEYS }}
+          FIRMA_GOB_API_TOKEN_KEY: ${{ secrets.FIRMA_GOB_API_TOKEN_KEY }}
+          FIRMA_GOB_SECRET: ${{ secrets.FIRMA_GOB_SECRET }}
+          API_ALLOW_LOCALHOST: ${{ vars.API_ALLOW_LOCALHOST }}
+          API_ALLOWED_IPS: ${{ vars.API_ALLOWED_IPS }}
+          API_SECURITY_ENABLED: ${{ vars.API_SECURITY_ENABLED }}
+          FIRMA_GOB_DEFAULT_ENTITY: ${{ vars.FIRMA_GOB_DEFAULT_ENTITY }}
+          FIRMA_GOB_ENABLED: ${{ vars.FIRMA_GOB_ENABLED }}
+          FIRMA_GOB_ENVIRONMENT: ${{ vars.FIRMA_GOB_ENVIRONMENT }}
+          FIRMA_GOB_PURPOSE_ATTENDED: ${{ vars.FIRMA_GOB_PURPOSE_ATTENDED }}
+          FIRMA_GOB_PURPOSE_UNATTENDED: ${{ vars.FIRMA_GOB_PURPOSE_UNATTENDED }}
+          FIRMA_GOB_TIMEOUT_MS: ${{ vars.FIRMA_GOB_TIMEOUT_MS }}
+          HTTP_BODY_LIMIT: ${{ vars.HTTP_BODY_LIMIT }}
+          NODE_ENV: ${{ vars.NODE_ENV }}
+          PORT: ${{ vars.PORT }}
+          SWAGGER_ENABLED: ${{ vars.SWAGGER_ENABLED }}
+        with:
+          azcliversion: latest
+          inlineScript: |
+            COMPOSE_B64=$(base64 -w 0 .github/deploy/docker-compose.yml)
+            
+            touch runner_env.txt
+            echo "API_CLIENT_KEYS=$API_CLIENT_KEYS" >> runner_env.txt
+            echo "FIRMA_GOB_API_TOKEN_KEY=$FIRMA_GOB_API_TOKEN_KEY" >> runner_env.txt
+            echo "FIRMA_GOB_SECRET=$FIRMA_GOB_SECRET" >> runner_env.txt
+            echo "API_ALLOW_LOCALHOST=$API_ALLOW_LOCALHOST" >> runner_env.txt
+            echo "API_ALLOWED_IPS=$API_ALLOWED_IPS" >> runner_env.txt
+            echo "API_SECURITY_ENABLED=$API_SECURITY_ENABLED" >> runner_env.txt
+            echo "FIRMA_GOB_DEFAULT_ENTITY=$FIRMA_GOB_DEFAULT_ENTITY" >> runner_env.txt
+            echo "FIRMA_GOB_ENABLED=$FIRMA_GOB_ENABLED" >> runner_env.txt
+            echo "FIRMA_GOB_ENVIRONMENT=$FIRMA_GOB_ENVIRONMENT" >> runner_env.txt
+            echo "FIRMA_GOB_PURPOSE_ATTENDED=$FIRMA_GOB_PURPOSE_ATTENDED" >> runner_env.txt
+            echo "FIRMA_GOB_PURPOSE_UNATTENDED=$FIRMA_GOB_PURPOSE_UNATTENDED" >> runner_env.txt
+            echo "FIRMA_GOB_TIMEOUT_MS=$FIRMA_GOB_TIMEOUT_MS" >> runner_env.txt
+            echo "HTTP_BODY_LIMIT=$HTTP_BODY_LIMIT" >> runner_env.txt
+            echo "NODE_ENV=$NODE_ENV" >> runner_env.txt
+            echo "PORT=$PORT" >> runner_env.txt
+            echo "SWAGGER_ENABLED=$SWAGGER_ENABLED" >> runner_env.txt
+            
+            ENV_B64=$(base64 -w 0 runner_env.txt)
+            
+            AZURE_SCRIPT="
+            set -e
+            mkdir -p /app/deploy
+            cd /app/deploy
+            echo '$COMPOSE_B64' | base64 -d > docker-compose.yml
+            echo '$ENV_B64' | base64 -d > .env
+            echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+            docker compose pull
+            docker compose up -d
+            docker logout ghcr.io
+            "
+            
+            az vm run-command invoke \
+              --resource-group "${{ vars.AZURE_VM_RESOURCE_GROUP }}" \
+              --name "${{ vars.AZURE_VM_NAME }}" \
+              --command-id RunShellScript \
+              --scripts "$AZURE_SCRIPT"

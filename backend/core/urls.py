@@ -77,6 +77,7 @@ urlpatterns = [
     path('api/ejecutivos/', include('ejecutivos.urls')),
     path('api/personalizacion/', include('personalizacion_sistema.urls')),
     path('api/', include('arco.urls')),
+    path('api/firma-digital/', include('firma_digital.urls')),
 ]
 
 from django.conf import settings

@@ -35,6 +35,7 @@ def get_full_user_data(user):
 
     # Fetch linked funcionario data if available
     funcionario_data = None
+    sello_resuelto = None
     try:
         funcionario = user.funcionario_profile
         funcionario_data = {
@@ -47,9 +48,16 @@ def get_full_user_data(user):
             'departamento_id': funcionario.departamento_id,
             'subdireccion': funcionario.subdireccion.nombre if funcionario.subdireccion else None,
             'subdireccion_id': funcionario.subdireccion_id,
+            'sello_preferido_id': funcionario.sello_preferido_id,
         }
+        from firma_digital.resolve import resolver_sello
+        resuelto = resolver_sello(funcionario)
+        if resuelto:
+            sello_resuelto = resuelto.to_dict()
     except Exception:
         pass
+
+    from firma_digital.authz import user_puede_firmar
 
     return {
         'id': user.id,
@@ -60,6 +68,8 @@ def get_full_user_data(user):
         'is_superuser': user.is_superuser,
         'avatar': avatar_url,
         'funcionario_data': funcionario_data,
+        'sello_resuelto': sello_resuelto,
+        'puede_firmar': user_puede_firmar(user),
         'groups': list(user.groups.values_list('name', flat=True)),
         'user_permissions': list(user.get_all_permissions()),
         'acepto_terminos': user.profile.acepto_terminos if hasattr(user, 'profile') else False,

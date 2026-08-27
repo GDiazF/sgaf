@@ -12,11 +12,12 @@ import {
   AreaChart,
   Area,
 } from 'recharts'
-import { MetricStrip, Card } from '@slep/ui'
+import { MetricStrip, Card, CardHeader, Button, Icon } from '@slep/ui'
 
 const MonitoreoKPI = () => {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [downloading, setDownloading] = useState(false)
   const { notify } = useNotify()
 
   useEffect(() => {
@@ -35,7 +36,35 @@ const MonitoreoKPI = () => {
       }
     }
     fetchKPI()
-  }, [])
+  }, [notify])
+
+  const handleDownload = async () => {
+    setDownloading(true)
+    try {
+      const response = await api.get('ejecutivos/gestiones/exportar_metricas/', {
+        responseType: 'blob',
+      })
+      const blob = new Blob([response.data], {
+        type: 'text/csv;charset=utf-8-sig',
+      })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', 'metricas_ejecutivos.csv')
+      document.body.appendChild(link)
+      link.click()
+      link.parentNode.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error downloading KPI metrics:', error)
+      notify({
+        variant: 'danger',
+        text: 'No se pudieron descargar las métricas.',
+      })
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   if (loading) {
     return <p className="comunicaciones-kpi-loading">Cargando métricas…</p>
@@ -56,6 +85,22 @@ const MonitoreoKPI = () => {
 
   return (
     <div className="comunicaciones-kpi">
+      <Card>
+        <CardHeader
+          title="Métricas y estadísticas"
+          subtitle="Resumen descargable de gestiones de ejecutivos de acompañamiento."
+          actions={
+            <Button
+              action="download"
+              loading={downloading}
+              onClick={handleDownload}
+            >
+              <Icon name="download" size="sm" /> Descargar métricas
+            </Button>
+          }
+        />
+      </Card>
+
       <MetricStrip items={metrics} />
 
       <div className="comunicaciones-kpi__charts">

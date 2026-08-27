@@ -1,0 +1,280 @@
+{
+  "info": {
+    "_postman_id": "d9fd57ea-2bb2-4da4-a307-6c4cc55d22c2",
+    "name": "firma-dep",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Coleccion de prueba para el backend firma-dep. Incluye endpoints publicos, preview y firma real con FirmaGob."
+  },
+  "item": [
+    {
+      "name": "Confirmar Conexion",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/confirmarconexion",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "confirmarconexion"
+          ]
+        },
+        "description": "Endpoint publico para validar rapidamente que firma-dep responde."
+      },
+      "response": []
+    },
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        },
+        "description": "Permite validar que el backend firma-dep este levantado."
+      },
+      "response": []
+    },
+    {
+      "name": "Capabilities",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "x-client-id",
+            "value": "{{clientId}}"
+          },
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/signatures/capabilities",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "signatures",
+            "capabilities"
+          ]
+        },
+        "description": "Entrega un resumen seguro del estado del servicio de firma."
+      },
+      "response": []
+    },
+    {
+      "name": "Preview PDF",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "x-client-id",
+            "value": "{{clientId}}"
+          },
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pdfBase64\": \"{{pdfBase64}}\",\n  \"fileName\": \"prueba-firma.pdf\",\n  \"signature\": {\n    \"mode\": \"desatendida\",\n    \"rut\": \"22.222.222-2\",\n    \"visibleSeal\": true,\n    \"sealPage\": 1,\n    \"sealTopMarginCm\": 22,\n    \"entity\": \"Subsecretaría General de la Presidencia\"\n  },\n  \"validation\": {\n    \"enabled\": true,\n    \"url\": \"{{validationUrl}}\",\n    \"documentId\": \"DEP-2026-0001\",\n    \"qrPayload\": \"{{validationUrl}}\",\n    \"footerText\": \"Este documento ha sido firmado electronicamente de acuerdo con la ley N 19.799.\"\n  },\n  \"options\": {\n    \"returnSignedPdfBase64\": true,\n    \"returnPreparedPdfBase64\": true\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/signatures/preview-pdf",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "signatures",
+            "preview-pdf"
+          ]
+        },
+        "description": "Genera una previsualizacion del PDF con footer de validacion y sello visible estimado."
+      },
+      "response": []
+    },
+    {
+      "name": "Sign PDF Desatendida",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "x-client-id",
+            "value": "{{clientId}}"
+          },
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pdfBase64\": \"{{pdfBase64}}\",\n  \"fileName\": \"prueba-firma.pdf\",\n  \"signature\": {\n    \"mode\": \"desatendida\",\n    \"rut\": \"22.222.222-2\",\n    \"visibleSeal\": true,\n    \"sealPage\": 1,\n    \"sealTopMarginCm\": 22,\n    \"entity\": \"Subsecretaría General de la Presidencia\"\n  },\n  \"validation\": {\n    \"enabled\": true,\n    \"url\": \"{{validationUrl}}\",\n    \"documentId\": \"DEP-2026-0001\",\n    \"qrPayload\": \"{{validationUrl}}\",\n    \"footerText\": \"Este documento ha sido firmado electronicamente de acuerdo con la ley N 19.799.\"\n  },\n  \"options\": {\n    \"returnSignedPdfBase64\": true,\n    \"returnPreparedPdfBase64\": true\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/signatures/sign-pdf",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "signatures",
+            "sign-pdf"
+          ]
+        },
+        "description": "Firma un PDF usando FirmaGob en modo desatendido."
+      },
+      "response": []
+    },
+    {
+      "name": "Sign PDF Atendida",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "x-client-id",
+            "value": "{{clientId}}"
+          },
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pdfBase64\": \"{{pdfBase64}}\",\n  \"fileName\": \"prueba-firma.pdf\",\n  \"signature\": {\n    \"mode\": \"atendida\",\n    \"rut\": \"11.111.111-1\",\n    \"otp\": \"{{otp}}\",\n    \"visibleSeal\": true,\n    \"sealPage\": 1,\n    \"sealTopMarginCm\": 22,\n    \"entity\": \"Subsecretaría General de la Presidencia\"\n  },\n  \"validation\": {\n    \"enabled\": true,\n    \"url\": \"{{validationUrl}}\",\n    \"documentId\": \"DEP-2026-0001\",\n    \"qrPayload\": \"{{validationUrl}}\",\n    \"footerText\": \"Este documento ha sido firmado electronicamente de acuerdo con la ley N 19.799.\"\n  },\n  \"options\": {\n    \"returnSignedPdfBase64\": true,\n    \"returnPreparedPdfBase64\": true\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/signatures/sign-pdf",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "signatures",
+            "sign-pdf"
+          ]
+        },
+        "description": "Firma un PDF usando FirmaGob en modo atendido. Requiere OTP."
+      },
+      "response": []
+    },
+    {
+      "name": "Sign PDF Atendida — Producción SLEP Iquique",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "x-client-id",
+            "value": "{{clientId}}"
+          },
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pdfBase64\": \"{{pdfBase64}}\",\n  \"fileName\": \"prueba-firma-slep.pdf\",\n  \"signature\": {\n    \"mode\": \"atendida\",\n    \"rut\": \"17.798.248-2\",\n    \"otp\": \"{{otp}}\",\n    \"visibleSeal\": true,\n    \"sealPage\": 1,\n    \"sealTopMarginCm\": 2,\n    \"sealLeftMarginCm\": 1.5,\n    \"entity\": \"Servicio Local de Educación Pública de Iquique\"\n  },\n  \"validation\": {\n    \"enabled\": true,\n    \"url\": \"{{validationUrl}}\",\n    \"documentId\": \"SGAF-PRUEBA-001\",\n    \"qrPayload\": \"{{validationUrl}}\",\n    \"footerText\": \"Este documento ha sido firmado electronicamente de acuerdo con la ley N 19.799.\"\n  },\n  \"options\": {\n    \"returnSignedPdfBase64\": true,\n    \"returnPreparedPdfBase64\": true,\n    \"verboseError\": true\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/signatures/sign-pdf",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "signatures",
+            "sign-pdf"
+          ]
+        },
+        "description": "Producción SLEP: requiere firma-dep con FIRMA_GOB_ENVIRONMENT=production y token e781…. RUT + OTP del certificado Propósito General en firma.digital.gob.cl. No usar entity SEGPRES ni RUT 11.111.111-1."
+      },
+      "response": []
+    },
+    {
+      "name": "Sign PDF File Desatendida",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "x-client-id",
+            "value": "{{clientId}}"
+          },
+          {
+            "key": "x-api-key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pdfBase64\": \"{{pdfBase64}}\",\n  \"fileName\": \"prueba-firma.pdf\",\n  \"signature\": {\n    \"mode\": \"desatendida\",\n    \"rut\": \"22.222.222-2\",\n    \"visibleSeal\": true,\n    \"sealPage\": 1,\n    \"sealTopMarginCm\": 22,\n    \"entity\": \"Subsecretaría General de la Presidencia\"\n  },\n  \"validation\": {\n    \"enabled\": true,\n    \"url\": \"{{validationUrl}}\",\n    \"documentId\": \"DEP-2026-0001\",\n    \"qrPayload\": \"{{validationUrl}}\",\n    \"footerText\": \"Este documento ha sido firmado electronicamente de acuerdo con la ley N 19.799.\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/signatures/sign-pdf-file",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "signatures",
+            "sign-pdf-file"
+          ]
+        },
+        "description": "Firma un PDF y responde el archivo binario application/pdf directamente."
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4010/api/v1"
+    },
+    {
+      "key": "clientId",
+      "value": "sgaf-backend"
+    },
+    {
+      "key": "apiKey",
+      "value": "dev-key"
+    },
+    {
+      "key": "pdfBase64",
+      "value": "REEMPLAZAR_POR_PDF_EN_BASE64"
+    },
+    {
+      "key": "validationUrl",
+      "value": "https://miapp.cl/validar/DEP-2026-0001"
+    },
+    {
+      "key": "otp",
+      "value": "123456"
+    }
+  ]
+}

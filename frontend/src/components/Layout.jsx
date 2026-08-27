@@ -127,12 +127,18 @@ const Layout = () => {
             try {
         const res = await api.get('notificaciones/')
         let fetched = res.data.results || res.data || []
-        const match = fetched.filter((n) => !n.leida && n.link === location.pathname)
+        // Notificaciones FIRMA no se auto-marcan al visitar /firma (persisten hasta firmar/rechazar)
+        const match = fetched.filter(
+          (n) =>
+            !n.leida &&
+            n.tipo !== 'FIRMA' &&
+            n.link &&
+            (n.link === location.pathname || n.link.split('?')[0] === location.pathname),
+        )
         if (match.length) {
           await Promise.all(match.map((n) => api.post(`notificaciones/${n.id}/marcar_leida/`)))
-          fetched = fetched.map((n) =>
-            n.link === location.pathname ? { ...n, leida: true } : n,
-          )
+          const ids = new Set(match.map((n) => n.id))
+          fetched = fetched.map((n) => (ids.has(n.id) ? { ...n, leida: true } : n))
         }
         setNotifications(fetched)
       } catch {
@@ -141,7 +147,12 @@ const Layout = () => {
     }
     fetchNotifications()
     const interval = setInterval(fetchNotifications, 30000)
-    return () => clearInterval(interval)
+    const handleRefresh = () => fetchNotifications()
+    window.addEventListener('refresh-notifications', handleRefresh)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('refresh-notifications', handleRefresh)
+    }
   }, [user, location.pathname])
 
     useEffect(() => {
@@ -491,9 +502,15 @@ const Layout = () => {
                             type="button"
                             className={`notif-panel__item${n.leida ? '' : ' is-unread'}`}
                             onClick={async () => {
-                              if (!n.leida) {
+                              // FIRMA: navegar sin marcar leída ni borrar (queda hasta firmar/rechazar)
+                              if (!n.leida && n.tipo !== 'FIRMA') {
                                 try {
                                   await api.post(`notificaciones/${n.id}/marcar_leida/`)
+                                  setNotifications((prev) =>
+                                    prev.map((x) =>
+                                      x.id === n.id ? { ...x, leida: true } : x,
+                                    ),
+                                  )
                                 } catch {
                                   /* ignore */
                                 }
@@ -573,6 +590,18 @@ const Layout = () => {
                           <Icon name="lock" size={16} />
                           ARCO
                         </DropdownItem>
+                        {user?.puede_firmar && (
+                          <>
+                            <DropdownItem as={Link} to="/firma" onClick={() => setIsProfileOpen(false)}>
+                              <Icon name="file-check" size={16} />
+                              Bandeja de firmas
+                            </DropdownItem>
+                            <DropdownItem as={Link} to="/firma-prueba" onClick={() => setIsProfileOpen(false)}>
+                              <Icon name="file-check" size={16} />
+                              Firma digital (prueba)
+                            </DropdownItem>
+                          </>
+                        )}
                         <DropdownItem
                           as={Link}
                           to="/admin/personalizacion/login/backgrounds"
@@ -621,6 +650,12 @@ const Layout = () => {
               <NavItem to="/reservas" icon="reservas" label="Reservas" onClick={closeDrawer} />
             )}
             <NavItem to="/procedimientos" icon="procedimientos" label="Procedimientos" onClick={closeDrawer} />
+            {user?.puede_firmar && (
+              <>
+                <NavItem to="/firma" icon="file-check" label="Bandeja de firmas" onClick={closeDrawer} />
+                <NavItem to="/firma-prueba" icon="file-check" label="Firma (prueba)" onClick={closeDrawer} />
+              </>
+            )}
 
             {showTesoreria && (
               <NavItem to="/tesoreria" icon="banknote" label="Tesorería" end onClick={closeDrawer} />

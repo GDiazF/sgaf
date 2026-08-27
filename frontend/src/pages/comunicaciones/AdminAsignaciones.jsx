@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import api from '../../api'
 import { useNotify } from '../../hooks/useNotify'
+import { downloadCsv } from '../../utils/csvDownload'
 import SearchableSelect from '../../components/common/SearchableSelect'
 import {
   DataTable,
@@ -31,7 +32,7 @@ const AdminAsignaciones = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true)
     try {
       const [resAsig, resFunc, resEst] = await Promise.all([
@@ -52,11 +53,11 @@ const AdminAsignaciones = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [notify])
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [fetchData])
 
   const pageRows = useMemo(() => {
     const start = (currentPage - 1) * pageSize
@@ -149,6 +150,32 @@ const AdminAsignaciones = () => {
     }
   }
 
+  const handleDownload = () => {
+    downloadCsv(
+      'asignaciones_ejecutivos.csv',
+      [
+        'Ejecutivo',
+        'RUT',
+        'Cargo',
+        'Establecimiento',
+        'RBD',
+        'Vigencia',
+        'Fecha asignación',
+      ],
+      asignaciones.map((item) => [
+        item.funcionario_details?.nombre_funcionario || '',
+        item.funcionario_details?.rut || '',
+        item.funcionario_details?.cargo || '',
+        item.establecimiento_details?.nombre || '',
+        item.establecimiento_details?.rbd ?? '',
+        item.vigente ? 'Vigente' : 'Inactivo',
+        item.fecha_asignacion
+          ? new Date(item.fecha_asignacion).toLocaleDateString('es-CL')
+          : '',
+      ]),
+    )
+  }
+
   const columns = useMemo(
     () => [
       {
@@ -232,24 +259,25 @@ const AdminAsignaciones = () => {
           },
         })}
         toolbar={
-          <div
-            className="table-toolbar__left"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-3)',
-              width: '100%',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <>
+            <div className="table-toolbar__left">
               <span className="table-toolbar__title">Asignaciones</span>
               <Badge variant="neutral">{asignaciones.length}</Badge>
             </div>
-            <Button variant="primary" size="sm" onClick={openModal}>
-              <Icon name="plus" size="sm" /> Nueva asignación
-            </Button>
-          </div>
+            <div className="table-toolbar__right">
+              <Button
+                action="download"
+                size="sm"
+                onClick={handleDownload}
+                disabled={!asignaciones.length}
+              >
+                <Icon name="download" size="sm" /> Descargar
+              </Button>
+              <Button variant="primary" size="sm" onClick={openModal}>
+                <Icon name="plus" size="sm" /> Nueva asignación
+              </Button>
+            </div>
+          </>
         }
       />
 

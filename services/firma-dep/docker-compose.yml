@@ -1,0 +1,22 @@
+services:
+  firma-dep:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: firma-dep
+    ports:
+      - "${PORT:-4010}:${PORT:-4010}"
+    env_file:
+      - .env
+    volumes:
+      - firma-dep-logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:${PORT:-4010}/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  firma-dep-logs:

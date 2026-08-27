@@ -7,7 +7,7 @@ import { usePermission } from '../../hooks/usePermission';
  * Route wrapper that checks for a specific permission.
  * If the user lacks the permission, they are redirected to the home page.
  */
-const ProtectedRoute = ({ permission, requireSuperuser = false }) => {
+const ProtectedRoute = ({ permission, requireSuperuser = false, requireFlag = null }) => {
     const { user, loading } = useAuth();
     const { can } = usePermission();
 
@@ -21,6 +21,10 @@ const ProtectedRoute = ({ permission, requireSuperuser = false }) => {
 
     // Superuser check for admin pages
     if (requireSuperuser && !user.is_superuser) {
+        return <Navigate to="/" replace />;
+    }
+
+    if (requireFlag && !user?.[requireFlag]) {
         return <Navigate to="/" replace />;
     }
 

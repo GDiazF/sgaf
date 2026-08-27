@@ -190,6 +190,36 @@ const RecepcionConformeList = () => {
     }
   }
 
+  const handleEnviarAFirmar = async (item) => {
+    if (!item?.id) return
+    setProcessingIds((prev) => [...prev, item.id])
+    try {
+      const { data } = await api.post(`recepciones-conformes/${item.id}/enviar_a_firmar/`, {
+        tipo: 'PAGO',
+      })
+      await fetchData(currentPage, pageSize, debouncedSearch, ordering, statusFilter)
+      const anexos = data?.anexos?.length ?? 0
+      notify({
+        variant: 'success',
+        text:
+          data?.message ||
+          `Enviado a firmar (${data?.codigo_interno || 'OK'})${
+            anexos ? ` · ${anexos} anexo(s)` : ''
+          }.`,
+      })
+    } catch (error) {
+      notify({
+        variant: 'danger',
+        text:
+          error.response?.data?.error ||
+          error.response?.data?.detail ||
+          'No se pudo enviar a firmar.',
+      })
+    } finally {
+      setProcessingIds((prev) => prev.filter((id) => id !== item.id))
+    }
+  }
+
   const handleEdit = (rc) => {
     editOverlay.reset()
     setEditingRC(rc)
@@ -316,6 +346,8 @@ const RecepcionConformeList = () => {
           registros_ids: prev.registros_ids.filter((id) => id !== paymentId),
         }))
         setCurrentPayments((prev) => prev.filter((p) => p.id !== paymentId))
+      } else if (confirmTarget.type === 'reenviarFirma') {
+        await handleEnviarAFirmar(confirmTarget.item)
       }
       setConfirmTarget(null)
     } finally {
@@ -360,6 +392,18 @@ const RecepcionConformeList = () => {
         danger: true,
       }
     }
+    if (confirmTarget.type === 'reenviarFirma') {
+      const folio = confirmTarget.item?.folio || confirmTarget.item?.id
+      const motivo = confirmTarget.item?.firma_motivo_rechazo
+      return {
+        title: 'Reenviar a firmar',
+        description: motivo
+          ? `¿Reenviar la RC ${folio} a la bandeja de firmas? Motivo del rechazo anterior: ${motivo}`
+          : `¿Reenviar la RC ${folio} a la bandeja de firmas (RC + anexos)?`,
+        confirmLabel: 'Reenviar',
+        danger: false,
+      }
+    }
     return null
   }, [confirmTarget])
 
@@ -389,7 +433,39 @@ const RecepcionConformeList = () => {
         priority: 2,
         render: (item) => {
           const meta = ESTADO_BADGE[item.estado] || { variant: 'neutral', label: item.estado }
-          return <Badge variant={meta.variant}>{meta.label}</Badge>
+          return (
+            <div className="data-table__cell-stack">
+              <Badge variant={meta.variant}>{meta.label}</Badge>
+              {item.firma_estado === 'pendiente' ? (
+                <Badge
+                  variant="accent"
+                  title={item.firma_codigo_interno || 'En bandeja de firmas'}
+                >
+                  En bandeja
+                </Badge>
+              ) : null}
+              {item.firma_estado === 'rechazado' ? (
+                <Badge
+                  variant="danger"
+                  title={
+                    item.firma_motivo_rechazo
+                      ? `Motivo: ${item.firma_motivo_rechazo}`
+                      : 'Firma rechazada'
+                  }
+                >
+                  Firma rechazada
+                </Badge>
+              ) : null}
+              {item.firma_estado === 'firmado' ? (
+                <Badge
+                  variant="success"
+                  title={item.firma_codigo_validacion || item.firma_codigo_interno || ''}
+                >
+                  Firmada digital
+                </Badge>
+              ) : null}
+            </div>
+          )
         },
       },
       {
@@ -507,6 +583,34 @@ const RecepcionConformeList = () => {
                   >
                     <Icon name="download" size="sm" />
                   </Button>
+
+                  {can('servicios.change_recepcionconforme') && item.puede_enviar_firma ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Enviar a firmar (RC + anexos)"
+                      disabled={processing}
+                      onClick={() => handleEnviarAFirmar(item)}
+                    >
+                      <Icon name="send" size="sm" />
+                    </Button>
+                  ) : null}
+
+                  {can('servicios.change_recepcionconforme') && item.puede_reenviar_firma ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title={
+                        item.firma_motivo_rechazo
+                          ? `Reenviar a firmar — Motivo rechazo: ${item.firma_motivo_rechazo}`
+                          : 'Reenviar a firmar'
+                      }
+                      disabled={processing}
+                      onClick={() => setConfirmTarget({ type: 'reenviarFirma', item })}
+                    >
+                      <Icon name="refresh" size="sm" />
+                    </Button>
+                  ) : null}
 
                   {can('servicios.change_recepcionconforme') ? (
                     <Button
@@ -630,6 +734,30 @@ const RecepcionConformeList = () => {
               },
             }
           }
+          if (can('servicios.change_recepcionconforme') && item.puede_enviar_firma) {
+            return {
+              primary: {
+                label: 'Enviar a firmar',
+                onClick: () => handleEnviarAFirmar(item),
+              },
+              secondary: {
+                label: 'Editar',
+                onClick: () => handleEdit(item),
+              },
+            }
+          }
+          if (can('servicios.change_recepcionconforme') && item.puede_reenviar_firma) {
+            return {
+              primary: {
+                label: 'Reenviar a firmar',
+                onClick: () => setConfirmTarget({ type: 'reenviarFirma', item }),
+              },
+              secondary: {
+                label: 'Historial',
+                onClick: () => setHistoryRC(item),
+              },
+            }
+          }
           return {
             primary: can('servicios.change_recepcionconforme')
               ? {
@@ -667,9 +795,11 @@ const RecepcionConformeList = () => {
               <div key={i} className="rc-history-timeline__item">
                 <div
                   className={`rc-history-timeline__dot rc-history-timeline__dot--${
-                    ev?.accion === 'CREACION'
+                    ev?.accion === 'CREACION' || ev?.accion === 'CREACION_HISTORICA'
                       ? 'create'
-                      : ev?.accion === 'MODIFICACION_PAGOS'
+                      : ev?.accion === 'MODIFICACION_PAGOS' ||
+                          ev?.accion === 'RECHAZO_FIRMA' ||
+                          ev?.accion === 'ANULACION'
                         ? 'danger'
                         : 'info'
                   }`}

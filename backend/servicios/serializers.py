@@ -80,11 +80,53 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
     grupo_firmante_nombre = serializers.ReadOnlyField(source='grupo_firmante.nombre')
     firmante_nombre = serializers.ReadOnlyField(source='firmante.nombre_funcionario')
     historial = HistorialRecepcionConformeSerializer(many=True, read_only=True)
+    firma_estado = serializers.SerializerMethodField()
+    firma_estado_label = serializers.SerializerMethodField()
+    firma_motivo_rechazo = serializers.SerializerMethodField()
+    firma_pendiente_id = serializers.SerializerMethodField()
+    firma_codigo_interno = serializers.SerializerMethodField()
+    firma_codigo_validacion = serializers.SerializerMethodField()
+    puede_enviar_firma = serializers.SerializerMethodField()
+    puede_reenviar_firma = serializers.SerializerMethodField()
 
     class Meta:
         model = RecepcionConforme
         fields = '__all__'
         read_only_fields = ('fecha_emision', 'folio')
+
+    def _firma_info(self, obj):
+        cache = getattr(self, '_firma_info_cache', None)
+        if cache is None:
+            cache = {}
+            self._firma_info_cache = cache
+        if obj.pk not in cache:
+            from .rc_firma import firma_info_rc
+            cache[obj.pk] = firma_info_rc(obj)
+        return cache[obj.pk]
+
+    def get_firma_estado(self, obj):
+        return self._firma_info(obj)['firma_estado']
+
+    def get_firma_estado_label(self, obj):
+        return self._firma_info(obj)['firma_estado_label']
+
+    def get_firma_motivo_rechazo(self, obj):
+        return self._firma_info(obj)['firma_motivo_rechazo']
+
+    def get_firma_pendiente_id(self, obj):
+        return self._firma_info(obj)['firma_pendiente_id']
+
+    def get_firma_codigo_interno(self, obj):
+        return self._firma_info(obj)['firma_codigo_interno']
+
+    def get_firma_codigo_validacion(self, obj):
+        return self._firma_info(obj)['firma_codigo_validacion']
+
+    def get_puede_enviar_firma(self, obj):
+        return self._firma_info(obj)['puede_enviar_firma']
+
+    def get_puede_reenviar_firma(self, obj):
+        return self._firma_info(obj)['puede_reenviar_firma']
 
     def validate(self, data):
         registros_ids = data.get('registros_ids', [])
@@ -122,7 +164,7 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
         if registros_ids:
             registros = RegistroPago.objects.filter(id__in=registros_ids)
             registros.update(recepcion_conforme=rc)
-            
+
         return rc
 
     def update(self, instance, validated_data):
