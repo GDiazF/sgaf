@@ -239,6 +239,7 @@ from django.contrib.auth import authenticate
 
 class MFATokenObtainPairView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def post(self, request):
         username = request.data.get('username')

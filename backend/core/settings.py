@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+from urllib.parse import urlparse
 from decouple import config, Csv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -10,8 +11,54 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-default-key-portable-version')
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-# Portabilidad de Hosts: Se leen de una lista separada por comas en el .env
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,10.0.100.28', cast=Csv())
+
+def _origin_from_url(url):
+    """http(s)://host[:port] para CORS/CSRF, o None."""
+    if not url or str(url).strip().upper() == 'AUTO':
+        return None
+    parsed = urlparse(str(url).strip())
+    if not parsed.scheme or not parsed.hostname:
+        return None
+    port = f':{parsed.port}' if parsed.port else ''
+    return f'{parsed.scheme}://{parsed.hostname}{port}'
+
+
+def _merge_network_settings():
+    """
+    ALLOWED_HOSTS / orígenes desde .env + SGAF_PUBLIC_URL y FRONTEND_URL.
+    Evita 400 Bad Request si el hostname del servidor no estaba listado manualmente.
+    """
+    hosts = {h.strip() for h in config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv()) if h.strip()}
+    cors = {o.strip() for o in config('CORS_ALLOWED_ORIGINS', default='', cast=Csv()) if o.strip()}
+    csrf = {o.strip() for o in config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv()) if o.strip()}
+
+    for url in (config('SGAF_PUBLIC_URL', default=''), config('FRONTEND_URL', default='')):
+        if not url or str(url).strip().upper() == 'AUTO':
+            continue
+        parsed = urlparse(str(url).strip())
+        hn = parsed.hostname
+        if hn:
+            hosts.add(hn)
+            hosts.add(hn.lower())
+            if hn.lower() != hn:
+                hosts.add(hn.upper())
+        origin = _origin_from_url(url)
+        if origin:
+            cors.add(origin)
+            csrf.add(origin)
+
+    hosts.update({'localhost', '127.0.0.1'})
+    if DEBUG and not cors:
+        cors.update({
+            'http://localhost:5173',
+            'http://127.0.0.1:5173',
+            'http://localhost:5174',
+        })
+        csrf.update(cors)
+    return sorted(hosts), sorted(cors), sorted(csrf)
+
+
+ALLOWED_HOSTS, CORS_ALLOWED_ORIGINS, CSRF_TRUSTED_ORIGINS = _merge_network_settings()
 
 # Application definition
 INSTALLED_APPS = [
@@ -158,9 +205,7 @@ SIMPLE_JWT = {
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bool)
 
-# Se leen desde el .env. Por ejemplo: FRONTEND_URL=http://localhost:5173,http://10.0.100.119
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:5173,http://10.0.100.28:5173', cast=Csv())
-CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://localhost:5173,http://10.0.100.28:5173', cast=Csv())
+# Orígenes adicionales en .env; SGAF_PUBLIC_URL / FRONTEND_URL ya se fusionan en _merge_network_settings().
 CORS_EXPOSE_HEADERS = [
     'Content-Disposition',
     'X-SGAF-Documento-Codigo',
