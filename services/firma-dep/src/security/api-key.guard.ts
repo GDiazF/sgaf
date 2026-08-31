@@ -88,13 +88,21 @@ export class ApiKeyGuard implements CanActivate {
 
   /** Joi/Config puede devolver boolean o string desde process.env. */
   private isEnvTruthy(key: string): boolean {
-    const value = this.configService.get<string | boolean>(key);
-    return value === true || value === 'true' || value === 1 || value === '1';
+    const value = this.configService.get<string | boolean | number>(key);
+    if (value === true || value === 1) {
+      return true;
+    }
+    const s = String(value ?? '').trim().toLowerCase();
+    return s === 'true' || s === '1';
   }
 
   private isEnvFalsy(key: string): boolean {
-    const value = this.configService.get<string | boolean>(key);
-    return value === false || value === 'false' || value === 0 || value === '0';
+    const value = this.configService.get<string | boolean | number>(key);
+    if (value === false || value === 0) {
+      return true;
+    }
+    const s = String(value ?? '').trim().toLowerCase();
+    return s === 'false' || s === '0';
   }
 
   private parseAllowedClients(): Map<string, string> {
