@@ -10,6 +10,7 @@ class TipoProcedimiento(models.Model):
     class Meta:
         verbose_name = "Tipo de Documento"
         verbose_name_plural = "Tipos de Documentos"
+        ordering = ['nombre']
 
     def __str__(self):
         return self.nombre

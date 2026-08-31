@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'personalizacion_sistema',
     'arco',
     'documentos.apps.DocumentosConfig',
+    'firma_digital',
 ]
 
 MIDDLEWARE = [
@@ -160,6 +161,11 @@ CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bo
 # Se leen desde el .env. Por ejemplo: FRONTEND_URL=http://localhost:5173,http://10.0.100.119
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:5173,http://10.0.100.28:5173', cast=Csv())
 CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://localhost:5173,http://10.0.100.28:5173', cast=Csv())
+CORS_EXPOSE_HEADERS = [
+    'Content-Disposition',
+    'X-SGAF-Documento-Codigo',
+    'X-SGAF-Pendiente-Id',
+]
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
@@ -182,6 +188,26 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Límites de subida aumentados para procesamiento de múltiples PDFs
 DATA_UPLOAD_MAX_MEMORY_SIZE = 209715200  # 200MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 209715200  # 200MB
+
+# ────────────────────────────────────────────────────────────
+# FIRMA-DEP (sidecar NestJS) — credenciales FirmaGob viven allí
+# ────────────────────────────────────────────────────────────
+FIRMA_DEP_URL = config('FIRMA_DEP_URL', default='http://127.0.0.1:4010/api/v1')
+FIRMA_DEP_CLIENT_ID = config('FIRMA_DEP_CLIENT_ID', default='sgaf-backend')
+FIRMA_DEP_API_KEY = config('FIRMA_DEP_API_KEY', default='dev-key')
+FIRMA_DEP_TIMEOUT_MS = config('FIRMA_DEP_TIMEOUT_MS', default=120000, cast=int)
+
+# Entity / purpose labels (solo UI y registro local; JWT lo arma firma-dep)
+FIRMAGOB_ENTITY = config(
+    'FIRMAGOB_ENTITY',
+    default='Servicio Local de Educación Pública de Iquique',
+)
+FIRMAGOB_RUN = config('FIRMAGOB_RUN', default='')
+FIRMAGOB_PURPOSE = config('FIRMAGOB_PURPOSE', default='Propósito General')
+# Legacy (ya no se usan para firmar; mantenidos por compatibilidad de .env antiguos)
+FIRMAGOB_API_URL = config('FIRMAGOB_API_URL', default='')
+FIRMAGOB_API_TOKEN = config('FIRMAGOB_API_TOKEN', default='')
+FIRMAGOB_SECRET = config('FIRMAGOB_SECRET', default='')
 
 # ────────────────────────────────────────────────────────────
 # SEGURIDAD EN PRODUCCIÓN (Art. 14 quinquies — Ley 21.719)

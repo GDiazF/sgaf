@@ -26,6 +26,7 @@ const emptyForm = () => ({
   nombre: '',
   descripcion: '',
   jefe: '',
+  es_firmante: false,
   activo: true,
   funcionarios: [],
 })
@@ -120,6 +121,7 @@ const Grupos = () => {
       nombre: item.nombre,
       descripcion: item.descripcion || '',
       jefe: item.jefe || '',
+      es_firmante: Boolean(item.es_firmante),
       activo: item.activo,
       funcionarios: item.funcionarios || [],
     })
@@ -242,6 +244,17 @@ const Grupos = () => {
         className: 'col--primary',
         cardRole: 'title',
         priority: 1,
+        render: (item) => (
+          <span>
+            {item.nombre}
+            {item.es_firmante ? (
+              <>
+                {' '}
+                <Badge variant="accent">Firmantes</Badge>
+              </>
+            ) : null}
+          </span>
+        ),
       },
       {
         key: 'descripcion',
@@ -250,6 +263,19 @@ const Grupos = () => {
         cardRole: 'subtitle',
         priority: 1,
         render: (item) => item.descripcion || '—',
+      },
+      {
+        key: 'es_firmante',
+        header: 'Firma digital',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 2,
+        render: (item) =>
+          item.es_firmante ? (
+            <Badge variant="accent">Autoriza firmar</Badge>
+          ) : (
+            <span>—</span>
+          ),
       },
       {
         key: 'total_miembros',
@@ -295,7 +321,7 @@ const Grupos = () => {
       <PageHeader
         icon="funcionarios"
         title="Grupos"
-        description="Equipos de trabajo del servicio"
+        description="Equipos de trabajo. Marque «Grupo de firmantes» para autorizar firma digital a sus miembros."
         breadcrumbs={[
           { label: 'Operaciones' },
           { label: 'Funcionarios', to: '/funcionarios' },
@@ -413,6 +439,24 @@ const Grupos = () => {
                 onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
               />
             </Field>
+            <div className="field field--full">
+              <label className="func-grupos__item" htmlFor="grupo-es-firmante">
+                <input
+                  id="grupo-es-firmante"
+                  type="checkbox"
+                  className="no-global"
+                  checked={Boolean(formData.es_firmante)}
+                  onChange={(e) =>
+                    setFormData({ ...formData, es_firmante: e.target.checked })
+                  }
+                />
+                <span>Grupo de firmantes</span>
+              </label>
+              <p className="field__hint">
+                Los miembros podrán firmar digitalmente si también tienen el permiso
+                correspondiente en su rol.
+              </p>
+            </div>
             <div className="field field--full">
               <span className="field__label">
                 Miembros ({formData.funcionarios.length})

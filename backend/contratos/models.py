@@ -363,6 +363,7 @@ class TipoServicioOperativo(models.Model):
     class Meta:
         verbose_name = "Tipo de Servicio Operativo"
         verbose_name_plural = "Tipos de Servicios Operativos"
+        ordering = ['nombre']
 
 class ServicioContrato(models.Model):
     MODALIDAD_DIARIO = 'DIARIO'
@@ -438,6 +439,8 @@ class ServicioContrato(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['contrato'], name='unique_gestion_por_contrato'),
         ]
+        ordering = ['nombre', 'id']
+
 
 class RutaTransporte(models.Model):
     servicio = models.ForeignKey(ServicioContrato, related_name='rutas', on_delete=models.CASCADE)

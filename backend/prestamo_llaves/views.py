@@ -32,7 +32,7 @@ class SolicitanteViewSet(viewsets.ModelViewSet):
     search_fields = ['rut', 'nombre', 'apellido']
 
 class ActivoViewSet(viewsets.ModelViewSet):
-    queryset = Activo.objects.all()
+    queryset = Activo.objects.all().order_by('nombre', 'id')
     serializer_class = ActivoSerializer
     pagination_class = LargeResultsSetPagination
     filterset_fields = {

@@ -3223,6 +3223,12 @@
   opacity: 0.35;
   transition: opacity var(--transition);
 }
+.data-table__cell-stack {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
 .data-table tbody tr:hover .data-table__actions,
 .data-table__actions:focus-within {
   opacity: 1;
@@ -5369,6 +5375,74 @@ body.has-modal-scroll-lock {
 .modal--lg { max-width: 640px; }
 .modal--xl { max-width: 920px; }
 .modal--confirm { max-width: 420px; }
+
+/* Consentimiento Ley 21.719 (primer login) */
+.terms-consent-modal.modal--lg {
+  max-width: 672px;
+}
+.terms-consent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--fg-muted, var(--muted));
+  line-height: var(--leading-normal);
+}
+.terms-consent__section p {
+  margin: 0;
+}
+.terms-consent__heading {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold, 700);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg, var(--text));
+}
+.terms-consent__note {
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  font-size: var(--text-xs);
+  font-style: italic;
+  color: var(--muted);
+}
+.terms-consent__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+}
+.terms-consent__footer .btn {
+  width: 100%;
+}
+.terms-consent__check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset, var(--bg-subtle, var(--bg)));
+  cursor: pointer;
+}
+.terms-consent__check-title {
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold, 700);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg, var(--text));
+}
+.terms-consent__check-desc {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  font-weight: var(--font-normal, 400);
+  text-transform: none;
+  letter-spacing: normal;
+}
 .modal--confirm .modal__body { text-align: center; }
 .modal--confirm .modal__icon {
   width: 48px;
@@ -11989,7 +12063,6 @@ body.has-modal-scroll-lock {
   }
 }
 
-
 /* ?? Tipo notificación modal (tabs + pick tables) ?? */
 .notif-type-form {
   display: flex;
@@ -12164,3 +12237,189 @@ body.has-modal-scroll-lock {
   font-size: 0.65rem;
   margin-top: 1px;
 }
+=======
+/* ── Firma digital (prueba): colocación de sello sobre preview PDF ── */
+.modal.firma-placement-modal {
+  max-width: min(1100px, 96vw);
+  width: 96vw;
+  max-height: 92dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal.firma-placement-modal .modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.firma-prueba__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.firma-prueba__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .firma-prueba__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.firma-prueba__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.firma-prueba__presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.firma-prueba__preset-btn {
+  width: 100%;
+  justify-content: center;
+  white-space: normal;
+  line-height: 1.25;
+  min-height: var(--control-height-sm, 2rem);
+  padding-block: var(--space-2);
+  text-align: center;
+}
+
+.firma-prueba__upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.firma-placement-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.firma-placement-toolbar__label {
+  min-width: 3.25rem;
+  text-align: center;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.firma-placement-viewport {
+  max-height: min(62vh, 640px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  padding: var(--space-2);
+}
+
+.firma-placement-viewport__track {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.firma-placement {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  max-width: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+}
+
+.firma-placement__img {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  vertical-align: top;
+}
+
+.firma-placement__stamp {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed var(--accent, #2563eb);
+  background: color-mix(in srgb, var(--accent, #2563eb) 18%, transparent);
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1);
+  color: var(--fg);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-ui);
+  text-align: center;
+  line-height: 1.25;
+  min-width: 48px;
+  min-height: 28px;
+}
+
+.firma-placement__stamp:active {
+  cursor: grabbing;
+}
+
+.firma-placement__hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.firma-prueba__sello-preview {
+  display: block;
+  max-width: 12rem;
+  max-height: 4rem;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+  background: var(--surface);
+}
+
+.sello-firma-thumb {
+  width: 3.5rem;
+  height: 1.75rem;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.sello-firma-preview {
+  display: block;
+  margin-top: var(--space-2);
+  max-width: 14rem;
+  max-height: 5rem;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-1);
+  background: var(--surface);
+}
+

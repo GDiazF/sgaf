@@ -31,7 +31,7 @@ const EjecutivoDashboard = () => {
       }
     }
     fetchMisEstablecimientos()
-  }, [])
+  }, [notify])
 
   const pageRows = useMemo(() => {
     const start = (currentPage - 1) * pageSize

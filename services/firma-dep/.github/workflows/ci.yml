@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target Environment'
+        required: true
+        type: choice
+        options:
+          - PRD
+          - QA
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Verify Branch and Environment Match
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "QA" ] && [ "${{ github.ref_name }}" != "dev" ]; then
+            echo "Error: QA builds must be triggered from the 'dev' branch."
+            echo "Current branch is '${{ github.ref_name }}'."
+            exit 1
+          fi
+          
+          if [ "${{ github.event.inputs.environment }}" = "PRD" ] && [ "${{ github.ref_name }}" != "main" ]; then
+            echo "Error: PRD builds must be triggered from the 'main' branch."
+            echo "Current branch is '${{ github.ref_name }}'."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Lowercase Repository Name
+        run: |
+          echo "IMAGE_NAME=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Set Variables
+        id: vars
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          ENV_NAME="${{ github.event.inputs.environment }}"
+          echo "tag=${SHORT_SHA}-${ENV_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.environment }}-latest

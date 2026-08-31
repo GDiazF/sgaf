@@ -62,10 +62,15 @@ function measureNaturalHeight(shell) {
     if (child.classList.contains('modal__body')) continue
     if (child.classList.contains('modal__header')) continue
     if (child.classList.contains('modal__footer')) continue
+    const pos = getComputedStyle(child).position
+    if (pos === 'absolute' || pos === 'fixed') continue
     total += child.getBoundingClientRect().height
   }
 
-  // afterHeader u otros bloques entre header y body, dentro del host
+  // afterHeader u otros bloques entre header y body, dentro del host.
+  // Ignorar .form-overlay: es position:absolute (inset:0) y su
+  // getBoundingClientRect no ocupa layout, pero sumarlo duplica la altura
+  // al pasar a loading/success/error.
   const host = shell.querySelector('.form-overlay-host')
   if (host) {
     for (const child of host.children) {
@@ -76,6 +81,8 @@ function measureNaturalHeight(shell) {
       // FormOverlay es position:absolute e inset:0 → su altura ≈ la del host.
       // Si se suma, el modal “crece” en cada guardado.
       if (child.classList.contains('form-overlay')) continue
+      const pos = getComputedStyle(child).position
+      if (pos === 'absolute' || pos === 'fixed') continue
       total += child.getBoundingClientRect().height
     }
   }

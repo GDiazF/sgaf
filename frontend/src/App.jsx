@@ -31,6 +31,7 @@ import Subdirecciones from './pages/funcionarios/Subdirecciones';
 import Departamentos from './pages/funcionarios/Departamentos';
 import Unidades from './pages/funcionarios/Unidades';
 import Grupos from './pages/funcionarios/Grupos';
+import SellosFirma from './pages/funcionarios/SellosFirma';
 import AnexosDashboard from './pages/telecomunicaciones/AnexosDashboard';
 // Vehiculos
 import VehiculosDashboard from './pages/vehiculos/VehiculosDashboard';
@@ -67,6 +68,9 @@ import ArcoManagement from './pages/admin/ArcoManagement';
 import LoginBackgroundsAdmin from './pages/admin/LoginBackgroundsAdmin';
 import CiberseguridadDashboard from './pages/ciberseguridad/CiberseguridadDashboard';
 import LegalPage from './pages/LegalPage';
+import FirmaPrueba from './pages/firma/FirmaPrueba';
+import ValidarDocumento from './pages/firma/ValidarDocumento';
+import BandejaFirmas from './pages/firma/BandejaFirmas';
 
 const PlantillasDocumentosPage = React.lazy(
   () => import('./pages/admin/documentos/PlantillasDocumentosPage'),
@@ -138,6 +142,8 @@ function App() {
             <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
             <Route path="/reservas-externas" element={<PublicReservas />} />
             <Route path="/legal" element={<LegalPage />} />
+            <Route path="/validar" element={<ValidarDocumento />} />
+            <Route path="/validar/:codigo" element={<ValidarDocumento />} />
             {/* Protected Routes */}
             <Route element={<PrivateRoute />}>
               <Route path="/" element={<Layout />}>
@@ -218,6 +224,7 @@ function App() {
                   <Route path="funcionarios/departamentos" element={<Departamentos />} />
                   <Route path="funcionarios/unidades" element={<Unidades />} />
                   <Route path="funcionarios/grupos" element={<Grupos />} />
+                  <Route path="funcionarios/sellos" element={<SellosFirma />} />
                 </Route>
                 {/* Telecomunicaciones */}
                 <Route element={<ProtectedRoute permission="servicios.view_servicio" />}>
@@ -300,7 +307,8 @@ function App() {
                   <Route path="admin/notification-types" element={<Navigate to="/admin/notificaciones" replace />} />
                   <Route path="admin/personalizacion/login/backgrounds" element={<LoginBackgroundsAdmin />} />
                 </Route>
-                <Route element={<ProtectedRoute permission="documentos.view_plantilladocumento" />}>
+
+                   <Route element={<ProtectedRoute permission="documentos.view_plantilladocumento" />}>
                   <Route
                     path="admin/documentos"
                     element={
@@ -318,6 +326,11 @@ function App() {
                     }
                   />
                 </Route>
+                <Route element={<ProtectedRoute requireFlag="puede_firmar" />}>
+                  <Route path="firma" element={<BandejaFirmas />} />
+                  <Route path="firma-prueba" element={<FirmaPrueba />} />
+                </Route>
+
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

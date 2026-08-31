@@ -108,6 +108,14 @@ class Grupo(models.Model):
         related_name='grupos_liderados',
         verbose_name="Jefe de Grupo"
     )
+    es_firmante = models.BooleanField(
+        "Grupo de firmantes",
+        default=False,
+        help_text=(
+            "Si está activo, los miembros de este grupo pueden firmar digitalmente "
+            "(además del permiso firma_digital.can_firmar)."
+        ),
+    )
     activo = models.BooleanField("Activo", default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
@@ -195,7 +203,16 @@ class Funcionario(models.Model):
         related_name="funcionarios",
         verbose_name="Grupos"
     )
-    
+    sello_preferido = models.ForeignKey(
+        'firma_digital.SelloFirma',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='preferido_por',
+        verbose_name='Sello de firma preferido',
+        help_text='Opcional. Si está vacío se usa el sello de Unidad → Departamento → Subdirección.',
+    )
+
     # Auditoría
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)

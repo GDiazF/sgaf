@@ -267,16 +267,17 @@ class RecepcionContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
 # =====================================================================
 
 class TipoServicioOperativoViewSet(viewsets.ModelViewSet):
-    queryset = TipoServicioOperativo.objects.all()
+    queryset = TipoServicioOperativo.objects.all().order_by('nombre')
     serializer_class = TipoServicioOperativoSerializer
     pagination_class = None
     permission_classes = _DEFAULT_PERMS
+
 
 class ServicioContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
     sgaf_action_permissions = {
         'generar_acta_conformidad': 'contratos.view_serviciocontrato',
     }
-    queryset = ServicioContrato.objects.select_related('contrato', 'tipo_servicio').all()
+    queryset = ServicioContrato.objects.select_related('contrato', 'tipo_servicio').all().order_by('nombre', 'id')
     serializer_class = ServicioContratoSerializer
     filterset_fields = ['contrato', 'tipo_servicio']
 

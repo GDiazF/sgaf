@@ -79,6 +79,7 @@ class Notificacion(models.Model):
         ('WARNING', 'Advertencia'),
         ('ERROR', 'Error'),
         ('TICKET', 'Ticket de Soporte'),
+        ('FIRMA', 'Firma digital'),
     ]
 
     usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notificaciones')

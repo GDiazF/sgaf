@@ -1,0 +1,17 @@
+node_modules/
+dist/
+logs/
+coverage/
+
+.git/
+.gitignore
+
+.env
+.env.*
+!.env.example
+
+*.md
+postman/
+
+npm-debug.log*
+.github/

@@ -577,6 +577,34 @@ class RecepcionConformeViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
     ordering_fields = ['fecha_emision', 'folio', 'proveedor__nombre', 'id']
     search_fields = ['folio', 'proveedor__nombre']
 
+    @action(detail=True, methods=['post'])
+    def enviar_a_firmar(self, request, pk=None):
+        """Envía o reenvía la RC a la bandeja de firmas (RC + anexos PDF)."""
+        rc = self.get_object()
+        tipo = (request.data.get('tipo') or 'PAGO').upper()
+        try:
+            from .rc_firma import enviar_rc_a_firmar
+
+            pendiente = enviar_rc_a_firmar(rc, request.user, tipo=tipo)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).exception('Error enviando RC %s a firmar', rc.pk)
+            return Response(
+                {'error': f'No se pudo armar el paquete de firma: {exc}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        return Response(
+            {
+                'message': 'Documento enviado a la bandeja de firmas.',
+                'codigo_interno': pendiente.codigo_interno,
+                'pendiente_id': pendiente.id,
+                'anexos': (pendiente.meta or {}).get('anexos') or [],
+            },
+            status=status.HTTP_200_OK,
+        )
+
     @action(detail=False, methods=['post'])
     def create_historical(self, request):
         from django.db import transaction
@@ -637,6 +665,11 @@ class RecepcionConformeViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         # 1. Liberate payments
         count_released = rc.registros.count()
         rc.registros.update(recepcion_conforme=None)
+
+        # 1b. Quitar de bandeja de firmas + notificación al firmante
+        from firma_digital.notify import cancelar_firmas_origen
+
+        firmas_canceladas = cancelar_firmas_origen(origen='rc', referencia_id=rc.id)
         
         # 2. Update state
         rc.estado = 'ANULADA'
@@ -644,10 +677,13 @@ class RecepcionConformeViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         
         # 3. Log history
         user = request.user.username if request.user else 'Sistema'
+        detalle = f'Documento anulado. Se liberaron {count_released} pagos asociados.'
+        if firmas_canceladas:
+            detalle += f' Se retiró de la bandeja de firmas ({firmas_canceladas} ítem(s)).'
         HistorialRecepcionConforme.objects.create(
             recepcion_conforme=rc,
             accion='ANULACION',
-            detalle=f"Documento anulado. Se liberaron {count_released} pagos asociados.",
+            detalle=detalle,
             usuario=user
         )
         
@@ -661,7 +697,7 @@ class CDPViewSet(viewsets.ModelViewSet):
     permission_classes = _DEFAULT_PERMS
 
 class TipoEntregaViewSet(viewsets.ModelViewSet):
-    queryset = TipoEntrega.objects.all()
+    queryset = TipoEntrega.objects.all().order_by('nombre')
     serializer_class = TipoEntregaSerializer
     permission_classes = _DEFAULT_PERMS
 

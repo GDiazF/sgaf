@@ -17,6 +17,35 @@ services:
       timeout: 5s
       retries: 5
 
+  firma-dep:
+    build:
+      context: ./services/firma-dep
+      dockerfile: Dockerfile
+    container_name: sgaf_firma_dep
+    restart: unless-stopped
+    env_file:
+      - ./services/firma-dep/.env
+    environment:
+      NODE_ENV: production
+      API_ALLOW_LOCALHOST: "false"
+      SWAGGER_ENABLED: "false"
+    volumes:
+      - ./services/firma-dep/logs:/app/logs
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4010/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    expose:
+      - "4010"
+
   backend:
     build: 
       context: ./backend
@@ -24,6 +53,10 @@ services:
     container_name: sgaf_backend_prod
     restart: unless-stopped
     env_file: .env
+    environment:
+      FIRMA_DEP_URL: http://firma-dep:4010/api/v1
+      FIRMA_DEP_CLIENT_ID: ${FIRMA_DEP_CLIENT_ID:-sgaf-backend}
+      FIRMA_DEP_API_KEY: ${FIRMA_DEP_API_KEY:-dev-key}
     volumes:
       - ./backend:/app
       - ./media:/app/media
@@ -31,11 +64,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      firma-dep:
+        condition: service_healthy
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: ../docker/frontend.Dockerfile
+      context: .
+      dockerfile: docker/frontend.Dockerfile
     container_name: sgaf_frontend_prod
     restart: unless-stopped
     ports:

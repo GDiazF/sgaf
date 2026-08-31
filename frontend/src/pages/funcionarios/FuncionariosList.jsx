@@ -327,6 +327,14 @@ const FuncionariosList = () => {
                 ))}
               </div>
             </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              type="button"
+              onClick={() => navigate('/funcionarios/sellos')}
+            >
+              <Icon name="file-check" size="sm" /> Sellos de firma
+            </Button>
             {canAdd ? (
               <Button variant="primary" size="sm" onClick={handleCreate}>
                 <Icon name="plus" size="sm" /> Nuevo funcionario

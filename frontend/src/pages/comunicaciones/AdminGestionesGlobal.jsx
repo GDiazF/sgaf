@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import api from '../../api'
 import useDebouncedValue from '../../hooks/useDebouncedValue'
 import { useNotify } from '../../hooks/useNotify'
+import { downloadCsv } from '../../utils/csvDownload'
 import GestionSeguimientoPanel from '../../components/comunicaciones/GestionSeguimientoPanel'
 import {
   FiltersBar,
@@ -23,9 +24,76 @@ const ESTADO_BADGE = {
   CERRADO: { variant: 'success', label: 'Cerrado' },
 }
 
+const RESPONSE_STATES = new Set(['RESPONDIDO', 'CERRADO'])
+
 const formatDate = (dateString) => {
   if (!dateString) return '—'
   return new Date(dateString).toLocaleDateString('es-CL')
+}
+
+const formatDateTime = (dateString) => {
+  if (!dateString) return ''
+  return new Date(dateString).toLocaleString('es-CL')
+}
+
+const getPasosSummary = (gestion) => {
+  const pasos = Array.isArray(gestion.subtareas) ? gestion.subtareas : []
+  const completed = pasos.filter((paso) => paso.completada).length
+  const pending = pasos.length - completed
+  const progress = pasos.length ? Math.round((completed / pasos.length) * 100) : 0
+  const detail = pasos.length
+    ? pasos
+        .map((paso, index) => {
+          const status = paso.completada ? 'Completado' : 'Pendiente'
+          const completedAt = paso.fecha_completada
+            ? `, completado ${formatDateTime(paso.fecha_completada)}`
+            : ''
+          return `${index + 1}. [${status}] ${paso.titulo || 'Sin título'}${completedAt}`
+        })
+        .join(' | ')
+    : 'Sin pasos registrados'
+
+  return { total: pasos.length, completed, pending, progress, detail }
+}
+
+const getLastHistoryEntry = (gestion) => {
+  const historial = Array.isArray(gestion.historial) ? gestion.historial : []
+  if (!historial.length) return ''
+  const latest = [...historial].sort(
+    (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime(),
+  )[0]
+  return [
+    latest.accion,
+    latest.usuario_nombre ? `por ${latest.usuario_nombre}` : '',
+    latest.fecha ? `el ${formatDateTime(latest.fecha)}` : '',
+    latest.detalles ? `(${latest.detalles})` : '',
+  ].filter(Boolean).join(' ')
+}
+
+const getUnidadRequirente = (gestion, empty = '—') => {
+  const unidades = Array.isArray(gestion.unidades_detalles)
+    ? gestion.unidades_detalles
+    : []
+  return unidades.length ? unidades.map((unidad) => unidad.nombre).join(', ') : empty
+}
+
+const getResponseTimeDays = (gestion) => {
+  const storedDays = Number(gestion.tiempo_gestion_dias)
+  if (Number.isFinite(storedDays) && storedDays > 0) return storedDays
+  if (!RESPONSE_STATES.has(gestion.estado)) return ''
+  if (!gestion.fecha_creacion || !gestion.fecha_actualizacion) return ''
+
+  const createdAt = new Date(gestion.fecha_creacion).getTime()
+  const updatedAt = new Date(gestion.fecha_actualizacion).getTime()
+  if (!Number.isFinite(createdAt) || !Number.isFinite(updatedAt)) return ''
+
+  return Math.max(0, Math.floor((updatedAt - createdAt) / 86400000))
+}
+
+const formatResponseTime = (gestion) => {
+  const days = getResponseTimeDays(gestion)
+  if (days === '') return RESPONSE_STATES.has(gestion.estado) ? '—' : 'En curso'
+  return `${days} d`
 }
 
 const AdminGestionesGlobal = () => {
@@ -62,7 +130,7 @@ const AdminGestionesGlobal = () => {
       }
     }
     fetchGestiones()
-  }, [])
+  }, [notify])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -82,6 +150,7 @@ const AdminGestionesGlobal = () => {
           g.establecimiento_details?.nombre?.toLowerCase().includes(q) ||
           g.ejecutivo_details?.nombre_funcionario?.toLowerCase().includes(q) ||
           g.requerimiento?.toLowerCase().includes(q) ||
+          getUnidadRequirente(g, '').toLowerCase().includes(q) ||
           g.establecimiento_details?.rbd?.toString().includes(q),
       )
     }
@@ -101,6 +170,14 @@ const AdminGestionesGlobal = () => {
         case 'ejecutivo':
           aValue = a.ejecutivo_details?.nombre_funcionario || ''
           bValue = b.ejecutivo_details?.nombre_funcionario || ''
+          break
+        case 'unidad':
+          aValue = getUnidadRequirente(a, '')
+          bValue = getUnidadRequirente(b, '')
+          break
+        case 'tiempo_respuesta':
+          aValue = getResponseTimeDays(a)
+          bValue = getResponseTimeDays(b)
           break
         case 'fecha':
           aValue = new Date(a.fecha_creacion).getTime()
@@ -144,6 +221,49 @@ const AdminGestionesGlobal = () => {
 
   const openDetail = (item) => setSelected(item)
 
+  const handleDownload = () => {
+    downloadCsv(
+      'gestiones_ejecutivos.csv',
+      [
+        'Fecha',
+        'Establecimiento',
+        'RBD',
+        'Ejecutivo',
+        'Unidad requirente',
+        'Requerimiento',
+        'Estado',
+        'Tiempo de respuesta (días)',
+        'Respuesta',
+        'Pasos total',
+        'Pasos completados',
+        'Pasos pendientes',
+        'Avance pasos (%)',
+        'Detalle pasos',
+        'Último movimiento',
+      ],
+      filteredSorted.map((item) => {
+        const pasos = getPasosSummary(item)
+        return [
+          formatDate(item.fecha_creacion),
+          item.establecimiento_details?.nombre || '',
+          item.establecimiento_details?.rbd ?? '',
+          item.ejecutivo_details?.nombre_funcionario || '',
+          getUnidadRequirente(item, ''),
+          item.requerimiento || '',
+          ESTADO_BADGE[item.estado]?.label || item.estado || '',
+          getResponseTimeDays(item),
+          item.respuesta || '',
+          pasos.total,
+          pasos.completed,
+          pasos.pending,
+          pasos.progress,
+          pasos.detail,
+          getLastHistoryEntry(item),
+        ]
+      }),
+    )
+  }
+
   const columns = useMemo(
     () => [
       {
@@ -183,12 +303,30 @@ const AdminGestionesGlobal = () => {
           item.ejecutivo_details?.nombre_funcionario || 'Sin asignar',
       },
       {
+        key: 'unidad',
+        header: 'Unidad requirente',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 5,
+        sortable: true,
+        render: (item) => getUnidadRequirente(item),
+      },
+      {
         key: 'requerimiento',
         header: 'Requerimiento',
         className: 'col--tablet-hide',
         cardRole: 'field',
-        priority: 5,
+        priority: 6,
         render: (item) => item.requerimiento || '—',
+      },
+      {
+        key: 'tiempo_respuesta',
+        header: 'Tiempo resp.',
+        className: 'col--tablet-hide',
+        cardRole: 'field',
+        priority: 6,
+        sortable: true,
+        render: (item) => formatResponseTime(item),
       },
       {
         key: 'estado',
@@ -302,10 +440,22 @@ const AdminGestionesGlobal = () => {
           },
         })}
         toolbar={
-          <div className="table-toolbar__left">
-            <span className="table-toolbar__title">Gestiones</span>
-            <Badge variant="neutral">{filteredSorted.length}</Badge>
-          </div>
+          <>
+            <div className="table-toolbar__left">
+              <span className="table-toolbar__title">Gestiones</span>
+              <Badge variant="neutral">{filteredSorted.length}</Badge>
+            </div>
+            <div className="table-toolbar__right">
+              <Button
+                action="download"
+                size="sm"
+                onClick={handleDownload}
+                disabled={!filteredSorted.length}
+              >
+                <Icon name="download" size="sm" /> Descargar
+              </Button>
+            </div>
+          </>
         }
       />
 

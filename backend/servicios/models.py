@@ -208,6 +208,10 @@ class TipoEntrega(models.Model):
     class Meta:
         verbose_name = "Tipo de Entrega"
         verbose_name_plural = "Tipos de Entrega"
+        ordering = ['nombre']
+
+        ordering = ['nombre']
+        ordering = ['nombre']
 class FacturaAdquisicion(models.Model):
     MODALIDAD_SIN_OC = 'SIN_OC'
     MODALIDAD_COMPRA_AGIL = 'COMPRA_AGIL'
