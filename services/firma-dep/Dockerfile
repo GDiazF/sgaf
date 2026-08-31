@@ -7,7 +7,7 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN npm run build
+RUN npm run build && npm prune --omit=dev
 
 # ── Stage 2: produccion ────────────────────────────────────────────────────────
 FROM node:26-alpine AS production
@@ -17,9 +17,9 @@ WORKDIR /app
 # Usuario sin privilegios
 RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
 
-# Solo dependencias de produccion
+# Dependencias de produccion (ya pruned en builder; evita 2º npm ci con lock desincronizado)
 COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+COPY --from=builder /app/node_modules ./node_modules
 
 # Artefactos del build
 COPY --from=builder /app/dist ./dist
