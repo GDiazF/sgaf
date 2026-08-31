@@ -12,9 +12,13 @@ import {
   Icon,
 } from '@slep/ui'
 
-const ZOOM_MIN = 50
-const ZOOM_MAX = 250
-const ZOOM_STEP = 25
+import {
+  ZOOM_MIN,
+  ZOOM_MAX,
+  ZOOM_STEP,
+  ZOOM_DEFAULT,
+  ZOOM_FIT,
+} from '../../utils/firmaPreviewZoom'
 
 const PRESETS = [
   { id: 'tl', label: 'Superior izquierda' },
@@ -78,7 +82,7 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
   const [loadError, setLoadError] = useState(null)
   const [preview, setPreview] = useState(null)
   const [page, setPage] = useState(1)
-  const [zoom, setZoom] = useState(100)
+  const [zoom, setZoom] = useState(ZOOM_DEFAULT)
   const [stampBox, setStampBox] = useState({ x: 0, y: 0, w: 160, h: 56 })
   const [otp, setOtp] = useState('')
   const [signerName, setSignerName] = useState('')
@@ -146,7 +150,7 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
       x: Math.max(margin, data.preview_width_px - stampW - margin),
       y: Math.max(margin, data.preview_height_px - stampH - margin),
     })
-    setZoom(100)
+    setZoom(ZOOM_DEFAULT)
   }, [])
 
   useEffect(() => {
@@ -157,7 +161,7 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
       setPreview(null)
       setPdfFile(null)
       setPage(1)
-      setZoom(100)
+      setZoom(ZOOM_DEFAULT)
       setLoadError(null)
       setLoadingPdf(true)
       try {
@@ -451,8 +455,8 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
                     type="button"
                     variant="quiet"
                     size="sm"
-                    disabled={signing || zoom === 100}
-                    onClick={() => setZoom(100)}
+                    disabled={signing || zoom === ZOOM_FIT}
+                    onClick={() => setZoom(ZOOM_FIT)}
                   >
                     Ajustar
                   </Button>
@@ -492,7 +496,7 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
                   </div>
                 </div>
                 <p className="firma-placement__hint">
-                  Use + / − para el zoom. Arrastre el recuadro azul o use los botones de esquina.
+                  Vista ampliada al {ZOOM_DEFAULT}% al abrir. Use + / − o «Ajustar» ({ZOOM_FIT}%).
                 </p>
               </>
             ) : (

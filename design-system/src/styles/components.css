@@ -12240,9 +12240,9 @@ body.has-modal-scroll-lock {
 =======
 /* ── Firma digital (prueba): colocación de sello sobre preview PDF ── */
 .modal.firma-placement-modal {
-  max-width: min(1100px, 96vw);
-  width: 96vw;
-  max-height: 92dvh;
+  max-width: min(1320px, 98vw);
+  width: 98vw;
+  max-height: 94dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -12252,6 +12252,24 @@ body.has-modal-scroll-lock {
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+
+.modal.firma-placement-modal .firma-prueba__grid {
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+.modal.firma-placement-modal .firma-prueba__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.page[data-od-id='firma-prueba-page'] .firma-placement-viewport,
+.modal.firma-placement-modal .firma-placement-viewport {
+  max-height: min(80vh, 920px);
+  min-height: min(58vh, 680px);
 }
 
 .firma-prueba__form {
@@ -12321,7 +12339,7 @@ body.has-modal-scroll-lock {
 }
 
 .firma-placement-viewport {
-  max-height: min(62vh, 640px);
+  max-height: min(72vh, 780px);
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);

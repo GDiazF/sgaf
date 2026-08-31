@@ -19,9 +19,13 @@ import {
   EmptyState,
 } from '@slep/ui'
 
-const ZOOM_MIN = 50
-const ZOOM_MAX = 250
-const ZOOM_STEP = 25
+import {
+  ZOOM_MIN,
+  ZOOM_MAX,
+  ZOOM_STEP,
+  ZOOM_DEFAULT,
+  ZOOM_FIT,
+} from '../../utils/firmaPreviewZoom'
 
 function downloadBlob(data, filename) {
   const url = window.URL.createObjectURL(new Blob([data], { type: 'application/pdf' }))
@@ -94,7 +98,7 @@ export default function FirmaPrueba() {
 
   const [preview, setPreview] = useState(null)
   const [page, setPage] = useState(1)
-  const [zoom, setZoom] = useState(100)
+  const [zoom, setZoom] = useState(ZOOM_DEFAULT)
   const [stampBox, setStampBox] = useState({ x: 0, y: 0, w: 160, h: 56 })
   const dragRef = useRef(null)
   const stageRef = useRef(null)
@@ -184,7 +188,7 @@ export default function FirmaPrueba() {
         x: Math.max(margin, data.preview_width_px - stampW - margin),
         y: Math.max(margin, data.preview_height_px - stampH - margin),
       })
-      setZoom(100)
+      setZoom(ZOOM_DEFAULT)
       if (openModal) setModalOpen(true)
     } catch (err) {
       setPreview(null)
@@ -690,8 +694,8 @@ export default function FirmaPrueba() {
                     type="button"
                     variant="quiet"
                     size="sm"
-                    disabled={loading || zoom === 100}
-                    onClick={() => setZoom(100)}
+                    disabled={loading || zoom === ZOOM_FIT}
+                    onClick={() => setZoom(ZOOM_FIT)}
                   >
                     Ajustar
                   </Button>
@@ -735,7 +739,7 @@ export default function FirmaPrueba() {
                   </div>
                 </div>
                 <p className="firma-placement__hint">
-                  Use + / − para el zoom. Arrastre el recuadro azul o use los botones de esquina.
+                  Vista ampliada al {ZOOM_DEFAULT}% al abrir. Use + / − o «Ajustar» ({ZOOM_FIT}%).
                 </p>
               </>
             ) : (

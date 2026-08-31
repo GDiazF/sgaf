@@ -181,7 +181,7 @@ class FirmaGobPreviewView(APIView):
         page_index = max(0, page - 1)
 
         try:
-            preview = render_page_preview(pdf['bytes'], page_index=page_index, scale=1.5)
+            preview = render_page_preview(pdf['bytes'], page_index=page_index, scale=2.0)
         except PdfPreviewError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
