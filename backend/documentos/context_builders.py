@@ -28,6 +28,15 @@ def _fmt_date(value):
     return str(value)
 
 
+def _usuario_emite(user):
+    """Nombre del usuario que emite; ignora AnonymousUser y sesiones no autenticadas."""
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return ''
+    if not callable(getattr(user, 'get_full_name', None)):
+        return getattr(user, 'username', '') or ''
+    return user.get_full_name() or getattr(user, 'username', '') or ''
+
+
 def _fmt_clp(valor):
     try:
         return f'$ {int(valor):,}'.replace(',', '.')
@@ -94,9 +103,7 @@ def context_from_factura_adq(factura, user=None):
     Contexto real para plantillas de propósito recepcion_adq.
     Sin valores de demo: solo datos de la factura/RC.
     """
-    usuario = ''
-    if user is not None:
-        usuario = user.get_full_name() or getattr(user, 'username', '') or ''
+    usuario = _usuario_emite(user)
 
     ctx = build_blank_context(usuario_nombre=usuario)
 
@@ -263,9 +270,7 @@ def _escape_cell(value):
 
 def context_from_recepcion_conforme(rc, user=None, tipo=None):
     """Contexto para plantilla RLB de recepción (1 o más pagos) o JUNJI multi."""
-    usuario = ''
-    if user is not None:
-        usuario = user.get_full_name() or getattr(user, 'username', '') or ''
+    usuario = _usuario_emite(user)
 
     tipo_fmt = (tipo or getattr(rc, 'tipo_rc', None) or 'PAGO').upper()
     if tipo_fmt not in ('PAGO', 'ESTANDAR'):
@@ -340,9 +345,7 @@ def context_from_registro_pago(pago, user=None, tipo=None):
     Contexto para RC de un solo registro (pestaña Pagos).
     El listado incluye únicamente ese pago; el folio RC se muestra si existe.
     """
-    usuario = ''
-    if user is not None:
-        usuario = user.get_full_name() or getattr(user, 'username', '') or ''
+    usuario = _usuario_emite(user)
 
     tipo_fmt = (tipo or 'PAGO').upper()
     if tipo_fmt not in ('PAGO', 'ESTANDAR'):
@@ -436,9 +439,7 @@ def context_from_ruta_establecimiento(
     ``monto_junji``: 0 si no es jardín; si es jardín = monto total (sin interés).
     ``incluir_periodo``: si False, ``rs_periodo`` queda vacío.
     """
-    usuario = ''
-    if user is not None:
-        usuario = user.get_full_name() or getattr(user, 'username', '') or ''
+    usuario = _usuario_emite(user)
 
     ctx = build_blank_context(usuario_nombre=usuario)
     servicio = ruta.servicio
@@ -500,9 +501,7 @@ def context_from_ruta_establecimiento(
 
 def context_from_periodo_cobro(periodo, user=None):
     """Contexto para PDF de cobro del periodo (diario / mensual / mixto)."""
-    usuario = ''
-    if user is not None:
-        usuario = user.get_full_name() or getattr(user, 'username', '') or ''
+    usuario = _usuario_emite(user)
 
     ctx = build_blank_context(usuario_nombre=usuario)
     ruta = periodo.ruta
