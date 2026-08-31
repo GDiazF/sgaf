@@ -74,14 +74,14 @@ const PersonalTIDashboard = () => {
   const [pendingDelete, setPendingDelete] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(25)
+  const [pageSize, setPageSize] = useState(50)
 
   const [cobertura, setCobertura] = useState([])
   const [coberturaLoading, setCoberturaLoading] = useState(false)
   const [coberturaFiltro, setCoberturaFiltro] = useState('todos')
   const [coberturaSearch, setCoberturaSearch] = useState('')
   const [coberturaPage, setCoberturaPage] = useState(1)
-  const [coberturaPageSize, setCoberturaPageSize] = useState(25)
+  const [coberturaPageSize, setCoberturaPageSize] = useState(50)
 
   const [isNarrow, setIsNarrow] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches,

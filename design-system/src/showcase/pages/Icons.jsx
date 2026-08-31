@@ -23,6 +23,7 @@ const NAV_ICON_MAP = [
   ['credit-card', 'Pagos'],
   ['clipboard-check', 'Recepciones'],
   ['file-check', 'CDPs'],
+  ['stamp', 'Documentación'],
   ['wrench', 'Operaciones (acordeón)'],
   ['funcionarios', 'Funcionarios'],
   ['car', 'Vehículos'],

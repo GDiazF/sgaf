@@ -42,12 +42,36 @@ const PaymentModal = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset solo al abrir
   }, [open, initialData])
 
-  const filteredServices = formData.establecimiento
-    ? services.filter((s) => s.establecimiento === parseInt(formData.establecimiento, 10))
-    : []
-
   const selectedService = services.find((s) => s.id === parseInt(formData.servicio, 10))
   const unidadMedida = selectedService?.unidad_medida
+  const selectedEstablishment =
+    establishments.find(
+      (e) => e.id === parseInt(formData.establecimiento || selectedService?.establecimiento, 10),
+    ) || null
+
+  const serviceOptions = services.map((s) => {
+    const nums = [s.numero_cliente, s.numero_servicio]
+      .filter(Boolean)
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .join(' / ')
+    const estName =
+      s.establecimiento_nombre ||
+      establishments.find((e) => e.id === s.establecimiento)?.nombre ||
+      ''
+    return {
+      value: s.id,
+      label: `${nums} — ${s.proveedor_nombre}${estName ? ` · ${estName}` : ''}`,
+    }
+  })
+
+  const handleServiceChange = (val) => {
+    const svc = services.find((s) => String(s.id) === String(val))
+    setFormData({
+      ...formData,
+      servicio: val,
+      establecimiento: svc?.establecimiento || '',
+    })
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -110,34 +134,28 @@ const PaymentModal = ({
       <form id="payment-form" className="crud-form" onSubmit={handleSubmit}>
         <p className="contracts-section-title">1. Contexto del servicio</p>
         <div className="form-grid">
-          <div className="field">
-            <SearchableSelect
-              label="Establecimiento"
-              required
-              options={establishments.map((e) => ({ value: e.id, label: e.nombre }))}
-              value={formData.establecimiento}
-              onChange={(val) => setFormData({ ...formData, establecimiento: val, servicio: '' })}
-              placeholder="Seleccione establecimiento…"
-            />
-          </div>
-          <div className="field">
-            <SearchableSelect
-              label="Servicio / ID cliente"
-              required
-              options={filteredServices.map((s) => ({
-                value: s.id,
-                label: `${s.proveedor_nombre} — ID: ${s.numero_cliente}`,
-              }))}
-              value={formData.servicio}
-              onChange={(val) => setFormData({ ...formData, servicio: val })}
-              placeholder={
-                formData.establecimiento
-                  ? 'Seleccione servicio…'
-                  : 'Primero elija establecimiento'
+          <SearchableSelect
+            className="field--full"
+            label="Servicio / ID cliente"
+            required
+            options={serviceOptions}
+            value={formData.servicio}
+            onChange={handleServiceChange}
+            placeholder="Buscar por número de servicio…"
+          />
+          <Field label="Establecimiento" htmlFor="pay-est" className="field--full">
+            <Input
+              id="pay-est"
+              readOnly
+              disabled
+              value={
+                selectedEstablishment?.nombre ||
+                (formData.servicio
+                  ? 'Sin establecimiento en este servicio'
+                  : 'Se completa al elegir el servicio')
               }
-              disabled={!formData.establecimiento}
             />
-          </div>
+          </Field>
         </div>
 
         <p className="contracts-section-title">2. Detalles del documento</p>

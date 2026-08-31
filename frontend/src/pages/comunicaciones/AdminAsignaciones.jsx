@@ -30,7 +30,7 @@ const AdminAsignaciones = () => {
   const { notify } = useNotify()
   const overlay = useFormOverlay()
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
 
   const fetchData = useCallback(async () => {
     setLoading(true)

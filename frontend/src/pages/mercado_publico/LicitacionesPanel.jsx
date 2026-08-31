@@ -74,7 +74,7 @@ const LicitacionesPanel = ({ isNarrow: isNarrowProp } = {}) => {
   const copiedTimerRef = useRef(null)
 
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
 
   const [isNarrowInternal, setIsNarrowInternal] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches,

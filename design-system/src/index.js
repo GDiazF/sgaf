@@ -22,6 +22,7 @@ export {
   FileInput,
   TextField,
 } from './components/ui/Field.jsx'
+export { MultiSelect } from './components/ui/MultiSelect.jsx'
 export {
   CurrencyInput,
   formatCLPDisplay,

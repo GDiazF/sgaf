@@ -35,7 +35,7 @@ const PaymentsReport = () => {
   const [selectedEstablishment, setSelectedEstablishment] = useState('')
   const [selectedProvider, setSelectedProvider] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(50)
   const [totalCount, setTotalCount] = useState(0)
   const [ordering, setOrdering] = useState('-fecha_pago')
   const [searchTerm, setSearchTerm] = useState('')

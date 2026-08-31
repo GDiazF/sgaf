@@ -40,7 +40,7 @@ const LoansDashboard = () => {
   const [returning, setReturning] = useState(false)
 
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
   const [totalCount, setTotalCount] = useState(0)
   const [totalAssets, setTotalAssets] = useState(0)
   const [ordering, setOrdering] = useState('-fecha_prestamo')

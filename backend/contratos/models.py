@@ -50,6 +50,16 @@ class OrientacionLicitacion(models.Model):
 class Contrato(models.Model):
     codigo_mercado_publico = models.CharField(max_length=100, verbose_name="Código Mercado Público", unique=True)
     descripcion = models.TextField(verbose_name="Descripción")
+    detalle = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='Detalle',
+        help_text=(
+            'Texto corto opcional para documentos (ej. recepción de servicio). '
+            'Si está vacío, las plantillas pueden usar la descripción completa.'
+        ),
+    )
     
     proceso = models.ForeignKey(ProcesoCompra, on_delete=models.PROTECT, related_name='contratos', verbose_name="Tipo de Proceso")
     estado = models.ForeignKey(EstadoContrato, on_delete=models.PROTECT, related_name='contratos', verbose_name="Estado")
@@ -60,13 +70,45 @@ class Contrato(models.Model):
         ('UNICA', 'OC Única'),
         ('MULTIPLE', 'OC Múltiple'),
     ]
+    PLANTILLA_TRANSPORTE = 'TRANSPORTE'
+    PLANTILLA_OTRO = 'OTRO'
+    PLANTILLA_COBRO_CHOICES = [
+        (PLANTILLA_TRANSPORTE, 'Transporte (valor diario)'),
+        (PLANTILLA_OTRO, 'Otro (monto mensual)'),
+    ]
     tipo_oc = models.CharField(max_length=10, choices=TIPO_OC_CHOICES, default='AGREEMENT', verbose_name="Tipo de OC")
+    plantilla_cobro = models.CharField(
+        max_length=20,
+        choices=PLANTILLA_COBRO_CHOICES,
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="Plantilla de cobro",
+        help_text='Define si la gestión operativa usa valor diario (transporte) o monto mensual.',
+    )
+    aplica_iva = models.BooleanField(
+        default=True,
+        verbose_name='Aplica IVA',
+        help_text=(
+            'Si está activo, el monto total de gestión se desglosa en neto + IVA 19% '
+            'al registrar la recepción de Mercado Público.'
+        ),
+    )
     nro_oc = models.CharField(max_length=50, blank=True, null=True, verbose_name="Número de OC")
     cdp = models.CharField(max_length=100, blank=True, null=True, verbose_name="Nº CDP")
     
     @property
-    def monto_total(self):
+    def monto_adjudicado(self):
         return sum(p.monto_adjudicado for p in self.proveedores_asociados.all())
+
+    @property
+    def monto_ampliaciones(self):
+        return sum(int(a.monto or 0) for a in self.ampliaciones.all() if a.monto)
+
+    @property
+    def monto_total(self):
+        """Techo vigente: adjudicado + montos de ampliaciones."""
+        return self.monto_adjudicado + self.monto_ampliaciones
         
     @property
     def monto_consumido_previo(self):
@@ -130,6 +172,34 @@ class Contrato(models.Model):
             return max(0, months)
         return 0
 
+    def ensure_gestion_operativa(self):
+        existing = self.servicios_operativos.first()
+        if existing:
+            return existing
+        if not self.plantilla_cobro:
+            return None
+        es_transporte = self.plantilla_cobro == self.PLANTILLA_TRANSPORTE
+        tipo_qs = TipoServicioOperativo.objects.all()
+        tipo = (
+            tipo_qs.filter(es_transporte=True).first()
+            if es_transporte
+            else tipo_qs.filter(es_transporte=False).first()
+        )
+        if not tipo and not es_transporte:
+            tipo = tipo_qs.exclude(nombre__icontains='transporte').first()
+        if not tipo:
+            return None
+        return ServicioContrato.objects.create(
+            contrato=self,
+            tipo_servicio=tipo,
+            nombre=self.codigo_mercado_publico,
+            modalidad_cobro=(
+                ServicioContrato.MODALIDAD_DIARIO
+                if es_transporte
+                else ServicioContrato.MODALIDAD_MENSUAL_POR_EST
+            ),
+        )
+
     def __str__(self):
         return f"{self.codigo_mercado_publico} - {self.categoria.nombre}"
 
@@ -166,6 +236,83 @@ class HistorialContrato(models.Model):
         verbose_name = "Historial de Contrato"
         verbose_name_plural = "Historial de Contratos"
         ordering = ['-fecha']
+
+
+class AmpliacionContrato(models.Model):
+    """Amplía la vigencia de un contrato sin crear otro expediente."""
+
+    contrato = models.ForeignKey(
+        Contrato,
+        on_delete=models.CASCADE,
+        related_name='ampliaciones',
+        verbose_name='Contrato',
+    )
+    fecha_termino_anterior = models.DateField(
+        verbose_name='Término previo',
+        help_text='Fecha de término del contrato al momento de registrar la ampliación.',
+    )
+    fecha_inicio = models.DateField(
+        verbose_name='Inicio de la ampliación',
+        help_text='Por defecto coincide con el término previo; puede ajustarse si hay un salto.',
+    )
+    fecha_termino = models.DateField(verbose_name='Nuevo término')
+    nro_resolucion = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        verbose_name='N° resolución / referencia',
+    )
+    motivo = models.TextField(blank=True, default='', verbose_name='Motivo / glosa')
+    monto = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Monto de la ampliación',
+        help_text='Monto adicional asociado a la ampliación (opcional).',
+    )
+    porcentaje = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='% de ampliación',
+        help_text='Dato informativo (ej. % sobre el contrato original). No se usa para cálculos.',
+    )
+    documento = models.FileField(
+        upload_to='contratos/ampliaciones/%Y/',
+        blank=True,
+        null=True,
+        verbose_name='Documento de ampliación',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    usuario = models.CharField(max_length=100, blank=True, default='', verbose_name='Usuario')
+
+    class Meta:
+        verbose_name = 'Ampliación de contrato'
+        verbose_name_plural = 'Ampliaciones de contrato'
+        ordering = ['-fecha_termino', '-created_at']
+
+    def __str__(self):
+        return (
+            f"Ampliación {self.contrato.codigo_mercado_publico}: "
+            f"{self.fecha_inicio} → {self.fecha_termino}"
+        )
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        super().clean()
+        if self.fecha_inicio and self.fecha_termino and self.fecha_termino < self.fecha_inicio:
+            raise ValidationError({
+                'fecha_termino': 'El nuevo término debe ser igual o posterior al inicio de la ampliación.',
+            })
+        if (
+            self.fecha_termino_anterior
+            and self.fecha_termino
+            and self.fecha_termino <= self.fecha_termino_anterior
+        ):
+            raise ValidationError({
+                'fecha_termino': 'El nuevo término debe ser posterior al término previo del contrato.',
+            })
 
 class ContratoProveedor(models.Model):
     contrato = models.ForeignKey(Contrato, on_delete=models.CASCADE, related_name='proveedores_asociados')
@@ -205,6 +352,10 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 class TipoServicioOperativo(models.Model):
     nombre = models.CharField(max_length=100)
     icono = models.CharField(max_length=50, default='Truck', help_text="Nombre del icono de Lucide")
+    es_transporte = models.BooleanField(
+        default=False,
+        help_text='Si es verdadero, la gestión usa valor diario, rutas y asistencia.',
+    )
 
     def __str__(self):
         return self.nombre
@@ -215,17 +366,81 @@ class TipoServicioOperativo(models.Model):
         ordering = ['nombre']
 
 class ServicioContrato(models.Model):
+    MODALIDAD_DIARIO = 'DIARIO'
+    MODALIDAD_MENSUAL_UNICO = 'MENSUAL_UNICO'
+    MODALIDAD_MENSUAL_POR_EST = 'MENSUAL_POR_EST'
+    MODALIDAD_MENSUAL_FIJO_VARIABLE = 'MENSUAL_FIJO_VARIABLE'
+    MODALIDAD_CHOICES = [
+        (MODALIDAD_DIARIO, 'Valor diario (transporte)'),
+        (MODALIDAD_MENSUAL_UNICO, 'Monto mensual igual en todos los colegios'),
+        (MODALIDAD_MENSUAL_POR_EST, 'Monto mensual distinto por colegio'),
+        (MODALIDAD_MENSUAL_FIJO_VARIABLE, 'Mensual fijo y/o variable (por periodo)'),
+    ]
+
     contrato = models.ForeignKey(Contrato, on_delete=models.CASCADE, related_name='servicios_operativos')
     tipo_servicio = models.ForeignKey(TipoServicioOperativo, on_delete=models.PROTECT, related_name='servicios')
     nombre = models.CharField(max_length=200)
+    modalidad_cobro = models.CharField(
+        max_length=30,
+        choices=MODALIDAD_CHOICES,
+        default=MODALIDAD_DIARIO,
+        db_index=True,
+    )
+    monto_mensual = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='Obligatorio si la modalidad es monto mensual único.',
+    )
 
     def __str__(self):
         return f"{self.nombre} ({self.contrato.codigo_mercado_publico})"
 
+    @property
+    def es_transporte(self):
+        tipo = self.tipo_servicio
+        if tipo and tipo.es_transporte:
+            return True
+        return 'transporte' in (tipo.nombre or '').lower() if tipo else False
+
+    @property
+    def es_mensual(self):
+        return self.modalidad_cobro in (
+            self.MODALIDAD_MENSUAL_UNICO,
+            self.MODALIDAD_MENSUAL_POR_EST,
+            self.MODALIDAD_MENSUAL_FIJO_VARIABLE,
+        )
+
+    @property
+    def es_mensual_mixto(self):
+        return self.modalidad_cobro == self.MODALIDAD_MENSUAL_FIJO_VARIABLE
+
+    @property
+    def permite_recepcion_servicio(self):
+        """PDF de recepción unitaria (sin folio): solo gestiones mensuales."""
+        return self.es_mensual
+
+    def clean(self):
+        super().clean()
+        if self.es_transporte:
+            self.modalidad_cobro = self.MODALIDAD_DIARIO
+            self.monto_mensual = None
+        elif self.modalidad_cobro == self.MODALIDAD_DIARIO:
+            raise ValidationError(
+                {'modalidad_cobro': 'Las gestiones que no son de transporte deben usar cobro mensual.'}
+            )
+        if self.modalidad_cobro == self.MODALIDAD_MENSUAL_UNICO and not self.monto_mensual:
+            raise ValidationError(
+                {'monto_mensual': 'Indique el monto mensual que aplica a todos los colegios.'}
+            )
+
     class Meta:
         verbose_name = "Servicio de Contrato"
         verbose_name_plural = "Servicios de Contrato"
+        constraints = [
+            models.UniqueConstraint(fields=['contrato'], name='unique_gestion_por_contrato'),
+        ]
         ordering = ['nombre', 'id']
+
 
 class RutaTransporte(models.Model):
     servicio = models.ForeignKey(ServicioContrato, related_name='rutas', on_delete=models.CASCADE)
@@ -234,7 +449,12 @@ class RutaTransporte(models.Model):
     proveedor = models.ForeignKey('servicios.Proveedor', on_delete=models.PROTECT)
     establecimientos = models.ManyToManyField('establecimientos.Establecimiento')
     
-    valor_diario = models.IntegerField()
+    valor_diario = models.IntegerField(default=0)
+    valor_mensual = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='Monto mensual de la línea (gestiones no transporte).',
+    )
     itinerario = models.TextField(blank=True, null=True, help_text="Detalle del trayecto (ej: Iquique - Chipana)")
 
     dia_inicio_periodo = models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(31)])
@@ -245,14 +465,18 @@ class RutaTransporte(models.Model):
 
     def clean(self):
         super().clean()
-        if not self.pk:
-            return
-            
-        # Validate proveedor belongs to contrato
         if hasattr(self, 'servicio') and self.servicio and hasattr(self, 'proveedor') and self.proveedor:
             proveedores_validos = self.servicio.contrato.proveedores_asociados.values_list('proveedor_id', flat=True)
             if self.proveedor_id not in proveedores_validos:
                 raise ValidationError({'proveedor': 'El proveedor no pertenece a los proveedores adjudicados del contrato.'})
+        if self.servicio_id and self.servicio.es_mensual:
+            if self.servicio.modalidad_cobro == ServicioContrato.MODALIDAD_MENSUAL_UNICO:
+                self.valor_mensual = self.servicio.monto_mensual
+            if self.servicio.es_mensual_mixto:
+                # Fijo y/o variable: valor_mensual es opcional (sugiere el fijo por defecto).
+                pass
+            elif not self.valor_mensual:
+                raise ValidationError({'valor_mensual': 'Indique el monto mensual de este establecimiento.'})
 
     def save(self, *args, **kwargs):
         is_update = self.pk is not None
@@ -264,6 +488,25 @@ class RutaTransporte(models.Model):
     def __str__(self):
         return f"{self.nombre} - {self.servicio.nombre}"
 
+    def rango_periodo(self, mes, anio):
+        import calendar
+        import datetime
+        if self.servicio_id and self.servicio.es_mensual:
+            last = calendar.monthrange(anio, mes)[1]
+            return datetime.date(anio, mes, 1), datetime.date(anio, mes, last)
+        if self.dia_inicio_periodo <= self.dia_fin_periodo:
+            return (
+                datetime.date(anio, mes, self.dia_inicio_periodo),
+                datetime.date(anio, mes, self.dia_fin_periodo),
+            )
+        fecha_fin = datetime.date(anio, mes, self.dia_fin_periodo)
+        if mes == 1:
+            prev_mes, prev_anio = 12, anio - 1
+        else:
+            prev_mes, prev_anio = mes - 1, anio
+        fecha_inicio = datetime.date(prev_anio, prev_mes, self.dia_inicio_periodo)
+        return fecha_inicio, fecha_fin
+
     def recalcular_periodos_abiertos(self):
         import datetime
         # Solo actualizamos periodos que no han sido congelados (CERRADO)
@@ -271,18 +514,7 @@ class RutaTransporte(models.Model):
         for p in periodos_abiertos:
             mes = p.mes_referencia
             anio = p.anio_referencia
-            
-            # Lógica de cálculo de rango idéntica a la creación
-            if self.dia_inicio_periodo <= self.dia_fin_periodo:
-                nueva_fecha_inicio = datetime.date(anio, mes, self.dia_inicio_periodo)
-                nueva_fecha_fin = datetime.date(anio, mes, self.dia_fin_periodo)
-            else:
-                nueva_fecha_fin = datetime.date(anio, mes, self.dia_fin_periodo)
-                if mes == 1:
-                    prev_mes, prev_anio = 12, anio - 1
-                else:
-                    prev_mes, prev_anio = mes - 1, anio
-                nueva_fecha_inicio = datetime.date(prev_anio, prev_mes, self.dia_inicio_periodo)
+            nueva_fecha_inicio, nueva_fecha_fin = self.rango_periodo(mes, anio)
             
             # Actualizamos solo si hubo cambios en los días de corte
             if p.fecha_inicio != nueva_fecha_inicio or p.fecha_fin != nueva_fecha_fin:
@@ -298,7 +530,7 @@ class RutaTransporte(models.Model):
     class Meta:
         verbose_name = "Ruta de Transporte"
         verbose_name_plural = "Rutas de Transporte"
-        unique_together = ('servicio', 'nombre')
+        unique_together = ('servicio', 'proveedor', 'nombre')
 
 class GrupoPresetRutas(models.Model):
     servicio = models.ForeignKey(ServicioContrato, related_name='grupos_preset', on_delete=models.CASCADE)
@@ -330,6 +562,33 @@ class PeriodoCobro(models.Model):
     ]
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='ABIERTO')
     monto_total_calculado = models.IntegerField(null=True, blank=True, help_text="Snapshot del cálculo al cerrar el periodo")
+    monto_fijo = models.IntegerField(
+        null=True,
+        blank=True,
+        default=0,
+        help_text='Componente fijo del periodo (modalidad fijo y/o variable).',
+    )
+    monto_variable = models.IntegerField(
+        null=True,
+        blank=True,
+        default=0,
+        help_text='Componente variable del periodo (consumo / extra).',
+    )
+    nro_factura = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text='N° factura / certificado de servicio (captura manual, no transporte).',
+    )
+    fecha_servicio = models.DateField(
+        null=True,
+        blank=True,
+        help_text='Fecha del servicio (opcional; p. ej. fumigación).',
+    )
+    incluir_periodo_en_rc = models.BooleanField(
+        default=True,
+        help_text='Si es falso, rs_periodo va vacío en el PDF (evita conflicto con fecha de servicio).',
+    )
 
     class Meta:
         unique_together = ('ruta', 'fecha_inicio', 'fecha_fin')
@@ -345,44 +604,63 @@ class PeriodoCobro(models.Model):
         meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
         return f"{meses[self.mes_referencia - 1]} {self.anio_referencia}"
 
-    @property
-    def dias_trabajados(self):
+    def _conteo_dias(self):
         import datetime
         ruta = self.ruta
         delta = (self.fecha_fin - self.fecha_inicio).days + 1
         dias_base = 0
         ausencias_efectivas = 0
-        
+
         feriados = set()
         if ruta.excluir_feriados:
             feriados = set(FeriadoNacional.objects.values_list('fecha', flat=True))
-            
-        # Obtener todas las ausencias registradas para este periodo
+
         ausencias_registradas = set(self.ausencias.values_list('fecha', flat=True))
 
         for i in range(delta):
             dia = self.fecha_inicio + datetime.timedelta(days=i)
-            
-            # 1. Verificar si el día es laborable según las reglas de la ruta
             is_valid_workday = True
             if not ruta.incluir_fines_semana and dia.weekday() >= 5:
                 is_valid_workday = False
             elif ruta.excluir_feriados and dia in feriados:
                 is_valid_workday = False
-            
+
             if is_valid_workday:
                 dias_base += 1
-                # 2. Solo restar la inasistencia si el día era laborable
                 if dia in ausencias_registradas:
                     ausencias_efectivas += 1
-        
+
+        return dias_base, ausencias_efectivas
+
+    @property
+    def dias_base(self):
+        return self._conteo_dias()[0]
+
+    @property
+    def dias_trabajados(self):
+        dias_base, ausencias_efectivas = self._conteo_dias()
         return dias_base - ausencias_efectivas
 
     @property
     def monto_total(self):
         if self.estado == 'CERRADO' and self.monto_total_calculado is not None:
             return self.monto_total_calculado
-        return self.dias_trabajados * self.ruta.valor_diario
+        ruta = self.ruta
+        servicio = ruta.servicio if ruta.servicio_id else None
+        if servicio and servicio.es_mensual_mixto:
+            fijo = int(self.monto_fijo or 0)
+            variable = int(self.monto_variable or 0)
+            return fijo + variable
+        if servicio and servicio.modalidad_cobro == servicio.MODALIDAD_MENSUAL_UNICO:
+            return int(ruta.valor_mensual or servicio.monto_mensual or 0)
+        if servicio and servicio.es_mensual:
+            base_monto = ruta.valor_mensual or servicio.monto_mensual or 0
+            dias_base, ausencias_efectivas = self._conteo_dias()
+            dias = dias_base - ausencias_efectivas
+            if dias_base <= 0:
+                return 0
+            return int(round(base_monto * dias / dias_base))
+        return self.dias_trabajados * ruta.valor_diario
 
     def calcular_total_dinamico(self):
         return self.monto_total

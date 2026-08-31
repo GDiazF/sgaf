@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../../api'
 import { useAuth } from '../../context/AuthContext'
 import { usePermission } from '../../hooks/usePermission'
@@ -9,6 +9,7 @@ import BulkUploadModal from '../../components/common/BulkUploadModal'
 import PaymentModal from '../../components/services/PaymentModal'
 import GenerateRCModal from '../../components/services/GenerateRCModal'
 import BulkPdfUploadModal from '../../components/services/BulkPdfUploadModal'
+import RecepcionConformeList from './RecepcionConformeList'
 import {
   PageHeader,
   FiltersBar,
@@ -52,7 +53,23 @@ const mediaUrl = (path) => {
 const PaymentsDashboard = () => {
   const { user } = useAuth()
   const { can } = usePermission()
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const isPrivileged = user?.is_superuser || can('servicios.delete_recepcionconforme')
+  const canPagos = can('servicios.view_registropago')
+  const canRC = can('servicios.view_recepcionconforme')
+  const tabFromUrl = searchParams.get('tab')
+  const activeTab =
+    tabFromUrl === 'recepciones' && canRC ? 'recepciones' : canPagos ? 'pagos' : 'recepciones'
+  const showTabs = canPagos && canRC
+
+  const selectTab = (id) => {
+    if (id === 'recepciones' && canRC) {
+      setSearchParams({ tab: 'recepciones' }, { replace: true })
+    } else {
+      setSearchParams({}, { replace: true })
+    }
+  }
 
   const [payments, setPayments] = useState([])
   const [services, setServices] = useState([])
@@ -84,9 +101,8 @@ const PaymentsDashboard = () => {
   const [totalCount, setTotalCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [ordering, setOrdering] = useState('-fecha_pago')
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
   const [statusFilter, setStatusFilter] = useState('all')
-  const [esHistoricoFilter, setEsHistoricoFilter] = useState('false')
   const [selectedType, setSelectedType] = useState('')
   const [selectedProvider, setSelectedProvider] = useState('')
   const debouncedSearch = useDebouncedValue(searchQuery)
@@ -125,7 +141,6 @@ const PaymentsDashboard = () => {
         ordering: order,
         page_size: size,
       }
-      if (esHistoricoFilter !== 'all') params.es_historico = esHistoricoFilter
       if (status === 'paid') params.recepcion_conforme__isnull = 'false'
       else if (status === 'pending') params.recepcion_conforme__isnull = 'true'
       if (selectedType) params['servicio__proveedor__tipo_proveedor'] = selectedType
@@ -147,20 +162,22 @@ const PaymentsDashboard = () => {
   }
 
     useEffect(() => {
-    fetchLookups()
-  }, [])
+    if (canPagos) fetchLookups()
+  }, [canPagos])
 
   useEffect(() => {
+    if (activeTab !== 'pagos' || !canPagos) return
     fetchData(1, pageSize, debouncedSearch, ordering, statusFilter)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    activeTab,
+    canPagos,
     debouncedSearch,
     ordering,
     pageSize,
     statusFilter,
     selectedType,
     selectedProvider,
-    esHistoricoFilter,
   ])
 
   const clearFilters = () => {
@@ -168,7 +185,6 @@ const PaymentsDashboard = () => {
     setSelectedType('')
     setSelectedProvider('')
     setStatusFilter('all')
-    setEsHistoricoFilter('false')
     setCurrentPage(1)
   }
 
@@ -376,22 +392,48 @@ const PaymentsDashboard = () => {
     }
   }
 
-    const handleDownloadRC = async (payment, tipo = 'PAGO') => {
-        try {
-            const response = await api.get(`registros-pagos/${payment.id}/generate_pdf/?tipo=${tipo}`, {
-        responseType: 'blob',
-      })
-      const url = window.URL.createObjectURL(new Blob([response.data]))
+  const handleDownloadRC = async (payment, tipo = 'PAGO') => {
+    try {
+      const response = await api.get(
+        `registros-pagos/${payment.id}/generate_pdf/?tipo=${tipo}`,
+        { responseType: 'blob' },
+      )
+      const contentType = response.headers?.['content-type'] || ''
+      if (contentType.includes('application/json')) {
+        const text = await response.data.text()
+        const payload = JSON.parse(text)
+        notify({
+          variant: 'danger',
+          text: payload.hint || payload.error || 'No se pudo generar el PDF.',
+        })
+        return
+      }
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
       const link = document.createElement('a')
       link.href = url
-      link.setAttribute('download', `RC_${payment.nro_documento}.pdf`)
+      link.setAttribute(
+        'download',
+        `RC_${payment.recepcion_conforme_folio || payment.nro_documento}.pdf`,
+      )
       document.body.appendChild(link)
       link.click()
       link.remove()
       window.URL.revokeObjectURL(url)
-        } catch (error) {
+    } catch (error) {
       console.error(error)
-      notify({ variant: 'danger', text: 'Error al descargar la recepción conforme.' })
+      let message = 'Error al descargar la recepción conforme.'
+      const data = error?.response?.data
+      if (data instanceof Blob) {
+        try {
+          const payload = JSON.parse(await data.text())
+          message = payload.hint || payload.error || message
+        } catch {
+          // ignore
+        }
+      } else if (data?.hint || data?.error) {
+        message = data.hint || data.error
+      }
+      notify({ variant: 'danger', text: message })
     }
   }
 
@@ -644,7 +686,8 @@ const PaymentsDashboard = () => {
             <div className="data-table__actions" onClick={(e) => e.stopPropagation()}>
                                     {item.comprobante ? (
                 <>
-                                            <a 
+                  {canPagos ? (
+                    <a 
                     href={mediaUrl(item.comprobante)}
                                                 target="_blank" 
                                                 rel="noopener noreferrer"
@@ -653,6 +696,7 @@ const PaymentsDashboard = () => {
                   >
                     <Icon name="file" size="sm" />
                   </a>
+                  ) : null}
                   {can('servicios.change_registropago') ? (
                     <Button
                       variant="ghost"
@@ -682,10 +726,12 @@ const PaymentsDashboard = () => {
                                             </label>
               ) : null}
 
+              {canPagos ? (
+                <>
               <Button
                 variant="ghost"
                 size="sm"
-                title="RC Monto JUNJI"
+                title="RLB Monto JUNJI (un registro)"
                                     disabled={!item.recepcion_conforme}
                 onClick={() => handleDownloadRC(item, 'ESTANDAR')}
               >
@@ -694,12 +740,14 @@ const PaymentsDashboard = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                title="RC Pago"
+                title="RLB un registro (enviar a pago)"
                                     disabled={!item.recepcion_conforme}
                 onClick={() => handleDownloadRC(item, 'PAGO')}
               >
                 <Icon name="download" size="sm" />
               </Button>
+                </>
+              ) : null}
               {can('servicios.change_registropago') ? (
                 <Button
                   variant="ghost"
@@ -741,55 +789,100 @@ const PaymentsDashboard = () => {
     <div className="page" data-od-id="pagos-servicios-page" data-fill-viewport>
       <PageHeader
         icon="credit-card"
-        title="Pagos de servicios"
-        description={`Gestión y registro de consumos de servicios básicos (${totalCount})`}
-        breadcrumbs={[{ label: 'SSGG' }, { label: 'Pagos de servicios' }]}
+        title="Pagos"
+        description={
+          activeTab === 'recepciones'
+            ? 'Historial y gestión de documentos tributarios aceptados'
+            : `Gestión y registro de consumos de servicios básicos (${totalCount})`
+        }
+        breadcrumbs={[{ label: 'SSGG' }, { label: 'Pagos' }]}
         linkComponent={Link}
         split
         actions={
-          <>
-            {can('servicios.add_registropago') ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                                        onClick={() => {
-                  setBulkFilesResults(null)
-                  setShowBulkFilesModal(true)
-                }}
-              >
-                <Icon name="upload" size="sm" /> Subir boletas
-              </Button>
-            ) : null}
-            {can('servicios.add_registropago') ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setBulkErrors([])
-                  setShowBulkForm(true)
-                }}
-              >
-                <Icon name="file" size="sm" /> Carga masiva
-              </Button>
-            ) : null}
-            {can('servicios.add_registropago') ? (
-              <Button variant="primary" size="sm" onClick={handleNew}>
-                <Icon name="plus" size="sm" /> Registrar pago
-              </Button>
-            ) : null}
-          </>
+          activeTab === 'pagos' ? (
+            <>
+              {can('servicios.add_registropago') ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setBulkFilesResults(null)
+                    setShowBulkFilesModal(true)
+                  }}
+                >
+                  <Icon name="upload" size="sm" /> Subir boletas
+                </Button>
+              ) : null}
+              {can('servicios.add_registropago') ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setBulkErrors([])
+                    setShowBulkForm(true)
+                  }}
+                >
+                  <Icon name="file" size="sm" /> Carga masiva
+                </Button>
+              ) : null}
+              {can('servicios.add_registropago') ? (
+                <Button variant="primary" size="sm" onClick={handleNew}>
+                  <Icon name="plus" size="sm" /> Registrar pago
+                </Button>
+              ) : null}
+            </>
+          ) : can('servicios.view_cdp') ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate('/services/cdp')}
+            >
+              <Icon name="file-check" size="sm" /> CDPs
+            </Button>
+          ) : null
         }
       />
 
-      
+      {showTabs ? (
+        <div className="tabs">
+          <ul className="tabs__list" role="tablist" aria-label="Secciones de pagos">
+            <li>
+              <button
+                type="button"
+                role="tab"
+                className={`tabs__btn${activeTab === 'pagos' ? ' is-active' : ''}`}
+                aria-selected={activeTab === 'pagos'}
+                onClick={() => selectTab('pagos')}
+              >
+                Pagos
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                role="tab"
+                className={`tabs__btn${activeTab === 'recepciones' ? ' is-active' : ''}`}
+                aria-selected={activeTab === 'recepciones'}
+                onClick={() => selectTab('recepciones')}
+              >
+                Recepciones
+              </button>
+            </li>
+          </ul>
+        </div>
+      ) : null}
 
+      {activeTab === 'recepciones' && canRC ? (
+        <RecepcionConformeList embedded />
+      ) : null}
+
+      {activeTab === 'pagos' && canPagos ? (
+      <>
       <FiltersBar
         onSearch={() => setCurrentPage(1)}
         onClear={clearFilters}
         activeCount={
-          [selectedType, selectedProvider, statusFilter !== 'all', esHistoricoFilter !== 'false'].filter(
-            Boolean,
-          ).length
+          [selectedType, selectedProvider, statusFilter !== 'all'].filter(Boolean).length
         }
         advanced={
           <>
@@ -838,20 +931,6 @@ const PaymentsDashboard = () => {
                 <option value="paid">Con RC generada</option>
               </Select>
             </Field>
-            <Field label="Vigencia" htmlFor="pay-hist">
-              <Select
-                id="pay-hist"
-                value={esHistoricoFilter}
-                onChange={(e) => {
-                  setEsHistoricoFilter(e.target.value)
-                  setCurrentPage(1)
-                }}
-              >
-                <option value="false">Vigentes</option>
-                <option value="true">Históricos</option>
-                <option value="all">Todos</option>
-              </Select>
-            </Field>
           </>
         }
       >
@@ -861,11 +940,11 @@ const PaymentsDashboard = () => {
             <Input
               id="pay-q"
               type="search"
-              placeholder="Boleta, medidor, cliente…"
+              placeholder="Boleta, medidor, cliente, RBD, monto…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-                                                </div>
+          </div>
         </Field>
       </FiltersBar>
 
@@ -973,6 +1052,8 @@ const PaymentsDashboard = () => {
             ) : null}
                                 </div>
                             </div>
+      ) : null}
+      </>
       ) : null}
 
       <PaymentModal

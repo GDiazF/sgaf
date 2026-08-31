@@ -38,7 +38,7 @@ const UserManagement = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [ordering, setOrdering] = useState('username')
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [mfaResetTarget, setMfaResetTarget] = useState(null)
@@ -364,16 +364,16 @@ const UserManagement = () => {
         cardRole: 'status',
         priority: 1,
         render: (user) => (
-          <Button
-            variant="quiet"
-            size="sm"
+          <button
+            type="button"
+            className="badge-toggle"
             onClick={() => toggleUserStatus(user)}
             title={user.is_active ? 'Desactivar cuenta' : 'Activar cuenta'}
           >
             <Badge variant={user.is_active ? 'success' : 'neutral'} dot>
               {user.is_active ? 'Activo' : 'Inactivo'}
             </Badge>
-          </Button>
+          </button>
         ),
       },
       {
@@ -384,8 +384,9 @@ const UserManagement = () => {
         priority: 1,
         sortable: true,
         render: (user) => (
-          <div className="contracts-cat">
+          <div className="data-table__cell-stack">
             <strong>{user.username}</strong>
+            <span>{user.email || 'Sin email'}</span>
           </div>
         ),
       },
@@ -397,36 +398,27 @@ const UserManagement = () => {
         priority: 2,
         render: (user) =>
           user.funcionario_data ? (
-            <div className="contracts-cat">
+            <div className="data-table__cell-stack">
               <strong>{user.funcionario_data.nombre_funcionario}</strong>
-              <span>{user.funcionario_data.rut}</span>
+              <span className="mono">{user.funcionario_data.rut}</span>
             </div>
           ) : (
-            <div className="contracts-cat">
+            <div className="data-table__cell-stack">
               <strong>
                 {user.first_name || user.last_name
                   ? `${user.first_name} ${user.last_name}`.trim()
                   : 'Sin nombre'}
               </strong>
-              <span>No vinculado a funcionario</span>
+              <span>Sin vínculo funcionario</span>
             </div>
           ),
       },
       {
-        key: 'email',
-        header: 'Email',
-        className: 'col--tablet-hide',
-        cardRole: 'field',
-        priority: 2,
-        render: (user) => user.email || '—',
-      },
-      {
         key: 'groups',
         header: 'Roles',
-        className: 'col--tablet-hide',
         render: (user) =>
           user.groups.length > 0 ? (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
+            <div className="users-table__roles">
               {user.groups.map((g) => (
                 <Badge key={g} variant="accent">
                   {g}
@@ -440,36 +432,40 @@ const UserManagement = () => {
       {
         key: 'mfa',
         header: 'MFA',
-        className: 'col--status',
+        className: 'users-table__col-mfa',
         render: (user) => (
           <div
-            className="data-table__actions"
-            style={{ flexDirection: 'column', alignItems: 'center' }}
+            className="users-table__mfa"
             onClick={(e) => e.stopPropagation()}
           >
-            <Badge variant={user.mfa_enabled ? 'success' : 'neutral'}>
-              {user.mfa_enabled ? `Activo (${user.mfa_method})` : 'Inactivo'}
+            <Badge
+              variant={user.mfa_enabled ? 'success' : 'neutral'}
+              title={
+                user.mfa_enabled
+                  ? `MFA activo (${user.mfa_method})`
+                  : 'MFA inactivo'
+              }
+            >
+              {user.mfa_enabled ? 'Sí' : 'No'}
             </Badge>
-            <div className="data-table__actions">
-              <IconButton
-                aria-label={
-                  user.mfa_enforced ? 'Quitar obligatoriedad MFA' : 'Forzar uso de MFA'
-                }
-                title={user.mfa_enforced ? 'Quitar obligatoriedad' : 'Forzar uso de MFA'}
-                onClick={() =>
-                  handleUserMFAAction(user.id, user.mfa_enforced ? 'UNENFORCE' : 'ENFORCE')
-                }
-              >
-                <Icon name="shield" size="sm" />
-              </IconButton>
-              <IconButton
-                aria-label="Reiniciar dispositivo MFA"
-                title="Reiniciar dispositivo MFA"
-                onClick={() => setMfaResetTarget(user.id)}
-              >
-                <Icon name="undo" size="sm" />
-              </IconButton>
-            </div>
+            <IconButton
+              aria-label={
+                user.mfa_enforced ? 'Quitar obligatoriedad MFA' : 'Forzar uso de MFA'
+              }
+              title={user.mfa_enforced ? 'Quitar obligatoriedad' : 'Forzar uso de MFA'}
+              onClick={() =>
+                handleUserMFAAction(user.id, user.mfa_enforced ? 'UNENFORCE' : 'ENFORCE')
+              }
+            >
+              <Icon name="shield" size={14} />
+            </IconButton>
+            <IconButton
+              aria-label="Reiniciar dispositivo MFA"
+              title="Reiniciar dispositivo MFA"
+              onClick={() => setMfaResetTarget(user.id)}
+            >
+              <Icon name="undo" size={14} />
+            </IconButton>
           </div>
         ),
       },
@@ -480,21 +476,20 @@ const UserManagement = () => {
         render: (user) => (
           <div className="data-table__actions" onClick={(e) => e.stopPropagation()}>
             {can('auth.change_user') ? (
-              <Button variant="ghost" size="sm" onClick={() => handleEdit(user)} title="Editar">
-                <Icon name="edit" size="sm" />
-              </Button>
+              <IconButton aria-label="Editar" onClick={() => handleEdit(user)} title="Editar">
+                <Icon name="edit" size={14} />
+              </IconButton>
             ) : null}
             {can('auth.delete_user') ? (
-              <Button
-                variant="ghost"
-                size="sm"
+              <IconButton
+                aria-label="Eliminar"
+                title="Eliminar"
                 onClick={() =>
                   setDeleteTarget({ id: user.id, name: user.username })
                 }
-                title="Eliminar"
               >
-                <Icon name="trash" size="sm" />
-              </Button>
+                <Icon name="trash" size={14} />
+              </IconButton>
             ) : null}
           </div>
         ),
@@ -576,6 +571,7 @@ const UserManagement = () => {
       </FiltersBar>
 
       <DataTable
+        className="users-table"
         columns={columns}
         rows={pageRows}
         loading={loading}

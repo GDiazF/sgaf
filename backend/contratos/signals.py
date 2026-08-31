@@ -36,6 +36,7 @@ def log_contrato_save(sender, instance, created, **kwargs):
                 'fecha_adjudicacion': 'Fecha Adjudicación',
                 'fecha_inicio': 'Fecha Inicio',
                 'fecha_termino': 'Fecha Término',
+                'plantilla_cobro': 'Plantilla de cobro',
             }
             
             for field, label in fields.items():

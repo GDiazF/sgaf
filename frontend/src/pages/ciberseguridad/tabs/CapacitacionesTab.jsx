@@ -37,7 +37,7 @@ const CapacitacionesTab = ({ user }) => {
   const overlay = useFormOverlay()
   const { notify } = useNotify()
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
 
   const debouncedSearch = useDebouncedValue(search)
 

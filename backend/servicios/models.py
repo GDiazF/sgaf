@@ -213,14 +213,35 @@ class TipoEntrega(models.Model):
         ordering = ['nombre']
         ordering = ['nombre']
 class FacturaAdquisicion(models.Model):
-    # Folio field (RCF-YYYY-XXXX)
+    MODALIDAD_SIN_OC = 'SIN_OC'
+    MODALIDAD_COMPRA_AGIL = 'COMPRA_AGIL'
+    MODALIDAD_CHOICES = [
+        (MODALIDAD_SIN_OC, 'Factura sin OC'),
+        (MODALIDAD_COMPRA_AGIL, 'Compra ágil'),
+    ]
+
+    # Folio field (ROC-/RCF-/RCA-YYYY-XXXX)
     folio = models.CharField(max_length=50, unique=True, blank=True, null=True, verbose_name="Folio RC")
+
+    modalidad = models.CharField(
+        max_length=20,
+        choices=MODALIDAD_CHOICES,
+        default=MODALIDAD_SIN_OC,
+        db_index=True,
+        verbose_name='Modalidad de recepción',
+        help_text='SIN_OC → RCF; COMPRA_AGIL → RCA. Si hay contrato, el folio es ROC.',
+    )
     
     nro_factura = models.CharField(max_length=50, blank=True, default="", verbose_name="Número de Factura")
     nro_oc = models.CharField(max_length=100, blank=True, default="", verbose_name="Orden de Compra")
 
-    # Numero de certificado de presupuesto (FK a CDP)
-    cdp = models.CharField(max_length=100, verbose_name="Certificado de Presupuesto (CDP)")
+    # Número de certificado de presupuesto (opcional en RCF/RCA; ROC lo pide en UI)
+    cdp = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        verbose_name="Certificado de Presupuesto (CDP)",
+    )
     
     # El periodo al que corresponde la factura (primero de mes para registrar mes/año)
     periodo = models.DateField(blank=True, null=True, verbose_name="Periodo")
@@ -277,13 +298,20 @@ class FacturaAdquisicion(models.Model):
     def save(self, *args, **kwargs):
         if not self.folio:
             year = datetime.date.today().year
-            # Prefix: ROC for contracts, RCF for direct acquisitions
-            prefix_base = "ROC" if self.contrato else "RCF"
-            prefix = f"{prefix_base}-{year}"
-            
-            # Filter specifically by the derived prefix to maintain independent sequences
-            last_factura = FacturaAdquisicion.objects.filter(folio__startswith=prefix).order_by('folio').last()
-            
+            if self.contrato_id or self.contrato:
+                prefix_base = 'ROC'
+            elif self.modalidad == self.MODALIDAD_COMPRA_AGIL:
+                prefix_base = 'RCA'
+            else:
+                prefix_base = 'RCF'
+            prefix = f'{prefix_base}-{year}'
+
+            last_factura = (
+                FacturaAdquisicion.objects.filter(folio__startswith=prefix)
+                .order_by('folio')
+                .last()
+            )
+
             if last_factura:
                 try:
                     last_seq_str = last_factura.folio.rsplit('-', 1)[-1]
@@ -293,9 +321,9 @@ class FacturaAdquisicion(models.Model):
                     new_seq = 1
             else:
                 new_seq = 1
-            
-            self.folio = f"{prefix}-{new_seq:04d}"
-        
+
+            self.folio = f'{prefix}-{new_seq:04d}'
+
         super().save(*args, **kwargs)
 
     def __str__(self):

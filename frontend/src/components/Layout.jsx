@@ -24,14 +24,8 @@ import UserProfileModal from './auth/UserProfileModal'
 import AboutModal from './common/AboutModal'
 import { APP_VERSION } from '../version'
 
-/** Rutas hermanas bajo /contracts que no deben marcar "Contratos" como activo. */
-const CONTRACTS_SIBLING = new Set(['servicios', 'ruta', 'periodo'])
-
 function isContractsNavActive({ pathname }) {
-  if (pathname === '/contracts') return true
-  if (!pathname.startsWith('/contracts/')) return false
-  const segment = pathname.split('/')[2]
-  return Boolean(segment) && !CONTRACTS_SIBLING.has(segment)
+  return pathname === '/contracts' || pathname.startsWith('/contracts/')
 }
 
 function ShellTopbar({
@@ -61,7 +55,7 @@ const Layout = () => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(true)
-  const [pendingReservas, setPendingReservas] = useState([])
+  const [liveFuentes, setLiveFuentes] = useState([])
   const [notifications, setNotifications] = useState([])
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [acceptLoading, setAcceptLoading] = useState(false)
@@ -98,34 +92,35 @@ const Layout = () => {
   }, [location.state])
 
     useEffect(() => {
-    const canApprove =
-      user?.is_superuser ||
-      user?.user_permissions?.includes('solicitudes_reservas.change_solicitudreserva')
-    if (!canApprove) return undefined
+    if (!user) return undefined
+    let cancelled = false
 
-        const fetchPending = async () => {
-            try {
-        const res = await api.get('reservas/solicitudes/', { params: { estado: 'PENDIENTE' } })
-        setPendingReservas(res.data.results || res.data || [])
+    const fetchLive = async () => {
+      try {
+        const res = await api.get('notificaciones/fuentes-vivas/')
+        if (!cancelled) setLiveFuentes(res.data.fuentes || [])
       } catch {
-        /* ignore */
+        if (!cancelled) setLiveFuentes([])
       }
     }
-    fetchPending()
-    const interval = setInterval(fetchPending, 60000)
-    const handleRefresh = () => fetchPending()
-    window.addEventListener('refresh-notifications', handleRefresh)
-        return () => {
+
+    fetchLive()
+    const interval = setInterval(fetchLive, 30000)
+    window.addEventListener('refresh-notifications', fetchLive)
+    return () => {
+      cancelled = true
       clearInterval(interval)
-      window.removeEventListener('refresh-notifications', handleRefresh)
+      window.removeEventListener('refresh-notifications', fetchLive)
     }
   }, [user])
 
-    useEffect(() => {
+     useEffect(() => {
     if (!user) return undefined
-        const fetchNotifications = async () => {
-            try {
-        const res = await api.get('notificaciones/')
+    const fetchNotifications = async () => {
+      try {
+        const res = await api.get('notificaciones/', {
+          params: { page_size: 20, ordering: '-fecha_creacion' },
+        })
         let fetched = res.data.results || res.data || []
         // Notificaciones FIRMA no se auto-marcan al visitar /firma (persisten hasta firmar/rechazar)
         const match = fetched.filter(
@@ -147,11 +142,11 @@ const Layout = () => {
     }
     fetchNotifications()
     const interval = setInterval(fetchNotifications, 30000)
-    const handleRefresh = () => fetchNotifications()
-    window.addEventListener('refresh-notifications', handleRefresh)
+    const onRefresh = () => fetchNotifications()
+    window.addEventListener('refresh-notifications', onRefresh)
     return () => {
       clearInterval(interval)
-      window.removeEventListener('refresh-notifications', handleRefresh)
+      window.removeEventListener('refresh-notifications', onRefresh)
     }
   }, [user, location.pathname])
 
@@ -261,12 +256,41 @@ const Layout = () => {
     return undefined
   }, [isNotificationsOpen])
 
-  const unreadCount = useMemo(
-    () =>
-      (notifications.filter((n) => !n.leida).length || 0) +
-      (pendingReservas.length || 0),
-    [notifications, pendingReservas],
+  const liveItemsCount = useMemo(
+    () => liveFuentes.reduce((acc, f) => acc + (f.items?.length || 0), 0),
+    [liveFuentes],
   )
+
+  const unreadPersisted = useMemo(
+    () => notifications.filter((n) => !n.leida).length,
+    [notifications],
+  )
+
+  const unreadCount = useMemo(
+    () => unreadPersisted + liveItemsCount,
+    [unreadPersisted, liveItemsCount],
+  )
+
+  const markNotificationRead = async (n) => {
+    if (n.leida) return
+    try {
+      await api.post(`notificaciones/${n.id}/marcar_leida/`)
+      setNotifications((prev) =>
+        prev.map((item) => (item.id === n.id ? { ...item, leida: true } : item)),
+      )
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const markAllNotificationsRead = async () => {
+    try {
+      await api.post('notificaciones/marcar_todas_leidas/')
+      setNotifications((prev) => prev.map((item) => ({ ...item, leida: true })))
+    } catch {
+      /* ignore */
+    }
+  }
 
   const showSsgg =
     can('contratos.view_contrato') ||
@@ -276,7 +300,11 @@ const Layout = () => {
     can('servicios.view_servicio') ||
     can('servicios.view_registropago') ||
     can('servicios.view_recepcionconforme') ||
-    can('servicios.view_cdp')
+    can('servicios.view_cdp') ||
+    can([
+      'documentacion_servicios.view_registroserviciodoc',
+      'servicios.view_proveedor',
+    ])
 
   const showOperaciones =
     can('funcionarios.view_funcionario') ||
@@ -429,6 +457,15 @@ const Layout = () => {
                   <div className="notif-panel__header">
                     <span className="notif-panel__title">Notificaciones</span>
                     <div className="notif-panel__header-actions">
+                      {unreadPersisted > 0 ? (
+                        <button
+                          type="button"
+                          className="notif-panel__action"
+                          onClick={markAllNotificationsRead}
+                        >
+                          Marcar todas
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className="notif-panel__close"
@@ -439,70 +476,41 @@ const Layout = () => {
                       </button>
                     </div>
                   </div>
-                  {!pendingReservas.length && !notifications.length ? (
+                  {!liveItemsCount && !notifications.length ? (
                     <p className="notif-panel__empty">Sin notificaciones</p>
                   ) : (
                     <ul className="notif-panel__list">
-                      {pendingReservas.map((res) => {
-                        const start = new Date(res.fecha_inicio)
-                        const dateKey = Number.isNaN(start.getTime())
-                          ? ''
-                          : `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`
-                        const dateLabel = Number.isNaN(start.getTime())
-                          ? ''
-                          : start.toLocaleDateString('es-CL', {
-                              weekday: 'short',
-                              day: 'numeric',
-                              month: 'short',
-                            })
-                        const timeLabel = Number.isNaN(start.getTime())
-                          ? ''
-                          : start.toLocaleTimeString('es-CL', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              hour12: false,
-                            })
-                        const desc = [
-                          res.nombre_funcionario || 'Solicitante',
-                          timeLabel,
-                          res.recurso_nombre,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')
-                        return (
-                          <li key={`res-${res.id}`}>
+                      {liveFuentes.flatMap((fuente) =>
+                        (fuente.items || []).map((item) => (
+                          <li key={`live-${fuente.codigo}-${item.id}`}>
                             <button
                               type="button"
                               className="notif-panel__item is-unread"
                               onClick={() => {
                                 setIsNotificationsOpen(false)
-                                navigate(
-                                  dateKey
-                                    ? `/reservas?date=${dateKey}&highlight=${res.id}`
-                                    : `/reservas?highlight=${res.id}`,
-                                )
+                                if (item.link) navigate(item.link)
                               }}
                             >
                               <span className="notif-panel__item-body">
-                                <div className="notif-panel__item-title">
-                                  Reserva: {res.titulo || 'Sin título'}
-                                </div>
-                                <div className="notif-panel__item-desc">{desc}</div>
+                                <div className="notif-panel__item-title">{item.titulo}</div>
+                                {item.descripcion ? (
+                                  <div className="notif-panel__item-desc">{item.descripcion}</div>
+                                ) : null}
                               </span>
-                              {dateLabel ? (
-                                <span className="notif-panel__item-time">{dateLabel}</span>
+                              {item.tiempo ? (
+                                <span className="notif-panel__item-time">{item.tiempo}</span>
                               ) : null}
                             </button>
                           </li>
-                        )
-                      })}
+                        )),
+                      )}
                       {notifications.slice(0, 8).map((n) => (
                         <li key={n.id}>
                           <button
                             type="button"
                             className={`notif-panel__item${n.leida ? '' : ' is-unread'}`}
                             onClick={async () => {
-                              // FIRMA: navegar sin marcar leída ni borrar (queda hasta firmar/rechazar)
+                            // FIRMA: navegar sin marcar leída ni borrar (queda hasta firmar/rechazar)
                               if (!n.leida && n.tipo !== 'FIRMA') {
                                 try {
                                   await api.post(`notificaciones/${n.id}/marcar_leida/`)
@@ -532,6 +540,14 @@ const Layout = () => {
                       ))}
                     </ul>
                   )}
+                  <div className="notif-panel__footer">
+                    <Link
+                      to="/notificaciones"
+                      onClick={() => setIsNotificationsOpen(false)}
+                    >
+                      Ver todas las notificaciones
+                    </Link>
+                  </div>
                 </NotificationBell>
                     </div>
             }
@@ -612,12 +628,22 @@ const Layout = () => {
                         </DropdownItem>
                         <DropdownItem
                           as={Link}
-                          to="/admin/email-settings"
+                          to="/admin/notificaciones"
                           onClick={() => setIsProfileOpen(false)}
                         >
-                          <Icon name="message" size={16} />
-                          Email
+                          <Icon name="bell" size={16} />
+                          Notificaciones
                         </DropdownItem>
+                        {(can('documentos.view_plantilladocumento') || user?.is_superuser) ? (
+                          <DropdownItem
+                            as={Link}
+                            to="/admin/documentos"
+                            onClick={() => setIsProfileOpen(false)}
+                          >
+                            <Icon name="procedimientos" size={16} />
+                            Plantillas de documentos
+                          </DropdownItem>
+                        ) : null}
                       </>
                     )}
                     <DropdownDivider />
@@ -702,26 +728,28 @@ const Layout = () => {
                     onClick={closeDrawer}
                   />
                 )}
-                {can('contratos.view_rutatransporte') && (
-                  <NavItem to="/contracts/servicios" icon="rutas" label="Gestión de Rutas" onClick={closeDrawer} />
-                )}
                 {can('servicios.view_proveedor') && (
                   <NavItem to="/services/providers" icon="proveedores" label="Proveedores" onClick={closeDrawer} />
                 )}
                 {can('servicios.view_facturaadquisicion') && (
-                  <NavItem to="/services/adquisiciones" icon="receipt" label="Factura sin OC" onClick={closeDrawer} />
+                  <NavItem to="/services/adquisiciones" icon="receipt" label="Recepciones" onClick={closeDrawer} />
                 )}
                 {can('servicios.view_servicio') && (
                   <NavItem to="/services" icon="servicios" label="Servicios" end onClick={closeDrawer} />
                 )}
-                {can('servicios.view_registropago') && (
+                {can(['servicios.view_registropago', 'servicios.view_recepcionconforme']) && (
                   <NavItem to="/services/payments" icon="credit-card" label="Pagos" onClick={closeDrawer} />
                 )}
-                {can('servicios.view_recepcionconforme') && (
-                  <NavItem to="/services/rc" icon="clipboard-check" label="Recepciones" onClick={closeDrawer} />
-                )}
-                {can('servicios.view_cdp') && (
-                  <NavItem to="/services/cdp" icon="file-check" label="CDPs" onClick={closeDrawer} />
+                {can([
+                  'documentacion_servicios.view_registroserviciodoc',
+                  'servicios.view_proveedor',
+                ]) && (
+                  <NavItem
+                    to="/services/documentacion"
+                    icon="file"
+                    label="Documentación"
+                    onClick={closeDrawer}
+                  />
                 )}
               </NavAccordion>
             )}

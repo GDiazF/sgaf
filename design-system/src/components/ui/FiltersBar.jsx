@@ -27,6 +27,8 @@ export function FiltersBar({
   forceOpen = false,
   /** 'desktop' | 'tablet' | 'mobile' — layout forzado en showcase */
   demoMode,
+  /** Acciones extra en la misma fila (p. ej. Nuevo, Feriados) */
+  actions,
   className,
   id,
   style,
@@ -126,6 +128,7 @@ export function FiltersBar({
               {clearLabel}
             </Button>
           ) : null}
+          {actions ? <div className="filters__extra">{actions}</div> : null}
         </div>
       </div>
 

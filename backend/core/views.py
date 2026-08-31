@@ -66,6 +66,7 @@ def get_full_user_data(user):
         'first_name': user.first_name,
         'last_name': user.last_name,
         'is_superuser': user.is_superuser,
+        'is_staff': user.is_staff,
         'avatar': avatar_url,
         'funcionario_data': funcionario_data,
         'sello_resuelto': sello_resuelto,

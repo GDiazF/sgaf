@@ -26,7 +26,7 @@ const AnexosDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeSection, setActiveSection] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(25)
+  const [pageSize, setPageSize] = useState(50)
   const [sortKey, setSortKey] = useState('nombre')
   const [sortDir, setSortDir] = useState('asc')
 
