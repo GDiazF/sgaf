@@ -51,19 +51,32 @@ def _label(sender):
     return f'{sender._meta.app_label}.{sender.__name__}'
 
 
+def _audit_log_table_columns(cursor):
+    """Columnas reales de core_auditlog (no el modelo ORM, que puede ir adelantado al esquema)."""
+    table = apps.get_model('core', 'AuditLog')._meta.db_table
+    if table not in connection.introspection.table_names(cursor):
+        return None
+    description = connection.introspection.get_table_description(cursor, table)
+    return {col.name for col in description}
+
+
 def _can_write_audit():
-    """Evita escribir durante migrate/test setup cuando aún no existe core_auditlog."""
+    """Evita escribir durante migrate/test setup cuando el esquema de auditoría no está listo."""
     global _audit_table_ready
     if _audit_table_ready:
         return True
     if not apps.ready:
         return False
     try:
-        table = apps.get_model('core', 'AuditLog')._meta.db_table
         with connection.cursor() as cursor:
-            if table in connection.introspection.table_names(cursor):
-                _audit_table_ready = True
-                return True
+            columns = _audit_log_table_columns(cursor)
+            if not columns:
+                return False
+            # core.0018_auditlog_changes: sin esta columna migrate falla al auditar saves.
+            if 'changes' not in columns:
+                return False
+            _audit_table_ready = True
+            return True
     except Exception:
         return False
     return False
@@ -71,6 +84,9 @@ def _can_write_audit():
 
 def should_audit(sender):
     if not isinstance(sender, type) or not issubclass(sender, models.Model):
+        return False
+    # Modelos históricos de RunPython (apps.get_model en migraciones).
+    if sender.__module__.startswith('__fake__'):
         return False
     if sender._meta.abstract or sender._meta.proxy:
         return False
