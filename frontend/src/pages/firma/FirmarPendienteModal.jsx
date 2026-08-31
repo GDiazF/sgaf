@@ -19,6 +19,7 @@ import {
   ZOOM_DEFAULT,
   ZOOM_FIT,
 } from '../../utils/firmaPreviewZoom'
+import { fetchPendientePdfBlob } from '../../utils/firmaPendientePdf'
 
 const PRESETS = [
   { id: 'tl', label: 'Superior izquierda' },
@@ -165,52 +166,9 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
       setLoadError(null)
       setLoadingPdf(true)
       try {
-        let blob = null
-        if (pendiente.tiene_archivo_origen || pendiente.id) {
-          try {
-            const stored = await api.get(
-              `firma-digital/pendientes/${pendiente.id}/documento/`,
-              { responseType: 'blob' },
-            )
-            if (stored.data instanceof Blob && stored.data.size >= 100) {
-              const ct = stored.data.type || ''
-              if (!ct.includes('json')) {
-                blob = stored.data
-              }
-            }
-          } catch {
-            /* fallback abajo */
-          }
-        }
-
-        if (!blob) {
-          const pagoId = pendiente.meta?.pago_id
-          if (!pagoId) {
-            throw new Error('Este documento no tiene PDF de origen asociado.')
-          }
-          const tipo = pendiente.meta?.tipo_pdf || 'PAGO'
-          const response = await api.get(
-            `registros-pagos/${pagoId}/generate_pdf/?tipo=${tipo}`,
-            { responseType: 'blob' },
-          )
-          blob = response.data
-        }
+        const blob = await fetchPendientePdfBlob(pendiente, api)
 
         if (cancelled) return
-
-        if (!(blob instanceof Blob) || blob.size < 100) {
-          throw new Error('El servidor no devolvió un PDF válido.')
-        }
-        if (blob.type && blob.type.includes('json')) {
-          const text = await blob.text()
-          let msg = 'No se pudo generar el PDF.'
-          try {
-            msg = JSON.parse(text).error || msg
-          } catch {
-            /* ignore */
-          }
-          throw new Error(msg)
-        }
 
         const file = new File(
           [blob],

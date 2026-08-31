@@ -2,7 +2,7 @@
 export const ZOOM_MIN = 50
 export const ZOOM_MAX = 300
 export const ZOOM_STEP = 25
-/** Zoom al abrir / recargar preview (más legible que 100% en modal). */
-export const ZOOM_DEFAULT = 150
+/** Zoom al abrir / recargar preview (legible en modal amplio). */
+export const ZOOM_DEFAULT = 200
 /** «Ajustar»: ancho del contenedor sin ampliación extra. */
 export const ZOOM_FIT = 100
