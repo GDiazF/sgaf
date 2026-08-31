@@ -95,4 +95,4 @@ docker compose ps
 ## Siguiente lectura
 
 - Respaldos nube/cron → [07 — Respaldos](./07-respaldos.md)
-- Manual web con pestañas → [manual-web/actualizar.html](../manual-web/actualizar.html)
+- Manual web con pestañas → [manual-web/actualizar.html](../../manual-web/actualizar.html)

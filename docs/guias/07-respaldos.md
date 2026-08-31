@@ -1,7 +1,7 @@
 # 07 — Respaldos
 
 **Qué cubre:** local, Google Drive (rclone), cron y restauración.  
-Manual web → [manual-web/respaldos.html](../manual-web/respaldos.html).
+Manual web → [manual-web/respaldos.html](../../manual-web/respaldos.html).
 
 ---
 

@@ -3,7 +3,7 @@ Manual SGAF — documentación offline
 
 CÓMO ABRIR
 ----------
-1. Abre la carpeta docs/manual-web/
+1. Abre la carpeta manual-web/ (raíz del proyecto, al mismo nivel que docs/)
 2. Haz doble clic en index.html
 3. Usa el menú lateral y las pestañas en cada página
 

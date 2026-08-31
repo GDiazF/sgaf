@@ -39,4 +39,4 @@ Administrador web (roles)  →  Guía 05 (sin terminal)
 
 Las guías antiguas (`docs/0`, `docs/1`, `docs/2.1`, `docs/2.2`, `docs/3`) siguen disponibles como referencia detallada.
 
-**Manual visual offline:** [manual-web/index.html](../manual-web/index.html) (abrir en el navegador sin internet).
+**Manual visual offline:** [manual-web/index.html](../../manual-web/index.html) (abrir en el navegador sin internet).

@@ -6,6 +6,8 @@ Esta versión del sistema ha sido refactorizada para ser completamente agnóstic
 - `/backend`: Lógica de Django y API.
 - `/frontend`: Aplicación React (Vite).
 - `/docker`: Configuraciones de contenedores y Nginx.
+- `/docs`: Documentación markdown y guías por tarea.
+- `/manual-web`: Manual offline HTML (abrir `index.html` en el navegador).
 - `/scripts`: Herramientas de mantenimiento (Backups/Restauración).
 
 ---

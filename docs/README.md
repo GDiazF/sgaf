@@ -4,7 +4,7 @@
 
 **Empiece aquí:** [guias/README.md](./guias/README.md)
 
-**Manual web (offline, con dibujos):** abra [manual-web/index.html](./manual-web/index.html) en el navegador (doble clic). Ver [manual-web/LEEME.txt](./manual-web/LEEME.txt).
+**Manual web (offline, con dibujos):** abra [manual-web/index.html](../manual-web/index.html) en el navegador (doble clic). Ver [manual-web/LEEME.txt](../manual-web/LEEME.txt).
 
 | Guía | Contenido |
 |------|-----------|
