@@ -637,23 +637,24 @@ export default function FirmaPrueba() {
         onClose={closeModal}
         title="Ubicar sello y firmar"
         subheader={file?.name || 'Documento PDF'}
-        size="lg"
-        className="firma-placement-modal"
+        className="modal--shell modal--viewer modal--firma-sign"
+        bodyClassName="modal__body--viewer"
         overlayStatus={loading ? 'loading' : null}
         overlayTitle="Firmando documento…"
         overlayDescription="Enviando a FirmaGob. Esto puede tardar unos segundos."
         footer={
           <>
-            <Button variant="quiet" onClick={closeModal} disabled={loading}>
+            <Button variant="quiet" size="sm" onClick={closeModal} disabled={loading}>
               Cancelar
             </Button>
             <Button
               variant="primary"
+              size="sm"
               onClick={handleSign}
               disabled={loading || !preview || !signerName.trim()}
               loading={loading}
             >
-              Firmar PDF con sello
+              Firmar con sello
             </Button>
           </>
         }

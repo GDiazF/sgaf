@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import api from '../../api'
 import { useAuth } from '../../context/AuthContext'
 import { useNotify } from '../../hooks/useNotify'
+import FirmaStampPreview from '../../components/firma/FirmaStampPreview'
 import {
   Modal,
   Button,
@@ -9,23 +10,16 @@ import {
   Input,
   Select,
   Alert,
-  Icon,
 } from '@slep/ui'
 
-import {
-  ZOOM_MIN,
-  ZOOM_MAX,
-  ZOOM_STEP,
-  ZOOM_DEFAULT,
-  ZOOM_FIT,
-} from '../../utils/firmaPreviewZoom'
+import { ZOOM_DEFAULT } from '../../utils/firmaPreviewZoom'
 import { fetchPendientePdfBlob } from '../../utils/firmaPendientePdf'
 
 const PRESETS = [
-  { id: 'tl', label: 'Superior izquierda' },
-  { id: 'tr', label: 'Superior derecha' },
-  { id: 'bl', label: 'Inferior izquierda' },
-  { id: 'br', label: 'Inferior derecha' },
+  { id: 'tl', label: 'Sup. izq.' },
+  { id: 'tr', label: 'Sup. der.' },
+  { id: 'bl', label: 'Inf. izq.' },
+  { id: 'br', label: 'Inf. der.' },
 ]
 
 function downloadBlob(data, filename) {
@@ -71,9 +65,6 @@ function getSignerDefaults(user) {
   }
 }
 
-/**
- * Modal reutilizable: misma UX que Firma prueba (preview + panel de datos/posiciones).
- */
 export default function FirmarPendienteModal({ open, pendiente, onClose, onFirmado }) {
   const { user } = useAuth()
   const { notify } = useNotify()
@@ -167,7 +158,6 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
       setLoadingPdf(true)
       try {
         const blob = await fetchPendientePdfBlob(pendiente, api)
-
         if (cancelled) return
 
         const file = new File(
@@ -346,8 +336,8 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
       onClose={() => {
         if (!signing) onClose?.()
       }}
-      size="lg"
-      className="firma-placement-modal"
+      className="modal--shell modal--viewer modal--firma-sign"
+      bodyClassName="modal__body--viewer"
       title="Ubicar sello y firmar"
       subheader={pendiente?.titulo || pendiente?.codigo_interno || 'Documento'}
       overlayStatus={signing ? 'loading' : null}
@@ -355,17 +345,18 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
       overlayDescription="Enviando a FirmaGob. Esto puede tardar unos segundos."
       footer={
         <>
-          <Button variant="quiet" type="button" onClick={onClose} disabled={signing}>
+          <Button variant="quiet" size="sm" type="button" onClick={onClose} disabled={signing}>
             Cancelar
           </Button>
           <Button
             variant="primary"
+            size="sm"
             type="button"
             loading={signing}
             disabled={signing || loadingPdf || !preview || !signerName.trim()}
             onClick={handleSign}
           >
-            Firmar PDF con sello
+            Firmar con sello
           </Button>
         </>
       }
@@ -382,90 +373,26 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
         </Alert>
       ) : null}
 
-      {!loadingPdf && !loadError ? (
-        <div className="firma-prueba__grid">
-          <div>
-            {preview ? (
-              <>
-                <div className="firma-placement-toolbar" role="toolbar" aria-label="Zoom de vista previa">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={signing || zoom <= ZOOM_MIN}
-                    onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z - ZOOM_STEP))}
-                    aria-label="Alejar"
-                  >
-                    −
-                  </Button>
-                  <span className="firma-placement-toolbar__label">{zoom}%</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={signing || zoom >= ZOOM_MAX}
-                    onClick={() => setZoom((z) => Math.min(ZOOM_MAX, z + ZOOM_STEP))}
-                    aria-label="Acercar"
-                  >
-                    <Icon name="plus" size={14} />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="quiet"
-                    size="sm"
-                    disabled={signing || zoom === ZOOM_FIT}
-                    onClick={() => setZoom(ZOOM_FIT)}
-                  >
-                    Ajustar
-                  </Button>
-                </div>
-                <div className="firma-placement-viewport" ref={viewportRef}>
-                  <div
-                    className="firma-placement-viewport__track"
-                    style={{ width: `${Math.max(100, zoom)}%` }}
-                  >
-                    <div
-                      className="firma-placement"
-                      ref={stageRef}
-                      style={{ width: `${(zoom / Math.max(100, zoom)) * 100}%` }}
-                    >
-                      <img
-                        className="firma-placement__img"
-                        src={`data:image/png;base64,${preview.image_base64}`}
-                        alt={`Vista previa página ${page}`}
-                        draggable={false}
-                      />
-                      <div
-                        className="firma-placement__stamp"
-                        style={stampStyle}
-                        onPointerDown={onStampPointerDown}
-                        onPointerMove={onStampPointerMove}
-                        onPointerUp={onStampPointerUp}
-                        onPointerCancel={onStampPointerUp}
-                        role="button"
-                        tabIndex={0}
-                        aria-label="Arrastrar posición del sello"
-                      >
-                        Sello
-                        <br />
-                        (arrastrar)
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <p className="firma-placement__hint">
-                  Vista ampliada al {ZOOM_DEFAULT}% al abrir. Use + / − o «Ajustar» ({ZOOM_FIT}%).
-                </p>
-              </>
-            ) : (
-              <Alert variant="info" title="Vista previa">
-                No hay vista previa disponible.
-              </Alert>
-            )}
+      {!loadingPdf && !loadError && preview ? (
+        <div className="firma-sign-layout">
+          <div className="firma-sign-layout__viewer">
+            <FirmaStampPreview
+              preview={preview}
+              page={page}
+              zoom={zoom}
+              onZoomChange={setZoom}
+              stampStyle={stampStyle}
+              onStampPointerDown={onStampPointerDown}
+              onStampPointerMove={onStampPointerMove}
+              onStampPointerUp={onStampPointerUp}
+              disabled={signing}
+              viewportRef={viewportRef}
+              stageRef={stageRef}
+            />
           </div>
 
-          <div className="firma-prueba__fields">
-            {preview && pageOptions.length > 1 ? (
+          <aside className="firma-sign-layout__aside">
+            {pageOptions.length > 1 ? (
               <Field label="Página">
                 <Select value={String(page)} onChange={handlePageChange} disabled={signing}>
                   {pageOptions.map((opt) => (
@@ -477,16 +404,15 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
               </Field>
             ) : null}
 
-            <Field label="Posición rápida">
-              <div className="firma-prueba__presets" role="group" aria-label="Esquinas del documento">
+            <Field label="Esquina del sello">
+              <div className="firma-sign-presets" role="group" aria-label="Esquinas del documento">
                 {PRESETS.map((p) => (
                   <Button
                     key={p.id}
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="firma-prueba__preset-btn"
-                    disabled={!preview || signing}
+                    disabled={signing}
                     onClick={() => applyPreset(p.id)}
                   >
                     {p.label}
@@ -495,59 +421,27 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
               </div>
             </Field>
 
-            <Field
-              label="Nombre en el sello"
-              required
-              hint="Tomado del funcionario vinculado a su usuario."
-            >
-              <Input
-                value={signerName}
-                readOnly
-                placeholder="Sin nombre en el perfil"
-                disabled={signing}
-              />
+            <Field label="Firmante" required>
+              <Input value={signerName} readOnly disabled={signing} placeholder="Sin nombre" />
             </Field>
 
-            <Field label="Cargo" hint="Tomado del funcionario vinculado a su usuario.">
-              <Input
-                value={signerRole}
-                readOnly
-                placeholder="Sin cargo en el perfil"
-                disabled={signing}
-              />
+            <Field label="Cargo">
+              <Input value={signerRole} readOnly disabled={signing} placeholder="Sin cargo" />
             </Field>
 
-            {config?.sello_resuelto ? (
-              <Field
-                label="Imagen del sello"
-                hint={`Desde ${config.sello_resuelto.nivel_label}${
-                  config.sello_resuelto.organo_nombre
-                    ? `: ${config.sello_resuelto.organo_nombre}`
-                    : ''
-                } (mantenedor de sellos).`}
-              >
-                {config.sello_resuelto.imagen_url ? (
-                  <img
-                    className="firma-prueba__sello-preview"
-                    src={config.sello_resuelto.imagen_url}
-                    alt={config.sello_resuelto.nombre}
-                  />
-                ) : (
-                  <span>{config.sello_resuelto.nombre}</span>
-                )}
-              </Field>
+            {config?.sello_resuelto?.imagen_url ? (
+              <img
+                className="firma-sign-layout__sello"
+                src={config.sello_resuelto.imagen_url}
+                alt={config.sello_resuelto.nombre}
+              />
             ) : (
               <Alert variant="warning" title="Sin sello de área">
-                Se usará un recuadro solo con nombre y cargo. Configure el sello en{' '}
-                <a href="/funcionarios/sellos">Funcionarios → Sellos de firma</a>.
+                Se usará recuadro con nombre y cargo.
               </Alert>
             )}
 
-            <Field
-              label="Código OTP"
-              hint="6 dígitos de Google Authenticator del certificado FirmaGob (RA). No es el MFA de inicio de sesión de SGAF."
-              required
-            >
+            <Field label="OTP FirmaGob" required hint="6 dígitos del certificado (RA).">
               <Input
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -558,15 +452,7 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
                 disabled={signing}
               />
             </Field>
-
-            <Alert variant="info" title="Propósito General">
-              Cada firma exige OTP del certificado en la RA (
-              <a href="https://firma.digital.gob.cl/ra/" target="_blank" rel="noreferrer">
-                firma.digital.gob.cl/ra
-              </a>
-              ). SGAF no registra ni guarda esa semilla OTP.
-            </Alert>
-          </div>
+          </aside>
         </div>
       ) : null}
     </Modal>

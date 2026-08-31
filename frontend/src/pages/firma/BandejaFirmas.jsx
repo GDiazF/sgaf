@@ -4,7 +4,7 @@ import api from '../../api'
 import { useAuth } from '../../context/AuthContext'
 import { useNotify } from '../../hooks/useNotify'
 import FirmarPendienteModal from './FirmarPendienteModal'
-import RevisarDocumentoModal from './RevisarDocumentoModal'
+import DocumentViewerModal from '../../components/common/DocumentViewerModal'
 import { fetchPendientePdfBlob } from '../../utils/firmaPendientePdf'
 import {
   PageHeader,
@@ -383,13 +383,13 @@ export default function BandejaFirmas() {
         }}
       />
 
-      <RevisarDocumentoModal
-        open={Boolean(revisarState)}
-        item={revisarState?.item}
-        pdfUrl={revisarState?.pdfUrl}
-        loading={revisarState?.loading}
-        error={revisarState?.error}
+      <DocumentViewerModal
+        open={Boolean(revisarState?.pdfUrl)}
         onClose={closeRevisar}
+        title="Revisar documento"
+        subtitle={revisarState?.item?.titulo || revisarState?.item?.codigo_interno}
+        documentType="PDF"
+        fileUrl={revisarState?.pdfUrl}
       />
 
       <Modal
