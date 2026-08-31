@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import api from '../../api'
 import { useAuth } from '../../context/AuthContext'
+import { usePermission } from '../../hooks/usePermission'
 import { useNotify } from '../../hooks/useNotify'
 import {
   PageHeader,
@@ -15,6 +16,7 @@ import {
   Badge,
   Modal,
   Icon,
+  EmptyState,
 } from '@slep/ui'
 
 const ZOOM_MIN = 50
@@ -74,6 +76,7 @@ function getSignerDefaults(user) {
 
 export default function FirmaPrueba() {
   const { user } = useAuth()
+  const { can } = usePermission()
   const { notify } = useNotify()
   const [config, setConfig] = useState(null)
   const [configError, setConfigError] = useState(null)
@@ -396,6 +399,17 @@ export default function FirmaPrueba() {
         height: `${(stampBox.h / preview.preview_height_px) * 100}%`,
       }
     : undefined
+
+  if (!can('firma_digital.can_probar_firma')) {
+    return (
+      <div className="page">
+        <EmptyState
+          title="Sin acceso"
+          description="No está autorizado al laboratorio de firma digital (prueba)."
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="page" data-od-id="firma-prueba-page">

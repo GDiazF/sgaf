@@ -328,6 +328,8 @@ function App() {
                 </Route>
                 <Route element={<ProtectedRoute requireFlag="puede_firmar" />}>
                   <Route path="firma" element={<BandejaFirmas />} />
+                </Route>
+                <Route element={<ProtectedRoute permission="firma_digital.can_probar_firma" />}>
                   <Route path="firma-prueba" element={<FirmaPrueba />} />
                 </Route>
 

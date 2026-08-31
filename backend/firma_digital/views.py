@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.http import FileResponse, HttpResponse
 
-from .authz import CanFirmarDigital
+from .authz import CanFirmarDigital, CanFirmarOProbarFirma, CanProbarFirmaDigital
 from .client import (
     PURPOSE_ATENDIDO,
     FirmaGobError,
@@ -104,7 +104,7 @@ class SelloFirmaViewSet(viewsets.ModelViewSet):
 class FirmaGobConfigView(APIView):
     """Expone configuración no sensible + sello resuelto + estado firma-dep."""
 
-    permission_classes = [CanFirmarDigital]
+    permission_classes = [CanFirmarOProbarFirma]
 
     def get(self, request):
         from django.conf import settings
@@ -169,7 +169,7 @@ class FirmaGobConfigView(APIView):
 class FirmaGobPreviewView(APIView):
     """Renderiza una página del PDF para ubicar el sello visual."""
 
-    permission_classes = [CanFirmarDigital]
+    permission_classes = [CanFirmarOProbarFirma]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -194,7 +194,7 @@ class FirmaGobProbarView(APIView):
     mode=atendida (OTP) | desatendida (sin OTP, solo lab).
     """
 
-    permission_classes = [CanFirmarDigital]
+    permission_classes = [CanProbarFirmaDigital]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):

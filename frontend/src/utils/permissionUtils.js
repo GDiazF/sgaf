@@ -90,6 +90,9 @@ export const groupPermissions = (permissions) => {
             case 'documentos':
                 module = 'Plantillas de documentos';
                 break;
+            case 'firma_digital':
+                module = 'Firma digital';
+                break;
             default:
                 // Fallbacks adicionales por nombre por si hay modelos sueltos o apps genéricas
                 if (name.includes('link de interes') || name.includes('linkinteres')) module = 'Dashboard, Links y Redes';

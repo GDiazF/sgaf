@@ -607,16 +607,16 @@ const Layout = () => {
                           ARCO
                         </DropdownItem>
                         {user?.puede_firmar && (
-                          <>
-                            <DropdownItem as={Link} to="/firma" onClick={() => setIsProfileOpen(false)}>
-                              <Icon name="file-check" size={16} />
-                              Bandeja de firmas
-                            </DropdownItem>
-                            <DropdownItem as={Link} to="/firma-prueba" onClick={() => setIsProfileOpen(false)}>
-                              <Icon name="file-check" size={16} />
-                              Firma digital (prueba)
-                            </DropdownItem>
-                          </>
+                          <DropdownItem as={Link} to="/firma" onClick={() => setIsProfileOpen(false)}>
+                            <Icon name="file-check" size={16} />
+                            Bandeja de firmas
+                          </DropdownItem>
+                        )}
+                        {can('firma_digital.can_probar_firma') && (
+                          <DropdownItem as={Link} to="/firma-prueba" onClick={() => setIsProfileOpen(false)}>
+                            <Icon name="file-check" size={16} />
+                            Firma digital (prueba)
+                          </DropdownItem>
                         )}
                         <DropdownItem
                           as={Link}
@@ -677,10 +677,10 @@ const Layout = () => {
             )}
             <NavItem to="/procedimientos" icon="procedimientos" label="Procedimientos" onClick={closeDrawer} />
             {user?.puede_firmar && (
-              <>
-                <NavItem to="/firma" icon="file-check" label="Bandeja de firmas" onClick={closeDrawer} />
-                <NavItem to="/firma-prueba" icon="file-check" label="Firma (prueba)" onClick={closeDrawer} />
-              </>
+              <NavItem to="/firma" icon="file-check" label="Bandeja de firmas" onClick={closeDrawer} />
+            )}
+            {can('firma_digital.can_probar_firma') && (
+              <NavItem to="/firma-prueba" icon="file-check" label="Firma (prueba)" onClick={closeDrawer} />
             )}
 
             {showTesoreria && (
