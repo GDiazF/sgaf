@@ -518,19 +518,38 @@ export default function FirmaPrueba() {
               </Alert>
             ) : null}
             <Field
-              label="RUT override (pruebas sandbox)"
+              label={
+                (config.firma_dep?.environment || '').toLowerCase() === 'production'
+                  ? 'RUT override (opcional)'
+                  : 'RUT override (pruebas sandbox)'
+              }
               htmlFor="firma-test-rut"
-              hint="Sandbox: 11.111.111-1 (atendida) o 22.222.222-2 (desatendida). Vacío = esos valores por defecto en lab."
+              hint={
+                (config.firma_dep?.environment || '').toLowerCase() === 'production'
+                  ? 'Producción: deje vacío para usar el RUT de su funcionario vinculado, o ingrese su RUT real con certificado Propósito General vigente en firma.digital.gob.cl. No use 11.111.111-1 ni 22.222.222-2.'
+                  : 'Sandbox/CERT: 11.111.111-1 (atendida) o 22.222.222-2 (desatendida). Vacío = valores por defecto del lab.'
+              }
             >
               <Input
                 id="firma-test-rut"
                 value={testRut}
                 onChange={(e) => setTestRut(e.target.value)}
                 placeholder={
-                  signatureMode === 'desatendida' ? '22.222.222-2' : '11.111.111-1'
+                  (config.firma_dep?.environment || '').toLowerCase() === 'production'
+                    ? 'Vacío = RUT del funcionario vinculado'
+                    : signatureMode === 'desatendida'
+                      ? '22.222.222-2'
+                      : '11.111.111-1'
                 }
               />
             </Field>
+            {(config.firma_dep?.environment || '').toLowerCase() === 'production'
+              && (/11\.?111\.?111-1/i.test(testRut) || /22\.?222\.?222-2/i.test(testRut)) ? (
+              <Alert variant="danger" title="RUT de sandbox en producción">
+                <code>11.111.111-1</code> y <code>22.222.222-2</code> solo funcionan en ambiente CERT/sandbox.
+                En producción use su RUT real y el OTP de su certificado Propósito General.
+              </Alert>
+            ) : null}
             {config.sello_resuelto ? (
               <p>
                 <strong>Sello orgánico:</strong> {config.sello_resuelto.nombre}
