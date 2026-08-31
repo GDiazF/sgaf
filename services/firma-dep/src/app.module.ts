@@ -22,6 +22,7 @@ import { SignaturesModule } from './signatures/signatures.module';
         API_SECURITY_ENABLED: Joi.boolean().truthy('true').falsy('false').default(true),
         API_CLIENT_KEYS: Joi.string().allow('').default('local-dev:dev-key'),
         API_ALLOW_LOCALHOST: Joi.boolean().truthy('true').falsy('false').default(true),
+        API_ALLOW_PRIVATE_NETWORKS: Joi.boolean().truthy('true').falsy('false').default(false),
         API_ALLOWED_IPS: Joi.string().allow('').default(''),
         HTTP_BODY_LIMIT: Joi.string().allow('').default('25mb'),
         FIRMA_GOB_ENABLED: Joi.boolean().truthy('true').falsy('false').default(true),

@@ -59,7 +59,11 @@ def format_rut_chile(rut: str) -> str:
 
 def _raise_from_dep(payload: Any, http_status: int | None) -> None:
     if isinstance(payload, dict):
-        msg = payload.get('error') or payload.get('message') or 'Error en firma-dep.'
+        raw_msg = payload.get('message') or payload.get('error')
+        if isinstance(raw_msg, list):
+            msg = ' '.join(str(m) for m in raw_msg)
+        else:
+            msg = str(raw_msg or 'Error en firma-dep.')
         detail = payload.get('detail') or payload.get('rawResponse')
         raise FirmaGobError(str(msg), status_code=http_status, payload=detail or payload)
     raise FirmaGobError(

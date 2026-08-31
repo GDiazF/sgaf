@@ -119,8 +119,37 @@ export class ApiKeyGuard implements CanActivate {
       return true;
     }
 
+    if (this.isPrivateNetworksAllowed() && this.isPrivateNetworkIp(requestIp)) {
+      return true;
+    }
+
     const allowedIps = this.parseAllowedIps();
     return allowedIps.has(requestIp);
+  }
+
+  private isPrivateNetworksAllowed(): boolean {
+    return this.configService.get<string>('API_ALLOW_PRIVATE_NETWORKS') === 'true';
+  }
+
+  private isPrivateNetworkIp(ip: string): boolean {
+    const normalized = ip.replace(/^::ffff:/, '');
+    if (normalized.includes(':')) {
+      return normalized === '::1' || normalized.startsWith('fe80:');
+    }
+    const parts = normalized.split('.').map((p) => Number(p));
+    if (parts.length !== 4 || parts.some((p) => Number.isNaN(p))) {
+      return false;
+    }
+    if (parts[0] === 10) {
+      return true;
+    }
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) {
+      return true;
+    }
+    if (parts[0] === 192 && parts[1] === 168) {
+      return true;
+    }
+    return false;
   }
 
   private isLocalhostAllowed(): boolean {

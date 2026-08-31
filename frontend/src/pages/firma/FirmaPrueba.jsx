@@ -413,8 +413,19 @@ export default function FirmaPrueba() {
       {config?.firma_dep_error ? (
         <Alert variant="warning" title="firma-dep">
           {config.firma_dep_error}
-          {' '}
-          Levante el servicio: <code>cd services/firma-dep && npm run start:dev</code>
+          {import.meta.env.DEV ? (
+            <>
+              {' '}
+              Levante el servicio: <code>cd services/firma-dep && npm run start:dev</code>
+            </>
+          ) : (
+            <>
+              {' '}
+              En producción verifique: <code>docker compose ps firma-dep</code>, que{' '}
+              <code>FIRMA_DEP_API_KEY</code> coincida con <code>API_CLIENT_KEYS</code> en{' '}
+              <code>~/sgaf/.env</code>, y reinicie con <code>docker compose up -d firma-dep backend</code>.
+            </>
+          )}
         </Alert>
       ) : null}
 

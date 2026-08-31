@@ -27,6 +27,7 @@ services:
       NODE_ENV: production
       PORT: 4010
       API_ALLOW_LOCALHOST: "false"
+      API_ALLOW_PRIVATE_NETWORKS: "true"
       SWAGGER_ENABLED: "false"
       API_SECURITY_ENABLED: "true"
     volumes:
