@@ -48,7 +48,7 @@ const AuditLog = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [ordering, setOrdering] = useState('-timestamp')
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
   const [totalCount, setTotalCount] = useState(0)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedLog, setSelectedLog] = useState(null)

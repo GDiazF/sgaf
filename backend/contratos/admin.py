@@ -1,21 +1,22 @@
 from django.contrib import admin
 from .models import (
     ProcesoCompra, EstadoContrato, CategoriaContrato, Contrato, OrientacionLicitacion,
-    TipoServicioOperativo, ServicioContrato, RutaTransporte, FeriadoNacional, PeriodoCobro
+    TipoServicioOperativo, ServicioContrato, RutaTransporte, FeriadoNacional, PeriodoCobro,
+    AmpliacionContrato,
 )
 
 @admin.register(TipoServicioOperativo)
 class TipoServicioOperativoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'icono')
+    list_display = ('nombre', 'icono', 'es_transporte')
 
 @admin.register(ServicioContrato)
 class ServicioContratoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'contrato', 'tipo_servicio')
-    list_filter = ('tipo_servicio', 'contrato')
+    list_display = ('nombre', 'contrato', 'tipo_servicio', 'modalidad_cobro')
+    list_filter = ('tipo_servicio', 'contrato', 'modalidad_cobro')
 
 @admin.register(RutaTransporte)
 class RutaTransporteAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'servicio', 'proveedor', 'valor_diario')
+    list_display = ('nombre', 'servicio', 'proveedor', 'valor_diario', 'valor_mensual')
     list_filter = ('servicio', 'proveedor')
 
 @admin.register(FeriadoNacional)
@@ -51,7 +52,7 @@ class OrientacionLicitacionAdmin(admin.ModelAdmin):
 class ContratoAdmin(admin.ModelAdmin):
     list_display = ('codigo_mercado_publico', 'categoria', 'orientacion', 'proceso', 'estado', 'fecha_inicio', 'fecha_termino', 'get_plazo')
     list_filter = ('estado', 'proceso', 'categoria', 'orientacion', 'fecha_inicio')
-    search_fields = ('codigo_mercado_publico', 'descripcion')
+    search_fields = ('codigo_mercado_publico', 'descripcion', 'detalle')
     readonly_fields = ('get_plazo',)
     
     def get_plazo(self, obj):
@@ -60,9 +61,23 @@ class ContratoAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Información General', {
-            'fields': ('codigo_mercado_publico', 'descripcion', 'categoria', 'orientacion', 'proceso', 'estado')
+            'fields': (
+                'codigo_mercado_publico', 'descripcion', 'detalle',
+                'categoria', 'orientacion', 'proceso', 'estado', 'aplica_iva', 'plantilla_cobro',
+            )
         }),
         ('Fechas', {
             'fields': ('fecha_adjudicacion', 'fecha_inicio', 'fecha_termino', 'get_plazo')
         }),
     )
+
+
+@admin.register(AmpliacionContrato)
+class AmpliacionContratoAdmin(admin.ModelAdmin):
+    list_display = (
+        'contrato', 'fecha_termino_anterior', 'fecha_inicio', 'fecha_termino',
+        'monto', 'porcentaje', 'nro_resolucion', 'usuario', 'created_at',
+    )
+    list_filter = ('created_at',)
+    search_fields = ('contrato__codigo_mercado_publico', 'nro_resolucion', 'motivo')
+    readonly_fields = ('fecha_termino_anterior', 'created_at', 'usuario')

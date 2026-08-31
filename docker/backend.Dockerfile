@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install gunicorn dj-database-url python-decouple
+RUN playwright install-deps chromium && playwright install chromium
 
 # Copy code
 COPY . .

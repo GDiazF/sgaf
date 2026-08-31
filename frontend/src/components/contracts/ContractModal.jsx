@@ -8,6 +8,7 @@ import {
   Input,
   Select,
   Icon,
+  Switch,
   useFormOverlay,
   formatApiFormError,
 } from '@slep/ui'
@@ -152,9 +153,22 @@ const ContractModal = ({
             <Input
               id="c-desc"
               required
-              placeholder="Ej: Adquisición de materiales…"
+              placeholder="Ej: KJC ADQ SERVICIO INTERNET Y TELEFONIA PARA 11 JARDINES…"
               value={formData.descripcion || ''}
               onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+            />
+          </Field>
+          <Field
+            label="Detalle"
+            htmlFor="c-detalle"
+            className="field--full"
+            hint="Texto corto opcional para documentos (recepción, actas). Si lo dejas vacío, no se usa en plantillas."
+          >
+            <Input
+              id="c-detalle"
+              placeholder="Ej: Servicio de internet jardín infantil"
+              value={formData.detalle || ''}
+              onChange={(e) => setFormData({ ...formData, detalle: e.target.value })}
             />
           </Field>
           <Field label="Código Mercado Público" required htmlFor="c-cod">
@@ -175,6 +189,35 @@ const ContractModal = ({
               onChange={(e) => setFormData({ ...formData, cdp: e.target.value })}
             />
           </Field>
+          <Field
+            label="Plantilla de cobro"
+            required={!editingId}
+            htmlFor="c-plantilla"
+            className="field--full"
+          >
+            <Select
+              id="c-plantilla"
+              required={!editingId}
+              value={formData.plantilla_cobro || ''}
+              onChange={(e) => setFormData({ ...formData, plantilla_cobro: e.target.value })}
+            >
+              <option value="">{editingId ? 'Sin definir (contratos anteriores)' : 'Seleccione…'}</option>
+              <option value="TRANSPORTE">Transporte · valor diario</option>
+              <option value="OTRO">Otro · monto mensual</option>
+            </Select>
+          </Field>
+          <div className="field field--full">
+            <Switch
+              id="c-aplica-iva"
+              checked={formData.aplica_iva !== false}
+              onChange={(e) => setFormData({ ...formData, aplica_iva: e.target.checked })}
+              label="Aplica IVA (19%)"
+            />
+            <p className="field__hint">
+              Si aplica, en la recepción de Mercado Público el monto total de gestión se desglosa
+              en neto + IVA 19%. Si está apagado, el total se registra sin IVA.
+            </p>
+          </div>
         </div>
 
         <p className="contracts-section-title">2. Clasificación y plazos</p>

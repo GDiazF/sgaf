@@ -51,7 +51,7 @@ const ArcoManagement = () => {
   const overlay = useFormOverlay()
   const savedOkRef = useRef(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
 
   const [isNarrow, setIsNarrow] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches,

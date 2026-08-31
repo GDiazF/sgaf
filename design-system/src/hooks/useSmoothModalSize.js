@@ -78,6 +78,8 @@ function measureNaturalHeight(shell) {
       if (child.classList.contains('modal__body')) continue
       if (child.classList.contains('modal__header')) continue
       if (child.classList.contains('modal__footer')) continue
+      // FormOverlay es position:absolute e inset:0 → su altura ≈ la del host.
+      // Si se suma, el modal “crece” en cada guardado.
       if (child.classList.contains('form-overlay')) continue
       const pos = getComputedStyle(child).position
       if (pos === 'absolute' || pos === 'fixed') continue
@@ -148,6 +150,12 @@ export function useSmoothModalSize(shellRef, { active = true } = {}) {
 
     const apply = () => {
       if (locked) return
+      // Mientras FormOverlay cubre el formulario, no re-medir: el overlay
+      // (y cambios de botón loading en el footer) disparan ResizeObserver
+      // y no deben alterar la altura del shell.
+      if (shell.querySelector('.form-overlay-host.is-busy')) {
+        return
+      }
       locked = true
 
       const from = shell.getBoundingClientRect().height

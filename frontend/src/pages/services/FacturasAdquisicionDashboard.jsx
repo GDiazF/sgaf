@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import api from '../../api'
 import useDebouncedValue from '../../hooks/useDebouncedValue'
 import { useNotify } from '../../hooks/useNotify'
+import { usePermission } from '../../hooks/usePermission'
 import AdquisicionModal from '../../components/services/AdquisicionModal'
 import {
   PageHeader,
@@ -43,7 +44,19 @@ const formatDate = (dateStr) => {
   return `${d}/${m}/${y}`
 }
 
+const TABS = [
+  { id: 'sin_oc', label: 'Facturas sin OC', api: 'facturas-adquisicion' },
+  { id: 'compra_agil', label: 'Compra ágil', api: 'compras-agiles' },
+]
+
 const FacturasAdquisicionDashboard = () => {
+  const { can } = usePermission()
+  const canView = can('servicios.view_facturaadquisicion')
+  const canAdd = can('servicios.add_facturaadquisicion')
+  const canChange = can('servicios.change_facturaadquisicion')
+  const canDelete = can('servicios.delete_facturaadquisicion')
+
+  const [activeTab, setActiveTab] = useState('sin_oc')
   const [facturas, setFacturas] = useState([])
   const [lookups, setLookups] = useState({
     establishments: [],
@@ -65,8 +78,10 @@ const FacturasAdquisicionDashboard = () => {
   const [totalCount, setTotalCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [ordering, setOrdering] = useState('-fecha_recepcion')
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
   const debouncedSearch = useDebouncedValue(searchQuery)
+  const isCompraAgil = activeTab === 'compra_agil'
+  const apiBase = isCompraAgil ? 'compras-agiles' : 'facturas-adquisicion'
 
   const fetchLookups = async () => {
     try {
@@ -101,10 +116,9 @@ const FacturasAdquisicionDashboard = () => {
         page,
         search,
         ordering: order,
-        sin_contrato: 'true',
         page_size: size,
       }
-      const factRes = await api.get('facturas-adquisicion/', { params })
+      const factRes = await api.get(`${apiBase}/`, { params })
       const data = factRes.data.results || (Array.isArray(factRes.data) ? factRes.data : [])
       setFacturas(data)
       setTotalCount(factRes.data.count ?? data.length)
@@ -112,7 +126,7 @@ const FacturasAdquisicionDashboard = () => {
     } catch (error) {
       console.error(error)
       setFacturas([])
-      notify({ variant: 'danger', text: 'No se pudieron cargar las facturas.' })
+      notify({ variant: 'danger', text: 'No se pudieron cargar las recepciones.' })
     } finally {
       setLoading(false)
     }
@@ -124,7 +138,14 @@ const FacturasAdquisicionDashboard = () => {
 
   useEffect(() => {
     fetchData(1, pageSize, debouncedSearch, ordering)
-  }, [debouncedSearch, ordering, pageSize])
+  }, [debouncedSearch, ordering, pageSize, activeTab])
+
+  const handleTabChange = (tabId) => {
+    if (tabId === activeTab) return
+    setActiveTab(tabId)
+    setSearchQuery('')
+    setCurrentPage(1)
+  }
 
   const clearFilters = () => {
     setSearchQuery('')
@@ -170,9 +191,9 @@ const FacturasAdquisicionDashboard = () => {
     }
     try {
       if (editingId) {
-        await api.put(`facturas-adquisicion/${editingId}/`, dataToSave)
+        await api.put(`${apiBase}/${editingId}/`, dataToSave)
       } else {
-        await api.post('facturas-adquisicion/', dataToSave)
+        await api.post(`${apiBase}/`, dataToSave)
       }
     } catch (error) {
       console.error(error)
@@ -192,13 +213,13 @@ const FacturasAdquisicionDashboard = () => {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await api.delete(`facturas-adquisicion/${deleteTarget.id}/`)
+      await api.delete(`${apiBase}/${deleteTarget.id}/`)
       setDeleteTarget(null)
-      notify({ variant: 'success', text: 'Factura eliminada.' })
+      notify({ variant: 'success', text: 'Recepción eliminada.' })
       await fetchData(currentPage, pageSize, debouncedSearch, ordering)
     } catch (error) {
       console.error(error)
-      notify({ variant: 'danger', text: 'Error al eliminar la factura.' })
+      notify({ variant: 'danger', text: 'Error al eliminar la recepción.' })
     } finally {
       setDeleting(false)
     }
@@ -206,10 +227,10 @@ const FacturasAdquisicionDashboard = () => {
 
   const handleDownloadPDF = async (item) => {
     try {
-      const response = await api.get(`facturas-adquisicion/${item.id}/generate_pdf/`, {
+      const response = await api.get(`${apiBase}/${item.id}/generate_pdf/`, {
         responseType: 'blob',
       })
-      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
       const rawFilename = item.nro_oc
         ? `RC ${item.nro_oc}.pdf`
         : `RC_Adquisicion_${item.folio || item.id}.pdf`
@@ -223,7 +244,19 @@ const FacturasAdquisicionDashboard = () => {
       window.URL.revokeObjectURL(url)
     } catch (error) {
       console.error(error)
-      notify({ variant: 'danger', text: 'Error al generar el PDF.' })
+      let message = 'Error al generar el PDF.'
+      const data = error?.response?.data
+      if (data instanceof Blob) {
+        try {
+          const payload = JSON.parse(await data.text())
+          message = payload.hint || payload.error || message
+        } catch {
+          // ignore
+        }
+      } else if (data?.hint || data?.error) {
+        message = data.hint || data.error
+      }
+      notify({ variant: 'danger', text: message })
     }
   }
 
@@ -292,6 +325,7 @@ const FacturasAdquisicionDashboard = () => {
           <div className="contracts-cat">
             <span>
               CDP: {item.cdp || '—'}
+              {item.nro_oc ? ` · OC: ${item.nro_oc}` : ''}
               {item.periodo ? ` · ${item.periodo}` : ''}
             </span>
             <span title={item.descripcion || ''}>{item.descripcion || '—'}</span>
@@ -318,44 +352,68 @@ const FacturasAdquisicionDashboard = () => {
         className: 'col--actions',
         render: (item) => (
           <div className="data-table__actions" onClick={(e) => e.stopPropagation()}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDownloadPDF(item)}
-              title="Generar recepción conforme"
-            >
-              <Icon name="download" size="sm" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
-              <Icon name="edit" size="sm" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(item)}>
-              <Icon name="trash" size="sm" />
-            </Button>
+            {canView ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDownloadPDF(item)}
+                title="Generar recepción conforme"
+              >
+                <Icon name="download" size="sm" />
+              </Button>
+            ) : null}
+            {canChange ? (
+              <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
+                <Icon name="edit" size="sm" />
+              </Button>
+            ) : null}
+            {canDelete ? (
+              <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(item)}>
+                <Icon name="trash" size="sm" />
+              </Button>
+            ) : null}
           </div>
         ),
       },
     ],
-    [],
+    [apiBase, canView, canChange, canDelete],
   )
 
   return (
-    <div className="page" data-od-id="facturas-sin-oc-page" data-fill-viewport>
+    <div className="page" data-od-id="recepciones-adq-page" data-fill-viewport>
       <PageHeader
         icon="receipt"
-        title="Facturas sin OC"
-        description={`Compras directas y adquisiciones (${totalCount})`}
-        breadcrumbs={[{ label: 'SSGG' }, { label: 'Facturas sin OC' }]}
+        title="Recepciones"
+        breadcrumbs={[{ label: 'SSGG' }, { label: 'Recepciones' }]}
         linkComponent={Link}
         split
         actions={
-          <Button variant="primary" size="sm" onClick={handleNew}>
-            <Icon name="plus" size="sm" /> Registrar factura
-          </Button>
+          canAdd ? (
+            <Button variant="primary" size="sm" onClick={handleNew}>
+              <Icon name="plus" size="sm" />
+              {isCompraAgil ? 'Registrar compra ágil' : 'Registrar factura'}
+            </Button>
+          ) : null
         }
       />
 
-      
+      <div className="tabs">
+        <ul className="tabs__list" role="tablist" aria-label="Tipos de recepción">
+          {TABS.map((tab) => (
+            <li key={tab.id}>
+              <button
+                type="button"
+                role="tab"
+                className={`tabs__btn${activeTab === tab.id ? ' is-active' : ''}`}
+                aria-selected={activeTab === tab.id}
+                onClick={() => handleTabChange(tab.id)}
+              >
+                {tab.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       <FiltersBar onSearch={() => setCurrentPage(1)} onClear={clearFilters}>
         <Field label="Buscar" htmlFor="adq-q">
@@ -377,12 +435,19 @@ const FacturasAdquisicionDashboard = () => {
         rows={facturas}
         loading={loading}
         totalCount={totalCount}
-        emptyTitle="Sin facturas"
-        emptyDescription="No hay facturas sin OC con la búsqueda actual."
+        emptyTitle={isCompraAgil ? 'Sin compras ágiles' : 'Sin facturas'}
+        emptyDescription={
+          isCompraAgil
+            ? 'No hay recepciones de compra ágil con la búsqueda actual.'
+            : 'No hay facturas sin OC con la búsqueda actual.'
+        }
         emptyAction={
-          <Button variant="primary" size="sm" onClick={handleNew}>
-            <Icon name="plus" size="sm" /> Registrar factura
-          </Button>
+          canAdd ? (
+            <Button variant="primary" size="sm" onClick={handleNew}>
+              <Icon name="plus" size="sm" />
+              {isCompraAgil ? 'Registrar compra ágil' : 'Registrar factura'}
+            </Button>
+          ) : null
         }
         fillViewport
         page={currentPage}
@@ -397,8 +462,17 @@ const FacturasAdquisicionDashboard = () => {
         sortKey={activeSortKey}
         onSort={handleSort}
         mobileCardActions={(item) => ({
-          primary: { label: 'Editar', onClick: () => handleEdit(item) },
-          secondary: { label: 'PDF', onClick: () => handleDownloadPDF(item) },
+          primary: canChange
+            ? { label: 'Editar', onClick: () => handleEdit(item) }
+            : canView
+              ? { label: 'PDF', onClick: () => handleDownloadPDF(item) }
+              : undefined,
+          secondary:
+            canView && canChange
+              ? { label: 'PDF', onClick: () => handleDownloadPDF(item) }
+              : canDelete
+                ? { label: 'Eliminar', onClick: () => setDeleteTarget(item) }
+                : undefined,
         })}
         toolbar={
           <div className="table-toolbar__left">
@@ -415,6 +489,7 @@ const FacturasAdquisicionDashboard = () => {
         editingId={editingId}
         initialData={formData}
         lookups={lookups}
+        variant={isCompraAgil ? 'compra_agil' : 'sin_oc'}
       />
 
       <ConfirmModal
@@ -423,10 +498,10 @@ const FacturasAdquisicionDashboard = () => {
           if (!deleting) setDeleteTarget(null)
         }}
         onConfirm={confirmDelete}
-        title="Eliminar factura"
+        title={isCompraAgil ? 'Eliminar compra ágil' : 'Eliminar factura'}
         description={
           deleteTarget
-            ? `¿Eliminar la factura ${deleteTarget.folio || `#${deleteTarget.id}`}?`
+            ? `¿Eliminar ${deleteTarget.folio || `#${deleteTarget.id}`}?`
             : ''
         }
         confirmLabel={deleting ? 'Eliminando…' : 'Eliminar'}

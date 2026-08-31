@@ -1,10 +1,92 @@
 from django.template import Template, Context
 from django.core.mail import get_connection, EmailMessage
+from email.mime.image import MIMEImage
 from .models import CuentaSMTP, DestinatariosCorreoOperativo, PlantillaCorreo
 import logging
+import mimetypes
+import os
 import re
 
 logger = logging.getLogger(__name__)
+
+# Cuerpo por defecto del envío de certificado al establecimiento / director.
+CUERPO_DOC_SERVICIOS_ENVIO_ESTABLECIMIENTO = (
+    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.55;">'
+    '<p>Estimado/a director/a,</p>'
+    '<p>Junto con saludar cordialmente, envío adjunto el certificado correspondiente al servicio '
+    'de <b>{{ tipo_nombre }}</b> realizado en su establecimiento'
+    '{% if fecha_servicio %} el {{ fecha_servicio }}{% endif %}.</p>'
+    '<p>Quedamos atentos ante cualquier consulta adicional.</p>'
+    '<p>Atentamente,</p>'
+    '<p>Departamento de SSGG, Operaciones y Soporte TI<br/>SLEP Iquique</p>'
+    '{% if logo_cid %}'
+    '<p style="margin-top:24px;">'
+    '<img src="cid:{{ logo_cid }}" alt="SLEP Iquique" '
+    'style="max-width:160px;height:auto;border:0;" />'
+    '</p>'
+    '{% endif %}'
+    '</div>'
+)
+
+# Logo empaquetado con el código (funciona en local y Docker sin depender de media/).
+_LOGO_SLEP_EMPAQUETADO = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'assets',
+    'logo_slep.png',
+)
+
+
+def _archivo_existe(path):
+    return bool(path) and os.path.isfile(path)
+
+
+def resolver_logo_slep():
+    """
+    Ruta absoluta al logo SLEP para embeber en correos.
+
+    Orden:
+    1. DocumentAsset «Logo SLEP» (media subido / volumen Docker)
+    2. logo_derecho de alguna ReportConfiguration
+    3. Rutas habituales bajo MEDIA_ROOT
+    4. Asset empaquetado en comunicaciones/assets/ (siempre en la imagen)
+    """
+    from django.conf import settings
+
+    try:
+        from core.models import DocumentAsset, ReportConfiguration
+
+        asset = (
+            DocumentAsset.objects.filter(nombre__icontains='Logo SLEP')
+            .exclude(archivo='')
+            .first()
+        )
+        if asset and asset.archivo:
+            path = asset.archivo.path
+            if _archivo_existe(path):
+                return path
+
+        for cfg in ReportConfiguration.objects.select_related('logo_derecho').all():
+            if cfg.logo_derecho_id and cfg.logo_derecho and cfg.logo_derecho.archivo:
+                path = cfg.logo_derecho.archivo.path
+                if _archivo_existe(path):
+                    return path
+    except Exception as exc:
+        logger.warning(f'No se pudo resolver logo desde DocumentAsset: {exc}')
+
+    media_root = getattr(settings, 'MEDIA_ROOT', '') or ''
+    for cand in (
+        os.path.join(media_root, 'report_assets', 'Logo_SLEP.png'),
+        os.path.join(media_root, 'pdf_assets', 'Logo SLEP.png'),
+        os.path.join(media_root, 'establecimientos', 'logos', 'Logo_SLEP_fondo_transparente.png'),
+    ):
+        if _archivo_existe(cand):
+            return cand
+
+    if _archivo_existe(_LOGO_SLEP_EMPAQUETADO):
+        return _LOGO_SLEP_EMPAQUETADO
+
+    logger.warning('Logo SLEP no encontrado (ni media ni asset empaquetado).')
+    return None
 
 
 def obtener_destinatarios_correo_operativo(proposito):
@@ -54,19 +136,70 @@ def obtener_destinatarios_correo_operativo(proposito):
 
     return list(deduplicados.values())
 
-def enviar_correo_maestro(proposito, destinatarios, contexto, archivo_adjunto=None):
+def _adjuntar_imagenes_inline(msg, imagenes_inline):
+    """
+    Adjunta imágenes embebidas (CID).
+    `imagenes_inline`: lista de dicts
+      {'cid': 'logo_slep', 'path': '...'}  o  {'cid': '...', 'contenido': b'...', 'mimetype': 'image/png', 'nombre': 'x.png'}
+    """
+    if not imagenes_inline:
+        return
+    for item in imagenes_inline:
+        cid = (item.get('cid') or '').strip()
+        if not cid:
+            continue
+        contenido = item.get('contenido')
+        nombre = item.get('nombre') or f'{cid}.png'
+        mimetype = item.get('mimetype')
+        path = item.get('path')
+        if contenido is None and path:
+            if not os.path.isfile(path):
+                logger.warning(f'Imagen inline no encontrada: {path}')
+                continue
+            with open(path, 'rb') as fh:
+                contenido = fh.read()
+            nombre = nombre or os.path.basename(path)
+            if not mimetype:
+                mimetype = mimetypes.guess_type(path)[0]
+        if not contenido:
+            continue
+        subtype = None
+        if mimetype and '/' in mimetype:
+            subtype = mimetype.split('/', 1)[1]
+        img = MIMEImage(contenido, _subtype=subtype or 'png')
+        img.add_header('Content-ID', f'<{cid}>')
+        img.add_header('Content-Disposition', 'inline', filename=nombre)
+        msg.attach(img)
+
+
+def enviar_correo_maestro(
+    proposito,
+    destinatarios,
+    contexto,
+    archivo_adjunto=None,
+    cuenta_smtp=None,
+    plantilla=None,
+    imagenes_inline=None,
+):
     """
     Función centralizada para enviar correos usando el nuevo sistema de comunicaciones.
+    `plantilla` / `cuenta_smtp` opcionales permiten override desde TipoNotificacion.
+    `imagenes_inline`: lista de dicts con cid + path/contenido para <img src="cid:...">.
     """
     try:
         # 1. Buscar la plantilla
-        plantilla = PlantillaCorreo.objects.filter(proposito=proposito).first()
+        if plantilla is None:
+            plantilla = PlantillaCorreo.objects.filter(proposito=proposito).first()
         if not plantilla:
             logger.warning(f"No se encontró plantilla para el propósito: {proposito}")
             return False
 
-        # 2. Buscar la cuenta SMTP (la de la plantilla o la default)
-        cuenta = plantilla.cuenta_smtp or CuentaSMTP.objects.filter(es_default=True).first()
+        # 2. Buscar la cuenta SMTP (override, la de la plantilla o la default)
+        cuenta = (
+            cuenta_smtp
+            or plantilla.cuenta_smtp
+            or CuentaSMTP.objects.filter(es_default=True).first()
+        )
         if not cuenta:
             logger.error("No hay ninguna cuenta SMTP configurada.")
             return False
@@ -98,7 +231,9 @@ def enviar_correo_maestro(proposito, destinatarios, contexto, archivo_adjunto=No
             connection=connection,
         )
         msg.content_subtype = "html"
-        
+
+        _adjuntar_imagenes_inline(msg, imagenes_inline)
+
         if archivo_adjunto:
             # archivo_adjunto: {'nombre': 'factura.pdf', 'contenido': b'...', 'mimetype': 'application/pdf'}
             msg.attach(archivo_adjunto['nombre'], archivo_adjunto['contenido'], archivo_adjunto['mimetype'])
@@ -109,6 +244,48 @@ def enviar_correo_maestro(proposito, destinatarios, contexto, archivo_adjunto=No
     except Exception as e:
         logger.error(f"Error en enviar_correo_maestro: {str(e)}")
         return False
+
+
+def enviar_correo_simple(
+    destinatarios,
+    contexto,
+    *,
+    cuenta_smtp=None,
+    asunto_tpl='{{ titulo }}',
+    cuerpo_tpl='<h2>{{ titulo }}</h2><p>{{ mensaje }}</p>',
+):
+    """Envío con plantilla inline (sin fila PlantillaCorreo)."""
+    try:
+        cuenta = cuenta_smtp or CuentaSMTP.objects.filter(es_default=True).first()
+        if not cuenta:
+            logger.error('No hay ninguna cuenta SMTP configurada.')
+            return False
+        ctx = Context(contexto)
+        asunto = Template(asunto_tpl).render(ctx)
+        cuerpo = Template(cuerpo_tpl).render(ctx)
+        connection = get_connection(
+            host=cuenta.smtp_host,
+            port=cuenta.smtp_port,
+            username=cuenta.smtp_user,
+            password=cuenta.smtp_password,
+            use_tls=cuenta.smtp_use_tls,
+            use_ssl=cuenta.smtp_use_ssl,
+        )
+        from_email = f'{cuenta.remitente_nombre} <{cuenta.remitente_email}>'
+        msg = EmailMessage(
+            subject=asunto,
+            body=cuerpo,
+            from_email=from_email,
+            to=destinatarios,
+            connection=connection,
+        )
+        msg.content_subtype = 'html'
+        msg.send()
+        return True
+    except Exception as e:
+        logger.error('Error en enviar_correo_simple: %s', e)
+        return False
+
 
 def migrar_configuracion_antigua():
     """
@@ -171,7 +348,35 @@ def migrar_configuracion_antigua():
             'nombre': 'Recordatorio de Reserva',
             'asunto': '⏰ Recordatorio: Tienes una reserva mañana',
             'cuerpo_html': '<h2>No lo olvides</h2><p>Hola {{ nombre }}, mañana tienes reservado <b>{{ recurso }}</b> a las {{ hora }}.</p>'
-        }
+        },
+        {
+            'proposito': 'DOC_SERVICIOS_NUEVO',
+            'nombre': 'Documentación de servicios — nuevo registro',
+            'asunto': '{{ titulo }}',
+            'cuerpo_html': (
+                '<h2>{{ titulo }}</h2>'
+                '<p>{{ mensaje }}</p>'
+                '{% if link %}<p><a href="{{ link }}">Ver en SGAF</a></p>{% endif %}'
+                '<p style="color:#666;font-size:12px;">Módulo {{ modulo }} · {{ evento }}</p>'
+            ),
+        },
+        {
+            'proposito': 'DOC_SERVICIOS_AVISO',
+            'nombre': 'Documentación de servicios — aviso por fecha',
+            'asunto': '{{ titulo }}',
+            'cuerpo_html': (
+                '<h2>{{ titulo }}</h2>'
+                '<p>{{ mensaje }}</p>'
+                '{% if link %}<p><a href="{{ link }}">Ver en SGAF</a></p>{% endif %}'
+                '<p style="color:#666;font-size:12px;">Recordatorio automático · {{ modulo }}</p>'
+            ),
+        },
+        {
+            'proposito': 'DOC_SERVICIOS_ENVIO_ESTABLECIMIENTO',
+            'nombre': 'Documentación de servicios — envío al establecimiento',
+            'asunto': 'Certificado {{ tipo_nombre }} — {{ establecimiento }}',
+            'cuerpo_html': CUERPO_DOC_SERVICIOS_ENVIO_ESTABLECIMIENTO,
+        },
     ]
 
     for t in templates_base:

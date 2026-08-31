@@ -31,7 +31,7 @@ const TicketsDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
   const [totalResults, setTotalResults] = useState(0)
   const [createOpen, setCreateOpen] = useState(false)
   const [categoriesOpen, setCategoriesOpen] = useState(false)

@@ -39,12 +39,30 @@ export function Modal({
 }) {
   const { mounted, visible } = useOverlayPresence(open, { durationMs: OVERLAY_EXIT_MS })
   const shellRef = useRef(null)
+  const backdropPointerDownRef = useRef(false)
   useSmoothModalSize(shellRef, { active: mounted && visible && smoothSize })
 
   const overlayBusy = overlayStatus === 'loading'
   const requestClose = () => {
     if (overlayBusy) return
     onClose?.()
+  }
+
+  const onBackdropPointerDown = (e) => {
+    backdropPointerDownRef.current = e.target === e.currentTarget
+  }
+
+  const onBackdropClick = (e) => {
+    // Solo cerrar si el gesto empezó y terminó en el backdrop
+    // (evita cerrar al seleccionar texto y soltar fuera del modal).
+    if (
+      visible &&
+      backdropPointerDownRef.current &&
+      e.target === e.currentTarget
+    ) {
+      requestClose()
+    }
+    backdropPointerDownRef.current = false
   }
 
   useEffect(() => {
@@ -112,9 +130,8 @@ export function Modal({
       aria-modal="true"
       aria-hidden={!visible}
       aria-labelledby={hideHeader ? undefined : labelledBy}
-      onClick={() => {
-        if (visible) requestClose()
-      }}
+      onPointerDown={onBackdropPointerDown}
+      onClick={onBackdropClick}
     >
       <div
         ref={shellRef}
@@ -122,6 +139,7 @@ export function Modal({
           'modal',
           confirm && 'modal--confirm',
           size === 'lg' && 'modal--lg',
+          size === 'xl' && 'modal--xl',
           size === 'sm' && 'modal--sm',
           overlayBusy && 'is-loading',
           className,
@@ -154,27 +172,46 @@ export function ConfirmModal({
   cancelLabel = 'Cancelar',
   danger = true,
   variant = 'dialog', // dialog | confirm
+  /** Si false, el padre cierra el modal (p. ej. tras una petición async). */
+  closeOnConfirm = true,
+  /** Estado de carga del botón confirmar (petición en curso). */
+  confirmLoading = false,
 }) {
+  const handleConfirm = async () => {
+    if (confirmLoading) return
+    try {
+      await Promise.resolve(onConfirm?.())
+      if (closeOnConfirm) onClose?.()
+    } catch {
+      // El padre muestra el error; no cerramos si closeOnConfirm es false.
+      if (closeOnConfirm) onClose?.()
+    }
+  }
+
   if (variant === 'confirm') {
     return (
       <Modal
         open={open}
-        onClose={onClose}
+        onClose={confirmLoading ? undefined : onClose}
         confirm
         title={title}
         showClose={false}
         footer={
           <>
-            <Button type="button" variant="ghost" onClick={onClose}>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={confirmLoading}
+              onClick={onClose}
+            >
               {cancelLabel}
             </Button>
             <Button
               type="button"
               variant={danger ? 'danger' : 'primary'}
-              onClick={() => {
-                onConfirm?.()
-                onClose?.()
-              }}
+              loading={confirmLoading}
+              disabled={confirmLoading}
+              onClick={handleConfirm}
             >
               {confirmLabel}
             </Button>
@@ -190,20 +227,24 @@ export function ConfirmModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={confirmLoading ? undefined : onClose}
       title={title}
       footer={
         <>
-          <Button type="button" variant="ghost" onClick={onClose}>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={confirmLoading}
+            onClick={onClose}
+          >
             {cancelLabel}
           </Button>
           <Button
             type="button"
             variant={danger ? 'danger' : 'primary'}
-            onClick={() => {
-              onConfirm?.()
-              onClose?.()
-            }}
+            loading={confirmLoading}
+            disabled={confirmLoading}
+            onClick={handleConfirm}
           >
             {confirmLabel}
           </Button>
@@ -232,10 +273,26 @@ export function Drawer({
   onOverlayDismiss,
 }) {
   const { mounted, visible } = useOverlayPresence(open, { durationMs: OVERLAY_EXIT_MS })
+  const backdropPointerDownRef = useRef(false)
   const overlayBusy = overlayStatus === 'loading'
   const requestClose = () => {
     if (overlayBusy) return
     onClose?.()
+  }
+
+  const onBackdropPointerDown = (e) => {
+    backdropPointerDownRef.current = e.target === e.currentTarget
+  }
+
+  const onBackdropClick = (e) => {
+    if (
+      visible &&
+      backdropPointerDownRef.current &&
+      e.target === e.currentTarget
+    ) {
+      requestClose()
+    }
+    backdropPointerDownRef.current = false
   }
 
   useEffect(() => {
@@ -280,9 +337,8 @@ export function Drawer({
     <div
       className={cn('drawer-backdrop', visible && 'is-open')}
       aria-hidden={!visible}
-      onClick={() => {
-        if (visible) requestClose()
-      }}
+      onPointerDown={onBackdropPointerDown}
+      onClick={onBackdropClick}
     >
       <aside
         className={cn(

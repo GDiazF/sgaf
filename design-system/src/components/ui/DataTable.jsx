@@ -143,6 +143,10 @@ function plainText(node) {
  * Columnas: cardRole = 'title' | 'subtitle' | 'status' | 'field'
  * mobileCardActions(row) → { primary?: { label, onClick }, secondary?: { label, onClick } }
  *
+ * Selección (opcional):
+ *   selectable + selectedKeys + onSelectionChange(keys)
+ *   → columna .col--select (cabecera = todos de la página) y checkbox por fila.
+ *
  * fillViewport (default true): el listado usa el alto restante del shell y scrollea
  * el cuerpo (toolbar/footer fijos). Pasar false solo en demos / embeds no-CRUD.
  */
@@ -156,7 +160,7 @@ export function DataTable({
   toolbar,
   totalCount,
   page = 1,
-  pageSize = 10,
+  pageSize = 50,
   onPageChange,
   onPageSizeChange,
   pageSizeOptions = [10, 25, 50, 100],
@@ -174,6 +178,9 @@ export function DataTable({
   skeletonRows = 6,
   mobileCardActions,
   recordListLabel = 'Listado en tarjetas',
+  selectable = false,
+  selectedKeys = [],
+  onSelectionChange,
 }) {
   const [expanded, setExpanded] = useState(() => ({}))
 
@@ -193,7 +200,38 @@ export function DataTable({
     [dataColumns],
   )
   const showExpand = responsive && tabletHideColumns.length > 0
-  const colSpan = columns.length + (showExpand ? 1 : 0)
+  const colSpan = columns.length + (showExpand ? 1 : 0) + (selectable ? 1 : 0)
+
+  const pageKeys = useMemo(
+    () => rows.map((row, i) => getRowKey(row, i)),
+    [rows, getRowKey],
+  )
+  const selectedSet = useMemo(() => new Set(selectedKeys.map(String)), [selectedKeys])
+  const allPageSelected =
+    pageKeys.length > 0 && pageKeys.every((k) => selectedSet.has(String(k)))
+  const somePageSelected = pageKeys.some((k) => selectedSet.has(String(k)))
+
+  const toggleAllPage = () => {
+    if (!onSelectionChange) return
+    if (allPageSelected) {
+      const drop = new Set(pageKeys.map(String))
+      onSelectionChange(selectedKeys.filter((k) => !drop.has(String(k))))
+    } else {
+      const next = new Set(selectedKeys.map(String))
+      pageKeys.forEach((k) => next.add(String(k)))
+      onSelectionChange([...next])
+    }
+  }
+
+  const toggleOne = (key) => {
+    if (!onSelectionChange) return
+    const s = String(key)
+    if (selectedSet.has(s)) {
+      onSelectionChange(selectedKeys.filter((k) => String(k) !== s))
+    } else {
+      onSelectionChange([...selectedKeys.map(String), s])
+    }
+  }
 
   const titleCol =
     dataColumns.find((c) => c.cardRole === 'title') ||
@@ -246,6 +284,7 @@ export function DataTable({
                 'data-table',
                 compact && 'data-table--compact',
                 responsive && 'data-table--responsive',
+                selectable && 'data-table--selectable',
               )}
               data-sortable
             >
@@ -253,6 +292,20 @@ export function DataTable({
                 <tr>
                   {showExpand ? (
                     <th className="data-table__expand-col" aria-label="Expandir fila" />
+                  ) : null}
+                  {selectable ? (
+                    <th className="col--select">
+                      <input
+                        type="checkbox"
+                        className="no-global"
+                        aria-label="Seleccionar todos"
+                        checked={allPageSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = somePageSelected && !allPageSelected
+                        }}
+                        onChange={toggleAllPage}
+                      />
+                    </th>
                   ) : null}
                   {columns.map((col) => (
                     <th
@@ -276,11 +329,13 @@ export function DataTable({
                 {rows.map((row, i) => {
                   const rowKey = getRowKey(row, i)
                   const isOpen = !!expanded[rowKey]
+                  const isSelected = selectedSet.has(String(rowKey))
                   return (
                     <Fragment key={rowKey}>
                       <tr
                         className={cn(
                           isOpen && 'is-expanded',
+                          isSelected && 'is-selected',
                           onRowClick && 'is-clickable',
                         )}
                         onClick={
@@ -305,6 +360,17 @@ export function DataTable({
                             >
                               <Icon name="chevron" className="icon" size={16} />
                             </button>
+                          </td>
+                        ) : null}
+                        {selectable ? (
+                          <td className="data-table__select-cell">
+                            <input
+                              type="checkbox"
+                              className="no-global"
+                              aria-label="Seleccionar fila"
+                              checked={isSelected}
+                              onChange={() => toggleOne(rowKey)}
+                            />
                           </td>
                         ) : null}
                         {columns.map((col) => (
@@ -353,9 +419,21 @@ export function DataTable({
               {rows.map((row, i) => {
                 const rowKey = getRowKey(row, i)
                 const actions = mobileCardActions?.(row, i)
+                const isSelected = selectedSet.has(String(rowKey))
                 return (
-                  <article key={rowKey} className="record-card">
+                  <article key={rowKey} className={cn('record-card', isSelected && 'is-selected')}>
                     <div className="record-card__header">
+                      {selectable ? (
+                        <label className="record-card__select">
+                          <input
+                            type="checkbox"
+                            className="no-global"
+                            aria-label="Seleccionar"
+                            checked={isSelected}
+                            onChange={() => toggleOne(rowKey)}
+                          />
+                        </label>
+                      ) : null}
                       <div className="record-card__primary">
                         {titleCol ? (
                           <h3 className="record-card__title">

@@ -1,109 +1,188 @@
-import React, { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import React, { useState, useEffect, useRef } from 'react'
 import api from '../../api'
-import { DataTable, Badge, Button, EmptyState, Alert, Icon } from '@slep/ui'
+import { usePermission } from '../../hooks/usePermission'
+import { useNotify } from '../../hooks/useNotify'
+import { Button, EmptyState, formatApiFormError } from '@slep/ui'
+import ServicioDetailPage from './ServicioDetailPage'
 
-const ContratoServiciosTab = ({ contractId }) => {
-  const navigate = useNavigate()
-  const [servicios, setServicios] = useState([])
+const tipoEsTransporte = (tipo) =>
+  Boolean(tipo?.es_transporte) || (tipo?.nombre || '').toLowerCase().includes('transporte')
+
+const ContratoServiciosTab = ({ contract }) => {
+  const { can } = usePermission()
+  const { notify } = useNotify()
+  const [gestion, setGestion] = useState(null)
+  const [tipos, setTipos] = useState([])
   const [loading, setLoading] = useState(true)
+  const [initId, setInitId] = useState(null)
+  const autoStarted = useRef(false)
+
+  const contractId = contract?.id
 
   useEffect(() => {
-    const fetchServicios = async () => {
+    if (!contractId) return
+    let cancelled = false
+    const load = async () => {
       try {
-        const servRes = await api.get(`contratos/servicios/?contrato=${contractId}`)
-        setServicios(servRes.data.results || servRes.data)
+        const [servRes, tiposRes] = await Promise.all([
+          api.get(`contratos/servicios/?contrato=${contractId}`),
+          api.get('contratos/tipos-servicios/'),
+        ])
+        if (cancelled) return
+        const list = servRes.data.results || servRes.data || []
+        setGestion(list[0] || null)
+        setTipos(tiposRes.data.results || tiposRes.data || [])
       } catch (error) {
         console.error(error)
+        notify({ variant: 'danger', text: 'No se pudo cargar la gestión operativa.' })
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-    fetchServicios()
+    load()
+    return () => {
+      cancelled = true
+    }
   }, [contractId])
 
-  const columns = [
-    {
-      key: 'nombre',
-      header: 'Operativo',
-      className: 'col--primary',
-      cardRole: 'title',
-      priority: 1,
-    },
-    {
-      key: 'tipo',
-      header: 'Tipo',
-      className: 'col--status',
-      cardRole: 'status',
-      priority: 1,
-      render: (item) => (
-        <Badge variant="accent">{item.tipo_servicio_nombre || '—'}</Badge>
-      ),
-    },
-    {
-      key: 'actions',
-      header: 'Acciones',
-      className: 'col--actions',
-      render: (item) => (
-        <div className="data-table__actions">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/contracts/servicios/${item.id}`)}
-          >
-            Abrir centro
-          </Button>
-        </div>
-      ),
-    },
-  ]
+  const tipoTransporte = tipos.find((t) => tipoEsTransporte(t))
+  const tipoOtro = tipos.find((t) => !tipoEsTransporte(t))
 
-  if (loading) {
-    return <EmptyState title="Cargando…" description="Buscando gestión operativa." />
+  const initGestion = async (tipo, plantilla) => {
+    if (!tipo || !contractId) return
+    setInitId(tipo.id)
+    try {
+      if (plantilla && plantilla !== contract.plantilla_cobro) {
+        await api.patch(`contratos/contratos/${contractId}/`, {
+          plantilla_cobro: plantilla,
+        })
+      } else if (contract.plantilla_cobro) {
+        await api.patch(`contratos/contratos/${contractId}/`, {
+          plantilla_cobro: contract.plantilla_cobro,
+        })
+      }
+      const servRes = await api.get(`contratos/servicios/?contrato=${contractId}`)
+      const list = servRes.data.results || servRes.data || []
+      if (list[0]) {
+        setGestion(list[0])
+        return
+      }
+      const res = await api.post('contratos/servicios/', {
+        contrato: contractId,
+        nombre: contract.codigo_mercado_publico || contract.descripcion || 'Gestión operativa',
+        tipo_servicio: tipo.id,
+        modalidad_cobro: tipoEsTransporte(tipo) ? 'DIARIO' : 'MENSUAL_POR_EST',
+      })
+      setGestion(res.data)
+    } catch (err) {
+      notify({
+        variant: 'danger',
+        text: formatApiFormError(err, 'No se pudo abrir la gestión.'),
+      })
+    } finally {
+      setInitId(null)
+    }
   }
 
-  if (!servicios.length) {
+  useEffect(() => {
+    if (loading || gestion || autoStarted.current || !contract?.plantilla_cobro) return
+    const tipo =
+      contract.plantilla_cobro === 'TRANSPORTE' ? tipoTransporte : tipoOtro
+    if (!tipo) return
+    autoStarted.current = true
+    initGestion(tipo, contract.plantilla_cobro)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, gestion, contract?.plantilla_cobro, tipoTransporte, tipoOtro])
+
+  if (gestion?.id) {
+    return (
+      <ServicioDetailPage servicioId={gestion.id} embedded contract={contract} />
+    )
+  }
+
+  if (loading || initId) {
+    return <EmptyState title="Cargando…" description="Abriendo la gestión del contrato." />
+  }
+
+  if (!can('contratos.add_rutatransporte')) {
     return (
       <EmptyState
-        title="Sin contratos operativos"
-        description="Este contrato aún no tiene gestión operativa vinculada."
-        action={
-          <Link to="/contracts/servicios" className="btn btn--primary btn--sm">
-            <Icon name="plus" size="sm" /> Ir a Gestión de rutas
-          </Link>
-        }
+        title="Sin plantilla de cobro"
+        description="Este contrato anterior no tiene definida la forma de calcular el gasto. Un editor puede indicarla al editar el contrato."
       />
     )
   }
 
   return (
-    <div className="contracts-tab">
-      <Alert variant="info" title="Nota">
-        El apartado operativo gestiona asistencia, periodos y multas. Para crear una
-        nueva gestión usá el módulo Gestión de rutas del menú.
-      </Alert>
-      <DataTable
-        columns={columns}
-        rows={servicios}
-        totalCount={servicios.length}
-        emptyTitle="Sin operativos"
-        fillViewport={false}
-        showFooter={false}
-        pageSizeId="serv-link-page"
-        toolbar={
-          <div className="table-toolbar__left">
-            <span className="table-toolbar__title">Gestión operativa</span>
-            <Badge variant="neutral">{servicios.length}</Badge>
-          </div>
-        }
-        mobileCardActions={(item) => ({
-          primary: {
-            label: 'Abrir',
-            onClick: () => navigate(`/contracts/servicios/${item.id}`),
-          },
-        })}
-      />
-    </div>
+    <EmptyState
+      title="Cómo se cobra este contrato"
+      description="Contrato creado antes de esta plantilla. Elija una vez Transporte u Otro; queda guardado en el contrato."
+      action={
+        <>
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={!!initId || !tipoTransporte}
+            loading={initId === tipoTransporte?.id}
+            onClick={() => initGestion(tipoTransporte, 'TRANSPORTE')}
+          >
+            Transporte · valor diario
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!!initId || !tipoOtro}
+            loading={initId === tipoOtro?.id}
+            onClick={() => initGestion(tipoOtro, 'OTRO')}
+          >
+            Otro · monto mensual
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!!initId || !tipoOtro}
+            loading={initId === `${tipoOtro?.id}-mixto`}
+            onClick={async () => {
+              if (!tipoOtro || !contractId) return
+              setInitId(`${tipoOtro.id}-mixto`)
+              try {
+                await api.patch(`contratos/contratos/${contractId}/`, {
+                  plantilla_cobro: 'OTRO',
+                })
+                const servRes = await api.get(`contratos/servicios/?contrato=${contractId}`)
+                const list = servRes.data.results || servRes.data || []
+                if (list[0]) {
+                  const patched = await api.patch(`contratos/servicios/${list[0].id}/`, {
+                    modalidad_cobro: 'MENSUAL_FIJO_VARIABLE',
+                  })
+                  setGestion(patched.data)
+                  return
+                }
+                const res = await api.post('contratos/servicios/', {
+                  contrato: contractId,
+                  nombre:
+                    contract.codigo_mercado_publico ||
+                    contract.descripcion ||
+                    'Gestión operativa',
+                  tipo_servicio: tipoOtro.id,
+                  modalidad_cobro: 'MENSUAL_FIJO_VARIABLE',
+                })
+                setGestion(res.data)
+              } catch (err) {
+                notify({
+                  variant: 'danger',
+                  text: formatApiFormError(err, 'No se pudo abrir la gestión.'),
+                })
+              } finally {
+                setInitId(null)
+              }
+            }}
+          >
+            Otro · fijo y/o variable
+          </Button>
+        </>
+      }
+    />
   )
 }
 

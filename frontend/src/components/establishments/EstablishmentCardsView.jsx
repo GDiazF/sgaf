@@ -273,6 +273,12 @@ const EstablishmentCardsView = ({ isOpen, onClose, data, establishmentTypes = []
                         {item.email || 'Sin correo'}
                       </div>
                       <div className="directory-card__row">
+                        <Icon name="message" size={12} />
+                        {item.email_director
+                          ? `Dir.: ${item.email_director}`
+                          : 'Sin correo director'}
+                      </div>
+                      <div className="directory-card__row">
                         <Icon name="telefonos" size={12} />
                         {principalPhone?.numero || 'Sin teléfono'}
                       </div>

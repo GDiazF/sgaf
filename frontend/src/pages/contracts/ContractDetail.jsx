@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import api from '../../api'
 import ContractModal from '../../components/contracts/ContractModal'
 import ContractReceptionModal from '../../components/contracts/ContractReceptionModal'
+import AmpliacionModal from '../../components/contracts/AmpliacionModal'
+import ContratoAmpliacionesTab, {
+  ampliacionLabel,
+} from '../../components/contracts/ContratoAmpliacionesTab'
 import ContratoServiciosTab from './ContratoServiciosTab'
 import DocumentViewerModal from '../../components/common/DocumentViewerModal'
 import { usePermission } from '../../hooks/usePermission'
@@ -18,20 +22,20 @@ import {
   Button,
   Field,
   Input,
+  Select,
   FileInput,
   Modal,
   ConfirmModal,
-  DetailItem,
   EmptyState,
   Icon,
   useFormOverlay,
   formatApiFormError,
 } from '@slep/ui'
 
-const TABS = [
+const TABS_BASE = [
   { id: 'info', label: 'General' },
   { id: 'providers', label: 'Proveedores' },
-  { id: 'servicios', label: 'Gestión' },
+  { id: 'servicios', label: 'Gestión de contrato' },
   { id: 'receptions', label: 'Recepciones' },
   { id: 'docs', label: 'Archivos' },
   { id: 'history', label: 'Historial' },
@@ -44,9 +48,54 @@ const formatCurrency = (amount) =>
     maximumFractionDigits: 0,
   }).format(amount || 0)
 
+const MONTH_NAMES = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+]
+
 const formatDate = (value) => {
   if (!value) return '—'
   return new Date(value).toLocaleDateString('es-CL')
+}
+
+const calcSegmentProgress = (fechaInicio, fechaTermino) => {
+  if (!fechaInicio || !fechaTermino) return { percentage: 0, monthsLeft: 0 }
+  const start = fechaInicio instanceof Date ? fechaInicio : new Date(fechaInicio)
+  const end = fechaTermino instanceof Date ? fechaTermino : new Date(fechaTermino)
+  const now = new Date()
+  const totalDuration = end.getTime() - start.getTime()
+  if (Number.isNaN(totalDuration) || totalDuration <= 0) {
+    return { percentage: 100, monthsLeft: 0 }
+  }
+  const elapsed = now.getTime() - start.getTime()
+  const percentage = Math.max(
+    0,
+    Math.min(Math.round((elapsed / totalDuration) * 100), 100),
+  )
+  const monthsLeft = Math.max(
+    0,
+    Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30.44)),
+  )
+  return { percentage, monthsLeft }
+}
+
+const formatPeriodo = (value) => {
+  if (!value) return '—'
+  const raw = String(value).slice(0, 10)
+  const [year, month] = raw.split('-')
+  const m = Number(month)
+  if (!year || !m || m < 1 || m > 12) return '—'
+  return `${MONTH_NAMES[m - 1]} ${year}`
 }
 
 const estadoVariant = (nombre) => {
@@ -57,20 +106,110 @@ const estadoVariant = (nombre) => {
   return 'neutral'
 }
 
+function ProviderAdjudicacionDetail({ row, catalog, establishments }) {
+  const previo = Number(row.monto_consumido_previo) || 0
+  const nombres = establishments.map((e) => e.nombre || e).filter(Boolean)
+
+  return (
+    <dl className="contracts-meta">
+      <div className="contracts-meta__item">
+        <dt>RUT</dt>
+        <dd>{catalog?.rut || '—'}</dd>
+      </div>
+      <div className="contracts-meta__item">
+        <dt>Tipo</dt>
+        <dd>{catalog?.tipo_proveedor_nombre || '—'}</dd>
+      </div>
+      <div className="contracts-meta__item">
+        <dt>Contacto</dt>
+        <dd>{catalog?.contacto || '—'}</dd>
+      </div>
+      <div className="contracts-meta__item">
+        <dt>Adjudicado</dt>
+        <dd>{formatCurrency(row.monto_adjudicado)}</dd>
+      </div>
+      <div className="contracts-meta__item">
+        <dt>Ejecutado</dt>
+        <dd>
+          {formatCurrency(row.monto_ejecutado)}
+          {previo > 0 ? ` (previo ${formatCurrency(previo)})` : ''}
+        </dd>
+      </div>
+      <div className="contracts-meta__item">
+        <dt>Saldo</dt>
+        <dd>{formatCurrency(row.monto_restante)}</dd>
+      </div>
+      <div className="contracts-meta__item contracts-meta__item--full">
+        <dt>Establecimientos</dt>
+        <dd>{nombres.length ? nombres.join(', ') : 'Sin asignaciones'}</dd>
+      </div>
+    </dl>
+  )
+}
+
 const ContractDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { can } = usePermission()
 
   const [contract, setContract] = useState(null)
   const [loading, setLoading] = useState(true)
   const [receptions, setReceptions] = useState([])
   const [history, setHistory] = useState([])
-  const [activeTab, setActiveTab] = useState('info')
+  const [selectedAmpliacionId, setSelectedAmpliacionId] = useState(null)
+  const tabParam = searchParams.get('tab')
+  const ampliacionesForTabs = contract?.ampliaciones || []
+  const tabs = useMemo(() => {
+    const list = [...TABS_BASE]
+    if (ampliacionesForTabs.length > 0) {
+      const ampTab = {
+        id: 'ampliaciones',
+        label:
+          ampliacionesForTabs.length === 1
+            ? 'Ampliación de contrato'
+            : `Ampliaciones (${ampliacionesForTabs.length})`,
+      }
+      // Justo después de General
+      list.splice(1, 0, ampTab)
+    }
+    return list
+  }, [ampliacionesForTabs.length])
+  const activeTab = tabs.some((t) => t.id === tabParam) ? tabParam : 'info'
+  const setActiveTab = (tabId) => {
+    const next = new URLSearchParams(searchParams)
+    if (tabId === 'info') next.delete('tab')
+    else next.set('tab', tabId)
+    setSearchParams(next, { replace: true })
+  }
+
+  useEffect(() => {
+    if (activeTab === 'ampliaciones' && ampliacionesForTabs.length === 0) {
+      setActiveTab('info')
+    }
+  }, [activeTab, ampliacionesForTabs.length])
+
+  useEffect(() => {
+    const list = contract?.ampliaciones || []
+    if (!list.length) {
+      setSelectedAmpliacionId(null)
+      return
+    }
+    if (!list.some((a) => String(a.id) === String(selectedAmpliacionId))) {
+      const latest = [...list].sort(
+        (a, b) =>
+          new Date(b.fecha_termino || 0).getTime() - new Date(a.fecha_termino || 0).getTime(),
+      )[0]
+      setSelectedAmpliacionId(latest?.id ?? null)
+    }
+  }, [contract?.ampliaciones, selectedAmpliacionId])
+
   const { notify } = useNotify()
 
   const [isEditModalOpen, setEditModalOpen] = useState(false)
   const [isDocModalOpen, setDocModalOpen] = useState(false)
+  const [isAmpliacionModalOpen, setAmpliacionModalOpen] = useState(false)
+  const [editingAmpliacion, setEditingAmpliacion] = useState(null)
   const [isReceptionModalOpen, setReceptionModalOpen] = useState(false)
   const [editingRC, setEditingRC] = useState(null)
   const [previewDoc, setPreviewDoc] = useState(null)
@@ -84,8 +223,12 @@ const ContractDetail = () => {
   const [historySearch, setHistorySearch] = useState('')
   const [historySort, setHistorySort] = useState({ key: 'fecha', direction: 'desc' })
   const [historyPage, setHistoryPage] = useState(1)
-  const [historyPageSize, setHistoryPageSize] = useState(25)
+  const [historyPageSize, setHistoryPageSize] = useState(50)
   const debouncedHistorySearch = useDebouncedValue(historySearch)
+  const [receptionSearch, setReceptionSearch] = useState('')
+  const [receptionPage, setReceptionPage] = useState(1)
+  const [receptionPageSize, setReceptionPageSize] = useState(50)
+  const debouncedReceptionSearch = useDebouncedValue(receptionSearch)
 
   const [lookups, setLookups] = useState({
     establishments: [],
@@ -171,6 +314,8 @@ const ContractDetail = () => {
     return {
       codigo_mercado_publico: contract.codigo_mercado_publico,
       descripcion: contract.descripcion,
+      detalle: contract.detalle || '',
+      aplica_iva: contract.aplica_iva !== false,
       proceso: contract.proceso,
       estado: contract.estado,
       categoria: contract.categoria,
@@ -182,6 +327,7 @@ const ContractDetail = () => {
       tipo_oc: contract.tipo_oc || 'UNICA',
       nro_oc: contract.nro_oc || '',
       cdp: contract.cdp || '',
+      plantilla_cobro: contract.plantilla_cobro || '',
       proveedores_asociados: contract.proveedores_asociados || [],
       establecimientos: contract.establecimientos || [],
     }
@@ -190,6 +336,7 @@ const ContractDetail = () => {
   const handleEditSave = async (dataToSubmit) => {
     const finalData = { ...dataToSubmit }
     if (finalData.orientacion === '') delete finalData.orientacion
+    if (finalData.plantilla_cobro === '') finalData.plantilla_cobro = null
     try {
       await api.put(`contratos/contratos/${contract.id}/`, finalData)
     } catch (error) {
@@ -201,6 +348,53 @@ const ContractDetail = () => {
   const handleEditClose = (result) => {
     setEditModalOpen(false)
     if (result?.saved) fetchContract()
+  }
+
+  const handleAmpliacionSave = async (form, editing) => {
+    const data = new FormData()
+    data.append('fecha_inicio', form.fecha_inicio)
+    data.append('fecha_termino', form.fecha_termino)
+    data.append('nro_resolucion', form.nro_resolucion || '')
+    data.append('motivo', form.motivo || '')
+    if (form.monto !== '' && form.monto != null) {
+      data.append('monto', form.monto)
+    } else if (editing?.id) {
+      data.append('monto', '')
+    }
+    if (form.porcentaje !== '' && form.porcentaje != null) {
+      data.append('porcentaje', form.porcentaje)
+    } else if (editing?.id) {
+      data.append('porcentaje', '')
+    }
+    if (form.documento instanceof File) {
+      data.append('documento', form.documento)
+    } else if (editing?.id && form.eliminar_documento) {
+      data.append('eliminar_documento', 'true')
+    }
+    if (editing?.id) {
+      await api.patch(`contratos/ampliaciones/${editing.id}/`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+    } else {
+      data.append('contrato', contract.id)
+      await api.post('contratos/ampliaciones/', data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+    }
+  }
+
+  const openAmpliacionModal = (ampliacion = null) => {
+    setEditingAmpliacion(ampliacion)
+    setAmpliacionModalOpen(true)
+  }
+
+  const handleAmpliacionClose = (result) => {
+    setAmpliacionModalOpen(false)
+    setEditingAmpliacion(null)
+    if (result?.saved) {
+      fetchContract()
+      setActiveTab('ampliaciones')
+    }
   }
 
   const handleFileUpload = async () => {
@@ -260,7 +454,7 @@ const ContractDetail = () => {
 
   const handleCreateReception = async (formData, isSplit = false) => {
     if (editingRC) {
-      await api.put(`facturas-adquisicion/${editingRC.id}/`, {
+      await api.put(`contratos/recepciones-contrato/${editingRC.id}/`, {
         ...formData,
         contrato: contract.id,
       })
@@ -269,7 +463,7 @@ const ContractDetail = () => {
       for (const estId of formData.establecimientos) {
         const estName =
           lookups.establishments.find((e) => e.id === estId)?.nombre || ''
-        await api.post('facturas-adquisicion/', {
+        await api.post('contratos/recepciones-contrato/', {
           ...formData,
           establecimientos: [estId],
           contrato: contract.id,
@@ -284,7 +478,7 @@ const ContractDetail = () => {
         }
       }
     } else {
-      await api.post('facturas-adquisicion/', {
+      await api.post('contratos/recepciones-contrato/', {
         ...formData,
         contrato: contract.id,
       })
@@ -301,7 +495,7 @@ const ContractDetail = () => {
     if (!deleteRcTarget) return
     setDeleting(true)
     try {
-      await api.delete(`facturas-adquisicion/${deleteRcTarget.id}/`)
+      await api.delete(`contratos/recepciones-contrato/${deleteRcTarget.id}/`)
       setDeleteRcTarget(null)
       notify({ variant: 'success', text: 'Recepción anulada.' })
       await fetchContract()
@@ -315,10 +509,10 @@ const ContractDetail = () => {
 
   const handleDownloadPDF = async (rc) => {
     try {
-      const response = await api.get(`facturas-adquisicion/${rc.id}/generate_pdf/`, {
+      const response = await api.get(`contratos/recepciones-contrato/${rc.id}/generate_pdf/`, {
         responseType: 'blob',
       })
-      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
       const oc = rc.nro_oc || contract.nro_oc
       const rawFilename = oc ? `RC ${oc}.pdf` : `RC ${rc.folio || rc.id}.pdf`
       const filename = rawFilename.replace(/[/\\?%*:|"<>]/g, '-')
@@ -328,23 +522,72 @@ const ContractDetail = () => {
       document.body.appendChild(link)
       link.click()
       link.remove()
+      window.URL.revokeObjectURL(url)
     } catch (error) {
       console.error(error)
-      notify({ variant: 'danger', text: 'Error al generar el PDF.' })
+      let message = 'Error al generar el PDF.'
+      const data = error?.response?.data
+      if (data instanceof Blob) {
+        try {
+          const payload = JSON.parse(await data.text())
+          message = payload.hint || payload.error || message
+        } catch {
+          // ignore
+        }
+      } else if (data?.hint || data?.error) {
+        message = data.hint || data.error
+      }
+      notify({ variant: 'danger', text: message })
     }
   }
 
   const sortedReceptions = useMemo(() => {
-    const list = [...receptions]
+    const q = debouncedReceptionSearch.toLowerCase().trim()
+    let list = [...receptions]
+    if (q) {
+      list = list.filter((rc) => {
+        const haystack = [
+          rc.folio,
+          rc.nro_oc,
+          rc.nro_factura,
+          rc.descripcion,
+          rc.proveedor_nombre,
+          formatPeriodo(rc.periodo),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        return haystack.includes(q)
+      })
+    }
     if (!sortConfig.key) return list
     return list.sort((a, b) => {
-      const valA = a[sortConfig.key]
-      const valB = b[sortConfig.key]
+      let valA = a[sortConfig.key]
+      let valB = b[sortConfig.key]
+      if (sortConfig.key === 'periodo') {
+        valA = a.periodo ? new Date(a.periodo).getTime() : 0
+        valB = b.periodo ? new Date(b.periodo).getTime() : 0
+      } else if (sortConfig.key === 'total_pagar') {
+        valA = Number(valA) || 0
+        valB = Number(valB) || 0
+      } else {
+        valA = (valA || '').toString().toLowerCase()
+        valB = (valB || '').toString().toLowerCase()
+      }
       if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1
       if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1
       return 0
     })
-  }, [receptions, sortConfig])
+  }, [receptions, sortConfig, debouncedReceptionSearch])
+
+  useEffect(() => {
+    setReceptionPage(1)
+  }, [debouncedReceptionSearch, sortConfig])
+
+  const receptionPageRows = useMemo(() => {
+    const start = (receptionPage - 1) * receptionPageSize
+    return sortedReceptions.slice(start, start + receptionPageSize)
+  }, [sortedReceptions, receptionPage, receptionPageSize])
 
   const filteredHistory = useMemo(() => {
     const q = debouncedHistorySearch.toLowerCase().trim()
@@ -408,39 +651,45 @@ const ContractDetail = () => {
 
   if (!contract) return null
 
+  const ampliaciones = contract.ampliaciones || []
+  const montoAdjudicado =
+    contract.monto_adjudicado != null
+      ? Number(contract.monto_adjudicado)
+      : Number(contract.monto_total || 0) - Number(contract.monto_ampliaciones || 0)
+  const montoAmpliaciones =
+    contract.monto_ampliaciones != null
+      ? Number(contract.monto_ampliaciones)
+      : ampliaciones.reduce((sum, a) => sum + (Number(a.monto) || 0), 0)
+  const montoTecho = Number(contract.monto_total) || montoAdjudicado + montoAmpliaciones
+  const montoEjecutado = Number(contract.monto_ejecutado) || 0
+  const montoRestante =
+    contract.monto_restante != null
+      ? Number(contract.monto_restante)
+      : montoTecho - montoEjecutado
+
   const executionPercentage =
-    contract.monto_total > 0
-      ? Math.min(Math.round((contract.monto_ejecutado / contract.monto_total) * 100), 100)
+    montoTecho > 0
+      ? Math.min(Math.round((montoEjecutado / montoTecho) * 100), 100)
       : 0
 
   const calculateTimeExecution = () => {
     if (!contract.fecha_inicio || (!contract.fecha_termino && !contract.plazo_meses)) {
       return { percentage: 0, monthsLeft: 0 }
     }
-    const start = new Date(contract.fecha_inicio)
-    let end
     if (contract.fecha_termino) {
-      end = new Date(contract.fecha_termino)
-    } else {
-      end = new Date(start)
-      end.setMonth(start.getMonth() + contract.plazo_meses)
+      return calcSegmentProgress(contract.fecha_inicio, contract.fecha_termino)
     }
-    const now = new Date()
-    const totalDuration = end.getTime() - start.getTime()
-    if (totalDuration <= 0) return { percentage: 100, monthsLeft: 0 }
-    const elapsed = now.getTime() - start.getTime()
-    const percentage = Math.max(
-      0,
-      Math.min(Math.round((elapsed / totalDuration) * 100), 100),
-    )
-    const monthsLeft = Math.max(
-      0,
-      Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30.44)),
-    )
-    return { percentage, monthsLeft }
+    const start = new Date(contract.fecha_inicio)
+    const end = new Date(start)
+    end.setMonth(start.getMonth() + contract.plazo_meses)
+    return calcSegmentProgress(start, end)
   }
 
   const { percentage: timePercentage, monthsLeft } = calculateTimeExecution()
+  const canRegisterAmpliacion =
+    can('contratos.add_ampliacioncontrato') ||
+    can('contratos.change_ampliacioncontrato') ||
+    can('contratos.change_contrato')
 
   const tabLabel = (tab) => {
     if (tab.id === 'providers') {
@@ -448,6 +697,11 @@ const ContractDetail = () => {
     }
     if (tab.id === 'receptions') return `${tab.label} (${receptions.length})`
     if (tab.id === 'docs') return `${tab.label} (${contract.documentos?.length || 0})`
+    if (tab.id === 'ampliaciones') {
+      return ampliaciones.length === 1
+        ? tab.label
+        : `Ampliaciones (${ampliaciones.length})`
+    }
     if (tab.id === 'history') return `${tab.label} (${history.length})`
     return tab.label
   }
@@ -586,6 +840,15 @@ const ContractDetail = () => {
       render: (rc) => rc.descripcion || '—',
     },
     {
+      key: 'periodo',
+      header: 'Periodo',
+      className: 'col--status',
+      cardRole: 'status',
+      priority: 1,
+      sortable: true,
+      render: (rc) => formatPeriodo(rc.periodo),
+    },
+    {
       key: 'total_pagar',
       header: 'Total RC',
       className: 'col--tablet-hide',
@@ -595,11 +858,11 @@ const ContractDetail = () => {
       render: (rc) => formatCurrency(rc.total_pagar),
     },
     {
-      key: 'periodo',
-      header: 'Periodo',
-      className: 'col--status',
-      cardRole: 'status',
-      priority: 1,
+      key: 'nro_factura',
+      header: 'Factura',
+      className: 'col--tablet-hide',
+      cardRole: 'field',
+      priority: 2,
       sortable: true,
       render: (rc) => (
         <Badge variant={rc.nro_factura ? 'success' : 'warning'} dot>
@@ -613,7 +876,7 @@ const ContractDetail = () => {
       className: 'col--actions',
       render: (rc) => (
         <div className="data-table__actions">
-          {can('servicios.change_recepcionconforme') ? (
+          {can('servicios.change_facturaadquisicion') ? (
             <Button
               variant="ghost"
               size="sm"
@@ -625,10 +888,12 @@ const ContractDetail = () => {
               <Icon name="edit" size="sm" />
             </Button>
           ) : null}
-          <Button variant="outline" size="sm" onClick={() => handleDownloadPDF(rc)}>
-            PDF
-          </Button>
-          {can('servicios.delete_recepcionconforme') ? (
+          {can('servicios.view_facturaadquisicion') ? (
+            <Button variant="outline" size="sm" onClick={() => handleDownloadPDF(rc)}>
+              PDF
+            </Button>
+          ) : null}
+          {can('servicios.delete_facturaadquisicion') ? (
             <Button variant="ghost" size="sm" onClick={() => setDeleteRcTarget(rc)}>
               <Icon name="trash" size="sm" />
             </Button>
@@ -660,16 +925,20 @@ const ContractDetail = () => {
       className: 'col--actions',
       render: (doc) => (
         <div className="data-table__actions">
-          <Button variant="outline" size="sm" onClick={() => setPreviewDoc(doc)}>
-            Ver
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => window.open(doc.archivo, '_blank', 'noopener,noreferrer')}
-          >
-            Descargar
-          </Button>
+          {can('contratos.view_documentocontrato') ? (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setPreviewDoc(doc)}>
+                Ver
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => window.open(doc.archivo, '_blank', 'noopener,noreferrer')}
+              >
+                Descargar
+              </Button>
+            </>
+          ) : null}
           {can('contratos.delete_documentocontrato') ? (
             <Button variant="ghost" size="sm" onClick={() => setDeleteDocTarget(doc)}>
               <Icon name="trash" size="sm" />
@@ -738,11 +1007,13 @@ const ContractDetail = () => {
         split
         actions={
           <>
-            <Badge variant={estadoVariant(contract.estado_nombre)} dot>
-              {contract.estado_nombre}
-            </Badge>
+            {canRegisterAmpliacion ? (
+              <Button variant="secondary" size="sm" onClick={() => openAmpliacionModal(null)}>
+                <Icon name="plus" size="sm" /> Ampliación de contrato
+              </Button>
+            ) : null}
             {can('contratos.change_contrato') ? (
-              <Button variant="primary" size="sm" onClick={() => setEditModalOpen(true)}>
+              <Button variant="outline" size="sm" onClick={() => setEditModalOpen(true)}>
                 <Icon name="edit" size="sm" /> Editar
               </Button>
             ) : null}
@@ -752,9 +1023,13 @@ const ContractDetail = () => {
 
       
 
-      <div className="tabs contracts-tabs">
+      <div
+        className={`tabs contracts-tabs${
+          ampliaciones.length > 1 ? ' contracts-tabs--amp-pick' : ''
+        }`}
+      >
         <ul className="tabs__list" role="tablist" aria-label="Secciones del contrato">
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <li key={tab.id}>
               <button
                 type="button"
@@ -770,6 +1045,30 @@ const ContractDetail = () => {
             </li>
           ))}
         </ul>
+        {activeTab === 'ampliaciones' && ampliaciones.length > 1 ? (
+          <div className="contracts-amp-picker">
+            <Select
+              id="amp-pick"
+              aria-label="Seleccionar ampliación"
+              value={selectedAmpliacionId ?? ''}
+              onChange={(e) =>
+                setSelectedAmpliacionId(Number(e.target.value) || e.target.value)
+              }
+            >
+              {[...ampliaciones]
+                .sort(
+                  (a, b) =>
+                    new Date(b.fecha_termino || 0).getTime() -
+                    new Date(a.fecha_termino || 0).getTime(),
+                )
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {ampliacionLabel(a)}
+                  </option>
+                ))}
+            </Select>
+          </div>
+        ) : null}
       </div>
 
       <div
@@ -784,14 +1083,18 @@ const ContractDetail = () => {
               <div className="contracts-metric contracts-metric--total">
                 <span className="contracts-metric__label">Presupuesto total</span>
                 <span className="contracts-metric__value">
-                  {formatCurrency(contract.monto_total)}
+                  {formatCurrency(montoTecho)}
                 </span>
-                <span className="contracts-metric__hint">Monto adjudicado del convenio</span>
+                <span className="contracts-metric__hint">
+                  {montoAmpliaciones > 0
+                    ? `${formatCurrency(montoAdjudicado)} adjudicado + ${formatCurrency(montoAmpliaciones)} ampliación`
+                    : 'Monto adjudicado del convenio'}
+                </span>
               </div>
               <div className="contracts-metric contracts-metric--spent">
                 <span className="contracts-metric__label">Ejecutado</span>
                 <span className="contracts-metric__value">
-                  {formatCurrency(contract.monto_ejecutado)}
+                  {formatCurrency(montoEjecutado)}
                 </span>
                 <div className="contracts-metric__bar" aria-hidden>
                   <span style={{ width: `${Math.min(100, executionPercentage)}%` }} />
@@ -801,7 +1104,7 @@ const ContractDetail = () => {
               <div className="contracts-metric contracts-metric--available">
                 <span className="contracts-metric__label">Disponible</span>
                 <span className="contracts-metric__value">
-                  {formatCurrency(contract.monto_restante)}
+                  {formatCurrency(montoRestante)}
                 </span>
                 <div className="contracts-metric__bar" aria-hidden>
                   <span
@@ -831,6 +1134,14 @@ const ContractDetail = () => {
             <div className="contracts-general__top">
               <ChartCard title="Información del proceso" subtitle="Ficha del convenio">
                 <dl className="contracts-meta">
+                  <div className="contracts-meta__item">
+                    <dt>Estado</dt>
+                    <dd>
+                      <Badge variant={estadoVariant(contract.estado_nombre)} dot>
+                        {contract.estado_nombre || '—'}
+                      </Badge>
+                    </dd>
+                  </div>
                   <div className="contracts-meta__item">
                     <dt>Proceso</dt>
                     <dd>{contract.proceso_nombre || '—'}</dd>
@@ -864,8 +1175,11 @@ const ContractDetail = () => {
                     <dd>{formatDate(contract.fecha_inicio)}</dd>
                   </div>
                   <div className="contracts-meta__item">
-                    <dt>Término</dt>
-                    <dd>{formatDate(contract.fecha_termino)}</dd>
+                    <dt>Término (vigente)</dt>
+                    <dd>
+                      {formatDate(contract.fecha_termino)}
+                      {(contract.ampliaciones?.length || 0) > 0 ? ' · ampliado' : ''}
+                    </dd>
                   </div>
                   <div className="contracts-meta__item">
                     <dt>Plazo</dt>
@@ -923,7 +1237,7 @@ const ContractDetail = () => {
               <ChartCard
                 title="Control presupuestario"
                 subtitle="Avance del gasto frente al techo"
-                range={`${formatCurrency(contract.monto_restante)} disponibles`}
+                range={`${formatCurrency(montoRestante)} disponibles`}
               >
                 <div className="chart-kpi">
                   <div className="chart-kpi__label">Presupuesto utilizado</div>
@@ -938,12 +1252,14 @@ const ContractDetail = () => {
                             : 'chart-kpi__trend--down'
                       }`}
                     >
-                      {formatCurrency(contract.monto_restante)} libre
+                      {formatCurrency(montoRestante)} libre
                     </span>
                   </div>
                   <div className="chart-kpi__hint">
-                    {formatCurrency(contract.monto_ejecutado)} ejecutados de{' '}
-                    {formatCurrency(contract.monto_total)}
+                    {formatCurrency(montoEjecutado)} ejecutados de {formatCurrency(montoTecho)}
+                    {montoAmpliaciones > 0 ? (
+                      <> (incluye {formatCurrency(montoAmpliaciones)} de ampliación)</>
+                    ) : null}
                   </div>
                   <div className="contracts-timeline">
                     <div className="contracts-timeline__rail contracts-timeline__rail--success">
@@ -966,11 +1282,11 @@ const ContractDetail = () => {
                   <div className="contracts-kpi-split">
                     <div>
                       <span className="contracts-kpi-split__label">Ejecutado</span>
-                      <strong>{formatCurrency(contract.monto_ejecutado)}</strong>
+                      <strong>{formatCurrency(montoEjecutado)}</strong>
                     </div>
                     <div>
                       <span className="contracts-kpi-split__label">Disponible</span>
-                      <strong>{formatCurrency(contract.monto_restante)}</strong>
+                      <strong>{formatCurrency(montoRestante)}</strong>
                     </div>
                   </div>
                 </div>
@@ -999,6 +1315,20 @@ const ContractDetail = () => {
                   </div>
                   <div className="chart-kpi__hint">
                     {formatDate(contract.fecha_inicio)} → {formatDate(contract.fecha_termino)}
+                    {ampliaciones.length > 0 ? (
+                      <>
+                        {' '}
+                        ·{' '}
+                        <button
+                          type="button"
+                          className="contracts-provider-link"
+                          onClick={() => setActiveTab('ampliaciones')}
+                        >
+                          {ampliaciones.length} ampliación
+                          {ampliaciones.length === 1 ? '' : 'es'}
+                        </button>
+                      </>
+                    ) : null}
                   </div>
                   <div className="contracts-timeline">
                     <div className="contracts-timeline__rail">
@@ -1068,20 +1398,40 @@ const ContractDetail = () => {
 
         {activeTab === 'servicios' ? (
           <div className="contracts-tab">
-            <ContratoServiciosTab contractId={contract.id} />
+            <ContratoServiciosTab contract={contract} />
           </div>
         ) : null}
 
         {activeTab === 'receptions' ? (
-          <div className="contracts-tab">
+          <div className="contracts-tab contracts-history-tab">
+            <FiltersBar
+              onSearch={() => setReceptionPage(1)}
+              onClear={() => {
+                setReceptionSearch('')
+                setReceptionPage(1)
+              }}
+            >
+              <Field label="Buscar" htmlFor="rc-q">
+                <div className="input-wrap">
+                  <Icon name="search" className="input-wrap__icon" size="sm" />
+                  <Input
+                    id="rc-q"
+                    type="search"
+                    placeholder="Folio, OC, factura, glosa o proveedor…"
+                    value={receptionSearch}
+                    onChange={(e) => setReceptionSearch(e.target.value)}
+                  />
+                </div>
+              </Field>
+            </FiltersBar>
             <DataTable
               columns={receptionColumns}
-              rows={sortedReceptions}
-              totalCount={receptions.length}
+              rows={receptionPageRows}
+              totalCount={sortedReceptions.length}
               emptyTitle="Sin recepciones"
-              emptyDescription="No hay recepciones conformes registradas."
+              emptyDescription="No hay recepciones conformes con los filtros actuales."
               emptyAction={
-                can('servicios.add_recepcionconforme') ? (
+                can('servicios.add_facturaadquisicion') ? (
                   <Button
                     variant="primary"
                     size="sm"
@@ -1095,17 +1445,38 @@ const ContractDetail = () => {
                 ) : undefined
               }
               fillViewport
-              showFooter={false}
+              page={receptionPage}
+              pageSize={receptionPageSize}
+              pageSizeId="rc-page"
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageChange={setReceptionPage}
+              onPageSizeChange={(n) => {
+                setReceptionPageSize(n)
+                setReceptionPage(1)
+              }}
               sortKey={sortConfig.key}
               onSort={handleSortReceptions}
-              pageSizeId="rc-page"
+              mobileCardActions={(rc) => ({
+                primary: can('servicios.view_facturaadquisicion')
+                  ? { label: 'PDF', onClick: () => handleDownloadPDF(rc) }
+                  : undefined,
+                secondary: can('servicios.change_facturaadquisicion')
+                  ? {
+                      label: 'Editar',
+                      onClick: () => {
+                        setEditingRC(rc)
+                        setReceptionModalOpen(true)
+                      },
+                    }
+                  : undefined,
+              })}
               toolbar={
                 <>
                   <div className="table-toolbar__left">
                     <span className="table-toolbar__title">Recepciones</span>
-                    <Badge variant="neutral">{receptions.length}</Badge>
+                    <Badge variant="neutral">{sortedReceptions.length}</Badge>
                   </div>
-                  {can('servicios.add_recepcionconforme') ? (
+                  {can('servicios.add_facturaadquisicion') ? (
                     <div className="table-toolbar__right">
                       <Button
                         variant="primary"
@@ -1123,6 +1494,20 @@ const ContractDetail = () => {
               }
             />
           </div>
+        ) : null}
+
+        {activeTab === 'ampliaciones' && ampliaciones.length > 0 ? (
+          <ContratoAmpliacionesTab
+            ampliaciones={ampliaciones}
+            selectedId={selectedAmpliacionId}
+            onSelectedIdChange={setSelectedAmpliacionId}
+            canEdit={canRegisterAmpliacion}
+            onEdit={openAmpliacionModal}
+            onPreviewDoc={setPreviewDoc}
+            formatCurrency={formatCurrency}
+            formatDate={formatDate}
+            calcSegmentProgress={calcSegmentProgress}
+          />
         ) : null}
 
         {activeTab === 'docs' ? (
@@ -1235,6 +1620,14 @@ const ContractDetail = () => {
         editingRC={editingRC}
       />
 
+      <AmpliacionModal
+        open={isAmpliacionModalOpen}
+        onClose={handleAmpliacionClose}
+        onSave={handleAmpliacionSave}
+        contract={contract}
+        editing={editingAmpliacion}
+      />
+
       <Modal
         open={isDocModalOpen}
         onClose={handleDocClose}
@@ -1306,7 +1699,7 @@ const ContractDetail = () => {
         open={!!selectedProvider}
         onClose={() => setSelectedProvider(null)}
         title={selectedProvider?.proveedor_nombre || 'Proveedor'}
-        subheader="Detalle de adjudicación en este contrato"
+        subheader="Adjudicación en este contrato"
         footer={
           <Button variant="secondary" type="button" onClick={() => setSelectedProvider(null)}>
             Cerrar
@@ -1314,73 +1707,20 @@ const ContractDetail = () => {
         }
       >
         {selectedProvider ? (
-          <div className="ticket-aside__details">
-            {(() => {
-              const catalog = resolveProviderCatalog(selectedProvider)
-              const pct =
-                selectedProvider.monto_adjudicado > 0
-                  ? Math.min(
-                      100,
-                      Math.round(
-                        (selectedProvider.monto_ejecutado /
-                          selectedProvider.monto_adjudicado) *
-                          100,
-                      ),
-                    )
-                  : 0
-              const establecimientos =
-                selectedProvider.establecimientos_detalle ||
-                (selectedProvider.establecimientos || [])
-                  .map((id) =>
-                    typeof id === 'object'
-                      ? id
-                      : lookups.establishments.find((e) => e.id === id),
-                  )
-                  .filter(Boolean)
-              return (
-                <>
-                  <DetailItem label="RUT">{catalog?.rut || '—'}</DetailItem>
-                  <DetailItem label="Acrónimo">{catalog?.acronimo || '—'}</DetailItem>
-                  <DetailItem label="Tipo">
-                    {catalog?.tipo_proveedor_nombre || '—'}
-                  </DetailItem>
-                  <DetailItem label="Contacto">{catalog?.contacto || '—'}</DetailItem>
-                  <DetailItem label="Adjudicado">
-                    {formatCurrency(selectedProvider.monto_adjudicado)}
-                  </DetailItem>
-                  <DetailItem label="Ejecutado">
-                    {formatCurrency(selectedProvider.monto_ejecutado)}
-                  </DetailItem>
-                  <DetailItem label="Consumo previo">
-                    {formatCurrency(selectedProvider.monto_consumido_previo)}
-                  </DetailItem>
-                  <DetailItem label="Saldo">
-                    {formatCurrency(selectedProvider.monto_restante)}
-                  </DetailItem>
-                  <DetailItem label="Consumo">
-                    <div className="contracts-gauge__track" style={{ marginTop: '0.35rem' }}>
-                      <div
-                        className="contracts-gauge__fill"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <span>{pct}%</span>
-                  </DetailItem>
-                  <DetailItem label="Establecimientos">
-                    {establecimientos.length ? (
-                      <ul className="contracts-estab-list">
-                        {establecimientos.map((e) => (
-                          <li key={e.id || e.nombre}>{e.nombre || e}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      'Sin asignaciones'
-                    )}
-                  </DetailItem>
-                </>
-              )
-            })()}
-          </div>
+          <ProviderAdjudicacionDetail
+            row={selectedProvider}
+            catalog={resolveProviderCatalog(selectedProvider)}
+            establishments={
+              selectedProvider.establecimientos_detalle ||
+              (selectedProvider.establecimientos || [])
+                .map((id) =>
+                  typeof id === 'object'
+                    ? id
+                    : lookups.establishments.find((e) => e.id === id),
+                )
+                .filter(Boolean)
+            }
+          />
         ) : null}
       </Modal>
 

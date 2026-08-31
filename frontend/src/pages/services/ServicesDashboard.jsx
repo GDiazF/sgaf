@@ -54,7 +54,7 @@ const ServicesDashboard = () => {
   const [totalCount, setTotalCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [ordering, setOrdering] = useState('establecimiento__nombre')
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
   const debouncedSearch = useDebouncedValue(searchQuery)
 
   const fetchLookups = async () => {

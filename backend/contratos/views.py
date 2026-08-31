@@ -1,59 +1,118 @@
 import datetime
-import calendar
 import logging
 from django.db import transaction
-from rest_framework import viewsets, filters, status
+from rest_framework import viewsets, filters, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from establecimientos.pagination import LargeResultsSetPagination
+from establecimientos.models import Establecimiento
 
 from .models import (
     ProcesoCompra, EstadoContrato, CategoriaContrato, Contrato, 
-    OrientacionLicitacion, DocumentoContrato, HistorialContrato,
+    OrientacionLicitacion, DocumentoContrato, HistorialContrato, AmpliacionContrato,
     TipoServicioOperativo, ServicioContrato, RutaTransporte, PeriodoCobro, AusenciaRuta,
     FeriadoNacional, GrupoPresetRutas
 )
 from .serializers import (
     ProcesoCompraSerializer, EstadoContratoSerializer, CategoriaContratoSerializer, 
     ContratoSerializer, OrientacionLicitacionSerializer, DocumentoContratoSerializer,
+    AmpliacionContratoSerializer,
     TipoServicioOperativoSerializer, ServicioContratoSerializer, RutaTransporteSerializer,
     PeriodoCobroSerializer, AusenciaRutaSerializer, FeriadoNacionalSerializer,
     GrupoPresetRutasSerializer
 )
 
-from core.utils.report_utils import get_report_assets
+from core.drf_permissions import SgafModelPermissions, SgafPermissionMixin
+from contratos.services.recepcion_contrato import RecepcionContratoService
+from servicios.models import FacturaAdquisicion
+from servicios.serializers import FacturaAdquisicionSerializer
+from servicios.pdf import build_rc_adq_pdf
 
 logger = logging.getLogger(__name__)
+
+_DEFAULT_PERMS = [permissions.IsAuthenticated, SgafModelPermissions]
 
 class ProcesoCompraViewSet(viewsets.ModelViewSet):
     queryset = ProcesoCompra.objects.all()
     serializer_class = ProcesoCompraSerializer
+    permission_classes = _DEFAULT_PERMS
 
 class EstadoContratoViewSet(viewsets.ModelViewSet):
     queryset = EstadoContrato.objects.all()
     serializer_class = EstadoContratoSerializer
+    permission_classes = _DEFAULT_PERMS
 
 class CategoriaContratoViewSet(viewsets.ModelViewSet):
     queryset = CategoriaContrato.objects.all()
     serializer_class = CategoriaContratoSerializer
+    permission_classes = _DEFAULT_PERMS
 
 class OrientacionLicitacionViewSet(viewsets.ModelViewSet):
     queryset = OrientacionLicitacion.objects.all()
     serializer_class = OrientacionLicitacionSerializer
+    permission_classes = _DEFAULT_PERMS
 
 class DocumentoContratoViewSet(viewsets.ModelViewSet):
     queryset = DocumentoContrato.objects.all()
     serializer_class = DocumentoContratoSerializer
     filterset_fields = ['contrato']
+    permission_classes = _DEFAULT_PERMS
 
-class ContratoViewSet(viewsets.ModelViewSet):
-    queryset = Contrato.objects.all()
+
+class AmpliacionContratoViewSet(viewsets.ModelViewSet):
+    """Registro de ampliaciones de vigencia. Alta, consulta y edición (sin borrar)."""
+
+    queryset = AmpliacionContrato.objects.select_related('contrato').all()
+    serializer_class = AmpliacionContratoSerializer
+    filterset_fields = ['contrato']
+    http_method_names = ['get', 'post', 'patch', 'head', 'options']
+
+    def get_permissions(self):
+        return [permissions.IsAuthenticated(), _AmpliacionContratoPermission()]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        contrato_id = self.request.query_params.get('contrato')
+        if contrato_id:
+            qs = qs.filter(contrato_id=contrato_id)
+        return qs
+
+
+class _AmpliacionContratoPermission(permissions.BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            return (
+                user.has_perm('contratos.view_ampliacioncontrato')
+                or user.has_perm('contratos.view_contrato')
+            )
+        if request.method in ('PATCH', 'PUT'):
+            return (
+                user.has_perm('contratos.change_ampliacioncontrato')
+                or user.has_perm('contratos.change_contrato')
+            )
+        return (
+            user.has_perm('contratos.add_ampliacioncontrato')
+            or user.has_perm('contratos.change_contrato')
+        )
+
+
+class ContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
+    sgaf_action_permissions = {
+        'resumen_periodo': 'contratos.view_contrato',
+    }
+    queryset = Contrato.objects.prefetch_related(
+        'ampliaciones', 'documentos', 'historial', 'proveedores_asociados',
+    ).all()
     serializer_class = ContratoSerializer
     pagination_class = LargeResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['proceso', 'estado', 'categoria', 'orientacion']
-    search_fields = ['codigo_mercado_publico', 'descripcion', 'nro_oc', 'cdp', 'proveedores_asociados__proveedor__nombre']
+    search_fields = ['codigo_mercado_publico', 'descripcion', 'detalle', 'nro_oc', 'cdp', 'proveedores_asociados__proveedor__nombre']
     ordering_fields = ['fecha_inicio', 'monto_total', 'created_at']
 
     def perform_update(self, serializer):
@@ -71,6 +130,138 @@ class ContratoViewSet(viewsets.ModelViewSet):
             usuario=str(user)
         )
 
+    @action(detail=True, methods=['get'], url_path='resumen-periodo')
+    def resumen_periodo(self, request, pk=None):
+        contrato = self.get_object()
+        try:
+            mes = int(request.query_params.get('mes'))
+            anio = int(request.query_params.get('anio'))
+        except (TypeError, ValueError):
+            return Response(
+                {'detail': 'Indique mes y año del periodo.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        proveedor_id = request.query_params.get('proveedor')
+        gestion = contrato.servicios_operativos.select_related('tipo_servicio').first()
+        if not gestion:
+            return Response({
+                'tiene_gestion': False,
+                'total': 0,
+                'lineas': [],
+                'establecimientos_ids': [],
+                'faltantes': 0,
+            })
+
+        rutas = gestion.rutas.select_related('proveedor').prefetch_related(
+            'establecimientos', 'periodos'
+        )
+        if proveedor_id:
+            rutas = rutas.filter(proveedor_id=proveedor_id)
+
+        lineas = []
+        total = 0
+        establecimientos_ids = []
+        con_periodo = 0
+        for ruta in rutas:
+            periodo = next(
+                (
+                    p
+                    for p in ruta.periodos.all()
+                    if p.mes_referencia == mes and p.anio_referencia == anio
+                ),
+                None,
+            )
+            ests = list(ruta.establecimientos.values_list('id', flat=True))
+            if not periodo:
+                lineas.append({
+                    'ruta_id': ruta.id,
+                    'nombre': ruta.nombre,
+                    'proveedor_id': ruta.proveedor_id,
+                    'establecimientos': ests,
+                    'monto': 0,
+                    'tiene_periodo': False,
+                })
+                continue
+            con_periodo += 1
+            monto = periodo.monto_total or 0
+            total += monto
+            establecimientos_ids.extend(ests)
+            lineas.append({
+                'ruta_id': ruta.id,
+                'nombre': ruta.nombre,
+                'proveedor_id': ruta.proveedor_id,
+                'establecimientos': ests,
+                'monto': monto,
+                'tiene_periodo': True,
+                'periodo_id': periodo.id,
+                'estado': periodo.estado,
+            })
+
+        return Response({
+            'tiene_gestion': True,
+            'gestion_id': gestion.id,
+            'es_transporte': gestion.es_transporte,
+            'modalidad_cobro': gestion.modalidad_cobro,
+            'total': total,
+            'lineas': lineas,
+            'establecimientos_ids': list(dict.fromkeys(establecimientos_ids)),
+            'faltantes': len(lineas) - con_periodo,
+            'lineas_con_periodo': con_periodo,
+        })
+
+
+class RecepcionContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
+    """
+    Recepciones conformes vinculadas a contrato (folios ROC-).
+    Misma tabla FacturaAdquisicion; reglas separadas de factura sin OC.
+    """
+    sgaf_action_permissions = {
+        'generate_pdf': 'servicios.view_facturaadquisicion',
+    }
+    serializer_class = FacturaAdquisicionSerializer
+    permission_classes = [permissions.IsAuthenticated, SgafModelPermissions]
+    filterset_fields = ['proveedor', 'establecimiento', 'tipo_entrega', 'cdp', 'contrato']
+    search_fields = ['descripcion', 'proveedor__nombre', 'id', 'folio', 'cdp', 'total_pagar', 'nro_oc']
+    # DjangoModelPermissions lee el modelo del queryset
+    queryset = FacturaAdquisicion.objects.filter(contrato__isnull=False)
+
+    def get_queryset(self):
+        contrato_id = self.request.query_params.get('contrato')
+        return RecepcionContratoService.queryset(contrato_id=contrato_id or None)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            data = RecepcionContratoService.prepare_payload(
+                request.data.copy() if hasattr(request.data, 'copy') else dict(request.data),
+            )
+        except DjangoValidationError as exc:
+            return Response(exc.message_dict if hasattr(exc, 'message_dict') else {'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        try:
+            data = RecepcionContratoService.prepare_payload(
+                request.data.copy() if hasattr(request.data, 'copy') else dict(request.data),
+                instance=instance,
+            )
+        except DjangoValidationError as exc:
+            return Response(exc.message_dict if hasattr(exc, 'message_dict') else {'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def generate_pdf(self, request, pk=None):
+        return build_rc_adq_pdf(self.get_object(), user=request.user)
+
+
 # =====================================================================
 # MÓDULO DE SERVICIOS OPERATIVOS (TRANSPORTE, ETC.)
 # =====================================================================
@@ -78,8 +269,14 @@ class ContratoViewSet(viewsets.ModelViewSet):
 class TipoServicioOperativoViewSet(viewsets.ModelViewSet):
     queryset = TipoServicioOperativo.objects.all().order_by('nombre')
     serializer_class = TipoServicioOperativoSerializer
+    pagination_class = None
+    permission_classes = _DEFAULT_PERMS
 
-class ServicioContratoViewSet(viewsets.ModelViewSet):
+
+class ServicioContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
+    sgaf_action_permissions = {
+        'generar_acta_conformidad': 'contratos.view_serviciocontrato',
+    }
     queryset = ServicioContrato.objects.select_related('contrato', 'tipo_servicio').all().order_by('nombre', 'id')
     serializer_class = ServicioContratoSerializer
     filterset_fields = ['contrato', 'tipo_servicio']
@@ -291,40 +488,91 @@ class ServicioContratoViewSet(viewsets.ModelViewSet):
         buffer.seek(0)
         return FileResponse(buffer, as_attachment=True, filename=f"Visto_Bueno_Rutas_{servicio.id}.pdf")
 
-class RutaTransporteViewSet(viewsets.ModelViewSet):
+class RutaTransporteViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
+    sgaf_action_permissions = {
+        'bulk_crear_lineas': 'contratos.add_rutatransporte',
+        'generar_periodo': 'contratos.add_periodocobro',
+        'bulk_generar_periodo': 'contratos.add_periodocobro',
+        'bulk_update': 'contratos.change_rutatransporte',
+        'recepcion_servicio': 'contratos.view_rutatransporte',
+    }
     queryset = RutaTransporte.objects.select_related('servicio', 'proveedor').prefetch_related('establecimientos', 'periodos', 'periodos__ausencias').all()
     serializer_class = RutaTransporteSerializer
     pagination_class = None # Ver todas las rutas sin paginación
     filterset_fields = ['servicio', 'proveedor']
+
+    @action(detail=False, methods=['post'], url_path='bulk-crear-lineas')
+    def bulk_crear_lineas(self, request):
+        servicio_id = request.data.get('servicio')
+        proveedor_id = request.data.get('proveedor')
+        est_ids = request.data.get('establecimientos') or []
+        valor_mensual = request.data.get('valor_mensual')
+        if not servicio_id or not proveedor_id or not est_ids:
+            return Response(
+                {'detail': 'Indique proveedor y al menos un establecimiento.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            servicio = ServicioContrato.objects.get(pk=servicio_id)
+        except ServicioContrato.DoesNotExist:
+            return Response({'servicio': 'Gestión no encontrada.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not valor_mensual and not servicio.es_mensual_mixto:
+            return Response(
+                {'valor_mensual': 'Indique el monto mensual.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        valor_mensual = valor_mensual or 0
+        nombres = {
+            e.id: e.nombre
+            for e in Establecimiento.objects.filter(id__in=est_ids)
+        }
+        creadas = []
+        errores = []
+        incluir_fines = request.data.get('incluir_fines_semana', True)
+        excluir_fer = request.data.get('excluir_feriados', False)
+        if isinstance(incluir_fines, str):
+            incluir_fines = incluir_fines.lower() in ('true', '1', 'yes')
+        if isinstance(excluir_fer, str):
+            excluir_fer = excluir_fer.lower() in ('true', '1', 'yes')
+        with transaction.atomic():
+            for est_id in est_ids:
+                payload = {
+                    'servicio': servicio_id,
+                    'proveedor': proveedor_id,
+                    'nombre': nombres.get(int(est_id), f'Establecimiento {est_id}'),
+                    'establecimientos': [est_id],
+                    'valor_mensual': valor_mensual,
+                    'valor_diario': 0,
+                    'dia_inicio_periodo': 1,
+                    'dia_fin_periodo': 31,
+                    'incluir_fines_semana': bool(incluir_fines),
+                    'excluir_feriados': bool(excluir_fer),
+                }
+                serializer = RutaTransporteSerializer(data=payload)
+                if serializer.is_valid():
+                    serializer.save()
+                    creadas.append(serializer.data)
+                else:
+                    errores.append({'establecimiento': est_id, 'errors': serializer.errors})
+            if errores and not creadas:
+                return Response({'detail': errores}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {'creadas': len(creadas), 'omitidas': len(errores), 'lineas': creadas},
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=['post'], url_path='generar-periodo')
     def generar_periodo(self, request, pk=None):
         ruta = self.get_object()
         mes = int(request.data.get('mes'))
         anio = int(request.data.get('anio'))
-        
-        # Lógica de cálculo de rango de fechas personalizada
-        if ruta.dia_inicio_periodo <= ruta.dia_fin_periodo:
-            fecha_inicio = datetime.date(anio, mes, ruta.dia_inicio_periodo)
-            fecha_fin = datetime.date(anio, mes, ruta.dia_fin_periodo)
-        else:
-            fecha_fin = datetime.date(anio, mes, ruta.dia_fin_periodo)
-            if mes == 1:
-                prev_mes, prev_anio = 12, anio - 1
-            else:
-                prev_mes, prev_anio = mes - 1, anio
-            fecha_inicio = datetime.date(prev_anio, prev_mes, ruta.dia_inicio_periodo)
+        fecha_inicio, fecha_fin = ruta.rango_periodo(mes, anio)
 
         if PeriodoCobro.objects.filter(ruta=ruta, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin).exists():
             return Response({"error": "Ya existe un periodo con este rango de fechas para esta ruta."}, status=status.HTTP_400_BAD_REQUEST)
 
-        periodo = PeriodoCobro.objects.create(
-            ruta=ruta,
-            fecha_inicio=fecha_inicio,
-            fecha_fin=fecha_fin,
-            mes_referencia=mes,
-            anio_referencia=anio
-        )
+        from .period_utils import crear_periodo_cobro
+        periodo = crear_periodo_cobro(ruta, fecha_inicio, fecha_fin, mes, anio)
         return Response(PeriodoCobroSerializer(periodo).data, status=status.HTTP_201_CREATED)
     
     @action(detail=False, methods=['post'], url_path='bulk-generar-periodo')
@@ -339,28 +587,12 @@ class RutaTransporteViewSet(viewsets.ModelViewSet):
         for rid in ruta_ids:
             try:
                 ruta = RutaTransporte.objects.get(id=rid)
-                
-                # Lógica de fechas
-                if ruta.dia_inicio_periodo <= ruta.dia_fin_periodo:
-                    fecha_inicio = datetime.date(anio, mes, ruta.dia_inicio_periodo)
-                    fecha_fin = datetime.date(anio, mes, ruta.dia_fin_periodo)
-                else:
-                    fecha_fin = datetime.date(anio, mes, ruta.dia_fin_periodo)
-                    if mes == 1:
-                        prev_mes, prev_anio = 12, anio - 1
-                    else:
-                        prev_mes, prev_anio = mes - 1, anio
-                    fecha_inicio = datetime.date(prev_anio, prev_mes, ruta.dia_inicio_periodo)
+                fecha_inicio, fecha_fin = ruta.rango_periodo(mes, anio)
                 
                 # Evitar duplicados
                 if not PeriodoCobro.objects.filter(ruta=ruta, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin).exists():
-                    PeriodoCobro.objects.create(
-                        ruta=ruta,
-                        fecha_inicio=fecha_inicio,
-                        fecha_fin=fecha_fin,
-                        mes_referencia=mes,
-                        anio_referencia=anio
-                    )
+                    from .period_utils import crear_periodo_cobro
+                    crear_periodo_cobro(ruta, fecha_inicio, fecha_fin, mes, anio)
                     created_count += 1
                 else:
                     skipped_count += 1
@@ -380,7 +612,14 @@ class RutaTransporteViewSet(viewsets.ModelViewSet):
         if not ruta_ids:
             return Response({"detail": "No se proporcionaron IDs de rutas."}, status=status.HTTP_400_BAD_REQUEST)
             
-        allowed_fields = ['incluir_fines_semana', 'excluir_feriados', 'valor_diario', 'dia_inicio_periodo', 'dia_fin_periodo']
+        allowed_fields = [
+            'incluir_fines_semana',
+            'excluir_feriados',
+            'valor_diario',
+            'valor_mensual',
+            'dia_inicio_periodo',
+            'dia_fin_periodo',
+        ]
         update_data = {k: v for k, v in fields_to_update.items() if k in allowed_fields}
         
         if not update_data:
@@ -393,8 +632,97 @@ class RutaTransporteViewSet(viewsets.ModelViewSet):
             "updated_count": updated_count
         }, status=status.HTTP_200_OK)
 
-class PeriodoCobroViewSet(viewsets.ModelViewSet):
-    queryset = PeriodoCobro.objects.select_related('ruta').prefetch_related('ausencias').all()
+    @action(detail=True, methods=['get'], url_path='recepcion-servicio')
+    def recepcion_servicio(self, request, pk=None):
+        """PDF de recepción unitaria (sin folio). Solo gestiones mensuales."""
+        from .pdf_gestion import build_recepcion_servicio_pdf
+
+        ruta = self.get_object()
+        est_id = request.query_params.get('establecimiento_id')
+        periodo_id = request.query_params.get('periodo_id')
+        establecimiento = None
+        if est_id:
+            try:
+                establecimiento = Establecimiento.objects.select_related('tipo').get(pk=est_id)
+            except Establecimiento.DoesNotExist:
+                return Response(
+                    {'error': 'Establecimiento no encontrado.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            establecimientos = list(ruta.establecimientos.select_related('tipo').all())
+            if len(establecimientos) == 1:
+                establecimiento = establecimientos[0]
+            elif not establecimientos:
+                return Response(
+                    {'error': 'La línea no tiene establecimientos.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            else:
+                return Response(
+                    {'error': 'Indique establecimiento_id.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        periodo = None
+        if not periodo_id:
+            return Response(
+                {
+                    'error': 'Indique el periodo de la recepción.',
+                    'hint': 'Seleccione un periodo antes de descargar el PDF.',
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            periodo = PeriodoCobro.objects.get(pk=periodo_id, ruta=ruta)
+        except PeriodoCobro.DoesNotExist:
+            return Response(
+                {'error': 'Periodo no encontrado para esta línea.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        monto_junji = request.query_params.get('monto_junji')
+        if monto_junji is not None and monto_junji != '':
+            try:
+                monto_junji = int(monto_junji)
+            except (TypeError, ValueError):
+                return Response(
+                    {'error': 'monto_junji inválido.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            monto_junji = None
+
+        incluir_periodo = request.query_params.get('incluir_periodo')
+        if incluir_periodo is None or incluir_periodo == '':
+            incluir_periodo = None
+        elif str(incluir_periodo).lower() in ('0', 'false', 'no'):
+            incluir_periodo = False
+        else:
+            incluir_periodo = True
+
+        return build_recepcion_servicio_pdf(
+            ruta,
+            establecimiento,
+            periodo=periodo,
+            user=request.user,
+            monto_junji=monto_junji,
+            incluir_periodo=incluir_periodo,
+        )
+
+
+class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
+    sgaf_action_permissions = {
+        'calendario': 'contratos.view_periodocobro',
+        'total': 'contratos.view_periodocobro',
+        'generate_pdf': 'contratos.view_periodocobro',
+        'toggle_dia': 'contratos.change_ausenciaruta',
+        'bulk_toggle_dia': 'contratos.change_ausenciaruta',
+        'cerrar': 'contratos.change_periodocobro',
+        'datos_recepcion': 'contratos.change_periodocobro',
+        'montos_mixto': 'contratos.change_periodocobro',
+    }
+    queryset = PeriodoCobro.objects.select_related('ruta', 'ruta__servicio').prefetch_related('ausencias').all()
     serializer_class = PeriodoCobroSerializer
     filterset_fields = ['ruta', 'estado', 'anio_referencia', 'mes_referencia']
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
@@ -405,6 +733,7 @@ class PeriodoCobroViewSet(viewsets.ModelViewSet):
     def calendario(self, request, pk=None):
         periodo = self.get_object()
         ruta = periodo.ruta
+        servicio = ruta.servicio if ruta.servicio_id else None
         ausencias = periodo.ausencias.values_list('fecha', flat=True)
         return Response({
             "fecha_inicio": periodo.fecha_inicio,
@@ -415,39 +744,67 @@ class PeriodoCobroViewSet(viewsets.ModelViewSet):
                 "excluir_feriados": ruta.excluir_feriados
             },
             "estado": periodo.estado,
-            "monto_total_calculado": periodo.monto_total_calculado
+            "monto_total_calculado": periodo.monto_total_calculado,
+            "nombre_estandarizado": periodo.nombre_estandarizado,
+            "monto_fijo": periodo.monto_fijo or 0,
+            "monto_variable": periodo.monto_variable or 0,
+            "nro_factura": periodo.nro_factura or '',
+            "fecha_servicio": periodo.fecha_servicio,
+            "incluir_periodo_en_rc": bool(periodo.incluir_periodo_en_rc),
+            "es_mensual_mixto": bool(servicio and servicio.es_mensual_mixto),
+            "es_mensual": bool(servicio and servicio.es_mensual),
+            "usa_asistencia": bool(
+                servicio
+                and (
+                    not servicio.es_mensual
+                    or servicio.modalidad_cobro == servicio.MODALIDAD_MENSUAL_POR_EST
+                )
+            ),
         })
 
     @action(detail=True, methods=['get'])
     def total(self, request, pk=None):
         periodo = self.get_object()
         total_dinero = periodo.calcular_total_dinamico()
-        
         ruta = periodo.ruta
+        servicio = ruta.servicio if ruta.servicio_id else None
+
+        if servicio and servicio.es_mensual_mixto:
+            return Response({
+                "total": total_dinero,
+                "dias_base": periodo.dias_base,
+                "ausencias": periodo.dias_base - periodo.dias_trabajados,
+                "dias_cobrar": periodo.dias_trabajados,
+                "estado": periodo.estado,
+                "es_mensual_mixto": True,
+                "monto_fijo": periodo.monto_fijo or 0,
+                "monto_variable": periodo.monto_variable or 0,
+            })
+
         delta = (periodo.fecha_fin - periodo.fecha_inicio).days + 1
         dias_base = 0
         ausencias_efectivas = 0
-        
+
         feriados = set()
         if ruta.excluir_feriados:
             feriados = set(FeriadoNacional.objects.values_list('fecha', flat=True))
-            
+
         ausencias_registradas = set(periodo.ausencias.values_list('fecha', flat=True))
 
         for i in range(delta):
             dia = periodo.fecha_inicio + datetime.timedelta(days=i)
-            
+
             is_valid_workday = True
             if not ruta.incluir_fines_semana and dia.weekday() >= 5:
                 is_valid_workday = False
             elif ruta.excluir_feriados and dia in feriados:
                 is_valid_workday = False
-            
+
             if is_valid_workday:
                 dias_base += 1
                 if dia in ausencias_registradas:
                     ausencias_efectivas += 1
-        
+
         dias_cobrar = dias_base - ausencias_efectivas
 
         return Response({
@@ -455,8 +812,92 @@ class PeriodoCobroViewSet(viewsets.ModelViewSet):
             "dias_base": dias_base,
             "ausencias": ausencias_efectivas,
             "dias_cobrar": dias_cobrar,
-            "estado": periodo.estado
+            "estado": periodo.estado,
+            "es_mensual_mixto": False,
+            "monto_fijo": periodo.monto_fijo or 0,
+            "monto_variable": periodo.monto_variable or 0,
         })
+
+    @action(detail=True, methods=['get'], url_path='generate-pdf')
+    def generate_pdf(self, request, pk=None):
+        """PDF de cobro del periodo según modalidad de la gestión."""
+        from .pdf_gestion import build_cobro_periodo_pdf
+
+        periodo = self.get_object()
+        return build_cobro_periodo_pdf(periodo, user=request.user)
+
+    @action(detail=True, methods=['patch'], url_path='datos-recepcion')
+    def datos_recepcion(self, request, pk=None):
+        """
+        Actualiza datos de recepción del periodo (no transporte):
+        nro_factura, fecha_servicio; y si es mixto también montos.
+        """
+        periodo = self.get_object()
+        servicio = periodo.ruta.servicio if periodo.ruta.servicio_id else None
+        if not servicio or not servicio.es_mensual:
+            return Response(
+                {'error': 'Solo aplica a gestiones mensuales (no transporte).'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if periodo.estado == 'CERRADO':
+            return Response(
+                {'error': 'El periodo está cerrado.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        data = {}
+        if 'nro_factura' in request.data:
+            data['nro_factura'] = (request.data.get('nro_factura') or '')[:100]
+        if 'fecha_servicio' in request.data:
+            raw = request.data.get('fecha_servicio')
+            if not raw:
+                data['fecha_servicio'] = None
+            else:
+                try:
+                    if hasattr(raw, 'isoformat'):
+                        data['fecha_servicio'] = raw
+                    else:
+                        data['fecha_servicio'] = datetime.datetime.strptime(
+                            str(raw)[:10], '%Y-%m-%d'
+                        ).date()
+                except (TypeError, ValueError):
+                    return Response(
+                        {'fecha_servicio': 'Formato inválido (YYYY-MM-DD).'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+        if 'incluir_periodo_en_rc' in request.data:
+            raw = request.data.get('incluir_periodo_en_rc')
+            if isinstance(raw, str):
+                data['incluir_periodo_en_rc'] = raw.lower() in ('1', 'true', 'yes', 'si', 'sí')
+            else:
+                data['incluir_periodo_en_rc'] = bool(raw)
+        if servicio.es_mensual_mixto:
+            if 'monto_fijo' in request.data:
+                try:
+                    data['monto_fijo'] = int(request.data.get('monto_fijo') or 0)
+                except (TypeError, ValueError):
+                    return Response(
+                        {'monto_fijo': 'Valor inválido.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            if 'monto_variable' in request.data:
+                try:
+                    data['monto_variable'] = int(request.data.get('monto_variable') or 0)
+                except (TypeError, ValueError):
+                    return Response(
+                        {'monto_variable': 'Valor inválido.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+        if not data:
+            return Response({'detail': 'Sin cambios.'}, status=status.HTTP_400_BAD_REQUEST)
+        for key, value in data.items():
+            setattr(periodo, key, value)
+        periodo.save(update_fields=list(data.keys()))
+        return Response(PeriodoCobroSerializer(periodo).data)
+
+    @action(detail=True, methods=['patch'], url_path='montos-mixto')
+    def montos_mixto(self, request, pk=None):
+        """Compat: redirige a datos-recepcion (montos mixto + factura/fecha)."""
+        return self.datos_recepcion(request, pk=pk)
 
     @action(detail=True, methods=['post'], url_path='toggle-dia')
     def toggle_dia(self, request, pk=None):
@@ -572,8 +1013,13 @@ class AusenciaRutaViewSet(viewsets.ModelViewSet):
     queryset = AusenciaRuta.objects.all()
     serializer_class = AusenciaRutaSerializer
     filterset_fields = ['periodo', 'fecha']
+    permission_classes = _DEFAULT_PERMS
 
-class FeriadoNacionalViewSet(viewsets.ModelViewSet):
+class FeriadoNacionalViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
+    sgaf_action_permissions = {
+        'bulk_create': 'contratos.add_feriadonacional',
+        'sincronizar': 'contratos.add_feriadonacional',
+    }
     queryset = FeriadoNacional.objects.all()
     serializer_class = FeriadoNacionalSerializer
     pagination_class = None  # Desactivamos paginación para que el calendario vea todo
@@ -612,3 +1058,4 @@ class GrupoPresetRutasViewSet(viewsets.ModelViewSet):
     serializer_class = GrupoPresetRutasSerializer
     filterset_fields = ['servicio']
     pagination_class = None
+    permission_classes = _DEFAULT_PERMS

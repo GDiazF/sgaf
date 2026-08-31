@@ -21,6 +21,8 @@ import {
 const emptyForm = (lookups = {}) => ({
   codigo_mercado_publico: '',
   descripcion: '',
+  detalle: '',
+  aplica_iva: true,
   proceso: lookups.procesos?.[0]?.id || '',
   estado: lookups.estados?.[0]?.id || '',
   categoria: lookups.categorias?.[0]?.id || '',
@@ -32,6 +34,7 @@ const emptyForm = (lookups = {}) => ({
   tipo_oc: 'UNICA',
   nro_oc: '',
   cdp: '',
+  plantilla_cobro: '',
   proveedores_asociados: [],
   establecimientos: [],
 })
@@ -77,7 +80,7 @@ const Contracts = () => {
   const [tiposEstablecimiento, setTiposEstablecimiento] = useState([])
 
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(50)
   const [totalCount, setTotalCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [ordering, setOrdering] = useState('vigente_first')
@@ -180,6 +183,8 @@ const Contracts = () => {
     setFormData({
       codigo_mercado_publico: item.codigo_mercado_publico,
       descripcion: item.descripcion,
+      detalle: item.detalle || '',
+      aplica_iva: item.aplica_iva !== false,
       proceso: item.proceso,
       estado: item.estado,
       categoria: item.categoria,
@@ -191,6 +196,7 @@ const Contracts = () => {
       tipo_oc: item.tipo_oc || 'UNICA',
       nro_oc: item.nro_oc || '',
       cdp: item.cdp || '',
+      plantilla_cobro: item.plantilla_cobro || '',
       proveedores_asociados: item.proveedores_asociados || [],
       establecimientos: item.establecimientos || [],
     })
@@ -201,6 +207,7 @@ const Contracts = () => {
   const handleSave = async (dataToSubmit) => {
     const finalData = { ...dataToSubmit }
     if (finalData.orientacion === '') delete finalData.orientacion
+    if (finalData.plantilla_cobro === '') finalData.plantilla_cobro = null
 
     try {
       if (editingId) {

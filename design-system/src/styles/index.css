@@ -6,6 +6,7 @@
 @import './charts.css';
 @import './calendar.css';
 @import './motion.css';
+@import './document-editor.css';
 
 @tailwind utilities;
 

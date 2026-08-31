@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { Button } from '../../components/ui/Button.jsx'
 import { Field, Input, Select, Textarea, Switch } from '../../components/ui/Field.jsx'
+import { MultiSelect } from '../../components/ui/MultiSelect.jsx'
 import { CurrencyInput } from '../../components/ui/CurrencyInput.jsx'
 import { KmInput } from '../../components/ui/KmInput.jsx'
 import { Icon } from '../../icons/Icon.jsx'
@@ -10,6 +11,7 @@ export function FormsPage() {
   const [on, setOn] = useState(true)
   const [monto, setMonto] = useState('1250000')
   const [km, setKm] = useState('15480')
+  const [periodos, setPeriodos] = useState(['Enero 2026'])
 
   return (
     <>
@@ -73,18 +75,14 @@ export function FormsPage() {
             <Field label="Textarea" className="field--full" style={{ gridColumn: '1 / -1' }}>
               <Textarea className="no-global" placeholder="Observaciones internas…" rows={3} />
             </Field>
-            <Field label="Multiselect" className="field--full" style={{ gridColumn: '1 / -1' }}>
-              <div className="multiselect">
-                <div className="multiselect__tags">
-                  <span className="multiselect__tag">
-                    Operaciones <button type="button" className="multiselect__tag-remove">×</button>
-                  </span>
-                  <span className="multiselect__tag">
-                    Soporte TI <button type="button" className="multiselect__tag-remove">×</button>
-                  </span>
-                  <span className="multiselect__placeholder">+ Agregar módulo</span>
-                </div>
-              </div>
+            <Field label="Select múltiple" htmlFor="form-multiselect">
+              <MultiSelect
+                id="form-multiselect"
+                value={periodos}
+                onChange={setPeriodos}
+                options={['Enero 2026', 'Febrero 2026', 'Marzo 2026', 'Abril 2026']}
+                placeholder="— Elige uno o más —"
+              />
             </Field>
             <Field label="File upload" className="field--full" style={{ gridColumn: '1 / -1' }}>
               <div className="file-input">
