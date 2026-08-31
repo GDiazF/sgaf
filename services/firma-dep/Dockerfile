@@ -1,5 +1,5 @@
 # ── Stage 1: build ────────────────────────────────────────────────────────────
-FROM node:26-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY . .
 RUN npm run build && npm prune --omit=dev
 
 # ── Stage 2: produccion ────────────────────────────────────────────────────────
-FROM node:26-alpine AS production
+FROM node:24-alpine AS production
 
 WORKDIR /app
 
