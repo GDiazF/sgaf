@@ -14,6 +14,7 @@ Documentación **corta y por tarea**. Elija según lo que necesita hacer.
 | Programar y probar en tu computadora | [04 — Desarrollo local](./04-desarrollo-local.md) |
 | Usuarios, roles y firma digital | [05 — Firma y permisos](./05-firma-y-permisos.md) |
 | Algo falló (login, firma, git, etc.) | [06 — Problemas frecuentes](./06-problemas-frecuentes.md) |
+| Respaldos, Google Drive y cron | [07 — Respaldos](./07-respaldos.md) |
 
 ---
 
@@ -37,3 +38,5 @@ Administrador web (roles)  →  Guía 05 (sin terminal)
 | **`~/sgaf`** | Carpeta del proyecto en el servidor |
 
 Las guías antiguas (`docs/0`, `docs/1`, `docs/2.1`, `docs/2.2`, `docs/3`) siguen disponibles como referencia detallada.
+
+**Manual visual offline:** [manual-web/index.html](../manual-web/index.html) (abrir en el navegador sin internet).

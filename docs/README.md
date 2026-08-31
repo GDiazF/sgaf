@@ -4,6 +4,8 @@
 
 **Empiece aquí:** [guias/README.md](./guias/README.md)
 
+**Manual web (offline, con dibujos):** abra [manual-web/index.html](./manual-web/index.html) en el navegador (doble clic). Ver [manual-web/LEEME.txt](./manual-web/LEEME.txt).
+
 | Guía | Contenido |
 |------|-----------|
 | [01 — Actualizar servidor](./guias/01-actualizar-servidor.md) | Lo más habitual: 3 comandos |
@@ -12,6 +14,7 @@
 | [04 — Desarrollo local](./guias/04-desarrollo-local.md) | Probar en tu PC |
 | [05 — Firma y permisos](./guias/05-firma-y-permisos.md) | Roles, bandeja, RC |
 | [06 — Problemas frecuentes](./guias/06-problemas-frecuentes.md) | Soluciones rápidas |
+| [07 — Respaldos](./guias/07-respaldos.md) | Local, Google Drive, cron |
 
 ---
 

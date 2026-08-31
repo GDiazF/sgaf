@@ -1,0 +1,24 @@
+Manual SGAF — documentación offline
+====================================
+
+CÓMO ABRIR
+----------
+1. Abre la carpeta docs/manual-web/
+2. Haz doble clic en index.html
+3. Usa el menú lateral y las pestañas en cada página
+
+PÁGINAS
+-------
+index.html      — Inicio y tarjetas de cada guía
+instalar.html   — Primera instalación (pestañas: script / manual)
+actualizar.html — Actualizar sistema (pestañas: script / manual)
+respaldos.html  — Local, Google Drive, cron, restaurar (5 pestañas)
+github.html     — Subir cambios desde Windows
+local.html      — Desarrollo en tu PC
+firma.html      — Permisos y firma digital
+problemas.html  — Soluciones rápidas
+glosario.html   — Palabras técnicas
+
+js/tabs.js      — Pestañas (sin internet)
+
+No requiere internet ni instalación adicional.

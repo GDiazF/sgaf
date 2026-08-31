@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Desarrollo local — Manual SGAF</title>
+  <link rel="stylesheet" href="css/manual.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar__brand"><a href="index.html"><h1>Manual SGAF</h1><p>Documentación offline</p></a></div>
+      <nav class="nav">
+        <div class="nav-group"><div class="nav-group__title">Inicio</div>
+          <a href="index.html">Bienvenida</a><a href="glosario.html">Glosario</a></div>
+        <div class="nav-group"><div class="nav-group__title">Servidor Ubuntu</div>
+          <a href="instalar.html">Primera instalación</a>
+          <a href="actualizar.html">Actualizar sistema</a><a href="respaldos.html">Respaldos</a></div>
+        <div class="nav-group"><div class="nav-group__title">Desarrollo</div>
+          <a href="github.html">Subir a GitHub</a><a href="local.html" class="is-here">Desarrollo local</a></div>
+        <div class="nav-group"><div class="nav-group__title">Uso web</div>
+          <a href="firma.html">Firma y permisos</a><a href="problemas.html">Problemas frecuentes</a></div>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="page-header">
+        <h2>Desarrollo local en tu PC</h2>
+        <p class="lead">Sin Docker. Abre SGAF en <strong>http://localhost:5173</strong></p>
+      </header>
+
+      <div class="block">
+        <h3>Terminal 1 — Backend</h3>
+        <pre>cd backend
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver 8000</pre>
+        <p>Crea <code>backend/.env</code> con <code>DEBUG=True</code>, CORS para <code>localhost:5173</code> y <code>FIRMA_DEP_URL=http://127.0.0.1:4010/api/v1</code>.</p>
+      </div>
+
+      <div class="block">
+        <h3>Terminal 2 — Frontend</h3>
+        <pre>cd frontend
+npm install
+npm run dev</pre>
+        <p>En <code>frontend/.env</code>: <code>VITE_API_URL=http://localhost:8000/api</code></p>
+      </div>
+
+      <div class="block">
+        <h3>Terminal 3 — Firma (opcional)</h3>
+        <pre>cd services\firma-dep
+npm install
+copy .env.example .env
+npm run start:dev</pre>
+        <p>Token/Secret FirmaGob van en <code>services/firma-dep/.env</code>.</p>
+      </div>
+
+      <table>
+        <tr><th>Terminal</th><th>Carpeta</th><th>URL</th></tr>
+        <tr><td>Backend</td><td><code>backend</code></td><td>localhost:8000</td></tr>
+        <tr><td>Frontend</td><td><code>frontend</code></td><td>localhost:5173</td></tr>
+        <tr><td>firma-dep</td><td><code>services/firma-dep</code></td><td>localhost:4010</td></tr>
+      </table>
+
+      <nav class="page-nav">
+        <a href="github.html"><span class="page-nav__label">← Anterior</span><span class="page-nav__title">Subir a GitHub</span></a>
+        <a href="firma.html" style="text-align:right"><span class="page-nav__label">Siguiente →</span><span class="page-nav__title">Firma y permisos</span></a>
+      </nav>
+    </main>
+  </div>
+</body>
+</html>

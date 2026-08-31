@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Problemas frecuentes — Manual SGAF</title>
+  <link rel="stylesheet" href="css/manual.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar__brand"><a href="index.html"><h1>Manual SGAF</h1><p>Documentación offline</p></a></div>
+      <nav class="nav">
+        <div class="nav-group"><div class="nav-group__title">Inicio</div>
+          <a href="index.html">Bienvenida</a><a href="glosario.html">Glosario</a></div>
+        <div class="nav-group"><div class="nav-group__title">Servidor Ubuntu</div>
+          <a href="instalar.html">Primera instalación</a>
+          <a href="actualizar.html">Actualizar sistema</a><a href="respaldos.html">Respaldos</a></div>
+        <div class="nav-group"><div class="nav-group__title">Desarrollo</div>
+          <a href="github.html">Subir a GitHub</a><a href="local.html">Desarrollo local</a></div>
+        <div class="nav-group"><div class="nav-group__title">Uso web</div>
+          <a href="firma.html">Firma y permisos</a><a href="problemas.html" class="is-here">Problemas frecuentes</a></div>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="page-header">
+        <h2>Problemas frecuentes</h2>
+        <p class="lead">Soluciones rápidas. Si persiste, revisa logs con <code>docker compose logs -f backend</code>.</p>
+      </header>
+
+      <div class="block">
+        <h3>Login: error 400 Bad Request</h3>
+        <p>El servidor no reconoce la URL del navegador.</p>
+        <pre>cd ~/sgaf
+./scripts/sync_env_network.sh
+docker compose up -d backend</pre>
+      </div>
+
+      <div class="block">
+        <h3>Actualicé pero no veo cambios en pantalla</h3>
+        <pre>docker compose up -d --build frontend</pre>
+        <p>O deploy completo sin <code>--quick</code> (ver <a href="actualizar.html">Actualizar</a>).</p>
+      </div>
+
+      <div class="block">
+        <h3>Git push rechazado</h3>
+        <pre>git pull origin reingenieria
+git push origin reingenieria</pre>
+      </div>
+
+      <div class="block">
+        <h3>No aparece menú Bandeja de firmas</h3>
+        <p>Revisa <a href="firma.html">Firma y permisos</a> y vuelve a iniciar sesión.</p>
+      </div>
+
+      <div class="block">
+        <h3>firma-dep no responde</h3>
+        <pre>docker compose logs -f firma-dep
+docker compose up -d --build firma-dep</pre>
+        <p>Verifica <code>API_ALLOW_PRIVATE_NETWORKS=true</code> y que <code>API_CLIENT_KEYS</code> coincide con <code>FIRMA_DEP_API_KEY</code>.</p>
+      </div>
+
+      <div class="block">
+        <h3>Cambiar contraseña admin</h3>
+        <pre>docker exec -it sgaf_backend_prod python manage.py changepassword admin</pre>
+      </div>
+
+      <div class="block">
+        <h3>Estado de contenedores</h3>
+        <pre>docker compose ps</pre>
+      </div>
+
+      <nav class="page-nav">
+        <a href="firma.html"><span class="page-nav__label">← Anterior</span><span class="page-nav__title">Firma y permisos</span></a>
+        <a href="glosario.html" style="text-align:right"><span class="page-nav__label">Siguiente →</span><span class="page-nav__title">Glosario</span></a>
+      </nav>
+    </main>
+  </div>
+</body>
+</html>

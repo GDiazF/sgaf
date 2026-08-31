@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Firma y permisos — Manual SGAF</title>
+  <link rel="stylesheet" href="css/manual.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar__brand"><a href="index.html"><h1>Manual SGAF</h1><p>Documentación offline</p></a></div>
+      <nav class="nav">
+        <div class="nav-group"><div class="nav-group__title">Inicio</div>
+          <a href="index.html">Bienvenida</a><a href="glosario.html">Glosario</a></div>
+        <div class="nav-group"><div class="nav-group__title">Servidor Ubuntu</div>
+          <a href="instalar.html">Primera instalación</a>
+          <a href="actualizar.html">Actualizar sistema</a><a href="respaldos.html">Respaldos</a></div>
+        <div class="nav-group"><div class="nav-group__title">Desarrollo</div>
+          <a href="github.html">Subir a GitHub</a><a href="local.html">Desarrollo local</a></div>
+        <div class="nav-group"><div class="nav-group__title">Uso web</div>
+          <a href="firma.html" class="is-here">Firma y permisos</a><a href="problemas.html">Problemas frecuentes</a></div>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="page-header">
+        <h2>Firma digital y permisos</h2>
+        <p class="lead">Configuración desde la web SGAF (Admin). No requiere terminal del servidor.</p>
+      </header>
+
+      <table>
+        <tr><th>Función</th><th>Dónde en SGAF</th></tr>
+        <tr><td>Bandeja de firmas</td><td>Menú <code>/firma</code></td></tr>
+        <tr><td>Laboratorio (solo TI)</td><td><code>/firma-prueba</code></td></tr>
+        <tr><td>Enviar RC a firmar</td><td>Pagos → Recepciones → Enviar a firmar</td></tr>
+        <tr><td>Validar documento</td><td><code>/validar</code></td></tr>
+      </table>
+
+      <div class="block">
+        <h3>Checklist: firmante operativo</h3>
+        <p>En <strong>Admin → Roles</strong> y <strong>Funcionarios</strong>:</p>
+        <ul class="checklist">
+          <li>Permiso «Puede firmar digitalmente»</li>
+          <li>Funcionario vinculado y activo</li>
+          <li>Grupo «firmantes» asignado</li>
+          <li>Sello de firma configurado</li>
+          <li>Cerrar sesión y volver a entrar</li>
+        </ul>
+      </div>
+
+      <div class="block">
+        <h3>Laboratorio de prueba (solo TI)</h3>
+        <p>Permiso separado: «Puede usar firma digital (prueba)». No lo des a todos los firmantes.</p>
+      </div>
+
+      <div class="block">
+        <h3>Enviar recepción conforme a firmar</h3>
+        <ol class="steps">
+          <li><strong>RC en estado Emitida</strong> con firmante asignado.</li>
+          <li><strong>Enviar a firmar</strong> en Pagos → Recepciones.</li>
+          <li>El firmante ve el documento en su <strong>Bandeja</strong> y firma con OTP de FirmaGob.</li>
+        </ol>
+      </div>
+
+      <div class="card card--warn">
+        <span class="card__title">Producción</span>
+        RUT real del firmante + OTP de la RA. Los RUT sandbox (<code>11.111.111-1</code>) no funcionan en producción.
+      </div>
+
+      <nav class="page-nav">
+        <a href="local.html"><span class="page-nav__label">← Anterior</span><span class="page-nav__title">Desarrollo local</span></a>
+        <a href="problemas.html" style="text-align:right"><span class="page-nav__label">Siguiente →</span><span class="page-nav__title">Problemas frecuentes</span></a>
+      </nav>
+    </main>
+  </div>
+</body>
+</html>
