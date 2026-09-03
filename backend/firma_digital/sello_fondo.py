@@ -121,3 +121,116 @@ def seal_image_base64_from_config() -> str | None:
     import base64
 
     return base64.b64encode(png).decode('ascii')
+
+
+def _wrap_text(draw, text: str, font, max_width: int) -> list[str]:
+    words = (text or '').split()
+    if not words:
+        return ['']
+    lines: list[str] = []
+    current = words[0]
+    for word in words[1:]:
+        trial = f'{current} {word}'
+        if draw.textlength(trial, font=font) <= max_width:
+            current = trial
+        else:
+            lines.append(current)
+            current = word
+    lines.append(current)
+    return lines
+
+
+def _load_preview_font(size: int):
+    from PIL import ImageFont
+
+    candidates = [
+        'arial.ttf',
+        'Arial.ttf',
+        'DejaVuSans.ttf',
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        'C:/Windows/Fonts/arial.ttf',
+        'C:/Windows/Fonts/segoeui.ttf',
+    ]
+    for path in candidates:
+        try:
+            return ImageFont.truetype(path, size=size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
+
+def build_sello_preview_png(
+    cfg=None,
+    *,
+    sample_name: str = 'Jorge Andrés Cubillos Díaz',
+    sample_date: str = 'Fecha 03/09/2026',
+    sample_time: str = '16:37:28 CLT',
+) -> bytes:
+    """PNG aproximado del sello (fondo + texto de ejemplo). No llama a FirmaGob."""
+    from .models import ConfiguracionSelloFirma
+
+    if cfg is None:
+        cfg = ConfiguracionSelloFirma.get_solo()
+
+    width_pt = int(getattr(cfg, 'ancho_pt', None) or 205) if cfg else 205
+    height_pt = int(getattr(cfg, 'alto_pt', None) or 84) if cfg else 84
+    logo = getattr(cfg, 'logo', None) if cfg else None
+    imagen_firma = getattr(cfg, 'imagen_firma', None) if cfg else None
+
+    fondo = compose_sello_fondo_png(
+        logo=logo,
+        imagen_firma=imagen_firma,
+        width_pt=width_pt,
+        height_pt=height_pt,
+    )
+    w = max(80, width_pt) * FONDO_SCALE
+    h = max(40, height_pt) * FONDO_SCALE
+
+    if fondo:
+        canvas = Image.open(io.BytesIO(fondo)).convert('RGBA')
+    else:
+        canvas = Image.new('RGBA', (w, h), (255, 255, 255, 255))
+
+    from PIL import ImageDraw
+
+    draw = ImageDraw.Draw(canvas)
+    pad = max(4, FONDO_SCALE * 2)
+    # Si hay logo, el texto simulado ocupa la zona derecha (como suele verse el sello).
+    has_logo = bool(getattr(logo, 'name', None))
+    text_left = int(w * 0.42) if has_logo else pad + FONDO_SCALE
+    text_right = w - pad
+    max_text_w = max(40, text_right - text_left)
+
+    title_size = max(10, int(8.5 * FONDO_SCALE * 0.95))
+    body_size = max(10, int(8.2 * FONDO_SCALE * 0.95))
+    font_title = _load_preview_font(title_size)
+    font_body = _load_preview_font(body_size)
+    line_gap = max(2, FONDO_SCALE)
+
+    lines: list[tuple[str, object]] = [('Firmado por', font_title)]
+    for part in _wrap_text(draw, sample_name, font_body, max_text_w):
+        lines.append((part, font_body))
+    lines.append((sample_date, font_body))
+    lines.append((sample_time, font_body))
+
+    # Centrar verticalmente el bloque de texto en el alto disponible.
+    heights = []
+    for text, font in lines:
+        bbox = draw.textbbox((0, 0), text, font=font)
+        heights.append(bbox[3] - bbox[1])
+    block_h = sum(heights) + line_gap * (len(lines) - 1)
+    y = max(pad, (h - block_h) // 2)
+    ink = (15, 23, 42, 255)
+
+    for (text, font), th in zip(lines, heights):
+        draw.text((text_left, y), text, font=font, fill=ink)
+        y += th + line_gap
+
+    # Marco para visualizar la caja exacta en pt.
+    draw.rectangle((0, 0, w - 1, h - 1), outline=(13, 110, 122, 255), width=max(1, FONDO_SCALE // 2))
+
+    rgb = Image.new('RGB', canvas.size, (255, 255, 255))
+    rgb.paste(canvas, mask=canvas.split()[3])
+    buf = io.BytesIO()
+    rgb.save(buf, format='PNG', optimize=True)
+    return buf.getvalue()

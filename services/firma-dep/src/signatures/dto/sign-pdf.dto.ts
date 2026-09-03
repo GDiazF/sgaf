@@ -72,6 +72,30 @@ class SignatureOptionsDto {
   @IsString()
   sealImageBase64?: string;
 
+  @ApiPropertyOptional({
+    example: 205,
+    default: 205,
+    description: 'Ancho del recuadro de firma visible en puntos PDF (default 205).',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(80)
+  @Max(400)
+  sealWidthPt?: number;
+
+  @ApiPropertyOptional({
+    example: 84,
+    default: 84,
+    description: 'Alto del recuadro de firma visible en puntos PDF (default 84).',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(40)
+  @Max(200)
+  sealHeightPt?: number;
+
   @ApiPropertyOptional({ example: 'Subsecretaría General de la Presidencia' })
   @IsOptional()
   @IsString()

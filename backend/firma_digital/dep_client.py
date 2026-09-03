@@ -138,8 +138,13 @@ def _build_sign_body(
 
     if visible_seal:
         try:
+            from .models import ConfiguracionSelloFirma
             from .sello_fondo import seal_image_base64_from_config
 
+            cfg = ConfiguracionSelloFirma.get_solo()
+            if cfg:
+                signature['sealWidthPt'] = int(cfg.ancho_pt or 205)
+                signature['sealHeightPt'] = int(cfg.alto_pt or 84)
             seal_b64 = seal_image_base64_from_config()
             if seal_b64:
                 signature['sealImageBase64'] = seal_b64
@@ -281,11 +286,26 @@ def seal_page_from_pdf_page(page: str | int | None) -> int | None:
 
 
 PT_PER_CM = 28.346456693
-# Tamaño fijo del sello que dibuja firma-dep (signatures.service.ts).
+# Defaults del sello (firma-dep). Pueden sobreescribirse desde ConfiguracionSelloFirma.
 FIRMA_DEP_SEAL_WIDTH_PT = 205.0
 FIRMA_DEP_SEAL_HEIGHT_PT = 84.0
 # Espacio reservado al pie de validación/QR en firma-dep.
 FIRMA_DEP_FOOTER_RESERVED_PT = 88.0
+
+
+def get_configured_seal_size_pt() -> tuple[float, float]:
+    """Ancho/alto del sello desde el mantenedor admin, o defaults oficiales."""
+    try:
+        from .models import ConfiguracionSelloFirma
+
+        cfg = ConfiguracionSelloFirma.get_solo()
+        if cfg:
+            return float(cfg.ancho_pt or FIRMA_DEP_SEAL_WIDTH_PT), float(
+                cfg.alto_pt or FIRMA_DEP_SEAL_HEIGHT_PT
+            )
+    except Exception:
+        logger.exception('No se pudo leer tamaño de sello desde configuración.')
+    return FIRMA_DEP_SEAL_WIDTH_PT, FIRMA_DEP_SEAL_HEIGHT_PT
 
 
 def get_pdf_page_size_pt(
@@ -315,6 +335,7 @@ def pdf_box_to_seal_margins_cm(
     ury: float,
     page_height_pt: float,
     clamp_above_footer: bool = True,
+    seal_height_pt: float | None = None,
 ) -> tuple[float, float]:
     """Caja PDF (origen abajo-izq) → (sealTopMarginCm, sealLeftMarginCm) de firma-dep.
 
@@ -322,12 +343,14 @@ def pdf_box_to_seal_margins_cm(
       x = leftCm * pt/cm
       y = pageHeight - topCm * pt/cm - sealHeight
     """
+    if seal_height_pt is None:
+        _, seal_height_pt = get_configured_seal_size_pt()
     left_cm = max(0.0, min(30.0, float(llx) / PT_PER_CM))
     top_cm = max(0.0, min(30.0, (float(page_height_pt) - float(ury)) / PT_PER_CM))
     if clamp_above_footer and page_height_pt > 0:
         # Evita que firma-dep mueva el sello a una página nueva por el pie de validación.
         max_top_pt = (
-            float(page_height_pt) - FIRMA_DEP_SEAL_HEIGHT_PT - FIRMA_DEP_FOOTER_RESERVED_PT
+            float(page_height_pt) - float(seal_height_pt) - FIRMA_DEP_FOOTER_RESERVED_PT
         )
         if max_top_pt > 0:
             top_cm = min(top_cm, max_top_pt / PT_PER_CM)

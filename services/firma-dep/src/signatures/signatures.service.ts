@@ -516,24 +516,27 @@ export class SignaturesService {
       });
     }
 
+    // Texto estimado: offsets relativos al tamaño oficial 205×84.
+    const textX = sealPlacement.x + sealPlacement.width * (86 / 205);
+    const textSize = Math.max(7, Math.min(11, sealPlacement.height * (8.5 / 84)));
     pageToDraw.drawText('Firmado XXXXX', {
-      x: sealPlacement.x + 86,
-      y: sealPlacement.y + 50,
-      size: 8.5,
+      x: textX,
+      y: sealPlacement.y + sealPlacement.height * (50 / 84),
+      size: textSize,
       font: regularFont,
       color: rgb(0, 0, 0),
     });
     pageToDraw.drawText('Cargo XXXXXX', {
-      x: sealPlacement.x + 86,
-      y: sealPlacement.y + 36,
-      size: 8.5,
+      x: textX,
+      y: sealPlacement.y + sealPlacement.height * (36 / 84),
+      size: textSize,
       font: regularFont,
       color: rgb(0, 0, 0),
     });
     pageToDraw.drawText('Fecha XXXXXXX', {
-      x: sealPlacement.x + 86,
-      y: sealPlacement.y + 22,
-      size: 8.5,
+      x: textX,
+      y: sealPlacement.y + sealPlacement.height * (22 / 84),
+      size: textSize,
       font: regularFont,
       color: rgb(0, 0, 0),
     });
@@ -781,15 +784,31 @@ export class SignaturesService {
     const sealPage = this.resolvePreviewPage(pdfDoc, dto.signature.sealPage);
     const topMarginCm = this.normalizeTopMargin(dto.signature.sealTopMarginCm);
     const leftMarginCm = this.normalizeLeftMargin(dto.signature.sealLeftMarginCm);
-    const position = this.resolveSealPlacement(sealPage, topMarginCm, leftMarginCm);
+    const { width: sealWidth, height: sealHeight } = this.resolveSealSize(dto);
+    const position = this.resolveSealPlacement(
+      sealPage,
+      topMarginCm,
+      leftMarginCm,
+      sealWidth,
+      sealHeight,
+    );
     const pageToUse = position.targetPage ?? sealPage;
 
     return {
       pageNumber: pdfDoc.getPages().indexOf(pageToUse) + 1,
       x: position.x,
       y: position.y,
-      width: 205,
-      height: 84,
+      width: sealWidth,
+      height: sealHeight,
+    };
+  }
+
+  private resolveSealSize(dto: SignPdfDto): { width: number; height: number } {
+    const width = Number(dto.signature?.sealWidthPt);
+    const height = Number(dto.signature?.sealHeightPt);
+    return {
+      width: Number.isFinite(width) ? Math.min(400, Math.max(80, width)) : 205,
+      height: Number.isFinite(height) ? Math.min(200, Math.max(40, height)) : 84,
     };
   }
 
@@ -797,10 +816,10 @@ export class SignaturesService {
     targetPage: PDFPage,
     topMarginCm?: number,
     leftMarginCm?: number,
+    sealWidth = 205,
+    sealHeight = 84,
   ) {
     const { width, height } = targetPage.getSize();
-    const sealWidth = 205;
-    const sealHeight = 84;
     // La firma visible por defecto queda alineada con la referencia institucional,
     // no pegada al borde derecho. Ambos margenes son configurables por el cliente.
     const x = Math.min(

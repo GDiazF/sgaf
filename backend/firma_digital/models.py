@@ -296,12 +296,19 @@ class ConfiguracionSelloFirma(models.Model):
     ancho_pt = models.PositiveIntegerField(
         'Ancho del recuadro (pt)',
         default=205,
-        help_text='Caja que recibe FirmaGob. Por defecto 205 (oficial firma-dep).',
+        help_text=(
+            'Ancho de la caja que FirmaGob usa para dibujar el texto. '
+            'A mayor ancho, el nombre se parte menos. Default oficial 205×84. '
+            'Sugeridos: 280×100 o 320×110.'
+        ),
     )
     alto_pt = models.PositiveIntegerField(
         'Alto del recuadro (pt)',
         default=84,
-        help_text='Caja que recibe FirmaGob. Por defecto 84 (oficial firma-dep).',
+        help_text=(
+            'Alto de la caja del sello en puntos PDF. Default oficial 84. '
+            'Sugeridos junto al ancho: 280×100 o 320×110.'
+        ),
     )
     actualizado_en = models.DateTimeField(auto_now=True)
 
@@ -315,6 +322,8 @@ class ConfiguracionSelloFirma(models.Model):
     def clean(self):
         if self.ancho_pt < 80 or self.alto_pt < 40:
             raise ValidationError('El recuadro del sello es demasiado pequeño (mín. 80×40 pt).')
+        if self.ancho_pt > 400 or self.alto_pt > 200:
+            raise ValidationError('El recuadro del sello es demasiado grande (máx. 400×200 pt).')
         if not self.pk and ConfiguracionSelloFirma.objects.exists():
             raise ValidationError('Solo puede existir una configuración de sello.')
 
