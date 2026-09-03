@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import api from '../../api'
 import { useAuth } from '../../context/AuthContext'
+import { usePermission } from '../../hooks/usePermission'
 import { useNotify } from '../../hooks/useNotify'
 import {
   PageHeader,
@@ -15,11 +16,16 @@ import {
   Badge,
   Modal,
   Icon,
+  EmptyState,
 } from '@slep/ui'
 
-const ZOOM_MIN = 50
-const ZOOM_MAX = 250
-const ZOOM_STEP = 25
+import {
+  ZOOM_MIN,
+  ZOOM_MAX,
+  ZOOM_STEP,
+  ZOOM_DEFAULT,
+  ZOOM_FIT,
+} from '../../utils/firmaPreviewZoom'
 
 function downloadBlob(data, filename) {
   const url = window.URL.createObjectURL(new Blob([data], { type: 'application/pdf' }))
@@ -74,6 +80,7 @@ function getSignerDefaults(user) {
 
 export default function FirmaPrueba() {
   const { user } = useAuth()
+  const { can } = usePermission()
   const { notify } = useNotify()
   const [config, setConfig] = useState(null)
   const [configError, setConfigError] = useState(null)
@@ -91,7 +98,7 @@ export default function FirmaPrueba() {
 
   const [preview, setPreview] = useState(null)
   const [page, setPage] = useState(1)
-  const [zoom, setZoom] = useState(100)
+  const [zoom, setZoom] = useState(ZOOM_DEFAULT)
   const [stampBox, setStampBox] = useState({ x: 0, y: 0, w: 160, h: 56 })
   const dragRef = useRef(null)
   const stageRef = useRef(null)
@@ -181,7 +188,7 @@ export default function FirmaPrueba() {
         x: Math.max(margin, data.preview_width_px - stampW - margin),
         y: Math.max(margin, data.preview_height_px - stampH - margin),
       })
-      setZoom(100)
+      setZoom(ZOOM_DEFAULT)
       if (openModal) setModalOpen(true)
     } catch (err) {
       setPreview(null)
@@ -397,6 +404,17 @@ export default function FirmaPrueba() {
       }
     : undefined
 
+  if (!can('firma_digital.can_probar_firma')) {
+    return (
+      <div className="page">
+        <EmptyState
+          title="Sin acceso"
+          description="No está autorizado al laboratorio de firma digital (prueba)."
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="page" data-od-id="firma-prueba-page">
       <PageHeader
@@ -518,19 +536,38 @@ export default function FirmaPrueba() {
               </Alert>
             ) : null}
             <Field
-              label="RUT override (pruebas sandbox)"
+              label={
+                (config.firma_dep?.environment || '').toLowerCase() === 'production'
+                  ? 'RUT override (opcional)'
+                  : 'RUT override (pruebas sandbox)'
+              }
               htmlFor="firma-test-rut"
-              hint="Sandbox: 11.111.111-1 (atendida) o 22.222.222-2 (desatendida). Vacío = esos valores por defecto en lab."
+              hint={
+                (config.firma_dep?.environment || '').toLowerCase() === 'production'
+                  ? 'Producción: deje vacío para usar el RUT de su funcionario vinculado, o ingrese su RUT real con certificado Propósito General vigente en firma.digital.gob.cl. No use 11.111.111-1 ni 22.222.222-2.'
+                  : 'Sandbox/CERT: 11.111.111-1 (atendida) o 22.222.222-2 (desatendida). Vacío = valores por defecto del lab.'
+              }
             >
               <Input
                 id="firma-test-rut"
                 value={testRut}
                 onChange={(e) => setTestRut(e.target.value)}
                 placeholder={
-                  signatureMode === 'desatendida' ? '22.222.222-2' : '11.111.111-1'
+                  (config.firma_dep?.environment || '').toLowerCase() === 'production'
+                    ? 'Vacío = RUT del funcionario vinculado'
+                    : signatureMode === 'desatendida'
+                      ? '22.222.222-2'
+                      : '11.111.111-1'
                 }
               />
             </Field>
+            {(config.firma_dep?.environment || '').toLowerCase() === 'production'
+              && (/11\.?111\.?111-1/i.test(testRut) || /22\.?222\.?222-2/i.test(testRut)) ? (
+              <Alert variant="danger" title="RUT de sandbox en producción">
+                <code>11.111.111-1</code> y <code>22.222.222-2</code> solo funcionan en ambiente CERT/sandbox.
+                En producción use su RUT real y el OTP de su certificado Propósito General.
+              </Alert>
+            ) : null}
             {config.sello_resuelto ? (
               <p>
                 <strong>Sello orgánico:</strong> {config.sello_resuelto.nombre}
@@ -600,23 +637,24 @@ export default function FirmaPrueba() {
         onClose={closeModal}
         title="Ubicar sello y firmar"
         subheader={file?.name || 'Documento PDF'}
-        size="lg"
-        className="firma-placement-modal"
+        className="modal--shell modal--viewer modal--firma-sign"
+        bodyClassName="modal__body--viewer"
         overlayStatus={loading ? 'loading' : null}
         overlayTitle="Firmando documento…"
         overlayDescription="Enviando a FirmaGob. Esto puede tardar unos segundos."
         footer={
           <>
-            <Button variant="quiet" onClick={closeModal} disabled={loading}>
+            <Button variant="quiet" size="sm" onClick={closeModal} disabled={loading}>
               Cancelar
             </Button>
             <Button
               variant="primary"
+              size="sm"
               onClick={handleSign}
               disabled={loading || !preview || !signerName.trim()}
               loading={loading}
             >
-              Firmar PDF con sello
+              Firmar con sello
             </Button>
           </>
         }
@@ -657,8 +695,8 @@ export default function FirmaPrueba() {
                     type="button"
                     variant="quiet"
                     size="sm"
-                    disabled={loading || zoom === 100}
-                    onClick={() => setZoom(100)}
+                    disabled={loading || zoom === ZOOM_FIT}
+                    onClick={() => setZoom(ZOOM_FIT)}
                   >
                     Ajustar
                   </Button>
@@ -702,7 +740,7 @@ export default function FirmaPrueba() {
                   </div>
                 </div>
                 <p className="firma-placement__hint">
-                  Use + / − para el zoom. Arrastre el recuadro azul o use los botones de esquina.
+                  Vista ampliada al {ZOOM_DEFAULT}% al abrir. Use + / − o «Ajustar» ({ZOOM_FIT}%).
                 </p>
               </>
             ) : (

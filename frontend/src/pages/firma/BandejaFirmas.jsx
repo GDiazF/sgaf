@@ -4,6 +4,8 @@ import api from '../../api'
 import { useAuth } from '../../context/AuthContext'
 import { useNotify } from '../../hooks/useNotify'
 import FirmarPendienteModal from './FirmarPendienteModal'
+import DocumentViewerModal from '../../components/common/DocumentViewerModal'
+import { fetchPendientePdfBlob } from '../../utils/firmaPendientePdf'
 import {
   PageHeader,
   DataTable,
@@ -49,6 +51,7 @@ export default function BandejaFirmas() {
   const [motivo, setMotivo] = useState('')
   const [rejecting, setRejecting] = useState(false)
   const [revisandoId, setRevisandoId] = useState(null)
+  const [revisarState, setRevisarState] = useState(null)
 
   const fetchCounts = useCallback(async () => {
     try {
@@ -127,65 +130,30 @@ export default function BandejaFirmas() {
     }
   }, [searchParams, setSearchParams, rows, loading, tab])
 
+  const closeRevisar = () => {
+    setRevisarState((prev) => {
+      if (prev?.pdfUrl) {
+        window.URL.revokeObjectURL(prev.pdfUrl)
+      }
+      return null
+    })
+    setRevisandoId(null)
+  }
+
   const handleRevisar = async (item) => {
     setRevisandoId(item.id)
+    setRevisarState({ item, loading: true, pdfUrl: null, error: null })
     try {
-      let blob = null
-      try {
-        const stored = await api.get(
-          `firma-digital/pendientes/${item.id}/documento/`,
-          { responseType: 'blob' },
-        )
-        if (stored.data instanceof Blob && stored.data.size >= 100) {
-          const ct = stored.data.type || ''
-          if (!ct.includes('json')) blob = stored.data
-        }
-      } catch {
-        /* fallback */
-      }
-
-      if (!blob) {
-        const pagoId = item?.meta?.pago_id
-        if (!pagoId) {
-          notify({
-            variant: 'warning',
-            text: 'No hay documento PDF asociado para revisar.',
-          })
-          return
-        }
-        const tipo = item.meta?.tipo_pdf || 'PAGO'
-        const response = await api.get(
-          `registros-pagos/${pagoId}/generate_pdf/?tipo=${tipo}`,
-          { responseType: 'blob' },
-        )
-        blob = response.data
-      }
-
-      const url = window.URL.createObjectURL(
-        new Blob([blob], { type: 'application/pdf' }),
-      )
-      const win = window.open(url, '_blank', 'noopener,noreferrer')
-      if (!win) {
-        const link = document.createElement('a')
-        link.href = url
-        link.setAttribute(
-          'download',
-          `${item.codigo_interno || item.meta?.folio || 'documento'}.pdf`,
-        )
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
-        notify({
-          variant: 'info',
-          text: 'El navegador bloqueó la vista previa; se descargó el PDF.',
-        })
-      }
-      setTimeout(() => window.URL.revokeObjectURL(url), 60_000)
+      const blob = await fetchPendientePdfBlob(item, api)
+      const pdfUrl = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))
+      setRevisarState({ item, loading: false, pdfUrl, error: null })
     } catch (err) {
-      notify({
-        variant: 'danger',
-        text: err?.response?.data?.error || 'No se pudo abrir el documento.',
-      })
+      const msg =
+        err?.message ||
+        err?.response?.data?.error ||
+        'No se pudo abrir el documento.'
+      setRevisarState({ item, loading: false, pdfUrl: null, error: msg })
+      notify({ variant: 'danger', text: msg })
     } finally {
       setRevisandoId(null)
     }
@@ -413,6 +381,15 @@ export default function BandejaFirmas() {
           fetchCounts()
           fetchRows()
         }}
+      />
+
+      <DocumentViewerModal
+        open={Boolean(revisarState?.pdfUrl)}
+        onClose={closeRevisar}
+        title="Revisar documento"
+        subtitle={revisarState?.item?.titulo || revisarState?.item?.codigo_interno}
+        documentType="PDF"
+        fileUrl={revisarState?.pdfUrl}
       />
 
       <Modal

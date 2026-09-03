@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Glosario — Manual SGAF</title>
+  <link rel="stylesheet" href="css/manual.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar__brand"><a href="index.html"><h1>Manual SGAF</h1><p>Documentación offline</p></a></div>
+      <nav class="nav">
+        <div class="nav-group"><div class="nav-group__title">Inicio</div>
+          <a href="index.html">Bienvenida</a><a href="glosario.html" class="is-here">Glosario</a></div>
+        <div class="nav-group"><div class="nav-group__title">Servidor Ubuntu</div>
+          <a href="instalar.html">Primera instalación</a>
+          <a href="actualizar.html">Actualizar sistema</a><a href="respaldos.html">Respaldos</a></div>
+        <div class="nav-group"><div class="nav-group__title">Desarrollo</div>
+          <a href="github.html">Subir a GitHub</a><a href="local.html">Desarrollo local</a></div>
+        <div class="nav-group"><div class="nav-group__title">Uso web</div>
+          <a href="firma.html">Firma y permisos</a><a href="problemas.html">Problemas frecuentes</a></div>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="page-header">
+        <h2>Glosario</h2>
+        <p class="lead">Palabras que aparecen en las guías, explicadas en simple.</p>
+      </header>
+
+      <table>
+        <tr><th>Palabra</th><th>Significado</th></tr>
+        <tr><td><code>~/sgaf</code></td><td>Carpeta del proyecto en el servidor Ubuntu</td></tr>
+        <tr><td><code>.env</code></td><td>Archivo de configuración y contraseñas (nunca en Git)</td></tr>
+        <tr><td>SSH</td><td>Conexión remota al servidor desde tu PC</td></tr>
+        <tr><td>Docker</td><td>Sistema que ejecuta SGAF en «contenedores» aislados</td></tr>
+        <tr><td>Contenedor</td><td>Proceso empaquetado: frontend, backend, base de datos, firma-dep</td></tr>
+        <tr><td><code>git pull</code></td><td>Bajar últimos cambios desde GitHub al servidor</td></tr>
+        <tr><td><code>git push</code></td><td>Subir cambios desde tu PC a GitHub</td></tr>
+        <tr><td><code>migrate</code></td><td>Actualizar estructura de la base de datos (automático en deploy)</td></tr>
+        <tr><td>firma-dep</td><td>Servicio interno que conecta SGAF con FirmaGob</td></tr>
+        <tr><td>OTP</td><td>Código 6 dígitos del certificado FirmaGob (no es el MFA de login SGAF)</td></tr>
+        <tr><td>RC</td><td>Recepción conforme (documento de pagos/servicios)</td></tr>
+        <tr><td>media/</td><td>Carpeta de archivos subidos (fotos, PDFs)</td></tr>
+        <tr><td>cron</td><td>Programador de tareas automáticas en Linux (respaldos)</td></tr>
+      </table>
+
+      <nav class="page-nav">
+        <a href="problemas.html"><span class="page-nav__label">← Anterior</span><span class="page-nav__title">Problemas frecuentes</span></a>
+        <a href="index.html" style="text-align:right"><span class="page-nav__label">Volver →</span><span class="page-nav__title">Inicio</span></a>
+      </nav>
+    </main>
+  </div>
+</body>
+</html>

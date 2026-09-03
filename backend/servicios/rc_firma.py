@@ -5,8 +5,6 @@ import io
 import logging
 
 import pypdfium2 as pdfium
-from django.test import RequestFactory
-from rest_framework.request import Request
 
 from firma_digital.models import FirmaPendiente
 from firma_digital.queue import encolar_firma
@@ -17,32 +15,17 @@ logger = logging.getLogger(__name__)
 
 
 def _pdf_rc_desde_pago(pago, user, tipo: str = 'PAGO') -> bytes:
-    """Genera el PDF de RC reutilizando la acción generate_pdf del ViewSet."""
-    from .views import RegistroPagoViewSet
+    """Genera el PDF de RC (un pago) sin pasar por ViewSet — evita AnonymousUser sin JWT."""
+    from servicios.pdf import build_registro_pago_rc_pdf
 
-    factory = RequestFactory()
-    django_request = factory.get(
-        f'/api/registros-pagos/{pago.pk}/generate_pdf/',
-        {'tipo': tipo},
-    )
-    django_request.user = user
-    drf_request = Request(django_request)
+    response = build_registro_pago_rc_pdf(pago, user=user, tipo=tipo or None)
 
-    viewset = RegistroPagoViewSet()
-    viewset.request = drf_request
-    viewset.format_kwarg = None
-    viewset.args = ()
-    viewset.kwargs = {'pk': str(pago.pk)}
-    viewset.action_map = {'get': 'generate_pdf'}
-    viewset.action = 'generate_pdf'
+    from rest_framework.response import Response as DRFResponse
 
-    def _qs():
-        return RegistroPago.objects.filter(pk=pago.pk)
-
-    viewset.get_queryset = _qs
-    response = viewset.generate_pdf(drf_request, pk=pago.pk)
-
-    if hasattr(response, 'render'):
+    if isinstance(response, DRFResponse):
+        data = response.data
+        err = data.get('error', str(data)) if isinstance(data, dict) else str(data)
+        raise ValueError(err or 'No se pudo generar el PDF de la recepción conforme.')
         response.render()
 
     if hasattr(response, 'file') and response.file is not None:

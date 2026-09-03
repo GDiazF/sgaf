@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Inicio — Manual SGAF</title>
+  <link rel="stylesheet" href="css/manual.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar__brand">
+        <a href="index.html">
+          <h1>Manual SGAF</h1>
+          <p>Documentación offline · Sin internet</p>
+        </a>
+      </div>
+      <nav class="nav" aria-label="Menú">
+        <div class="nav-group">
+          <div class="nav-group__title">Inicio</div>
+          <a href="index.html" class="is-here">Bienvenida</a>
+          <a href="glosario.html">Glosario</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-group__title">Servidor Ubuntu</div>
+          <a href="instalar.html">Primera instalación</a>
+          <a href="actualizar.html">Actualizar sistema</a>
+          <a href="respaldos.html">Respaldos</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-group__title">Desarrollo</div>
+          <a href="github.html">Subir a GitHub</a>
+          <a href="local.html">Desarrollo local</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-group__title">Uso web</div>
+          <a href="firma.html">Firma y permisos</a>
+          <a href="problemas.html">Problemas frecuentes</a>
+        </div>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <header class="page-header">
+        <h2>Bienvenida al manual SGAF</h2>
+        <p class="lead">
+          Elige una guía del menú lateral o una tarjeta abajo. Cada tema tiene su propia página,
+          sin amontonar todo en un solo lugar.
+        </p>
+      </header>
+
+      <div class="role-row">
+        <div class="role-box"><strong>Admin servidor</strong>Instalar, actualizar, respaldar</div>
+        <div class="role-box"><strong>Desarrollador</strong>Programar y subir a GitHub</div>
+        <div class="role-box"><strong>Admin web</strong>Usuarios y firma en SGAF</div>
+      </div>
+
+      <figure class="figure" aria-hidden="true">
+        <svg viewBox="0 0 520 160" width="480" height="148">
+          <rect x="10" y="50" width="100" height="48" rx="8" fill="#e8f4f6" stroke="#0d6e7a" stroke-width="2"/>
+          <text x="60" y="78" text-anchor="middle" font-size="12">Tu PC</text>
+          <path d="M110 74 H165" stroke="#0d6e7a" stroke-width="2" marker-end="url(#arr)"/>
+          <rect x="165" y="50" width="100" height="48" rx="8" fill="#fef3c7" stroke="#b45309" stroke-width="2"/>
+          <text x="215" y="78" text-anchor="middle" font-size="12">GitHub</text>
+          <path d="M285 74 H340" stroke="#0d6e7a" stroke-width="2" marker-end="url(#arr)"/>
+          <rect x="340" y="40" width="150" height="68" rx="8" fill="#d1fae5" stroke="#047857" stroke-width="2"/>
+          <text x="415" y="72" text-anchor="middle" font-size="12">Servidor Ubuntu</text>
+          <text x="415" y="90" text-anchor="middle" font-size="10" fill="#5c6b7a">docker compose</text>
+          <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#0d6e7a"/></marker></defs>
+        </svg>
+        <figcaption>Flujo típico: desarrollo → GitHub → actualizar servidor</figcaption>
+      </figure>
+
+      <div class="hub-grid">
+        <a class="hub-card" href="instalar.html">
+          <span class="hub-card__num">Guía 1</span>
+          <div class="hub-card__title">Primera instalación</div>
+          <p class="hub-card__desc">Servidor nuevo, Docker, secretos y primer deploy.</p>
+        </a>
+        <a class="hub-card" href="actualizar.html">
+          <span class="hub-card__num">Guía 2 · Lo más habitual</span>
+          <div class="hub-card__title">Actualizar sistema</div>
+          <p class="hub-card__desc">git pull y deploy con respaldo automático.</p>
+        </a>
+        <a class="hub-card" href="respaldos.html">
+          <span class="hub-card__num">Guía 3</span>
+          <div class="hub-card__title">Respaldos</div>
+          <p class="hub-card__desc">Local, Google Drive (rclone) y cron automático.</p>
+        </a>
+        <a class="hub-card" href="github.html">
+          <span class="hub-card__num">Guía 4</span>
+          <div class="hub-card__title">Subir a GitHub</div>
+          <p class="hub-card__desc">Desde Windows: commit y push.</p>
+        </a>
+        <a class="hub-card" href="local.html">
+          <span class="hub-card__num">Guía 5</span>
+          <div class="hub-card__title">Desarrollo local</div>
+          <p class="hub-card__desc">Backend, frontend y firma-dep en tu PC.</p>
+        </a>
+        <a class="hub-card" href="firma.html">
+          <span class="hub-card__num">Guía 6</span>
+          <div class="hub-card__title">Firma y permisos</div>
+          <p class="hub-card__desc">Roles, bandeja y recepciones conformes.</p>
+        </a>
+        <a class="hub-card" href="problemas.html">
+          <span class="hub-card__num">Ayuda</span>
+          <div class="hub-card__title">Problemas frecuentes</div>
+          <p class="hub-card__desc">Login, git, firma y logs.</p>
+        </a>
+        <a class="hub-card" href="glosario.html">
+          <span class="hub-card__num">Referencia</span>
+          <div class="hub-card__title">Glosario</div>
+          <p class="hub-card__desc">Palabras técnicas explicadas en simple.</p>
+        </a>
+      </div>
+
+      <p class="footer-note">
+        Abrí cualquier página con doble clic. No requiere internet. Markdown extendido en <code>docs/guias/</code>.
+      </p>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Primera instalación — Manual SGAF</title>
+  <link rel="stylesheet" href="css/manual.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar__brand"><a href="index.html"><h1>Manual SGAF</h1><p>Documentación offline</p></a></div>
+      <nav class="nav">
+        <div class="nav-group"><div class="nav-group__title">Inicio</div>
+          <a href="index.html">Bienvenida</a><a href="glosario.html">Glosario</a></div>
+        <div class="nav-group"><div class="nav-group__title">Servidor Ubuntu</div>
+          <a href="instalar.html" class="is-here">Primera instalación</a>
+          <a href="actualizar.html">Actualizar sistema</a>
+          <a href="respaldos.html">Respaldos</a></div>
+        <div class="nav-group"><div class="nav-group__title">Desarrollo</div>
+          <a href="github.html">Subir a GitHub</a><a href="local.html">Desarrollo local</a></div>
+        <div class="nav-group"><div class="nav-group__title">Uso web</div>
+          <a href="firma.html">Firma y permisos</a><a href="problemas.html">Problemas frecuentes</a></div>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="page-header">
+        <h2>Primera instalación en el servidor</h2>
+        <p class="lead">Ubuntu nuevo, sin SGAF. Cada paso explica qué hace y por qué es necesario.</p>
+      </header>
+
+      <figure class="figure">
+        <svg viewBox="0 0 460 130" width="440" height="124">
+          <rect x="15" y="15" width="95" height="40" rx="6" fill="#e8f4f6" stroke="#0d6e7a"/><text x="62" y="40" text-anchor="middle" font-size="11">Frontend</text>
+          <rect x="130" y="15" width="95" height="40" rx="6" fill="#e8f4f6" stroke="#0d6e7a"/><text x="177" y="40" text-anchor="middle" font-size="11">Backend</text>
+          <rect x="245" y="15" width="95" height="40" rx="6" fill="#d1fae5" stroke="#047857"/><text x="292" y="40" text-anchor="middle" font-size="11">PostgreSQL</text>
+          <rect x="130" y="75" width="95" height="40" rx="6" fill="#fef3c7" stroke="#b45309"/><text x="177" y="100" text-anchor="middle" font-size="10">firma-dep</text>
+          <line x1="177" y1="55" x2="177" y2="75" stroke="#94a3b8"/>
+        </svg>
+        <figcaption>Cuatro contenedores Docker en el servidor</figcaption>
+      </figure>
+
+      <div class="card card--warn">
+        <span class="card__title">Requisitos previos</span>
+        <p class="step-legend">Docker, Docker Compose y Git instalados en Ubuntu.</p>
+        <p class="step-why"><strong>Por qué</strong> SGAF no se instala como un programa .exe: corre dentro de contenedores Docker orquestados por Compose, y el código se obtiene clonando el repositorio Git. Sin estas herramientas no hay forma de levantar el sistema. Detalle en <code>docs/0. preparacion_servidor.md</code>.</p>
+      </div>
+
+      <div class="tabs" data-tabs>
+        <div class="tabs__bar" role="tablist" aria-label="Modo de instalación">
+          <button type="button" class="tabs__btn is-active" data-tab="script" aria-selected="true">Modo script (.sh)</button>
+          <button type="button" class="tabs__btn" data-tab="manual" aria-selected="false">Modo manual</button>
+        </div>
+
+        <!-- SCRIPT -->
+        <div class="tabs__panel is-active" data-panel="script" role="tabpanel">
+          <ol class="steps">
+            <li>
+              <strong>Paso 1 — Descargar el código desde GitHub</strong>
+              <pre>cd ~
+git clone -b reingenieria https://github.com/GDiazF/sgaf.git sgaf
+cd sgaf
+chmod +x scripts/*.sh scripts/lib/*.sh</pre>
+              <p class="step-legend">Clona la rama de producción y da permiso de ejecución a los scripts.</p>
+              <p class="step-why"><strong>Por qué</strong> El servidor empieza vacío: necesita una copia del proyecto. La rama <code>reingenieria</code> es la que se despliega en producción. <code>chmod +x</code> permite ejecutar <code>deploy.sh</code> y demás; sin eso Linux rechaza el script con “Permission denied”.</p>
+            </li>
+            <li>
+              <strong>Paso 2 — Crear configuración base (.env)</strong>
+              <pre>./scripts/setup_env.sh</pre>
+              <p class="step-legend">Genera <code>.env</code> desde la plantilla y detecta IP/hostname del servidor.</p>
+              <p class="step-why"><strong>Por qué</strong> Django, PostgreSQL y firma-dep leen secretos y URLs desde <code>.env</code> (nunca van en Git). El script crea el archivo si no existe y rellena CORS, <code>ALLOWED_HOSTS</code> y URL pública según la red del servidor, evitando el error 400 al hacer login.</p>
+            </li>
+            <li>
+              <strong>Paso 3 — Completar secretos (una sola vez)</strong>
+              <pre>nano .env</pre>
+              <p class="step-legend">Editar contraseñas y claves que el script no puede inventar por usted.</p>
+              <p class="step-why"><strong>Por qué</strong> Cada instalación debe tener sus propios secretos únicos. Si dos servidores comparten <code>SECRET_KEY</code> o contraseñas de BD, un compromiso en uno afecta al otro. FirmaGob y firma-dep también requieren credenciales reales de la RA.</p>
+              <table>
+                <tr><th>Variable</th><th>Qué poner</th><th>Por qué</th></tr>
+                <tr><td><code>SECRET_KEY</code></td><td>Texto largo aleatorio</td><td>Firma sesiones y tokens Django</td></tr>
+                <tr><td><code>DB_PASSWORD</code></td><td>Contraseña PostgreSQL</td><td>Protege la base de datos</td></tr>
+                <tr><td><code>FIRMA_GOB_*</code></td><td>Token y Secret de FirmaGob</td><td>Conexión con la autoridad certificadora</td></tr>
+                <tr><td><code>FIRMA_DEP_API_KEY</code></td><td>Clave que usted elige</td><td>Autentica backend → firma-dep</td></tr>
+                <tr><td><code>API_CLIENT_KEYS</code></td><td><code>sgaf-backend:</code> + misma clave</td><td>Debe coincidir con <code>FIRMA_DEP_API_KEY</code></td></tr>
+              </table>
+              <p><strong>Nunca suba <code>.env</code> a Git.</strong></p>
+            </li>
+            <li>
+              <strong>Paso 4 — Desplegar (levantar Docker)</strong>
+              <pre>./scripts/deploy.sh</pre>
+              <p class="step-legend">Construye imágenes, inicia contenedores, crea tablas y archivos estáticos.</p>
+              <p class="step-why"><strong>Por qué</strong> Hasta este momento no hay SGAF corriendo: solo archivos en disco. <code>deploy.sh</code> ejecuta <code>docker compose up --build</code>, espera al backend, corre <code>migrate</code> (tablas iniciales) y <code>collectstatic</code>. Al final muestra la URL de acceso.</p>
+            </li>
+            <li>
+              <strong>Paso 5 — Crear usuario administrador</strong>
+              <pre>docker exec -it sgaf_backend_prod python manage.py createsuperuser</pre>
+              <p class="step-legend">Crea la primera cuenta con acceso total al sistema.</p>
+              <p class="step-why"><strong>Por qué</strong> La BD nueva no tiene usuarios. Sin un superusuario no puede entrar a SGAF ni al panel de administración para crear roles, funcionarios y permisos de firma.</p>
+            </li>
+            <li>
+              <strong>Paso 6 — Configurar respaldos en nube (recomendado)</strong>
+              <p class="step-legend">Programar copias automáticas a Google Drive con rclone y cron.</p>
+              <p class="step-why"><strong>Por qué</strong> Un respaldo solo en el mismo disco del servidor no protege si el servidor falla, se formatea o es robado. La nube + cron asegura copias periódicas sin depender de que alguien recuerde hacerlo manualmente. Ver <a href="respaldos.html">Respaldos</a>.</p>
+            </li>
+          </ol>
+        </div>
+
+        <!-- MANUAL -->
+        <div class="tabs__panel" data-panel="manual" role="tabpanel" hidden>
+          <p>Sin <code>setup_env.sh</code> ni <code>deploy.sh</code>. Mismas etapas, ejecutadas manualmente.</p>
+
+          <div class="card card--ok">
+            <span class="card__title">Bloque completo</span>
+            <pre>cd ~
+git clone -b reingenieria https://github.com/GDiazF/sgaf.git sgaf
+cd sgaf
+cp .env.example .env
+chmod 600 .env
+nano .env
+docker compose up -d --build
+docker exec sgaf_backend_prod python manage.py migrate --noinput
+docker exec sgaf_backend_prod python manage.py collectstatic --noinput
+docker exec -it sgaf_backend_prod python manage.py createsuperuser
+docker compose ps</pre>
+          </div>
+
+          <ol class="steps">
+            <li>
+              <strong>Paso 1 — Clonar el repositorio</strong>
+              <pre>cd ~
+git clone -b reingenieria https://github.com/GDiazF/sgaf.git sgaf
+cd sgaf</pre>
+              <p class="step-legend">Obtener el código fuente en el servidor.</p>
+              <p class="step-why"><strong>Por qué</strong> Equivalente al paso 1 del modo script: sin el código no hay aplicación que desplegar.</p>
+            </li>
+            <li>
+              <strong>Paso 2 — Crear y editar .env</strong>
+              <pre>cp .env.example .env
+chmod 600 .env
+nano .env</pre>
+              <p class="step-legend">Copiar plantilla, restringir permisos y completar secretos y red.</p>
+              <p class="step-why"><strong>Por qué</strong> <code>cp</code> crea lo que haría <code>setup_env.sh</code>. <code>chmod 600</code> limita lectura del archivo solo a su usuario (protege contraseñas). En <code>nano</code> debe completar secretos y URLs (ver tabla en <a href="actualizar.html">Actualizar → Modo manual</a>, paso 4).</p>
+            </li>
+            <li>
+              <strong>Paso 3 — Levantar contenedores Docker</strong>
+              <pre>docker compose up -d --build</pre>
+              <p class="step-legend">Compila y arranca frontend, backend, PostgreSQL y firma-dep.</p>
+              <p class="step-why"><strong>Por qué</strong> SGAF corre en cuatro servicios que deben estar activos y comunicados. <code>-d</code> los deja en segundo plano; <code>--build</code> construye las imágenes la primera vez.</p>
+            </li>
+            <li>
+              <strong>Paso 4 — Migraciones y archivos estáticos</strong>
+              <pre>docker exec sgaf_backend_prod python manage.py migrate --noinput
+docker exec sgaf_backend_prod python manage.py collectstatic --noinput</pre>
+              <p class="step-legend">Crear tablas en PostgreSQL y preparar assets del admin.</p>
+              <p class="step-why"><strong>Por qué</strong> La BD del contenedor PostgreSQL está vacía: <code>migrate</code> crea todas las tablas Django. <code>collectstatic</code> deja listos CSS/JS del panel de administración.</p>
+            </li>
+            <li>
+              <strong>Paso 5 — Crear usuario administrador</strong>
+              <pre>docker exec -it sgaf_backend_prod python manage.py createsuperuser</pre>
+              <p class="step-legend">Primera cuenta con acceso al sistema.</p>
+              <p class="step-why"><strong>Por qué</strong> Sin usuario no puede iniciar sesión ni configurar roles, funcionarios ni firma digital.</p>
+            </li>
+          </ol>
+
+          <p>Actualizaciones posteriores → <a href="actualizar.html">Actualizar sistema</a>.</p>
+        </div>
+      </div>
+
+      <nav class="page-nav">
+        <a href="index.html"><span class="page-nav__label">← Anterior</span><span class="page-nav__title">Inicio</span></a>
+        <a href="actualizar.html" style="text-align:right"><span class="page-nav__label">Siguiente →</span><span class="page-nav__title">Actualizar sistema</span></a>
+      </nav>
+    </main>
+  </div>
+  <script src="js/tabs.js"></script>
+</body>
+</html>

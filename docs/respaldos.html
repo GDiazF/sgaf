@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Respaldos — Manual SGAF</title>
+  <link rel="stylesheet" href="css/manual.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar__brand"><a href="index.html"><h1>Manual SGAF</h1><p>Documentación offline</p></a></div>
+      <nav class="nav">
+        <div class="nav-group"><div class="nav-group__title">Inicio</div>
+          <a href="index.html">Bienvenida</a><a href="glosario.html">Glosario</a></div>
+        <div class="nav-group"><div class="nav-group__title">Servidor Ubuntu</div>
+          <a href="instalar.html">Primera instalación</a>
+          <a href="actualizar.html">Actualizar sistema</a>
+          <a href="respaldos.html" class="is-here">Respaldos</a></div>
+        <div class="nav-group"><div class="nav-group__title">Desarrollo</div>
+          <a href="github.html">Subir a GitHub</a><a href="local.html">Desarrollo local</a></div>
+        <div class="nav-group"><div class="nav-group__title">Uso web</div>
+          <a href="firma.html">Firma y permisos</a><a href="problemas.html">Problemas frecuentes</a></div>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="page-header">
+        <h2>Respaldos</h2>
+        <p class="lead">Proteger base de datos y archivos. Cada pestaña explica qué hace cada paso y por qué.</p>
+      </header>
+
+      <figure class="figure">
+        <svg viewBox="0 0 400 100" width="380" height="95">
+          <rect x="20" y="25" width="80" height="50" rx="6" fill="#d1fae5" stroke="#047857"/>
+          <text x="60" y="55" text-anchor="middle" font-size="11">Servidor</text>
+          <path d="M100 50 H170" stroke="#0d6e7a" stroke-width="2" marker-end="url(#bk)"/>
+          <rect x="170" y="25" width="90" height="50" rx="6" fill="#e8f4f6" stroke="#0d6e7a"/>
+          <text x="215" y="55" text-anchor="middle" font-size="11">.sql / media</text>
+          <path d="M280 50 H350" stroke="#0d6e7a" stroke-width="2" marker-end="url(#bk)"/>
+          <rect x="350" y="30" width="45" height="40" rx="6" fill="#fef3c7" stroke="#b45309"/>
+          <text x="372" y="55" text-anchor="middle" font-size="9">Drive</text>
+          <defs><marker id="bk" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#0d6e7a"/></marker></defs>
+        </svg>
+        <figcaption>Local en el servidor → copia opcional a Google Drive (rclone) → automatización con cron</figcaption>
+      </figure>
+
+      <div class="tabs" data-tabs>
+        <div class="tabs__bar" role="tablist" aria-label="Tipos de respaldo">
+          <button type="button" class="tabs__btn is-active" data-tab="local-script" aria-selected="true">Local (script)</button>
+          <button type="button" class="tabs__btn" data-tab="local-manual" aria-selected="false">Local (manual)</button>
+          <button type="button" class="tabs__btn" data-tab="nube" aria-selected="false">Google Drive</button>
+          <button type="button" class="tabs__btn" data-tab="cron" aria-selected="false">Cron</button>
+          <button type="button" class="tabs__btn" data-tab="restaurar" aria-selected="false">Restaurar</button>
+        </div>
+
+        <!-- LOCAL SCRIPT -->
+        <div class="tabs__panel is-active" data-panel="local-script" role="tabpanel">
+          <ol class="steps">
+            <li>
+              <strong>Paso 1 — Respaldo al actualizar (con deploy)</strong>
+              <pre>cd ~/sgaf
+./scripts/deploy.sh --backup</pre>
+              <p class="step-legend">Respalda la BD y luego actualiza el sistema en un solo flujo.</p>
+              <p class="step-why"><strong>Por qué</strong> Es la forma más segura de actualizar: siempre tiene un <code>.sql</code> del momento justo antes de migraciones o cambios de código. El archivo queda en <code>~/sgaf_backups/respaldo_YYYYMMDD_HHMMSS.sql</code>.</p>
+            </li>
+            <li>
+              <strong>Paso 2 — Respaldo solo BD (sin actualizar)</strong>
+              <pre>cd ~/sgaf
+./scripts/backup_db.sh</pre>
+              <p class="step-legend">Genera respaldo en <code>./respaldos/</code> dentro del proyecto.</p>
+              <p class="step-why"><strong>Por qué</strong> Cuando quiere una copia de seguridad sin desplegar cambios (ej. antes de una operación arriesgada en la web). El script rota automáticamente archivos de más de 30 días para no llenar el disco.</p>
+            </li>
+          </ol>
+        </div>
+
+        <!-- LOCAL MANUAL -->
+        <div class="tabs__panel" data-panel="local-manual" role="tabpanel" hidden>
+          <ol class="steps">
+            <li>
+              <strong>Paso 1 — Crear carpeta de respaldos</strong>
+              <pre>mkdir -p ~/sgaf_backups</pre>
+              <p class="step-legend">Asegura que existe un lugar fijo para guardar copias.</p>
+              <p class="step-why"><strong>Por qué</strong> Sin la carpeta, el redirección <code>&gt; archivo.sql</code> puede fallar. Centralizar en <code>~/sgaf_backups</code> facilita encontrar respaldos después.</p>
+            </li>
+            <li>
+              <strong>Paso 2 — Exportar base de datos</strong>
+              <pre>STAMP=$(date +%Y%m%d_%H%M%S)
+docker exec sgaf_db_prod pg_dump -U sgaf_user sgaf_db \
+  > ~/sgaf_backups/respaldo_${STAMP}.sql
+ls -lh ~/sgaf_backups/respaldo_${STAMP}.sql</pre>
+              <p class="step-legend">Volcar todo PostgreSQL a un archivo SQL con marca de tiempo.</p>
+              <p class="step-why"><strong>Por qué</strong> <code>pg_dump</code> dentro del contenedor accede a la BD en ejecución. La fecha en el nombre evita confusiones. <code>ls -lh</code> verifica que el archivo tiene tamaño razonable (no 0 bytes).</p>
+            </li>
+            <li>
+              <strong>Paso 3 — Copiar archivos media</strong>
+              <pre>cp -a ~/sgaf/media ~/sgaf_backups/media_${STAMP}</pre>
+              <p class="step-legend">Duplicar fotos, PDFs y documentos subidos por usuarios.</p>
+              <p class="step-why"><strong>Por qué</strong> El respaldo de BD no incluye archivos en disco: solo registros. Los PDF firmados, fotos de funcionarios, etc. viven en <code>~/sgaf/media</code>. Sin copiar media, recuperaría datos pero perdería archivos.</p>
+            </li>
+            <li>
+              <strong>Paso 4 — (Opcional) Comprimir</strong>
+              <pre>gzip ~/sgaf_backups/respaldo_${STAMP}.sql</pre>
+              <p class="step-legend">Reduce tamaño para guardar o subir a la nube.</p>
+              <p class="step-why"><strong>Por qué</strong> Un <code>.sql</code> de producción puede ser grande. <code>gzip</code> ahorra espacio en disco y acelera subidas a Google Drive.</p>
+            </li>
+          </ol>
+        </div>
+
+        <!-- GOOGLE DRIVE -->
+        <div class="tabs__panel" data-panel="nube" role="tabpanel" hidden>
+          <p>Script del repo: <code>scripts/respaldo_automatico_sgaf.sh</code>. Copia BD y media a Google Drive vía <strong>rclone</strong>.</p>
+
+          <ol class="steps">
+            <li>
+              <strong>Paso 1 — Instalar rclone</strong>
+              <pre>sudo apt update
+sudo apt install rclone -y</pre>
+              <p class="step-legend">Herramienta de línea de comandos para sincronizar con la nube.</p>
+              <p class="step-why"><strong>Por qué</strong> El servidor no tiene interfaz gráfica para Google Drive. rclone permite subir y sincronizar archivos desde scripts y cron sin abrir el navegador en Ubuntu.</p>
+            </li>
+            <li>
+              <strong>Paso 2 — Vincular cuenta Google Drive</strong>
+              <pre>rclone config</pre>
+              <p class="step-legend">Crear un “remote” llamado <code>drivesoporteti</code> (nombre que usa el script).</p>
+              <p class="step-why"><strong>Por qué</strong> rclone necesita credenciales OAuth guardadas en el servidor. El nombre <code>drivesoporteti</code> debe coincidir con <code>DRIVE_REMOTE</code> en el script; si usa otro nombre, debe cambiarlo también en el script.</p>
+              <ul class="checklist">
+                <li><code>n</code> → nuevo remote · nombre: <code>drivesoporteti</code></li>
+                <li>Tipo <code>drive</code> · Client ID/Secret: vacío (Enter)</li>
+                <li>Scope <code>1</code> · Auto config: <code>n</code> (SSH sin navegador)</li>
+                <li>En Windows: <code>rclone authorize "drive" "clave..."</code> → pegar JSON en Ubuntu</li>
+                <li>Shared Drive: <code>n</code> · Guardar: <code>y</code> · Salir: <code>q</code></li>
+              </ul>
+            </li>
+            <li>
+              <strong>Paso 3 — Ajustar rutas en el script</strong>
+              <pre>nano ~/sgaf/scripts/respaldo_automatico_sgaf.sh</pre>
+              <pre>BACKUP_DIR="/home/tu_usuario/sgaf/backups"
+MEDIA_DIR="/home/tu_usuario/sgaf/media"</pre>
+              <p class="step-legend">Reemplazar <code>tu_usuario</code> con su usuario Linux real.</p>
+              <p class="step-why"><strong>Por qué</strong> El script en Git tiene rutas de ejemplo (<code>svtest</code>). En otro servidor las carpetas están bajo <code>/home/&lt;su_usuario&gt;/sgaf/</code>. Rutas incorrectas hacen que el respaldo falle o guarde en el lugar equivocado.</p>
+            </li>
+            <li>
+              <strong>Paso 4 — Permisos y formato Linux</strong>
+              <pre>sed -i 's/\r$//' ~/sgaf/scripts/*.sh
+chmod +x ~/sgaf/scripts/respaldo_automatico_sgaf.sh</pre>
+              <p class="step-legend">Corregir finales de línea Windows y habilitar ejecución.</p>
+              <p class="step-why"><strong>Por qué</strong> Archivos editados en Windows traen <code>\r\n</code>; en Linux eso provoca <code>\r: command not found</code>. Sin <code>chmod +x</code>, bash no puede ejecutar el script (ni manual ni desde cron).</p>
+            </li>
+            <li>
+              <strong>Paso 5 — Probar una ejecución manual</strong>
+              <pre>bash ~/sgaf/scripts/respaldo_automatico_sgaf.sh</pre>
+              <p class="step-legend">Verificar que sube a Drive antes de programar cron.</p>
+              <p class="step-why"><strong>Por qué</strong> Si falla aquí (rclone, docker, rutas), fallará también en cron. Confirme en Google Drive las carpetas <code>SGAF_Backups</code> y <code>SGAF_Media</code>. El script comprime BD, hace <code>rclone copy/sync</code> y borra copias &gt; 14 días.</p>
+            </li>
+          </ol>
+        </div>
+
+        <!-- CRON -->
+        <div class="tabs__panel" data-panel="cron" role="tabpanel" hidden>
+          <p>Requiere rclone y script configurados (pestaña Google Drive).</p>
+
+          <ol class="steps">
+            <li>
+              <strong>Paso 1 — Abrir el programador de tareas</strong>
+              <pre>crontab -e</pre>
+              <p class="step-legend">Edita la lista de comandos que Linux ejecuta automáticamente.</p>
+              <p class="step-why"><strong>Por qué</strong> Los respaldos manuales dependen de que alguien recuerde hacerlos. <code>cron</code> ejecuta el script en horarios fijos sin intervención humana.</p>
+            </li>
+            <li>
+              <strong>Paso 2 — Agregar horarios de respaldo</strong>
+              <pre># Respaldos SGAF: 9:00 y 18:00 todos los días
+0 9 * * * /home/tu_usuario/sgaf/scripts/respaldo_automatico_sgaf.sh >> /home/tu_usuario/backup_log.txt 2>&1
+0 18 * * * /home/tu_usuario/sgaf/scripts/respaldo_automatico_sgaf.sh >> /home/tu_usuario/backup_log.txt 2>&1</pre>
+              <p class="step-legend">Dos respaldos diarios: mañana y tarde. Cambie <code>tu_usuario</code>.</p>
+              <p class="step-why"><strong>Por qué</strong> <code>0 9 * * *</code> = minuto 0, hora 9, todos los días. Dos puntos en el día limitan la pérdida de datos si falla el servidor entre respaldos. <code>> backup_log.txt 2>&1</code> guarda salida y errores para diagnosticar.</p>
+            </li>
+            <li>
+              <strong>Paso 3 — Guardar y salir del editor</strong>
+              <p class="step-legend">En nano: Ctrl+O, Enter, Ctrl+X.</p>
+              <p class="step-why"><strong>Por qué</strong> Las líneas no se activan hasta guardar <code>crontab</code>. Si cierra sin guardar, no habrá respaldos automáticos.</p>
+            </li>
+            <li>
+              <strong>Paso 4 — Verificar que cron registró las tareas</strong>
+              <pre>crontab -l</pre>
+              <p class="step-legend">Lista las entradas activas de su usuario.</p>
+              <p class="step-why"><strong>Por qué</strong> Confirma que las dos líneas aparecen y las rutas son correctas. Tras el primer horario programado, revise <code>cat ~/backup_log.txt</code>.</p>
+            </li>
+          </ol>
+
+          <div class="card card--accent">
+            <span class="card__title">Formato cron</span>
+            <pre>minuto  hora  día  mes  día_semana  comando
+0       9     *    *    *             respaldo...</pre>
+          </div>
+
+          <div class="block">
+            <h3>Problemas frecuentes</h3>
+            <table>
+              <tr><th>Error</th><th>Por qué ocurre</th><th>Solución</th></tr>
+              <tr><td><code>Permission denied</code></td><td>Script sin permiso de ejecución</td><td><code>chmod +x ~/sgaf/scripts/respaldo_automatico_sgaf.sh</code></td></tr>
+              <tr><td><code>\r: command not found</code></td><td>Archivo con formato Windows</td><td><code>sed -i 's/\r$//' ~/sgaf/scripts/*.sh</code></td></tr>
+              <tr><td><code>docker: command not found</code></td><td>Cron usa PATH mínimo</td><td>Verificar rutas en el script o export PATH</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <!-- RESTAURAR -->
+        <div class="tabs__panel" data-panel="restaurar" role="tabpanel" hidden>
+          <div class="card card--warn">
+            <span class="card__title">Precaución</span>
+            Restaurar <strong>reemplaza</strong> los datos actuales. Respalde el estado actual antes de importar uno antiguo.
+          </div>
+
+          <ol class="steps">
+            <li>
+              <strong>Paso 1 — Restaurar base de datos desde archivo local</strong>
+              <pre># Comprimido:
+gunzip -c ~/sgaf_backups/respaldo.sql.gz | \
+  docker exec -i sgaf_db_prod psql -U sgaf_user -d sgaf_db
+
+# Sin comprimir:
+cat ~/sgaf_backups/respaldo.sql | \
+  docker exec -i sgaf_db_prod psql -U sgaf_user -d sgaf_db</pre>
+              <p class="step-legend">Importar el SQL dentro del contenedor PostgreSQL.</p>
+              <p class="step-why"><strong>Por qué</strong> <code>psql</code> ejecuta las instrucciones del dump y reconstruye tablas y datos. Se usa cuando una actualización falló o se borraron datos por error.</p>
+            </li>
+            <li>
+              <strong>Paso 2 — Restaurar media</strong>
+              <pre>cp -a ~/sgaf_backups/media_respaldo/* ~/sgaf/media/</pre>
+              <p class="step-legend">Devolver archivos subidos al directorio activo.</p>
+              <p class="step-why"><strong>Por qué</strong> La BD restaurada puede referenciar archivos que solo existen en la copia de <code>media/</code>. Sin este paso vería registros pero PDFs o imágenes rotas.</p>
+            </li>
+            <li>
+              <strong>Paso 3 — Restaurar desde Google Drive</strong>
+              <pre>rclone copy drivesoporteti:SGAF_Backups/backup_sgaf_2026-01-01_09-00.sql.gz ~/restaurar/
+gunzip -c ~/restaurar/backup_sgaf_2026-01-01_09-00.sql.gz | \
+  docker exec -i sgaf_db_prod psql -U sgaf_user -d sgaf_db</pre>
+              <p class="step-legend">Bajar el respaldo de la nube y luego importarlo.</p>
+              <p class="step-why"><strong>Por qué</strong> Si el servidor perdió discos o no tiene copias locales, la nube es el único origen. <code>rclone copy</code> trae el archivo; el resto es igual que restaurar local.</p>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <nav class="page-nav">
+        <a href="actualizar.html"><span class="page-nav__label">← Anterior</span><span class="page-nav__title">Actualizar sistema</span></a>
+        <a href="github.html" style="text-align:right"><span class="page-nav__label">Siguiente →</span><span class="page-nav__title">Subir a GitHub</span></a>
+      </nav>
+    </main>
+  </div>
+  <script src="js/tabs.js"></script>
+</body>
+</html>

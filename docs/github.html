@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subir a GitHub — Manual SGAF</title>
+  <link rel="stylesheet" href="css/manual.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar__brand"><a href="index.html"><h1>Manual SGAF</h1><p>Documentación offline</p></a></div>
+      <nav class="nav">
+        <div class="nav-group"><div class="nav-group__title">Inicio</div>
+          <a href="index.html">Bienvenida</a><a href="glosario.html">Glosario</a></div>
+        <div class="nav-group"><div class="nav-group__title">Servidor Ubuntu</div>
+          <a href="instalar.html">Primera instalación</a>
+          <a href="actualizar.html">Actualizar sistema</a><a href="respaldos.html">Respaldos</a></div>
+        <div class="nav-group"><div class="nav-group__title">Desarrollo</div>
+          <a href="github.html" class="is-here">Subir a GitHub</a><a href="local.html">Desarrollo local</a></div>
+        <div class="nav-group"><div class="nav-group__title">Uso web</div>
+          <a href="firma.html">Firma y permisos</a><a href="problemas.html">Problemas frecuentes</a></div>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="page-header">
+        <h2>Subir cambios a GitHub</h2>
+        <p class="lead">En tu PC Windows, después de probar que todo funciona localmente.</p>
+      </header>
+
+      <div class="card card--accent">
+        <span class="card__title">Flujo completo</span>
+        Probar en PC → <code>git push</code> → en el servidor: <a href="actualizar.html">Actualizar sistema</a>
+      </div>
+
+      <ol class="steps">
+        <li>
+          <strong>Ver cambios pendientes</strong>
+          <pre>cd "C:\...\SGAF_CC"
+git status</pre>
+        </li>
+        <li>
+          <strong>Si modificaste la base de datos</strong> (solo en tu PC)
+          <pre>cd backend
+python manage.py makemigrations
+python manage.py migrate</pre>
+          Incluye archivos nuevos en <code>migrations/</code> en el commit.
+        </li>
+        <li>
+          <strong>Guardar cambios</strong>
+          <pre>git add .
+git commit -m "Describe el cambio en una frase"</pre>
+        </li>
+        <li>
+          <strong>Subir a GitHub</strong>
+          <pre>git push origin reingenieria</pre>
+        </li>
+      </ol>
+
+      <div class="block">
+        <h3>En el servidor después del push</h3>
+        <table>
+          <tr><th>Tipo de cambio</th><th>Acción</th></tr>
+          <tr><td>Pantallas, menús, modales</td><td><a href="actualizar.html">Deploy completo</a> (build frontend)</td></tr>
+          <tr><td>Solo API / migraciones</td><td><code>git pull</code> + deploy o <code>restart backend</code></td></tr>
+        </table>
+      </div>
+
+      <nav class="page-nav">
+        <a href="respaldos.html"><span class="page-nav__label">← Anterior</span><span class="page-nav__title">Respaldos</span></a>
+        <a href="local.html" style="text-align:right"><span class="page-nav__label">Siguiente →</span><span class="page-nav__title">Desarrollo local</span></a>
+      </nav>
+    </main>
+  </div>
+</body>
+</html>

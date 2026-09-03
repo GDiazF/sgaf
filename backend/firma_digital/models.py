@@ -1,4 +1,4 @@
-﻿import os
+import os
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -53,6 +53,7 @@ class SelloFirma(models.Model):
         ordering = ['nombre']
         permissions = [
             ('can_firmar', 'Puede firmar digitalmente'),
+            ('can_probar_firma', 'Puede usar firma digital (prueba)'),
         ]
 
     def __str__(self):

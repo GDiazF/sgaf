@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Actualizar sistema — Manual SGAF</title>
+  <link rel="stylesheet" href="css/manual.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar__brand"><a href="index.html"><h1>Manual SGAF</h1><p>Documentación offline</p></a></div>
+      <nav class="nav">
+        <div class="nav-group"><div class="nav-group__title">Inicio</div>
+          <a href="index.html">Bienvenida</a><a href="glosario.html">Glosario</a></div>
+        <div class="nav-group"><div class="nav-group__title">Servidor Ubuntu</div>
+          <a href="instalar.html">Primera instalación</a>
+          <a href="actualizar.html" class="is-here">Actualizar sistema</a>
+          <a href="respaldos.html">Respaldos</a></div>
+        <div class="nav-group"><div class="nav-group__title">Desarrollo</div>
+          <a href="github.html">Subir a GitHub</a><a href="local.html">Desarrollo local</a></div>
+        <div class="nav-group"><div class="nav-group__title">Uso web</div>
+          <a href="firma.html">Firma y permisos</a><a href="problemas.html">Problemas frecuentes</a></div>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="page-header">
+        <h2>Actualizar el sistema</h2>
+        <p class="lead">Bajar cambios de GitHub y aplicarlos en el servidor. Cada paso indica qué hace y por qué es necesario.</p>
+      </header>
+
+      <div class="card card--warn">
+        <span class="card__title">Siempre respalde antes de actualizar</span>
+        <p>Las actualizaciones pueden incluir cambios en la base de datos (migraciones). Si algo falla a mitad del proceso, el respaldo es su única forma de volver al estado anterior sin perder datos.</p>
+        <p>Respaldos en nube y cron → <a href="respaldos.html">Respaldos</a>.</p>
+      </div>
+
+      <div class="tabs" data-tabs>
+        <div class="tabs__bar" role="tablist" aria-label="Modo de actualización">
+          <button type="button" class="tabs__btn is-active" data-tab="script" aria-selected="true">Modo script (.sh)</button>
+          <button type="button" class="tabs__btn" data-tab="manual" aria-selected="false">Modo manual</button>
+        </div>
+
+        <!-- MODO SCRIPT -->
+        <div class="tabs__panel is-active" data-panel="script" role="tabpanel">
+          <p>Usa los scripts del repositorio. Recomendado en producción: menos errores y orden garantizado.</p>
+
+          <div class="card card--ok">
+            <span class="card__title">Copiar y pegar (recomendado)</span>
+            <pre>cd ~/sgaf
+git pull origin reingenieria
+./scripts/deploy.sh --backup</pre>
+          </div>
+
+          <ol class="steps">
+            <li>
+              <strong>Paso 1 — Conectarse por SSH al servidor</strong>
+              <p class="step-legend">Abrir una terminal remota en el Ubuntu donde ya corre SGAF.</p>
+              <p class="step-why"><strong>Por qué</strong> SGAF no se actualiza desde su PC Windows: el código y Docker están en el servidor. SSH es la forma segura de ejecutar comandos allí.</p>
+            </li>
+            <li>
+              <strong>Paso 2 — Ir a la carpeta del proyecto</strong>
+              <pre>cd ~/sgaf</pre>
+              <p class="step-legend">Todos los comandos de deploy deben ejecutarse desde la raíz del repositorio.</p>
+              <p class="step-why"><strong>Por qué</strong> <code>docker compose</code> y los scripts buscan <code>docker-compose.yml</code> y <code>.env</code> en esa carpeta. Si está en otro directorio, los comandos fallan o usan configuración incorrecta.</p>
+            </li>
+            <li>
+              <strong>Paso 3 — Bajar los cambios desde GitHub</strong>
+              <pre>git pull origin reingenieria</pre>
+              <p class="step-legend">Trae al servidor el código que subió el desarrollador desde su PC.</p>
+              <p class="step-why"><strong>Por qué</strong> El servidor solo tiene una copia local del código. <code>git pull</code> sincroniza esa copia con la rama <code>reingenieria</code> en GitHub. Sin este paso, seguiría corriendo la versión antigua.</p>
+            </li>
+            <li>
+              <strong>Paso 4 — Desplegar con respaldo automático</strong>
+              <pre>./scripts/deploy.sh --backup</pre>
+              <p class="step-legend">Un solo comando: respalda la BD, reconstruye contenedores, aplica migraciones y archivos estáticos.</p>
+              <p class="step-why"><strong>Por qué</strong> El flag <code>--backup</code> guarda un <code>.sql</code> en <code>~/sgaf_backups/</code> <em>antes</em> de tocar nada. Luego el script actualiza Docker (nuevas imágenes si cambió código), ejecuta <code>migrate</code> (tablas nuevas o modificadas) y <code>collectstatic</code> (CSS/JS del admin Django). Es el equivalente seguro a hacer todo manualmente.</p>
+            </li>
+            <li>
+              <strong>Paso 5 — Verificar que los servicios están activos</strong>
+              <pre>docker compose ps</pre>
+              <p class="step-legend">Confirma que los cuatro contenedores muestran estado <strong>Up</strong>.</p>
+              <p class="step-why"><strong>Por qué</strong> Si un contenedor está detenido o reiniciando en bucle, la web no responderá o fallará la firma. Revisar aquí evita asumir que “terminó bien” cuando en realidad el backend no arrancó.</p>
+              <p>Deben estar Up: <code>sgaf_db_prod</code>, <code>sgaf_backend_prod</code>, <code>sgaf_frontend_prod</code>, <code>sgaf_firma_dep</code>.</p>
+            </li>
+            <li>
+              <strong>Paso 6 — Probar en el navegador</strong>
+              <p class="step-legend">Abrir la URL del sistema (la de <code>SGAF_PUBLIC_URL</code> en <code>.env</code>) e iniciar sesión.</p>
+              <p class="step-why"><strong>Por qué</strong> <code>docker compose ps</code> solo confirma que los procesos corren, no que la aplicación responde bien. Un error de CORS, migración incompleta o frontend viejo solo se nota al usar la web.</p>
+            </li>
+          </ol>
+
+          <div class="block">
+            <h3>Casos especiales</h3>
+            <table>
+              <tr><th>Situación</th><th>Qué hacer</th><th>Por qué</th></tr>
+              <tr><td>Cambió menús, modales o bandeja</td><td>Deploy completo o <code>docker compose up -d --build frontend</code></td><td>El frontend es una imagen Docker; sin rebuild sigue mostrando la UI antigua aunque el código en disco ya cambió.</td></tr>
+              <tr><td>Solo cambió API backend</td><td><code>docker compose restart backend</code></td><td>Python se recarga al reiniciar; no hace falta rebuild si no cambió dependencias ni Dockerfile.</td></tr>
+              <tr><td>Login error 400</td><td><code>./scripts/sync_env_network.sh</code> + <code>docker compose up -d backend</code></td><td>Django rechaza peticiones si la URL del navegador no está en <code>ALLOWED_HOSTS</code> o CORS.</td></tr>
+            </table>
+          </div>
+
+          <div class="block">
+            <h3>Opciones de deploy.sh</h3>
+            <table>
+              <tr><th>Comando</th><th>Qué hace</th><th>Cuándo usarlo</th></tr>
+              <tr><td><code>./scripts/deploy.sh --backup</code></td><td>Respaldo + actualización completa</td><td><strong>Producción habitual.</strong> Siempre que actualice con datos reales.</td></tr>
+              <tr><td><code>./scripts/deploy.sh</code></td><td>Actualiza sin respaldo</td><td>Solo en entornos de prueba donde puede perder datos.</td></tr>
+              <tr><td><code>./scripts/deploy.sh --quick</code></td><td>Solo reinicia contenedores</td><td>Cuando no hubo cambios de código ni migraciones; no actualiza pantallas.</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <!-- MODO MANUAL -->
+        <div class="tabs__panel" data-panel="manual" role="tabpanel" hidden>
+          <p>Mismos pasos que <code>deploy.sh</code>, uno por uno. Útil para entender el proceso o si el script falla.</p>
+
+          <div class="card card--accent">
+            <span class="card__title">Orden obligatorio</span>
+            Respaldo → <code>git pull</code> → Docker → migraciones → estáticos. No invertir el orden: migrar sin respaldo o sin contenedores actualizados causa errores graves.
+          </div>
+
+          <div class="card card--ok">
+            <span class="card__title">Bloque completo (copiar y pegar)</span>
+            <pre>cd ~/sgaf
+mkdir -p ~/sgaf_backups
+STAMP=$(date +%Y%m%d_%H%M%S)
+docker exec sgaf_db_prod pg_dump -U sgaf_user sgaf_db \
+  > ~/sgaf_backups/respaldo_${STAMP}.sql
+ls -lh ~/sgaf_backups/respaldo_${STAMP}.sql
+git pull origin reingenieria
+docker compose up -d --build
+docker exec sgaf_backend_prod python manage.py migrate --noinput
+docker exec sgaf_backend_prod python manage.py collectstatic --noinput
+docker compose ps</pre>
+          </div>
+
+          <ol class="steps">
+            <li>
+              <strong>Paso 1 — Ir al proyecto</strong>
+              <pre>cd ~/sgaf</pre>
+              <p class="step-legend">Ubicarse en la raíz del repositorio en el servidor.</p>
+              <p class="step-why"><strong>Por qué</strong> Docker Compose y los archivos de configuración están en esta carpeta. Otros directorios no tienen el contexto correcto para desplegar.</p>
+            </li>
+            <li>
+              <strong>Paso 2 — Respaldo de base de datos (obligatorio)</strong>
+              <pre>mkdir -p ~/sgaf_backups
+STAMP=$(date +%Y%m%d_%H%M%S)
+docker exec sgaf_db_prod pg_dump -U sgaf_user sgaf_db \
+  > ~/sgaf_backups/respaldo_${STAMP}.sql
+ls -lh ~/sgaf_backups/respaldo_${STAMP}.sql</pre>
+              <p class="step-legend">Exporta toda la BD a un archivo de texto SQL con fecha en el nombre.</p>
+              <p class="step-why"><strong>Por qué</strong> Las migraciones pueden alterar tablas y columnas. Si una migración falla a medias, la BD queda inconsistente. El <code>pg_dump</code> es una “foto” recuperable con <code>psql</code>. <code>ls -lh</code> confirma que el archivo existe y no está vacío.</p>
+              <p>Use <code>DB_USER</code> y <code>DB_NAME</code> de su <code>.env</code>.</p>
+            </li>
+            <li>
+              <strong>Paso 3 — Bajar cambios de GitHub</strong>
+              <pre>git pull origin reingenieria</pre>
+              <p class="step-legend">Actualiza el código fuente en el servidor.</p>
+              <p class="step-why"><strong>Por qué</strong> Sin <code>git pull</code>, Docker reconstruiría las mismas versiones antiguas. Este paso trae el código nuevo que debe empaquetarse en los contenedores.</p>
+            </li>
+            <li>
+              <strong>Paso 4 — (Opcional) Revisar .env si cambió IP o dominio</strong>
+              <pre>nano .env</pre>
+              <p class="step-legend">Solo si el acceso por URL nueva da error 400 al iniciar sesión.</p>
+              <p class="step-why"><strong>Por qué</strong> Django valida el host y el origen de cada petición. Si movió el servidor o accede por otro nombre, debe listar esa URL en <code>ALLOWED_HOSTS</code>, CORS y CSRF. El script <code>sync_env_network.sh</code> hace esto automáticamente en modo script.</p>
+              <table>
+                <tr><th>Variable</th><th>Ejemplo</th><th>Para qué</th></tr>
+                <tr><td><code>ALLOWED_HOSTS</code></td><td><code>localhost,192.168.1.50,svtest</code></td><td>Hosts que Django acepta</td></tr>
+                <tr><td><code>CORS_ALLOWED_ORIGINS</code></td><td><code>http://192.168.1.50</code></td><td>Origen del frontend en el navegador</td></tr>
+                <tr><td><code>CSRF_TRUSTED_ORIGINS</code></td><td>Igual que CORS</td><td>Permite el formulario de login</td></tr>
+                <tr><td><code>SGAF_PUBLIC_URL</code></td><td><code>http://192.168.1.50</code></td><td>URL pública del sistema</td></tr>
+                <tr><td><code>VITE_API_URL</code></td><td><code>http://192.168.1.50/api</code></td><td>URL del API para el frontend</td></tr>
+              </table>
+            </li>
+            <li>
+              <strong>Paso 5 — Reconstruir y levantar contenedores</strong>
+              <pre>docker compose up -d --build</pre>
+              <p class="step-legend">Compila imágenes con el código nuevo y reinicia los servicios en segundo plano.</p>
+              <p class="step-why"><strong>Por qué</strong> Los contenedores encapsulan frontend, backend, base de datos y firma-dep. <code>--build</code> asegura que cambios en código o dependencias entren en la imagen. Sin build, solo reinicia lo que ya estaba empaquetado.</p>
+              <p>Solo pantallas: <code>docker compose up -d --build frontend</code><br>
+              Solo reiniciar sin cambios: <code>docker compose up -d</code></p>
+            </li>
+            <li>
+              <strong>Paso 6 — Aplicar migraciones</strong>
+              <pre>docker exec sgaf_backend_prod python manage.py migrate --noinput</pre>
+              <p class="step-legend">Actualiza la estructura de tablas según los modelos del código nuevo.</p>
+              <p class="step-why"><strong>Por qué</strong> Cuando el desarrollador cambia modelos Django, genera archivos de migración. <code>migrate</code> los ejecuta en PostgreSQL (nuevas tablas, columnas, índices). Si salta este paso, la app puede crashear al usar funciones nuevas.</p>
+            </li>
+            <li>
+              <strong>Paso 7 — Recolectar archivos estáticos</strong>
+              <pre>docker exec sgaf_backend_prod python manage.py collectstatic --noinput</pre>
+              <p class="step-legend">Copia CSS, JS e imágenes del admin Django a la carpeta que sirve el servidor.</p>
+              <p class="step-why"><strong>Por qué</strong> El panel de administración y algunos assets del backend no van en el frontend React. <code>collectstatic</code> los deja listos para que nginx/backend los entregue correctamente.</p>
+            </li>
+            <li>
+              <strong>Paso 8 — Verificar</strong>
+              <pre>docker compose ps
+docker exec sgaf_backend_prod python manage.py check</pre>
+              <p class="step-legend">Revisa contenedores y configuración Django.</p>
+              <p class="step-why"><strong>Por qué</strong> <code>ps</code> confirma que todo está Up. <code>manage.py check</code> detecta errores de configuración antes de que un usuario los encuentre en producción.</p>
+              <p>Abra <code>SGAF_PUBLIC_URL</code> en el navegador y pruebe el login.</p>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <nav class="page-nav">
+        <a href="instalar.html"><span class="page-nav__label">← Anterior</span><span class="page-nav__title">Primera instalación</span></a>
+        <a href="respaldos.html" style="text-align:right"><span class="page-nav__label">Siguiente →</span><span class="page-nav__title">Respaldos</span></a>
+      </nav>
+    </main>
+  </div>
+  <script src="js/tabs.js"></script>
+</body>
+</html>

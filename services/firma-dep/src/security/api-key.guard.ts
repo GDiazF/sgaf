@@ -83,7 +83,26 @@ export class ApiKeyGuard implements CanActivate {
   }
 
   private isSecurityEnabled(): boolean {
-    return this.configService.get<string>('API_SECURITY_ENABLED') !== 'false';
+    return !this.isEnvFalsy('API_SECURITY_ENABLED');
+  }
+
+  /** Joi/Config puede devolver boolean o string desde process.env. */
+  private isEnvTruthy(key: string): boolean {
+    const value = this.configService.get<string | boolean | number>(key);
+    if (value === true || value === 1) {
+      return true;
+    }
+    const s = String(value ?? '').trim().toLowerCase();
+    return s === 'true' || s === '1';
+  }
+
+  private isEnvFalsy(key: string): boolean {
+    const value = this.configService.get<string | boolean | number>(key);
+    if (value === false || value === 0) {
+      return true;
+    }
+    const s = String(value ?? '').trim().toLowerCase();
+    return s === 'false' || s === '0';
   }
 
   private parseAllowedClients(): Map<string, string> {
@@ -128,7 +147,7 @@ export class ApiKeyGuard implements CanActivate {
   }
 
   private isPrivateNetworksAllowed(): boolean {
-    return this.configService.get<string>('API_ALLOW_PRIVATE_NETWORKS') === 'true';
+    return this.isEnvTruthy('API_ALLOW_PRIVATE_NETWORKS');
   }
 
   private isPrivateNetworkIp(ip: string): boolean {
@@ -153,7 +172,7 @@ export class ApiKeyGuard implements CanActivate {
   }
 
   private isLocalhostAllowed(): boolean {
-    return this.configService.get<string>('API_ALLOW_LOCALHOST') !== 'false';
+    return !this.isEnvFalsy('API_ALLOW_LOCALHOST');
   }
 
   private parseAllowedIps(): Set<string> {
