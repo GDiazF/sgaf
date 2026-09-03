@@ -64,6 +64,14 @@ class SignatureOptionsDto {
   @Max(30)
   sealLeftMarginCm?: number;
 
+  @ApiPropertyOptional({
+    description:
+      'PNG/JPEG en base64 para el fondo del sello visible. Si no viene, se usa assets/logo-dep.png. FirmaGob sigue dibujando el texto (layer2).',
+  })
+  @IsOptional()
+  @IsString()
+  sealImageBase64?: string;
+
   @ApiPropertyOptional({ example: 'Subsecretaría General de la Presidencia' })
   @IsOptional()
   @IsString()

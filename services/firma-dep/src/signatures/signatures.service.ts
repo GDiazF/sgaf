@@ -54,7 +54,6 @@ type CompletedSignatureArtifacts = {
 @Injectable()
 export class SignaturesService {
   private readonly logger = new Logger(SignaturesService.name);
-  private readonly sealLogoBase64 = this.loadSealLogoBase64();
 
   constructor(
     private readonly configService: ConfigService,
@@ -268,7 +267,7 @@ export class SignaturesService {
     const layoutXml =
       dto.signature.visibleSeal === false
         ? null
-        : this.buildVisibleSealLayout(preparedPdf.sealPlacement);
+        : this.buildVisibleSealLayout(preparedPdf.sealPlacement, dto);
     const fileName = this.resolveSignedFileName(dto.fileName);
 
     const body = {
@@ -500,15 +499,20 @@ export class SignaturesService {
     }
 
     const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const logoImage = await this.embedPreviewLogo(pdfDoc);
+    const logoImage = await this.embedPreviewLogo(pdfDoc, dto);
     const pageToDraw = pages[Math.max(0, sealPlacement.pageNumber - 1)];
 
-    if (logoImage) {
+    if (logoImage && logoImage.width > 0 && logoImage.height > 0) {
+      const boxW = sealPlacement.width;
+      const boxH = sealPlacement.height;
+      const scale = Math.min(boxW / logoImage.width, boxH / logoImage.height);
+      const drawW = logoImage.width * scale;
+      const drawH = logoImage.height * scale;
       pageToDraw.drawImage(logoImage, {
         x: sealPlacement.x,
-        y: sealPlacement.y,
-        width: 78,
-        height: 78,
+        y: sealPlacement.y + (boxH - drawH) / 2,
+        width: drawW,
+        height: drawH,
       });
     }
 
@@ -543,7 +547,10 @@ export class SignaturesService {
    * Aqui definimos la caja de firma en coordenadas PDF y la imagen base
    * que el proveedor usara para estampar la firma visible real.
    */
-  private buildVisibleSealLayout(sealPlacement: VisibleSealPlacement | null): string | null {
+  private buildVisibleSealLayout(
+    sealPlacement: VisibleSealPlacement | null,
+    dto: SignPdfDto,
+  ): string | null {
     if (!sealPlacement) {
       return null;
     }
@@ -553,6 +560,7 @@ export class SignaturesService {
     const urx = sealPlacement.x + sealPlacement.width;
     const ury = sealPlacement.y + sealPlacement.height;
     const page = String(sealPlacement.pageNumber);
+    const imageBase64 = this.resolveSealImageBase64(dto);
 
     return [
       '<AgileSignerConfig>',
@@ -566,7 +574,7 @@ export class SignaturesService {
       `<ury>${Math.round(ury)}</ury>`,
       `<page>${page}</page>`,
       '<image>BASE64</image>',
-      `<BASE64VALUE>${this.sealLogoBase64}</BASE64VALUE>`,
+      `<BASE64VALUE>${imageBase64}</BASE64VALUE>`,
       '</Visible>',
       '</Signature>',
       '</Application>',
@@ -882,19 +890,35 @@ export class SignaturesService {
     return `${normalized.slice(0, Math.max(0, maxLength - 3))}...`;
   }
 
-  private async embedPreviewLogo(pdfDoc: PDFDocument): Promise<PDFImage | null> {
-    if (!this.sealLogoBase64) {
+  private async embedPreviewLogo(pdfDoc: PDFDocument, dto: SignPdfDto): Promise<PDFImage | null> {
+    const imageBase64 = this.resolveSealImageBase64(dto);
+    if (!imageBase64) {
       return null;
     }
 
+    const buffer = Buffer.from(imageBase64, 'base64');
     try {
-      return await pdfDoc.embedPng(Buffer.from(this.sealLogoBase64, 'base64'));
+      return await pdfDoc.embedPng(buffer);
     } catch {
-      this.logger.warn(
-        'No se pudo incrustar el logo institucional en la previsualizacion del PDF.',
-      );
-      return null;
+      try {
+        return await pdfDoc.embedJpg(buffer);
+      } catch {
+        this.logger.warn(
+          'No se pudo incrustar el logo institucional en la previsualizacion del PDF.',
+        );
+        return null;
+      }
     }
+  }
+
+  private resolveSealImageBase64(dto: SignPdfDto): string {
+    const fromClient = String(dto.signature?.sealImageBase64 ?? '')
+      .trim()
+      .replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
+    if (fromClient) {
+      return fromClient;
+    }
+    return this.loadSealLogoBase64();
   }
 
   private loadSealLogoBase64(): string {

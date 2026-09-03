@@ -1,8 +1,13 @@
 import os
+import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from django.db import models
+
+SELLO_IMAGE_EXTENSIONS = ('svg', 'png', 'jpg', 'jpeg')
+_sello_image_validator = FileExtensionValidator(allowed_extensions=SELLO_IMAGE_EXTENSIONS)
 
 
 def sello_firma_upload_to(instance, filename):
@@ -263,3 +268,60 @@ class DocumentoFirmado(models.Model):
 
     def __str__(self):
         return self.codigo
+
+
+def sello_fondo_upload_to(_instance, filename):
+    _, ext = os.path.splitext(filename)
+    ext = (ext or '.png').lower()
+    return f'firma_sello/{uuid.uuid4().hex}{ext}'
+
+
+class ConfiguracionSelloFirma(models.Model):
+    """Imágenes de fondo del sello visible. El texto lo dibuja FirmaGob (layer2)."""
+
+    logo = models.FileField(
+        'Logo institucional',
+        upload_to=sello_fondo_upload_to,
+        blank=True,
+        validators=[_sello_image_validator],
+        help_text='SVG, PNG o JPG. Se coloca a la izquierda del recuadro, sin deformar.',
+    )
+    imagen_firma = models.FileField(
+        'Imagen de firma',
+        upload_to=sello_fondo_upload_to,
+        blank=True,
+        validators=[_sello_image_validator],
+        help_text='SVG, PNG o JPG. Se coloca a la derecha del recuadro, sin deformar.',
+    )
+    ancho_pt = models.PositiveIntegerField(
+        'Ancho del recuadro (pt)',
+        default=205,
+        help_text='Caja que recibe FirmaGob. Por defecto 205 (oficial firma-dep).',
+    )
+    alto_pt = models.PositiveIntegerField(
+        'Alto del recuadro (pt)',
+        default=84,
+        help_text='Caja que recibe FirmaGob. Por defecto 84 (oficial firma-dep).',
+    )
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Configuración de sello (FirmaGob)'
+        verbose_name_plural = 'Configuración de sello (FirmaGob)'
+
+    def __str__(self):
+        return 'Sello visible FirmaGob'
+
+    def clean(self):
+        if self.ancho_pt < 80 or self.alto_pt < 40:
+            raise ValidationError('El recuadro del sello es demasiado pequeño (mín. 80×40 pt).')
+        if not self.pk and ConfiguracionSelloFirma.objects.exists():
+            raise ValidationError('Solo puede existir una configuración de sello.')
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_solo(cls):
+        return cls.objects.first()

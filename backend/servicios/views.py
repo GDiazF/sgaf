@@ -12,8 +12,7 @@ from .models import Proveedor, TipoDocumento, Servicio, TipoProveedor, RegistroP
 from establecimientos.models import Establecimiento
 from .serializers import (
     ProveedorSerializer, TipoDocumentoSerializer, ServicioSerializer, 
-    TipoProveedorSerializer, RegistroPagoSerializer, RecepcionConformeSerializer,
-    RecepcionConformeListSerializer,
+    TipoProveedorSerializer, RegistroPagoSerializer, RecepcionConformeSerializer, 
     CDPSerializer, TipoEntregaSerializer, FacturaAdquisicionSerializer,
     CompraAgilSerializer,
 )
@@ -577,51 +576,6 @@ class RecepcionConformeViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
     }
     ordering_fields = ['fecha_emision', 'folio', 'proveedor__nombre', 'id']
     search_fields = ['folio', 'proveedor__nombre']
-
-    def get_serializer_class(self):
-        if self.action == 'list':
-            return RecepcionConformeListSerializer
-        return RecepcionConformeSerializer
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        if self.action == 'list':
-            return qs.select_related(
-                'proveedor',
-                'proveedor__tipo_proveedor',
-                'grupo_firmante',
-                'firmante',
-            )
-        return qs.select_related(
-            'proveedor',
-            'proveedor__tipo_proveedor',
-            'grupo_firmante',
-            'firmante',
-        ).prefetch_related('registros', 'historial')
-
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        firma_map = getattr(self, '_list_firma_map', None)
-        if firma_map is not None:
-            context['firma_map'] = firma_map
-        return context
-
-    def list(self, request, *args, **kwargs):
-        from .rc_firma import firma_map_for_rc_ids
-
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            self._list_firma_map = firma_map_for_rc_ids([rc.id for rc in page])
-        else:
-            self._list_firma_map = firma_map_for_rc_ids(
-                list(queryset.values_list('id', flat=True)),
-            )
-        try:
-            return super().list(request, *args, **kwargs)
-        finally:
-            if hasattr(self, '_list_firma_map'):
-                del self._list_firma_map
 
     @action(detail=True, methods=['post'])
     def enviar_a_firmar(self, request, pk=None):

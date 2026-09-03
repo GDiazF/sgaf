@@ -136,6 +136,16 @@ def _build_sign_body(
     if mode == MODE_ATENDIDA:
         signature['otp'] = normalize_otp(otp)
 
+    if visible_seal:
+        try:
+            from .sello_fondo import seal_image_base64_from_config
+
+            seal_b64 = seal_image_base64_from_config()
+            if seal_b64:
+                signature['sealImageBase64'] = seal_b64
+        except Exception:
+            logger.exception('No se pudo componer el fondo del sello; se usará el logo por defecto de firma-dep.')
+
     body: dict[str, Any] = {
         'pdfBase64': base64.b64encode(pdf_bytes).decode('ascii'),
         'fileName': file_name or 'documento.pdf',

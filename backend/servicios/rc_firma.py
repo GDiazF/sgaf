@@ -157,33 +157,10 @@ def enviar_rc_a_firmar(rc: RecepcionConforme, user, *, tipo: str = 'PAGO') -> Fi
     return pendiente
 
 
-def firma_map_for_rc_ids(rc_ids):
-    """Última FirmaPendiente por RC en una sola consulta (evita N+1 en listados)."""
-    if not rc_ids:
-        return {}
-    from firma_digital.models import FirmaPendiente
-
-    firmas = (
-        FirmaPendiente.objects.filter(origen='rc', referencia_id__in=rc_ids)
-        .select_related('documento_registro')
-        .order_by('referencia_id', '-creado_en')
-    )
-    result = {}
-    for fp in firmas:
-        if fp.referencia_id not in result:
-            result[fp.referencia_id] = fp
-    return result
-
-
-def firma_info_rc(rc: RecepcionConforme, latest=None, *, allow_query=True) -> dict:
+def firma_info_rc(rc: RecepcionConforme) -> dict:
     """Resumen de firma para listado de RC."""
-    if latest is None and allow_query:
-        latest = (
-            FirmaPendiente.objects.filter(origen='rc', referencia_id=rc.id)
-            .select_related('documento_registro')
-            .order_by('-creado_en')
-            .first()
-        )
+    qs = FirmaPendiente.objects.filter(origen='rc', referencia_id=rc.id).order_by('-creado_en')
+    latest = qs.first()
 
     base_sin = {
         'firma_estado': 'sin_envio',
