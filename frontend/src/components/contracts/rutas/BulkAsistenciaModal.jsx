@@ -6,6 +6,17 @@ import { usePermission } from '../../../hooks/usePermission'
 import { useNotify } from '../../../hooks/useNotify'
 import api from '../../../api'
 
+function periodoForRuta(ruta, periodName) {
+  return ruta.periodos?.find((p) => p.nombre_estandarizado === periodName)
+}
+
+function dateInPeriodo(periodo, fStr) {
+  if (!periodo?.fecha_inicio || !periodo?.fecha_fin) return false
+  const start = String(periodo.fecha_inicio).slice(0, 10)
+  const end = String(periodo.fecha_fin).slice(0, 10)
+  return fStr >= start && fStr <= end
+}
+
 export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, rowLabel = 'Rutas' }) {
   const { can } = usePermission()
   const [selectedPeriodName, setSelectedPeriodName] = useState('')
@@ -43,7 +54,10 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
   }, [rutas])
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      setSelectedPeriodName('')
+      return undefined
+    }
     const fetchFeriados = async () => {
       try {
         const res = await api.get('contratos/feriados/')
@@ -54,26 +68,33 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
       }
     }
     fetchFeriados()
+    return undefined
   }, [open])
+
+  useEffect(() => {
+    if (!open || selectedPeriodName || availablePeriodNames.length === 0) return
+    setSelectedPeriodName(availablePeriodNames[0])
+  }, [open, selectedPeriodName, availablePeriodNames])
 
   const applicableRutas = useMemo(() => {
     if (!selectedPeriodName) return []
-    return rutas.filter((r) =>
-      r.periodos?.some((p) => p.nombre_estandarizado === selectedPeriodName),
-    )
+    return rutas.filter((r) => periodoForRuta(r, selectedPeriodName))
   }, [selectedPeriodName, rutas])
 
   const diasGrid = useMemo(() => {
     if (!selectedPeriodName || applicableRutas.length === 0) return []
-    const firstRuta = applicableRutas[0]
-    const p = firstRuta?.periodos.find(
-      (per) => per.nombre_estandarizado === selectedPeriodName,
-    )
-    if (!p) return []
-    return eachDayOfInterval({
-      start: parseISO(p.fecha_inicio),
-      end: parseISO(p.fecha_fin),
+    let minStart = null
+    let maxEnd = null
+    applicableRutas.forEach((ruta) => {
+      const p = periodoForRuta(ruta, selectedPeriodName)
+      if (!p) return
+      const start = parseISO(String(p.fecha_inicio).slice(0, 10))
+      const end = parseISO(String(p.fecha_fin).slice(0, 10))
+      if (!minStart || start < minStart) minStart = start
+      if (!maxEnd || end > maxEnd) maxEnd = end
     })
+    if (!minStart || !maxEnd) return []
+    return eachDayOfInterval({ start: minStart, end: maxEnd })
   }, [selectedPeriodName, applicableRutas])
 
   const handleToggleCell = async (periodoId, fechaStr) => {
@@ -96,12 +117,12 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
 
     const validPeriodoIds = []
     applicableRutas.forEach((r) => {
-      const p = r.periodos.find((per) => per.nombre_estandarizado === selectedPeriodName)
-      if (p) {
+      const p = periodoForRuta(r, selectedPeriodName)
+      if (p && dateInPeriodo(p, fStr)) {
         const incFinSem = p.regla?.incluir_fines_semana ?? r.incluir_fines_semana ?? false
         const excFer = p.regla?.excluir_feriados ?? r.excluir_feriados ?? false
         const isInvalid = (isSem && !incFinSem) || (isFer && excFer)
-        if (!isInvalid) validPeriodoIds.push(p.id)
+        if (!isInvalid && p.estado !== 'CERRADO') validPeriodoIds.push(p.id)
       }
     })
 
@@ -136,7 +157,7 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
       open={open}
       onClose={onClose}
       title="Planilla de asistencia"
-      subheader="Haz clic en un día para marcar toda la columna"
+      subheader={`Marca inasistencias en todos los ${rowLabel.toLowerCase()} del periodo · clic en el día = toda la columna`}
       className="rutas-detail-modal--sheet"
       headerActions={
         <div style={{ minWidth: 200 }}>
@@ -194,7 +215,7 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
               <tr>
                 <th className="rutas-detail-matrix__sticky">
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>
-                    {rowLabel}
+                    {rowLabel} ({applicableRutas.length})
                   </span>
                 </th>
                 {diasGrid.map((fecha) => {
@@ -232,9 +253,7 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
             </thead>
             <tbody>
               {applicableRutas.map((ruta) => {
-                const p = ruta.periodos.find(
-                  (per) => per.nombre_estandarizado === selectedPeriodName,
-                )
+                const p = periodoForRuta(ruta, selectedPeriodName)
                 return (
                   <tr key={ruta.id}>
                     <td className="rutas-detail-matrix__sticky">
@@ -283,7 +302,8 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
 
                       const isInvalidSem = isSem && !incFinSem
                       const isInvalidFer = isFer && excFer
-                      const isInvalid = isInvalidSem || isInvalidFer
+                      const outOfRange = !dateInPeriodo(p, fStr)
+                      const isInvalid = outOfRange || isInvalidSem || isInvalidFer
                       const isToggling = togglingId === `${p?.id}-${fStr}`
 
                       return (
@@ -291,16 +311,22 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
                           {isInvalid ? (
                             <div
                               className={`rutas-detail-matrix__blocked${isInvalidFer ? ' is-fer' : ''}`}
-                              title={isInvalidFer ? 'Feriado' : 'Fin de semana'}
+                              title={
+                                outOfRange
+                                  ? 'Fuera del periodo de la línea'
+                                  : isInvalidFer
+                                    ? 'Feriado'
+                                    : 'Fin de semana'
+                              }
                             >
-                              {isInvalidFer ? 'F' : '·'}
+                              {outOfRange ? '—' : isInvalidFer ? 'F' : '·'}
                             </div>
                           ) : (
                             <button
                               type="button"
                               onClick={() => handleToggleCell(p?.id, fStr)}
                               disabled={
-                                isToggling || !p || !can('contratos.change_ausenciaruta')
+                                isToggling || !p || p.estado === 'CERRADO' || !can('contratos.change_ausenciaruta')
                               }
                               className={`rutas-detail-matrix__cell${isAus ? ' is-aus' : ''}`}
                               title={isAus ? 'Marcar como TRABAJADO' : 'Marcar como AUSENTE'}

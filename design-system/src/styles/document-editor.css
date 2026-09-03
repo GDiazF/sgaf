@@ -321,6 +321,11 @@
   min-width: 4.5rem;
 }
 
+.doc-editor__border-width-select {
+  min-width: 7.5rem;
+  width: auto;
+}
+
 .doc-editor__page-select {
   min-width: 7rem;
   width: 8rem;
@@ -399,8 +404,8 @@
 
 .doc-page {
   position: relative;
-  width: var(--doc-page-w, 210mm);
-  min-height: var(--doc-page-h, 297mm);
+  width: var(--doc-page-w, 215.9mm);
+  min-height: var(--doc-page-h, 279.4mm);
   margin: 0 auto;
   background: transparent;
   color: #111;
@@ -442,7 +447,7 @@
   left: 0;
   top: 0;
   width: 100%;
-  height: var(--doc-page-h, 297mm);
+  height: var(--doc-page-h, 279.4mm);
   background: #fff;
   box-shadow: 0 8px 24px oklch(19% 0.015 250 / 0.12);
 }
@@ -470,13 +475,13 @@
   outline: none;
   position: relative;
   min-height: calc(
-    var(--doc-page-h, 297mm) - var(--doc-margin-top, 20mm) - var(--doc-margin-bottom, 20mm)
+    var(--doc-page-h, 279.4mm) - var(--doc-margin-top, 20mm) - var(--doc-margin-bottom, 20mm)
   );
   font-family: "Calibri", "Source Sans 3", "Segoe UI", sans-serif;
   font-size: 11pt;
   line-height: 1.35;
   color: #111;
-  overflow-x: hidden;
+  overflow: hidden;
   overflow-wrap: anywhere;
   word-wrap: break-word;
   word-break: break-word;
@@ -559,16 +564,36 @@
   box-sizing: border-box;
 }
 
+.doc-page .sgaf-table-wrap {
+  position: relative;
+}
+
+/* Tablas anidadas: apilar por encima de la tabla padre (debajo de logos) */
+.doc-page td .sgaf-table-wrap,
+.doc-page th .sgaf-table-wrap,
+.doc-page td .tableWrapper,
+.doc-page th .tableWrapper {
+  z-index: 2;
+}
+
+.doc-page td .sgaf-table-wrap > .table-left-resize-handle,
+.doc-page th .sgaf-table-wrap > .table-left-resize-handle {
+  left: -8px;
+  width: 16px;
+  z-index: 32;
+  pointer-events: auto;
+}
+
 .doc-page .tiptap table,
 .doc-page .ProseMirror table {
   border-collapse: collapse;
   margin: 0.4em 0;
   table-layout: fixed;
-  width: 100%;
+  width: auto;
   max-width: 100%;
   box-sizing: border-box;
   position: relative;
-  z-index: 2;
+  z-index: 1;
 }
 
 /* Fila modelo de listado de pagos (se repite al generar el PDF) */
@@ -595,6 +620,91 @@
   overflow-wrap: anywhere;
   word-wrap: break-word;
   word-break: break-word;
+}
+
+.doc-page .tiptap table[data-border-width='2'] td,
+.doc-page .tiptap table[data-border-width='2'] th,
+.doc-page .ProseMirror table[data-border-width='2'] td,
+.doc-page .ProseMirror table[data-border-width='2'] th {
+  border-width: 2px;
+}
+
+.doc-page .tiptap table[data-border-width='3'] td,
+.doc-page .tiptap table[data-border-width='3'] th,
+.doc-page .ProseMirror table[data-border-width='3'] td,
+.doc-page .ProseMirror table[data-border-width='3'] th {
+  border-width: 3px;
+}
+
+.doc-page .tiptap td[data-border-width='2'],
+.doc-page .tiptap th[data-border-width='2'],
+.doc-page .ProseMirror td[data-border-width='2'],
+.doc-page .ProseMirror th[data-border-width='2'] {
+  border-width: 2px;
+}
+
+.doc-page .tiptap td[data-border-width='3'],
+.doc-page .tiptap th[data-border-width='3'],
+.doc-page .ProseMirror td[data-border-width='3'],
+.doc-page .ProseMirror th[data-border-width='3'] {
+  border-width: 3px;
+}
+
+.doc-page .tiptap td[data-border-sides='none'],
+.doc-page .tiptap th[data-border-sides='none'],
+.doc-page .ProseMirror td[data-border-sides='none'],
+.doc-page .ProseMirror th[data-border-sides='none'] {
+  border-color: transparent;
+}
+
+.doc-page .tiptap td[data-border-sides='top'],
+.doc-page .tiptap th[data-border-sides='top'],
+.doc-page .ProseMirror td[data-border-sides='top'],
+.doc-page .ProseMirror th[data-border-sides='top'] {
+  border-color: transparent;
+  border-top-color: #333;
+}
+
+.doc-page .tiptap td[data-border-sides='bottom'],
+.doc-page .tiptap th[data-border-sides='bottom'],
+.doc-page .ProseMirror td[data-border-sides='bottom'],
+.doc-page .ProseMirror th[data-border-sides='bottom'] {
+  border-color: transparent;
+  border-bottom-color: #333;
+}
+
+.doc-page .tiptap td[data-border-sides='left'],
+.doc-page .tiptap th[data-border-sides='left'],
+.doc-page .ProseMirror td[data-border-sides='left'],
+.doc-page .ProseMirror th[data-border-sides='left'] {
+  border-color: transparent;
+  border-left-color: #333;
+}
+
+.doc-page .tiptap td[data-border-sides='right'],
+.doc-page .tiptap th[data-border-sides='right'],
+.doc-page .ProseMirror td[data-border-sides='right'],
+.doc-page .ProseMirror th[data-border-sides='right'] {
+  border-color: transparent;
+  border-right-color: #333;
+}
+
+.doc-page .tiptap td[data-border-sides='top,bottom'],
+.doc-page .tiptap th[data-border-sides='top,bottom'],
+.doc-page .ProseMirror td[data-border-sides='top,bottom'],
+.doc-page .ProseMirror th[data-border-sides='top,bottom'] {
+  border-color: transparent;
+  border-top-color: #333;
+  border-bottom-color: #333;
+}
+
+.doc-page .tiptap td[data-border-sides='left,right'],
+.doc-page .tiptap th[data-border-sides='left,right'],
+.doc-page .ProseMirror td[data-border-sides='left,right'],
+.doc-page .ProseMirror th[data-border-sides='left,right'] {
+  border-color: transparent;
+  border-left-color: #333;
+  border-right-color: #333;
 }
 
 .doc-page .tiptap table[data-borders='0'] td,
@@ -796,21 +906,27 @@
   cursor: col-resize;
 }
 
-.doc-page .table-left-resize-handle {
+.doc-page .sgaf-table-wrap > .table-left-resize-handle {
   position: absolute;
-  left: -2px;
+  left: -6px;
   top: 0;
   bottom: 0;
-  width: 8px;
+  width: 12px;
   z-index: 25;
   cursor: col-resize;
   background: transparent;
+  pointer-events: auto;
+}
+
+.doc-page .sgaf-table-wrap:hover > .table-left-resize-handle,
+.doc-page .sgaf-table-wrap.is-left-resizing > .table-left-resize-handle {
+  box-shadow: inset 2px 0 0 var(--primary);
 }
 
 .doc-page tr > td:first-child:hover .table-left-resize-handle,
 .doc-page tr > th:first-child:hover .table-left-resize-handle,
 .doc-page .tableWrapper.is-left-resizing .table-left-resize-handle {
-  box-shadow: inset 2px 0 0 var(--primary);
+  box-shadow: none;
 }
 
 .doc-page .ProseMirror.row-resize-cursor {
@@ -908,15 +1024,35 @@
   max-width: 100%;
 }
 
+/* Huella 0×0 en el flujo: la tabla no se desplaza horizontalmente */
 .sgaf-logo-node,
-.node-logoVariable {
-  position: absolute;
-  z-index: 1;
-  width: max-content;
-  max-width: 100%;
-  margin: 0;
+.node-logoVariable,
+.ProseMirror > .react-renderer.node-logoVariable {
+  display: block;
+  position: static;
+  width: 0 !important;
+  height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible;
+  border: none;
   cursor: grab;
   user-select: none;
+  touch-action: none;
+}
+
+.sgaf-logo-view {
+  display: block;
+  position: absolute;
+  z-index: 10;
+  width: max-content;
+  max-width: none;
+  margin: 0;
+  cursor: grab;
+  line-height: 0;
 }
 
 .sgaf-logo-node:active,
@@ -924,10 +1060,9 @@
   cursor: grabbing;
 }
 
-.sgaf-logo-node:has(.is-selected),
-.sgaf-logo-node:active,
-.node-logoVariable:has(.is-selected) {
-  z-index: 5;
+.sgaf-logo-view.is-selected,
+.sgaf-logo-node:has(.is-selected) .sgaf-logo-view {
+  z-index: 12;
 }
 
 .sgaf-shape-node,
@@ -1004,10 +1139,8 @@
 
 .sgaf-logo-var {
   display: block;
-  max-width: 100%;
+  max-width: none;
   height: auto;
-  outline: 1px dashed var(--border-strong);
-  background: var(--surface-raised);
   pointer-events: none;
   -webkit-user-drag: none;
 }
@@ -1178,14 +1311,6 @@
   color: var(--muted);
 }
 
-.sgaf-logo-view {
-  display: block;
-  position: relative;
-  width: max-content;
-  max-width: 100%;
-  cursor: grab;
-}
-
 .ProseMirror-selectednode .sgaf-logo-view,
 .sgaf-logo-view.is-selected {
   outline: 2px solid var(--primary);
@@ -1237,6 +1362,142 @@
 .doc-editor__hf .ProseMirror {
   min-height: 20mm;
   position: relative;
+}
+
+/* Marco compacto al editar encabezado/pie (misma banda que el PDF) */
+.doc-page.doc-editor__hf.doc-page--header,
+.doc-page.doc-editor__hf.doc-page--footer {
+  overflow: visible;
+}
+
+.doc-page.doc-editor__hf.doc-page--header {
+  min-height: calc(var(--doc-hf-header-h) + var(--doc-margin-top) + var(--doc-margin-bottom));
+  height: calc(var(--doc-hf-header-h) + var(--doc-margin-top) + var(--doc-margin-bottom));
+}
+
+.doc-page.doc-editor__hf.doc-page--footer {
+  min-height: calc(var(--doc-hf-footer-h) + var(--doc-margin-top) + var(--doc-margin-bottom));
+  height: calc(var(--doc-hf-footer-h) + var(--doc-margin-top) + var(--doc-margin-bottom));
+}
+
+.doc-page.doc-editor__hf.doc-page--header .doc-sheet {
+  height: 100%;
+}
+
+.doc-page.doc-editor__hf.doc-page--footer .doc-sheet {
+  height: 100%;
+}
+
+.doc-page.doc-editor__hf.doc-page--header .ProseMirror {
+  min-height: var(--doc-hf-header-h);
+  max-height: var(--doc-hf-header-h);
+  overflow: visible;
+}
+
+.doc-page.doc-editor__hf.doc-page--footer .ProseMirror {
+  min-height: var(--doc-hf-footer-h);
+  max-height: var(--doc-hf-footer-h);
+  overflow: visible;
+}
+
+/* Bandas de solo lectura sobre el cuerpo */
+.doc-hf-bands {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.doc-hf-bands__sheet {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+}
+
+.doc-hf-band {
+  position: absolute;
+  left: var(--doc-margin-left);
+  right: var(--doc-margin-right);
+  display: block;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 1px dashed var(--border-strong, #9ca3af);
+  background: oklch(62% 0.1 250 / 0.08);
+  overflow: hidden;
+  pointer-events: auto;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.doc-hf-band:hover {
+  border-color: var(--primary, #2563eb);
+  background: oklch(62% 0.1 250 / 0.12);
+}
+
+.doc-hf-band--header {
+  top: var(--doc-margin-top);
+  height: var(--doc-hf-header-h);
+}
+
+.doc-hf-band--footer {
+  bottom: var(--doc-margin-bottom);
+  height: var(--doc-hf-footer-h);
+}
+
+.doc-hf-band__label {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.doc-hf-band__content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.doc-hf-band__content .sgaf-logo-slot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.doc-hf-band__content .sgaf-logo-slot,
+.doc-hf-band__content img[data-sgaf-logo] {
+  position: absolute;
+  max-width: none;
+  margin: 0;
+}
+
+.doc-hf-band__content p {
+  margin: 0;
+}
+
+.doc-hf-status {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.doc-hf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .doc-page-setup {

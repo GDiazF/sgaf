@@ -22,6 +22,10 @@ import {
   useFormOverlay,
   formatApiFormError,
 } from '@slep/ui'
+import { pageCssVars } from '../../../components/documentos/pageMetrics.js'
+import { htmlHasContent } from '../../../components/documentos/hfMetrics.js'
+import { layoutEditorPagination } from '../../../components/documentos/layoutPageBreaks.js'
+import { syncTableIndents } from '../../../components/documentos/tableLayout.js'
 
 const emptyPlantilla = {
   nombre: '',
@@ -39,23 +43,7 @@ const emptyPlantilla = {
   margen_izquierdo_mm: 20,
   margen_derecho_mm: 20,
   activa: true,
-}
-
-function pageCssVars(plantilla, sizes) {
-  const spec = sizes.find((s) => s.key === plantilla.tamano_pagina)
-  let width = Number(plantilla.ancho_mm) || spec?.width_mm || 210
-  let height = Number(plantilla.alto_mm) || spec?.height_mm || 297
-  if (plantilla.orientacion === 'landscape') {
-    ;[width, height] = [height, width]
-  }
-  return {
-    '--doc-page-w': `${width}mm`,
-    '--doc-page-h': `${height}mm`,
-    '--doc-margin-top': `${plantilla.margen_superior_mm || 20}mm`,
-    '--doc-margin-right': `${plantilla.margen_derecho_mm || 20}mm`,
-    '--doc-margin-bottom': `${plantilla.margen_inferior_mm || 20}mm`,
-    '--doc-margin-left': `${plantilla.margen_izquierdo_mm || 20}mm`,
-  }
+  es_default: false,
 }
 
 const PlantillaDocumentoEditorPage = () => {
@@ -81,6 +69,7 @@ const PlantillaDocumentoEditorPage = () => {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewHtml, setPreviewHtml] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [showHfBands, setShowHfBands] = useState(true)
 
   const editors = useRef({ cuerpo: null, encabezado: null, pie: null })
 
@@ -88,6 +77,11 @@ const PlantillaDocumentoEditorPage = () => {
     setSlot((prev) => (prev === id ? prev : id))
     const next = editors.current[id]
     if (next) setToolbarEditor((prev) => (prev === next ? prev : next))
+    requestAnimationFrame(() => {
+      if (!next?.view) return
+      layoutEditorPagination(next.view)
+      syncTableIndents(next.view)
+    })
   }, [])
 
   const onReadyCuerpo = useCallback((editor) => {
@@ -188,9 +182,9 @@ const PlantillaDocumentoEditorPage = () => {
     nombre: plantilla.nombre,
     descripcion: plantilla.descripcion,
     proposito: plantilla.proposito || 'borrador',
-    cuerpo_html: plantilla.cuerpo_html,
-    encabezado_html: plantilla.encabezado_html,
-    pie_html: plantilla.pie_html,
+    cuerpo_html: editors.current.cuerpo?.getHTML?.() ?? plantilla.cuerpo_html,
+    encabezado_html: editors.current.encabezado?.getHTML?.() ?? plantilla.encabezado_html,
+    pie_html: editors.current.pie?.getHTML?.() ?? plantilla.pie_html,
     tamano_pagina: plantilla.tamano_pagina,
     orientacion: plantilla.orientacion,
     ancho_mm: plantilla.tamano_pagina === 'personalizado' ? plantilla.ancho_mm || null : null,
@@ -249,6 +243,23 @@ const PlantillaDocumentoEditorPage = () => {
     }
   }
 
+  const handleExport = async () => {
+    try {
+      const res = await api.get(`documentos/plantillas/${id}/exportar/`, {
+        responseType: 'blob',
+      })
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/json' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${(plantilla.nombre || 'plantilla').replace(/\s+/g, '-')}.sgaf-plantilla.json`
+      link.click()
+      window.URL.revokeObjectURL(url)
+      notify({ variant: 'success', text: 'Plantilla exportada.' })
+    } catch {
+      notify({ variant: 'danger', text: 'No se pudo exportar la plantilla.' })
+    }
+  }
+
   const propositoMeta = (catalog.propositos || []).find(
     (item) => item.key === (plantilla.proposito || 'borrador'),
   )
@@ -276,6 +287,34 @@ const PlantillaDocumentoEditorPage = () => {
     () => pageCssVars(plantilla, catalog.page_sizes || []),
     [plantilla, catalog.page_sizes],
   )
+
+  const headerInUse = htmlHasContent(plantilla.encabezado_html)
+  const footerInUse = htmlHasContent(plantilla.pie_html)
+  const hfOverlay = useMemo(
+    () => ({
+      show: showHfBands && slot === 'cuerpo',
+      headerHtml: plantilla.encabezado_html || '',
+      footerHtml: plantilla.pie_html || '',
+      onEditHeader: () => activateSlot('encabezado'),
+      onEditFooter: () => activateSlot('pie'),
+    }),
+    [
+      showHfBands,
+      slot,
+      plantilla.encabezado_html,
+      plantilla.pie_html,
+      activateSlot,
+    ],
+  )
+
+  useEffect(() => {
+    for (const editor of Object.values(editors.current)) {
+      if (editor?.view) {
+        layoutEditorPagination(editor.view)
+        syncTableIndents(editor.view)
+      }
+    }
+  }, [cssVars])
 
   if (!canView) {
     return (
@@ -308,6 +347,9 @@ const PlantillaDocumentoEditorPage = () => {
             </Button>
             <Button variant="secondary" size="sm" onClick={handlePdf} disabled={loading}>
               <Icon name="download" size="sm" /> PDF
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleExport} disabled={loading}>
+              <Icon name="download" size="sm" /> Exportar
             </Button>
             {canChange ? (
               <Button variant="primary" size="sm" onClick={handleSave} disabled={overlay.busy || loading}>
@@ -359,7 +401,7 @@ const PlantillaDocumentoEditorPage = () => {
 
           <div className="doc-editor__workspace">
             <div className="doc-editor__canvas-wrap">
-              <DocPageFrame style={cssVars} hidden={slot !== 'cuerpo'}>
+              <DocPageFrame style={cssVars} hidden={slot !== 'cuerpo'} hfOverlay={hfOverlay}>
                 <DocumentRichEditor
                   content={plantilla.cuerpo_html}
                   onChange={(html) => patch({ cuerpo_html: html })}
@@ -369,7 +411,12 @@ const PlantillaDocumentoEditorPage = () => {
                   placeholder="Escriba el cuerpo del documento. Inserte variables desde el panel."
                 />
               </DocPageFrame>
-              <DocPageFrame className="doc-editor__hf" style={cssVars} hidden={slot !== 'encabezado'}>
+              <DocPageFrame
+                className="doc-editor__hf"
+                variant="header"
+                style={cssVars}
+                hidden={slot !== 'encabezado'}
+              >
                 <DocumentRichEditor
                   content={plantilla.encabezado_html}
                   onChange={(html) => patch({ encabezado_html: html })}
@@ -377,10 +424,15 @@ const PlantillaDocumentoEditorPage = () => {
                   onFocus={() => activateSlot('encabezado')}
                   editable={canChange}
                   compact
-                  placeholder="Encabezado (se repite en cada hoja del PDF)"
+                  placeholder="Encabezado (18 mm, se repite en cada hoja del PDF). Logos de encabezado van aquí."
                 />
               </DocPageFrame>
-              <DocPageFrame className="doc-editor__hf" style={cssVars} hidden={slot !== 'pie'}>
+              <DocPageFrame
+                className="doc-editor__hf"
+                variant="footer"
+                style={cssVars}
+                hidden={slot !== 'pie'}
+              >
                 <DocumentRichEditor
                   content={plantilla.pie_html}
                   onChange={(html) => patch({ pie_html: html })}
@@ -388,7 +440,7 @@ const PlantillaDocumentoEditorPage = () => {
                   onFocus={() => activateSlot('pie')}
                   editable={canChange}
                   compact
-                  placeholder="Pie de página. El PDF agrega el número de hoja."
+                  placeholder="Pie de página (12 mm). El PDF agrega el número de hoja."
                 />
               </DocPageFrame>
             </div>
@@ -410,7 +462,7 @@ const PlantillaDocumentoEditorPage = () => {
                     htmlFor="doc-proposito"
                     hint={
                       propositoMeta?.description
-                      || 'Define qué variables verás y qué módulo usará esta plantilla al descargar. Solo una plantilla por propósito (salvo borrador).'
+                      || 'Define qué variables verás y qué módulo usará esta plantilla al descargar. Recepción de servicio admite varias variantes.'
                     }
                   >
                     <Select
@@ -420,7 +472,9 @@ const PlantillaDocumentoEditorPage = () => {
                       onChange={(e) => handlePropositoChange(e.target.value)}
                     >
                       {(catalog.propositos || []).map((item) => {
-                        const ocupado = (catalog.propositos_ocupados || []).includes(item.key)
+                        const multi = item.key === 'recepcion_servicio'
+                        const ocupado = !multi
+                          && (catalog.propositos_ocupados || []).includes(item.key)
                           && item.key !== (plantilla.proposito || 'borrador')
                           && item.key !== 'borrador'
                         return (
@@ -449,6 +503,52 @@ const PlantillaDocumentoEditorPage = () => {
                     disabled={!canChange}
                     onChange={(e) => patch({ activa: e.target.checked })}
                   />
+                  {plantilla.proposito === 'recepcion_servicio' ? (
+                    <Switch
+                      label="Predeterminada del sistema"
+                      checked={!!plantilla.es_default}
+                      disabled={!canChange}
+                      onChange={(e) => patch({ es_default: e.target.checked })}
+                    />
+                  ) : null}
+                </div>
+              </Card>
+
+              <Card>
+                <CardHeader
+                  title="Encabezado y pie"
+                  subtitle="Zonas fijas que se repiten en cada hoja del PDF (18 mm / 12 mm)."
+                />
+                <div className="doc-page-setup">
+                  <Switch
+                    label="Mostrar zonas en la hoja"
+                    checked={showHfBands}
+                    disabled={!headerInUse && !footerInUse}
+                    onChange={(e) => setShowHfBands(e.target.checked)}
+                  />
+                  <p className="doc-hf-status">
+                    Encabezado: {headerInUse ? 'en uso' : 'vacío'}
+                    {' · '}
+                    Pie: {footerInUse ? 'en uso' : 'vacío'}
+                  </p>
+                  <div className="doc-hf-actions">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => activateSlot('encabezado')}
+                    >
+                      Editar encabezado
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => activateSlot('pie')}
+                    >
+                      Editar pie
+                    </Button>
+                  </div>
                 </div>
               </Card>
 

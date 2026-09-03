@@ -20,7 +20,7 @@ PAGE_SIZE_CHOICES = [(key, spec['label']) for key, spec in PAGE_SIZES.items()]
 
 
 def resolve_page_mm(tamano, orientacion='portrait', ancho_mm=None, alto_mm=None):
-    spec = PAGE_SIZES.get(tamano) or PAGE_SIZES['a4']
+    spec = PAGE_SIZES.get(tamano) or PAGE_SIZES['carta']
     width = float(ancho_mm) if ancho_mm else spec['width_mm']
     height = float(alto_mm) if alto_mm else spec['height_mm']
     if width is None:

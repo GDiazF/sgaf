@@ -23,9 +23,11 @@ const formatDate = (date) => {
   return date.split('-').reverse().join('/')
 }
 
-const PaymentsReport = () => {
+/** Contenido del reporte; usable embebido en Pagos o como página standalone. */
+export function PaymentsReportPanel({ embedded = false }) {
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [establishments, setEstablishments] = useState([])
   const [providers, setProviders] = useState([])
@@ -111,6 +113,7 @@ const PaymentsReport = () => {
   }, [currentPage, pageSize, debouncedSearchTerm, fetchData])
 
   const handleExport = async () => {
+    setExporting(true)
     setErrorMessage('')
     try {
       const params = buildFilterParams()
@@ -132,6 +135,8 @@ const PaymentsReport = () => {
     } catch (error) {
       console.error('Error exporting excel:', error)
       setErrorMessage('No se pudo descargar el reporte en Excel.')
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -195,26 +200,75 @@ const PaymentsReport = () => {
   )
 
   return (
-    <div className="page" data-od-id="payments-report-page" data-fill-viewport>
-      <PageHeader
-        icon="receipt"
-        title="Reporte de consumos"
-        description="Consulta histórica de consumos, facturación y pagos corporativos"
-        breadcrumbs={[
-          { label: 'Inicio', to: '/' },
-          { label: 'Servicios', to: '/services' },
-          { label: 'Reporte de consumos' },
-        ]}
-        linkComponent={Link}
+    <>
+      <FiltersBar
+        onSearch={() => setCurrentPage(1)}
         actions={
-          <Button type="button" variant="secondary" onClick={handleExport}>
-            <Icon name="download" size={16} />
-            Descargar Excel
+          <Button type="button" variant="secondary" size="sm" disabled={exporting} onClick={handleExport}>
+            <Icon name="download" size="sm" />
+            {exporting ? 'Descargando…' : 'Descargar Excel'}
           </Button>
         }
-      />
-
-      <FiltersBar>
+        advanced={
+          <>
+            <Field label="Desde">
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value)
+                  setCurrentPage(1)
+                }}
+              />
+            </Field>
+            <Field label="Hasta">
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value)
+                  setCurrentPage(1)
+                }}
+              />
+            </Field>
+            <Field label="Establecimiento">
+              <Select
+                value={selectedEstablishment}
+                onChange={(e) => {
+                  setSelectedEstablishment(e.target.value)
+                  setCurrentPage(1)
+                }}
+              >
+                <option value="">Todos</option>
+                <option value="JARDINES">Todos los jardines</option>
+                <option value="COLEGIOS">Todos los colegios</option>
+                {establishments.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombre}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Proveedor">
+              <Select
+                value={selectedProvider}
+                onChange={(e) => {
+                  setSelectedProvider(e.target.value)
+                  setCurrentPage(1)
+                }}
+              >
+                <option value="">Todos los proveedores</option>
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </>
+        }
+        activeCount={[selectedEstablishment, selectedProvider, endDate].filter(Boolean).length}
+      >
         <Field label="Buscar">
           <Input
             value={searchTerm}
@@ -224,60 +278,6 @@ const PaymentsReport = () => {
             }}
             placeholder="Cliente, factura o jardín…"
           />
-        </Field>
-        <Field label="Desde">
-          <Input
-            type="date"
-            value={startDate}
-            onChange={(e) => {
-              setStartDate(e.target.value)
-              setCurrentPage(1)
-            }}
-          />
-        </Field>
-        <Field label="Hasta">
-          <Input
-            type="date"
-            value={endDate}
-            onChange={(e) => {
-              setEndDate(e.target.value)
-              setCurrentPage(1)
-            }}
-          />
-        </Field>
-        <Field label="Establecimiento">
-          <Select
-            value={selectedEstablishment}
-            onChange={(e) => {
-              setSelectedEstablishment(e.target.value)
-              setCurrentPage(1)
-            }}
-          >
-            <option value="">Todos</option>
-            <option value="JARDINES">Todos los jardines</option>
-            <option value="COLEGIOS">Todos los colegios</option>
-            {establishments.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.nombre}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Proveedor">
-          <Select
-            value={selectedProvider}
-            onChange={(e) => {
-              setSelectedProvider(e.target.value)
-              setCurrentPage(1)
-            }}
-          >
-            <option value="">Todos los proveedores</option>
-            {providers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nombre}
-              </option>
-            ))}
-          </Select>
         </Field>
       </FiltersBar>
 
@@ -310,9 +310,27 @@ const PaymentsReport = () => {
         ordering={ordering}
         sortKey={ordering.replace(/^-/, '')}
         onSort={handleSort}
+        fillViewport
       />
-    </div>
+    </>
   )
 }
+
+const PaymentsReport = () => (
+  <div className="page" data-od-id="payments-report-page" data-fill-viewport>
+    <PageHeader
+      icon="receipt"
+      title="Reporte de consumos"
+      description="Consulta histórica de consumos, facturación y pagos corporativos"
+      breadcrumbs={[
+        { label: 'Inicio', to: '/' },
+        { label: 'Servicios', to: '/services' },
+        { label: 'Reporte de consumos' },
+      ]}
+      linkComponent={Link}
+    />
+    <PaymentsReportPanel />
+  </div>
+)
 
 export default PaymentsReport

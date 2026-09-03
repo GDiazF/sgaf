@@ -58,6 +58,7 @@ _GROUPS_PAGOS = [
 _GROUPS_RECEPCION_SERVICIO = [
     'institucion',
     'establecimiento',
+    'volumen',
     'recepcion_servicio',
     'sistema',
 ]
@@ -116,8 +117,8 @@ PROPOSITOS = [
         'key': 'recepcion_servicio',
         'label': 'Recepción de servicio',
         'description': (
-            'PDF unitario sin folio (gestión mensual). '
-            'Incluye establecimiento (ciudad, dirección, etc.), contrato, proveedor, '
+            'PDF unitario sin folio (gestión mensual o volumétrica). '
+            'Incluye establecimiento, volumen (m³), contrato, proveedor, '
             'periodo, factura, montos y JUNJI.'
         ),
         'groups': _GROUPS_RECEPCION_SERVICIO,
@@ -140,6 +141,16 @@ DEFAULT_PROPOSITO = 'borrador'
 BORRADOR_PROPOSITO = 'borrador'
 
 PROPOSITO_LABELS = {item['key']: item['label'] for item in PROPOSITOS}
+
+# Propósitos que admiten varias plantillas activas (p. ej. variantes por contrato).
+PROPOSITOS_PLANTILLAS_MULTIPLES = frozenset({'recepcion_servicio'})
+
+# Plantillas con filas repetibles pago_* (boletas RLB).
+PROPOSITOS_RLB = frozenset({
+    'recepcion_rlb',
+    'recepcion_rlb_unitario',
+    'recepcion_rlb_junji',
+})
 
 
 def propositos_payload():

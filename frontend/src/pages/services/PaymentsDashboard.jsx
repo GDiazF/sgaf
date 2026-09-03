@@ -10,6 +10,7 @@ import PaymentModal from '../../components/services/PaymentModal'
 import GenerateRCModal from '../../components/services/GenerateRCModal'
 import BulkPdfUploadModal from '../../components/services/BulkPdfUploadModal'
 import RecepcionConformeList from './RecepcionConformeList'
+import { PaymentsReportPanel } from './PaymentsReport'
 import {
   PageHeader,
   FiltersBar,
@@ -59,13 +60,21 @@ const PaymentsDashboard = () => {
   const canPagos = can('servicios.view_registropago')
   const canRC = can('servicios.view_recepcionconforme')
   const tabFromUrl = searchParams.get('tab')
-  const activeTab =
-    tabFromUrl === 'recepciones' && canRC ? 'recepciones' : canPagos ? 'pagos' : 'recepciones'
-  const showTabs = canPagos && canRC
+  const activeTab = (() => {
+    if (tabFromUrl === 'recepciones' && canRC) return 'recepciones'
+    if (tabFromUrl === 'reporte' && canPagos) return 'reporte'
+    if (canPagos) return 'pagos'
+    if (canRC) return 'recepciones'
+    return 'pagos'
+  })()
+  const showTabs =
+    [canPagos, canRC, canPagos].filter(Boolean).length > 1
 
   const selectTab = (id) => {
     if (id === 'recepciones' && canRC) {
       setSearchParams({ tab: 'recepciones' }, { replace: true })
+    } else if (id === 'reporte' && canPagos) {
+      setSearchParams({ tab: 'reporte' }, { replace: true })
     } else {
       setSearchParams({}, { replace: true })
     }
@@ -793,7 +802,9 @@ const PaymentsDashboard = () => {
         description={
           activeTab === 'recepciones'
             ? 'Historial y gestión de documentos tributarios aceptados'
-            : `Gestión y registro de consumos de servicios básicos (${totalCount})`
+            : activeTab === 'reporte'
+              ? 'Consulta histórica de consumos, facturación y pagos corporativos'
+              : `Gestión y registro de consumos de servicios básicos (${totalCount})`
         }
         breadcrumbs={[{ label: 'SSGG' }, { label: 'Pagos' }]}
         linkComponent={Link}
@@ -846,36 +857,60 @@ const PaymentsDashboard = () => {
       {showTabs ? (
         <div className="tabs">
           <ul className="tabs__list" role="tablist" aria-label="Secciones de pagos">
-            <li>
-              <button
-                type="button"
-                role="tab"
-                className={`tabs__btn${activeTab === 'pagos' ? ' is-active' : ''}`}
-                aria-selected={activeTab === 'pagos'}
-                onClick={() => selectTab('pagos')}
-              >
-                Pagos
-              </button>
-            </li>
-            <li>
-              <button
-                type="button"
-                role="tab"
-                className={`tabs__btn${activeTab === 'recepciones' ? ' is-active' : ''}`}
-                aria-selected={activeTab === 'recepciones'}
-                onClick={() => selectTab('recepciones')}
-              >
-                Recepciones
-              </button>
-            </li>
+            {canPagos ? (
+              <li>
+                <button
+                  type="button"
+                  role="tab"
+                  className={`tabs__btn${activeTab === 'pagos' ? ' is-active' : ''}`}
+                  aria-selected={activeTab === 'pagos'}
+                  onClick={() => selectTab('pagos')}
+                >
+                  Pagos
+                </button>
+              </li>
+            ) : null}
+            {canRC ? (
+              <li>
+                <button
+                  type="button"
+                  role="tab"
+                  className={`tabs__btn${activeTab === 'recepciones' ? ' is-active' : ''}`}
+                  aria-selected={activeTab === 'recepciones'}
+                  onClick={() => selectTab('recepciones')}
+                >
+                  Recepciones
+                </button>
+              </li>
+            ) : null}
+            {canPagos ? (
+              <li>
+                <button
+                  type="button"
+                  role="tab"
+                  className={`tabs__btn${activeTab === 'reporte' ? ' is-active' : ''}`}
+                  aria-selected={activeTab === 'reporte'}
+                  onClick={() => selectTab('reporte')}
+                >
+                  Reporte de consumos
+                </button>
+              </li>
+            ) : null}
           </ul>
         </div>
       ) : null}
 
-      {activeTab === 'recepciones' && canRC ? (
-        <RecepcionConformeList embedded />
-      ) : null}
-
+      <div
+        className="tabs__panel is-active payments-tab-panel"
+        role="tabpanel"
+        aria-label={
+          activeTab === 'recepciones'
+            ? 'Recepciones'
+            : activeTab === 'reporte'
+              ? 'Reporte de consumos'
+              : 'Pagos'
+        }
+      >
       {activeTab === 'pagos' && canPagos ? (
       <>
       <FiltersBar
@@ -1055,6 +1090,15 @@ const PaymentsDashboard = () => {
       ) : null}
       </>
       ) : null}
+
+      {activeTab === 'recepciones' && canRC ? (
+        <RecepcionConformeList embedded />
+      ) : null}
+
+      {activeTab === 'reporte' && canPagos ? (
+        <PaymentsReportPanel embedded />
+      ) : null}
+      </div>
 
       <PaymentModal
         open={showForm}

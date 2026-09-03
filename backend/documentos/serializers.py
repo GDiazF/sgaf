@@ -2,7 +2,44 @@ from rest_framework import serializers
 
 from .models import PlantillaDocumento
 from .page_sizes import resolve_page_mm
-from .propositos import is_borrador, normalize_proposito, proposito_label
+from .propositos import (
+    PROPOSITOS_PLANTILLAS_MULTIPLES,
+    is_borrador,
+    normalize_proposito,
+    proposito_label,
+)
+
+
+def sync_plantilla_default(instance):
+    """Una sola predeterminada por propósito; al menos una si hay activas."""
+    if is_borrador(instance.proposito):
+        return
+    if instance.es_default:
+        PlantillaDocumento.objects.filter(
+            proposito=instance.proposito,
+            es_default=True,
+        ).exclude(pk=instance.pk).update(es_default=False)
+        return
+    has_default = PlantillaDocumento.objects.filter(
+        proposito=instance.proposito,
+        es_default=True,
+        activa=True,
+    ).exists()
+    if not has_default:
+        fallback = (
+            PlantillaDocumento.objects
+            .filter(proposito=instance.proposito, activa=True)
+            .order_by('nombre')
+            .first()
+        )
+        if fallback:
+            PlantillaDocumento.objects.filter(
+                proposito=instance.proposito,
+                es_default=True,
+            ).exclude(pk=fallback.pk).update(es_default=False)
+            if not fallback.es_default:
+                fallback.es_default = True
+                fallback.save(update_fields=['es_default'])
 
 
 class PlantillaDocumentoSerializer(serializers.ModelSerializer):
@@ -21,7 +58,7 @@ class PlantillaDocumentoSerializer(serializers.ModelSerializer):
             'ancho_efectivo_mm', 'alto_efectivo_mm',
             'margen_superior_mm', 'margen_inferior_mm',
             'margen_izquierdo_mm', 'margen_derecho_mm',
-            'activa',
+            'activa', 'es_default',
             'creado_por', 'creado_por_nombre',
             'actualizado_por', 'actualizado_por_nombre',
             'creado_en', 'actualizado_en',
@@ -31,6 +68,10 @@ class PlantillaDocumentoSerializer(serializers.ModelSerializer):
             'creado_por_nombre', 'actualizado_por_nombre',
             'ancho_efectivo_mm', 'alto_efectivo_mm',
         ]
+        extra_kwargs = {
+            # DRF infiere UniqueValidator desde UniqueConstraint; validamos en validate().
+            'proposito': {'validators': []},
+        }
 
     def get_creado_por_nombre(self, obj):
         user = obj.creado_por
@@ -80,16 +121,47 @@ class PlantillaDocumentoSerializer(serializers.ModelSerializer):
         attrs['proposito'] = proposito
 
         if not is_borrador(proposito):
-            qs = PlantillaDocumento.objects.filter(proposito=proposito)
-            if self.instance is not None:
-                qs = qs.exclude(pk=self.instance.pk)
-            if qs.exists():
-                otra = qs.first()
-                raise serializers.ValidationError({
-                    'proposito': (
-                        f'Ya existe una plantilla asignada a «{proposito_label(proposito)}» '
-                        f'(«{otra.nombre}»). Solo puede haber una por funcionalidad. '
-                        'Pase la otra a borrador o edítela.'
-                    ),
-                })
+            if proposito not in PROPOSITOS_PLANTILLAS_MULTIPLES:
+                qs = PlantillaDocumento.objects.filter(proposito=proposito)
+                if self.instance is not None:
+                    qs = qs.exclude(pk=self.instance.pk)
+                if qs.exists():
+                    otra = qs.first()
+                    raise serializers.ValidationError({
+                        'proposito': (
+                            f'Ya existe una plantilla asignada a «{proposito_label(proposito)}» '
+                            f'(«{otra.nombre}»). Solo puede haber una por funcionalidad. '
+                            'Pase la otra a borrador o edítela.'
+                        ),
+                    })
+                attrs['es_default'] = True
+            else:
+                es_default = attrs.get(
+                    'es_default',
+                    getattr(self.instance, 'es_default', False),
+                )
+                activa = attrs.get('activa', getattr(self.instance, 'activa', True))
+                if es_default and not activa:
+                    raise serializers.ValidationError({
+                        'es_default': 'La plantilla predeterminada debe estar activa.',
+                    })
+                if not es_default:
+                    others = PlantillaDocumento.objects.filter(
+                        proposito=proposito,
+                        es_default=True,
+                    )
+                    if self.instance is not None:
+                        others = others.exclude(pk=self.instance.pk)
+                    if not others.exists() and activa:
+                        attrs['es_default'] = True
         return attrs
+
+    def create(self, validated_data):
+        instance = super().create(validated_data)
+        sync_plantilla_default(instance)
+        return instance
+
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+        sync_plantilla_default(instance)
+        return instance

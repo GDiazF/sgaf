@@ -15,10 +15,17 @@ def capture_old_contrato(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Contrato)
 def log_contrato_save(sender, instance, created, **kwargs):
+    if getattr(instance, '_skip_historial_signal', False):
+        return
     accion = 'CREACION' if created else 'MODIFICACION'
     if created:
-        detalle = f"Se ha creado el contrato {instance.codigo_mercado_publico}."
+        if instance.es_borrador:
+            detalle = f'Se creó un borrador de contrato (ID {instance.pk}).'
+        else:
+            detalle = f"Se ha creado el contrato {instance.codigo_mercado_publico}."
     else:
+        if instance.es_borrador:
+            return
         old_instance = getattr(instance, '_old_instance', None)
         if old_instance:
             changes = []

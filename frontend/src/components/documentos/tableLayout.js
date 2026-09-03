@@ -2,11 +2,53 @@ import { mergeAttributes } from '@tiptap/core'
 import { TextSelection, Plugin, PluginKey } from '@tiptap/pm/state'
 import TableRow from '@tiptap/extension-table-row'
 import { TableMap, CellSelection, deleteRow, deleteColumn, deleteTable } from '@tiptap/pm/tables'
-import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import Table, { TableView, createColGroup } from '@tiptap/extension-table'
+import { setCellBordersCommand, normalizeTableBorderWidth } from './cellBorders.js'
 
 export const MIN_COL_WIDTH = 32
 const LEFT_HIT = 16
+const NESTED_LEFT_HIT = 24
+
+/** Plantillas guardadas sin colwidth en celdas: inferir desde colgroup antes de cargar. */
+export function hydrateTableColwidthInHtml(html) {
+  if (!html || !String(html).includes('<table')) return html || ''
+  const doc = new DOMParser().parseFromString(`<div id="sgaf-hydrate-root">${html}</div>`, 'text/html')
+  const root = doc.getElementById('sgaf-hydrate-root')
+  if (!root) return html
+
+  root.querySelectorAll('table').forEach((table) => {
+    const cols = [...table.querySelectorAll(':scope > colgroup > col')]
+    if (!cols.length) return
+    const widths = cols.map((col) => {
+      const raw = col.getAttribute('style') || ''
+      const match = raw.match(/width:\s*(\d+(?:\.\d+)?)px/)
+      return match ? Math.round(Number.parseFloat(match[1])) : 0
+    })
+    if (!widths.some((w) => w > 0)) return
+
+    const firstRow = table.querySelector('tr')
+    if (!firstRow) return
+    let colIndex = 0
+    firstRow.querySelectorAll('th, td').forEach((cell) => {
+      const span = Math.max(1, Number.parseInt(cell.getAttribute('colspan') || '1', 10))
+      if (cell.getAttribute('colwidth') || cell.getAttribute('data-colwidth')) {
+        colIndex += span
+        return
+      }
+      const slice = widths.slice(colIndex, colIndex + span)
+      if (!slice.length || !slice.some((w) => w > 0)) {
+        colIndex += span
+        return
+      }
+      const joined = slice.map((w) => (w > 0 ? w : MIN_COL_WIDTH)).join(',')
+      cell.setAttribute('colwidth', joined)
+      cell.setAttribute('data-colwidth', joined)
+      colIndex += span
+    })
+  })
+
+  return root.innerHTML
+}
 
 export const TABLE_BORDER_PRESETS = [
   { value: 'all', label: 'Todos los bordes' },
@@ -22,6 +64,8 @@ export const TABLE_BORDER_PRESETS = [
   { value: 'top-bottom', label: 'Superior e inferior' },
   { value: 'left-right', label: 'Izquierdo y derecho' },
 ]
+
+export { TABLE_BORDER_WIDTH_PRESETS, normalizeTableBorderWidth, borderSidesToPreset } from './cellBorders.js'
 
 const TABLE_BORDER_VALUES = new Set(TABLE_BORDER_PRESETS.map((p) => p.value))
 
@@ -39,12 +83,25 @@ export function tableBordersDataAttr(value) {
   return normalized === 'all' ? null : normalized
 }
 
+export function tableBorderWidthDataAttr(value) {
+  const width = normalizeTableBorderWidth(value)
+  return width === 1 ? null : String(width)
+}
+
 export function editorContentWidth(view) {
   const el = view?.dom
-  if (!el) return 640
+  if (!el) return null
   const cs = getComputedStyle(el)
   const width = el.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0')
+  if (width < 64) return null
   return Math.max(MIN_COL_WIDTH, Math.floor(width))
+}
+
+export function tablePixelWidth(tableNode) {
+  const widths = columnWidths(tableNode)
+  if (!widths.length) return null
+  const sum = widths.reduce((acc, w) => acc + (w > 0 ? w : 0), 0)
+  return sum > 0 ? sum : null
 }
 
 function evenWidths(count, budget) {
@@ -153,19 +210,31 @@ function createSizedTable(schema, rowsCount, colsCount, withHeaderRow, totalWidt
   return tableType.createChecked({ indent: 0 }, rows)
 }
 
-function applyWrapperLayout(dom, indent) {
+function applyWrapperLayout(dom, indent, totalWidth) {
   if (!dom) return
   const value = Math.max(0, Number(indent) || 0)
+  const maxAvail = value ? `calc(100% - ${value}px)` : '100%'
   dom.style.marginLeft = value ? `${value}px` : ''
-  dom.style.width = value ? `calc(100% - ${value}px)` : '100%'
-  dom.style.maxWidth = value ? `calc(100% - ${value}px)` : '100%'
+  if (totalWidth && totalWidth > 0) {
+    dom.style.width = `${totalWidth}px`
+    dom.style.maxWidth = maxAvail
+  } else {
+    dom.style.width = maxAvail
+    dom.style.maxWidth = maxAvail
+  }
 }
 
-function syncTableIndents(view) {
+export function syncTableIndents(view) {
+  if (!view) return
   view.state.doc.descendants((node, pos) => {
     if (node.type.name !== 'table') return
     const dom = view.nodeDOM(pos)
-    if (dom) applyWrapperLayout(dom, node.attrs.indent)
+    if (!dom) return
+    const wrap = dom.classList?.contains('sgaf-table-wrap') ? dom : dom.closest?.('.sgaf-table-wrap') || dom
+    const table = wrap.querySelector?.('table') || (wrap.tagName === 'TABLE' ? wrap : null)
+    const total = tablePixelWidth(node)
+    applyWrapperLayout(wrap, node.attrs.indent, total)
+    if (table && total) table.style.width = `${total}px`
   })
 }
 
@@ -173,7 +242,18 @@ export class SgafTableView extends TableView {
   constructor(node, cellMinWidth, view) {
     super(node, cellMinWidth, view)
     this.dom.classList.add('sgaf-table-wrap')
+    this.leftHandle = document.createElement('div')
+    this.leftHandle.className = 'table-left-resize-handle'
+    this.leftHandle.contentEditable = 'false'
+    this.leftHandle.addEventListener('mousedown', (event) => {
+      event.stopPropagation()
+    }, true)
+    this.dom.insertBefore(this.leftHandle, this.table)
     this.applyLayout(node)
+  }
+
+  destroy() {
+    this.leftHandle = null
   }
 
   update(node) {
@@ -188,8 +268,10 @@ export class SgafTableView extends TableView {
   }
 
   applyLayout(node) {
-    applyWrapperLayout(this.dom, node.attrs.indent)
+    const total = tablePixelWidth(node)
+    applyWrapperLayout(this.dom, node.attrs.indent, total)
     if (!this.table) return
+    if (total) this.table.style.width = `${total}px`
     const borders = tableBordersDataAttr(node.attrs.borders)
     if (borders) this.table.setAttribute('data-borders', borders)
     else this.table.removeAttribute('data-borders')
@@ -204,42 +286,92 @@ function tableDomFromNode(view, pos) {
   return table ? { wrapper, table } : null
 }
 
-function findTableAtLeftEdge(view, event) {
-  const from = event.target?.nodeType === 1 ? event.target : event.target?.parentElement
-  if (from?.closest?.('.table-row-resize-handle')) return null
-  const onHandle = from?.closest?.('.table-left-resize-handle')
+function getNestedTableWrap(from, root) {
+  if (!from) return null
+  let scoped = null
+  let el = from
+  while (el && el !== root) {
+    if (el.classList?.contains('sgaf-table-wrap')) {
+      const hostCell = el.closest('td, th')
+      if (hostCell && hostCell !== el) scoped = el
+    }
+    el = el.parentElement
+  }
+  return scoped
+}
+
+function findTableFromHandle(view, handleEl) {
+  const wrap = handleEl?.closest?.('.sgaf-table-wrap')
+  if (!wrap) return null
   let found = null
   view.state.doc.descendants((node, pos) => {
-    if (found) return false
-    if (node.type.name !== 'table') return
+    if (found || node.type.name !== 'table') return
+    if (view.nodeDOM(pos) !== wrap) return
     const parts = tableDomFromNode(view, pos)
-    if (!parts || !view.dom.contains(parts.table)) return
-    if (onHandle && !parts.wrapper.contains(onHandle)) return
-    const cell = from?.closest?.('td, th')
-    if (!onHandle && cell) {
-      const cbox = cell.getBoundingClientRect()
-      if (event.clientY >= cbox.bottom - 10) return
-    }
-    const box = parts.table.getBoundingClientRect()
-    const nearLeft = event.clientX >= box.left - LEFT_HIT && event.clientX <= box.left + LEFT_HIT
-    const inY = event.clientY >= box.top && event.clientY <= box.bottom
-    if (onHandle && parts.wrapper.contains(onHandle) && inY) {
-      found = { node, pos, ...parts }
-      return false
-    }
-    if (!onHandle && nearLeft && inY) {
-      found = { node, pos, ...parts }
-      return false
-    }
-    return undefined
+    if (!parts) return
+    found = { node, pos, ...parts }
   })
   return found
 }
 
+function findTableAtLeftEdge(view, event) {
+  const from = event.target?.nodeType === 1 ? event.target : event.target?.parentElement
+  if (from?.closest?.('.table-row-resize-handle')) return null
+
+  const onHandle = from?.closest?.('.table-left-resize-handle')
+  if (onHandle) {
+    const hit = findTableFromHandle(view, onHandle)
+    if (!hit) return null
+    const box = hit.table.getBoundingClientRect()
+    const inY = event.clientY >= box.top && event.clientY <= box.bottom
+    return inY ? hit : null
+  }
+
+  const { clientX, clientY } = event
+  const scopedWrap = getNestedTableWrap(from, view.dom)
+  const hits = []
+
+  view.state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'table') return
+    const parts = tableDomFromNode(view, pos)
+    if (!parts || !view.dom.contains(parts.table)) return
+    if (scopedWrap && parts.wrapper !== scopedWrap) return
+
+    const cell = from?.closest?.('td, th')
+    if (cell) {
+      const cbox = cell.getBoundingClientRect()
+      if (clientY >= cbox.bottom - 10) return
+    }
+
+    const box = parts.wrapper.getBoundingClientRect()
+    const hitPad = scopedWrap && parts.wrapper === scopedWrap ? NESTED_LEFT_HIT : LEFT_HIT
+    const nearLeft = clientX >= box.left - hitPad && clientX <= box.left + hitPad
+    const inY = clientY >= box.top && clientY <= box.bottom
+    if (!nearLeft || !inY) return
+
+    hits.push({
+      node,
+      pos,
+      ...parts,
+      box,
+      area: box.width * box.height,
+      leftDist: Math.abs(clientX - box.left),
+    })
+  })
+
+  if (!hits.length) return null
+
+  hits.sort((a, b) => {
+    if (a.leftDist !== b.leftDist) return a.leftDist - b.leftDist
+    return a.area - b.area
+  })
+  return hits[0]
+}
+
 function paintLeftResize(table, wrapper, indent, widths) {
-  applyWrapperLayout(wrapper, indent)
-  const cols = wrapper.querySelectorAll('colgroup col')
   const total = widths.reduce((sum, w) => sum + w, 0)
+  applyWrapperLayout(wrapper, indent, total)
+  const cols = wrapper.querySelectorAll('colgroup col')
   table.style.width = `${total}px`
   widths.forEach((width, i) => {
     if (cols[i]) cols[i].style.width = `${width}px`
@@ -271,9 +403,10 @@ function startLeftResize(view, event, hit) {
   const startX = event.clientX
   const startIndent = Math.max(0, Number(hit.node.attrs.indent) || 0)
   const startWidths = columnWidths(hit.node)
+  const maxW = editorContentWidth(view) || 640
   const filled = startWidths.every((w) => w > 0)
     ? startWidths
-    : evenWidths(Math.max(1, startWidths.length), editorContentWidth(view) - startIndent)
+    : evenWidths(Math.max(1, startWidths.length), maxW - startIndent)
   const tablePos = hit.pos
   const tableEl = hit.table
   const wrapper = hit.wrapper
@@ -281,7 +414,7 @@ function startLeftResize(view, event, hit) {
   wrapper.classList.add('is-left-resizing')
 
   const paint = (clientX) => {
-    const next = previewLeftResize(startX, startIndent, filled, clientX, editorContentWidth(view))
+    const next = previewLeftResize(startX, startIndent, filled, clientX, editorContentWidth(view) || maxW)
     paintLeftResize(tableEl, wrapper, next.indent, next.widths)
     return next
   }
@@ -311,34 +444,6 @@ function startLeftResize(view, event, hit) {
   return true
 }
 
-function leftHandleDecorations(doc) {
-  const decos = []
-  doc.descendants((node, pos) => {
-    if (node.type.name !== 'table') return
-    const map = TableMap.get(node)
-    const seen = new Set()
-    for (let row = 0; row < map.height; row += 1) {
-      const offset = map.map[row * map.width]
-      if (seen.has(offset)) continue
-      seen.add(offset)
-      const cellPos = pos + 1 + offset
-      decos.push(
-        Decoration.widget(
-          cellPos + 1,
-          () => {
-            const el = document.createElement('div')
-            el.className = 'table-left-resize-handle'
-            el.contentEditable = 'false'
-            return el
-          },
-          { side: -1, ignoreSelection: true },
-        ),
-      )
-    }
-  })
-  return DecorationSet.create(doc, decos)
-}
-
 function deleteSelectedTablePartFromView(view) {
   const sel = view.state.selection
   if (!(sel instanceof CellSelection)) return false
@@ -364,12 +469,17 @@ function tableIndentPlugin() {
       const view = holder.view
       if (!view) return null
       const maxW = editorContentWidth(view)
+      if (!maxW) return null
       let tr = null
       state.doc.descendants((node, pos) => {
         if (node.type.name !== 'table') return
         const indent = Math.max(0, Number(node.attrs.indent) || 0)
         const budget = Math.max(MIN_COL_WIDTH, maxW - indent)
         const current = columnWidths(node)
+        const knownSum = current.reduce((sum, w) => sum + (w > 0 ? w : 0), 0)
+        const hasAllWidths = current.length > 0 && current.every((w) => w > 0)
+        // Tabla ya más angosta que el ancho útil: no estirar al recargar/editar.
+        if (hasAllWidths && knownSum > 0 && knownSum <= budget) return
         const next = normalizeWidths(current, budget)
         const total = next.reduce((sum, w) => sum + w, 0)
         const nextIndent = Math.max(0, Math.min(indent, maxW - total))
@@ -406,7 +516,6 @@ function tableIndentPlugin() {
       }
     },
     props: {
-      decorations: (state) => leftHandleDecorations(state.doc),
       handleDOMEvents: {
         mousedown: (view, event) => {
           if (!view.editable || event.button !== 0) return false
@@ -515,7 +624,7 @@ export const SgafTable = Table.extend({
       insertTable:
         ({ rows = 3, cols = 3, withHeaderRow = true } = {}) =>
         ({ tr, dispatch, editor }) => {
-          const totalWidth = editorContentWidth(editor.view)
+          const totalWidth = editorContentWidth(editor.view) || 640
           const node = createSizedTable(editor.schema, rows, cols, withHeaderRow, totalWidth)
           if (dispatch) {
             const offset = tr.selection.from + 1
@@ -525,13 +634,29 @@ export const SgafTable = Table.extend({
           }
           return true
         },
-      setTableBorders:
+      setCellBorders:
         (style = 'all') =>
+        (props) => {
+          if (!props.editor.isActive('table')) return false
+          return setCellBordersCommand(normalizeTableBorders(style))(props)
+        },
+      setCellBorderWidth:
+        (width = 1) =>
         ({ editor, commands }) => {
           if (!editor.isActive('table')) return false
-          return commands.updateAttributes('table', {
-            borders: normalizeTableBorders(style),
-          })
+          return commands.setCellAttribute('borderWidth', normalizeTableBorderWidth(width))
+        },
+      setTableBorders:
+        (style = 'all') =>
+        (props) => {
+          if (!props.editor.isActive('table')) return false
+          return setCellBordersCommand(normalizeTableBorders(style))(props)
+        },
+      setTableBorderWidth:
+        (width = 1) =>
+        ({ editor, commands }) => {
+          if (!editor.isActive('table')) return false
+          return commands.setCellAttribute('borderWidth', normalizeTableBorderWidth(width))
         },
     }
   },

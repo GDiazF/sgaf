@@ -2,6 +2,8 @@
 
 from datetime import date
 
+from .propositos import PROPOSITOS_RLB
+
 VARIABLE_GROUPS = [
     {
         'key': 'institucion',
@@ -39,6 +41,7 @@ VARIABLE_GROUPS = [
         'label': 'Proveedor',
         'variables': [
             {'key': 'proveedor_nombre', 'label': 'Razón social', 'type': 'text'},
+            {'key': 'proveedor_acronimo', 'label': 'Acrónimo / sigla', 'type': 'text'},
             {'key': 'proveedor_rut', 'label': 'RUT proveedor', 'type': 'text'},
             {'key': 'proveedor_tipo', 'label': 'Tipo de proveedor', 'type': 'text'},
             {'key': 'proveedor_contacto', 'label': 'Contacto proveedor', 'type': 'text'},
@@ -53,6 +56,12 @@ VARIABLE_GROUPS = [
             {'key': 'establecimiento_nombre', 'label': 'Nombre establecimiento', 'type': 'text'},
             {'key': 'establecimiento_rbd', 'label': 'RBD', 'type': 'text'},
             {'key': 'establecimiento_direccion', 'label': 'Dirección', 'type': 'text'},
+            {
+                'key': 'establecimiento_director',
+                'label': 'Director/a',
+                'type': 'text',
+                'hint': 'Nombre del director/a registrado en el establecimiento.',
+            },
             {'key': 'establecimiento_ciudad', 'label': 'Ciudad', 'type': 'text', 'hint': 'Por defecto Iquique; editable en el establecimiento.'},
             {
                 'key': 'establecimiento_comuna',
@@ -65,6 +74,36 @@ VARIABLE_GROUPS = [
                 'label': 'Nombres (varios)',
                 'type': 'text',
                 'hint': 'Lista de establecimientos unidos por coma.',
+            },
+            {
+                'key': 'establecimientos_directores',
+                'label': 'Directores/as (varios)',
+                'type': 'text',
+                'hint': 'Lista de directores/as unidos por coma (RC con varios colegios).',
+            },
+        ],
+    },
+    {
+        'key': 'volumen',
+        'label': 'Volumen (m³)',
+        'variables': [
+            {
+                'key': 'volumen_m3',
+                'label': 'Volumen (m³)',
+                'type': 'text',
+                'hint': 'Metros cúbicos del periodo (suma de los registros diarios del calendario).',
+            },
+            {
+                'key': 'precio_m3',
+                'label': 'Precio por m³',
+                'type': 'text',
+                'hint': 'Tarifa $/m³ de la línea en gestión.',
+            },
+            {
+                'key': 'unidad_cobro',
+                'label': 'Unidad de cobro',
+                'type': 'text',
+                'hint': 'Ej. m³. Vacío si la gestión no es volumétrica.',
             },
         ],
     },
@@ -86,6 +125,18 @@ VARIABLE_GROUPS = [
             {'key': 'rc_iva', 'label': 'IVA', 'type': 'text'},
             {'key': 'rc_otros', 'label': 'Otros montos', 'type': 'text'},
             {'key': 'rc_total', 'label': 'Total', 'type': 'text'},
+            {
+                'key': 'rc_iva_total',
+                'label': 'IVA total',
+                'type': 'text',
+                'hint': 'Igual que rc_iva. IVA 19% contenido en el total a pagar.',
+            },
+            {
+                'key': 'rc_total_neto',
+                'label': 'Total neto',
+                'type': 'text',
+                'hint': 'Igual que rc_neto. Total a pagar menos IVA (19% incluido).',
+            },
             {'key': 'rc_estado_pago', 'label': 'Estado de pago', 'type': 'text'},
         ],
     },
@@ -101,6 +152,18 @@ VARIABLE_GROUPS = [
             {'key': 'rc_total_interes', 'label': 'Total intereses (suma)', 'type': 'text'},
             {'key': 'rc_total_junji', 'label': 'Total monto JUNJI (suma)', 'type': 'text'},
             {'key': 'rc_total', 'label': 'Total montos (suma)', 'type': 'text'},
+            {
+                'key': 'rc_iva_total',
+                'label': 'IVA total (suma)',
+                'type': 'text',
+                'hint': 'Suma del IVA (19%) calculado por boleta sobre el monto total ingresado.',
+            },
+            {
+                'key': 'rc_total_neto',
+                'label': 'Total neto (suma)',
+                'type': 'text',
+                'hint': 'Suma de montos totales menos el IVA total (19% incluido).',
+            },
             {'key': 'rc_estado_pago', 'label': 'Estado de la RC', 'type': 'text'},
             {'key': 'establecimientos_nombres', 'label': 'Establecimientos (lista)', 'type': 'text'},
             {
@@ -120,6 +183,12 @@ VARIABLE_GROUPS = [
                 'label': 'Fila · Establecimiento',
                 'type': 'text',
                 'hint': 'Va en la fila modelo de la tabla (se repite por cada boleta).',
+            },
+            {
+                'key': 'pago_director',
+                'label': 'Fila · Director/a',
+                'type': 'text',
+                'hint': 'Director/a del establecimiento de la fila (se repite por cada boleta).',
             },
             {
                 'key': 'pago_nro_documento',
@@ -150,6 +219,18 @@ VARIABLE_GROUPS = [
                 'label': 'Fila · Monto total',
                 'type': 'text',
                 'hint': 'Va en la fila modelo de la tabla (se repite por cada boleta).',
+            },
+            {
+                'key': 'pago_iva',
+                'label': 'Fila · IVA (19% incluido)',
+                'type': 'text',
+                'hint': 'IVA de la boleta calculado desde el monto total. Fila repetible.',
+            },
+            {
+                'key': 'pago_neto',
+                'label': 'Fila · Neto',
+                'type': 'text',
+                'hint': 'Monto total de la boleta menos IVA. Fila repetible.',
             },
             {
                 'key': 'rc_listado_html',
@@ -225,7 +306,7 @@ VARIABLE_GROUPS = [
                 'key': 'rs_monto',
                 'label': 'Monto total',
                 'type': 'text',
-                'hint': 'Monto del periodo (fijo+variable, único, o prorrateado).',
+                'hint': 'Monto del periodo (fijo+variable, único, prorrateado o volumétrico).',
             },
             {
                 'key': 'monto_junji',
@@ -342,6 +423,7 @@ SAMPLE_CONTEXT = {
     'contrato_fecha_inicio': '01-03-2026',
     'contrato_fecha_termino': '31-12-2026',
     'proveedor_nombre': 'Transportes Ejemplo SpA',
+    'proveedor_acronimo': 'TEJ',
     'proveedor_rut': '76.123.456-7',
     'proveedor_tipo': 'Persona jurídica',
     'proveedor_contacto': 'Ana Pérez',
@@ -350,6 +432,7 @@ SAMPLE_CONTEXT = {
     'establecimiento_nombre': 'Escuela Ejemplo',
     'establecimiento_rbd': '12345-6',
     'establecimiento_direccion': 'Av. Ejemplo 100',
+    'establecimiento_director': 'María González Pérez',
     'establecimiento_ciudad': 'Iquique',
     'establecimiento_comuna': 'Iquique',
     'rc_folio': 'ROC-000123',
@@ -371,45 +454,59 @@ SAMPLE_CONTEXT = {
     'rc_cantidad_pagos': '3',
     'rc_total_interes': '$12.000',
     'rc_total_junji': '$1.178.000',
+    'rc_iva_total': '$190.001',
+    'rc_total_neto': '$999.999',
     'rc_listado_html': '<p>Listado de ejemplo</p>',
     'pago_nro_cliente': '1001',
     'pago_rbd': '12345-6',
     'pago_establecimiento': 'Escuela Ejemplo',
+    'pago_director': 'María González Pérez',
     'pago_nro_documento': 'B-100',
     'pago_fecha_vencimiento': '10-03-2026',
     'pago_interes': '$4.000',
     'pago_monto_junji': '$396.000',
     'pago_monto_total': '$400.000',
+    'pago_iva': '$63.866',
+    'pago_neto': '$336.134',
     '_pagos_rows': [
         {
             'pago_nro_cliente': '1001',
             'pago_rbd': '12345-6',
             'pago_establecimiento': 'Escuela Ejemplo',
+            'pago_director': 'María González Pérez',
             'pago_nro_documento': 'B-100',
             'pago_fecha_vencimiento': '10-03-2026',
             'pago_interes': '$4.000',
             'pago_monto_junji': '$396.000',
             'pago_monto_total': '$400.000',
+            'pago_iva': '$63.866',
+            'pago_neto': '$336.134',
         },
         {
             'pago_nro_cliente': '1002',
             'pago_rbd': '23456-7',
             'pago_establecimiento': 'Liceo Ejemplo',
+            'pago_director': 'Juan Soto Rojas',
             'pago_nro_documento': 'B-101',
             'pago_fecha_vencimiento': '12-03-2026',
             'pago_interes': '$5.000',
             'pago_monto_junji': '$495.000',
             'pago_monto_total': '$500.000',
+            'pago_iva': '$79.832',
+            'pago_neto': '$420.168',
         },
         {
             'pago_nro_cliente': '1003',
             'pago_rbd': '34567-8',
             'pago_establecimiento': 'Jardín Ejemplo',
+            'pago_director': 'Ana Pérez López',
             'pago_nro_documento': 'B-102',
             'pago_fecha_vencimiento': '15-03-2026',
             'pago_interes': '$3.000',
             'pago_monto_junji': '$287.000',
             'pago_monto_total': '$290.000',
+            'pago_iva': '$46.303',
+            'pago_neto': '$243.697',
         },
     ],
     'firmante_nombre': 'Juan Soto',
@@ -421,6 +518,9 @@ SAMPLE_CONTEXT = {
     'rs_nro_factura': 'F-12345',
     'rs_glosa': 'Recepción conforme del servicio del periodo',
     'rs_monto': '$400.000',
+    'volumen_m3': '12,5',
+    'precio_m3': '$45.000',
+    'unidad_cobro': 'm³',
     'monto_junji': '$0',
     'rs_servicio_nombre': 'Gestión de transporte escolar',
     'rs_ruta_nombre': 'Escuela Ejemplo',
@@ -438,13 +538,13 @@ SAMPLE_CONTEXT = {
     'valor_mensual': '$400.000',
     'monto_fijo': '$300.000',
     'monto_variable': '$100.000',
-    'establecimientos_nombres': 'Escuela Ejemplo',
+    'establecimientos_nombres': 'Escuela Ejemplo, Liceo Ejemplo',
+    'establecimientos_directores': 'María González Pérez, Juan Soto Rojas',
     'hoy': date.today().strftime('%d-%m-%Y'),
     'usuario_emite': 'Usuario de prueba',
     'otros': '',
     'observaciones': '',
     'lugar_recepcion': 'Iquique',
-    'establecimientos_nombres': 'Escuela Ejemplo, Liceo Ejemplo',
 }
 
 
@@ -520,11 +620,15 @@ def known_variable_keys():
     return keys
 
 
-def build_sample_context(usuario_nombre=''):
+def build_sample_context(usuario_nombre='', proposito=None):
     ctx = dict(SAMPLE_CONTEXT)
     ctx['hoy'] = date.today().strftime('%d-%m-%Y')
     if usuario_nombre:
         ctx['usuario_emite'] = usuario_nombre
+    prop = (proposito or '').strip()
+    # ROC/RCF/RCA/etc.: no simular filas de boletas en vista previa.
+    if prop and prop not in PROPOSITOS_RLB and prop != 'borrador':
+        ctx.pop('_pagos_rows', None)
     return ctx
 
 

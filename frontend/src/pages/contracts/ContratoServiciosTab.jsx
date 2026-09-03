@@ -71,7 +71,11 @@ const ContratoServiciosTab = ({ contract }) => {
         contrato: contractId,
         nombre: contract.codigo_mercado_publico || contract.descripcion || 'Gestión operativa',
         tipo_servicio: tipo.id,
-        modalidad_cobro: tipoEsTransporte(tipo) ? 'DIARIO' : 'MENSUAL_POR_EST',
+        modalidad_cobro: tipoEsTransporte(tipo)
+          ? 'DIARIO'
+          : plantilla === 'VOLUMETRICO'
+            ? 'POR_M3'
+            : 'MENSUAL_POR_EST',
       })
       setGestion(res.data)
     } catch (err) {
@@ -136,6 +140,15 @@ const ContratoServiciosTab = ({ contract }) => {
             onClick={() => initGestion(tipoOtro, 'OTRO')}
           >
             Otro · monto mensual
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!!initId || !tipoOtro}
+            loading={initId === `${tipoOtro?.id}-volumetrico`}
+            onClick={() => initGestion(tipoOtro, 'VOLUMETRICO')}
+          >
+            Volumétrico · $/m³
           </Button>
           <Button
             variant="secondary"
