@@ -58,7 +58,7 @@ const ServiciosDashboard = () => {
       setLoading(true)
       const [servRes, contRes, tiposRes] = await Promise.all([
         api.get('contratos/servicios/'),
-        api.get('contratos/contratos/', { params: { page_size: 1000 } }),
+        api.get('contratos/contratos/', { params: { page_size: 1000, vista: 'activos' } }),
         api.get('contratos/tipos-servicios/'),
       ])
       const tipos = tiposRes.data.results || tiposRes.data

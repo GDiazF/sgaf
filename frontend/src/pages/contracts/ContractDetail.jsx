@@ -4,6 +4,7 @@ import api from '../../api'
 import ContractModal from '../../components/contracts/ContractModal'
 import ContractReceptionModal from '../../components/contracts/ContractReceptionModal'
 import AmpliacionModal from '../../components/contracts/AmpliacionModal'
+import ContratoPlantillaRecepcionModal from '../../components/contracts/ContratoPlantillaRecepcionModal'
 import ContratoAmpliacionesTab, {
   ampliacionLabel,
 } from '../../components/contracts/ContratoAmpliacionesTab'
@@ -28,6 +29,7 @@ import {
   ConfirmModal,
   EmptyState,
   Icon,
+  IconButton,
   useFormOverlay,
   formatApiFormError,
 } from '@slep/ui'
@@ -40,6 +42,12 @@ const TABS_BASE = [
   { id: 'docs', label: 'Archivos' },
   { id: 'history', label: 'Historial' },
 ]
+
+import {
+  prepareContractPayload,
+  contractToFormData,
+  contractTitle,
+} from '../../utils/contractForm'
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat('es-CL', {
@@ -209,6 +217,7 @@ const ContractDetail = () => {
   const [isEditModalOpen, setEditModalOpen] = useState(false)
   const [isDocModalOpen, setDocModalOpen] = useState(false)
   const [isAmpliacionModalOpen, setAmpliacionModalOpen] = useState(false)
+  const [isPlantillaRecepcionOpen, setPlantillaRecepcionOpen] = useState(false)
   const [editingAmpliacion, setEditingAmpliacion] = useState(null)
   const [isReceptionModalOpen, setReceptionModalOpen] = useState(false)
   const [editingRC, setEditingRC] = useState(null)
@@ -285,6 +294,10 @@ const ContractDetail = () => {
     try {
       setLoading(true)
       const response = await api.get(`contratos/contratos/${id}/`)
+      if (response.data.es_borrador) {
+        navigate(`/contracts/${id}/edit`, { replace: true })
+        return
+      }
       setContract(response.data)
       setReceptions(response.data.recepciones || [])
       setHistory(response.data.historial || [])
@@ -311,38 +324,14 @@ const ContractDetail = () => {
 
   const editFormData = useMemo(() => {
     if (!contract) return null
-    return {
-      codigo_mercado_publico: contract.codigo_mercado_publico,
-      descripcion: contract.descripcion,
-      detalle: contract.detalle || '',
-      aplica_iva: contract.aplica_iva !== false,
-      proceso: contract.proceso,
-      estado: contract.estado,
-      categoria: contract.categoria,
-      orientacion: contract.orientacion || '',
-      proveedor: contract.proveedor || '',
-      fecha_adjudicacion: contract.fecha_adjudicacion,
-      fecha_inicio: contract.fecha_inicio,
-      fecha_termino: contract.fecha_termino,
-      tipo_oc: contract.tipo_oc || 'UNICA',
-      nro_oc: contract.nro_oc || '',
-      cdp: contract.cdp || '',
-      plantilla_cobro: contract.plantilla_cobro || '',
-      proveedores_asociados: contract.proveedores_asociados || [],
-      establecimientos: contract.establecimientos || [],
-    }
+    return contractToFormData(contract)
   }, [contract])
 
   const handleEditSave = async (dataToSubmit) => {
-    const finalData = { ...dataToSubmit }
-    if (finalData.orientacion === '') delete finalData.orientacion
-    if (finalData.plantilla_cobro === '') finalData.plantilla_cobro = null
-    try {
-      await api.put(`contratos/contratos/${contract.id}/`, finalData)
-    } catch (error) {
-      console.error(error)
-      throw error
-    }
+    await api.put(
+      `contratos/contratos/${contract.id}/`,
+      prepareContractPayload(dataToSubmit),
+    )
   }
 
   const handleEditClose = (result) => {
@@ -395,6 +384,15 @@ const ContractDetail = () => {
       fetchContract()
       setActiveTab('ampliaciones')
     }
+  }
+
+  const handlePlantillaRecepcionClose = (result) => {
+    setPlantillaRecepcionOpen(false)
+    if (result?.saved) fetchContract()
+  }
+
+  const handlePlantillaRecepcionSaved = (data) => {
+    setContract(data)
   }
 
   const handleFileUpload = async () => {
@@ -996,12 +994,12 @@ const ContractDetail = () => {
     <div className="page" data-od-id="contract-detail-page" data-fill-viewport>
       <PageHeader
         icon="contratos"
-        title={contract.codigo_mercado_publico}
-        description={contract.descripcion}
+        title={contractTitle(contract)}
+        description={contract.descripcion?.trim() || ''}
         breadcrumbs={[
           { label: 'SSGG' },
           { label: 'Contratos', to: '/contracts' },
-          { label: contract.codigo_mercado_publico },
+          { label: contractTitle(contract) },
         ]}
         linkComponent={Link}
         split
@@ -1013,6 +1011,19 @@ const ContractDetail = () => {
               </Button>
             ) : null}
             {can('contratos.change_contrato') ? (
+              <IconButton
+                aria-label="Configurar plantilla de recepción colegio"
+                title={
+                  contract.plantilla_recepcion_servicio_nombre
+                    ? `Plantilla recepción: ${contract.plantilla_recepcion_servicio_nombre}`
+                    : 'Plantilla recepción: predeterminada del sistema'
+                }
+                onClick={() => setPlantillaRecepcionOpen(true)}
+              >
+                <Icon name="settings" size="sm" />
+              </IconButton>
+            ) : null}
+            {can('contratos.change_contrato') ? (
               <Button variant="outline" size="sm" onClick={() => setEditModalOpen(true)}>
                 <Icon name="edit" size="sm" /> Editar
               </Button>
@@ -1020,8 +1031,6 @@ const ContractDetail = () => {
           </>
         }
       />
-
-      
 
       <div
         className={`tabs contracts-tabs${
@@ -1626,6 +1635,13 @@ const ContractDetail = () => {
         onSave={handleAmpliacionSave}
         contract={contract}
         editing={editingAmpliacion}
+      />
+
+      <ContratoPlantillaRecepcionModal
+        open={isPlantillaRecepcionOpen}
+        onClose={handlePlantillaRecepcionClose}
+        onSaved={handlePlantillaRecepcionSaved}
+        contract={contract}
       />
 
       <Modal

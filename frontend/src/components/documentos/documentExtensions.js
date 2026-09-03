@@ -5,14 +5,41 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import { TableMap, cellAround } from '@tiptap/pm/tables'
-import { LogoNodeView, logoContentBox, logoPercentsFromContentPx } from './LogoNodeView.jsx'
+import { LogoNodeView, logoAttrsFromPointer } from './LogoNodeView.jsx'
 import { ShapeNodeView, shapeCss } from './ShapeNodeView.jsx'
+import { cellBorderInlineStyle, normalizeTableBorderWidth } from './cellBorders.js'
+
+function parseCellColwidth(element) {
+  const colspan = Math.max(1, Number.parseInt(element.getAttribute('colspan') || '1', 10))
+  for (const attr of ['colwidth', 'data-colwidth']) {
+    const raw = element.getAttribute(attr)
+    if (!raw) continue
+    const parts = raw
+      .split(',')
+      .map((item) => Number.parseInt(String(item).trim(), 10))
+      .filter((item) => Number.isFinite(item) && item > 0)
+    if (parts.length === colspan) return parts
+    if (parts.length === 1 && colspan === 1) return parts
+  }
+  const styleMatch = String(element.style?.width || '').match(/^(\d+(?:\.\d+)?)px$/)
+  if (styleMatch) return [Math.round(Number.parseFloat(styleMatch[1]))]
+  return null
+}
 
 function withCellLayout(CellExtension) {
   return CellExtension.extend({
     addAttributes() {
       return {
         ...this.parent?.(),
+        colwidth: {
+          default: null,
+          parseHTML: (element) => parseCellColwidth(element),
+          renderHTML: (attributes) => {
+            if (!attributes.colwidth?.length) return {}
+            const joined = attributes.colwidth.join(',')
+            return { colwidth: joined, 'data-colwidth': joined }
+          },
+        },
         backgroundColor: {
           default: null,
           parseHTML: (element) => element.style.backgroundColor || null,
@@ -60,9 +87,28 @@ function withCellLayout(CellExtension) {
             }
           },
         },
+        borderSides: {
+          default: null,
+          parseHTML: (element) => {
+            const raw = element.getAttribute('data-border-sides')
+            if (!raw) return null
+            return raw === 'none' ? 'none' : raw
+          },
+          renderHTML: (attributes) => {
+            if (!attributes.borderSides) return {}
+            return { 'data-border-sides': attributes.borderSides }
+          },
+        },
+        borderWidth: {
+          default: 1,
+          parseHTML: (element) => normalizeTableBorderWidth(element.getAttribute('data-border-width') || '1'),
+          renderHTML: (attributes) => ({
+            'data-border-width': String(normalizeTableBorderWidth(attributes.borderWidth)),
+          }),
+        },
       }
     },
-    renderHTML({ HTMLAttributes }) {
+    renderHTML({ node, HTMLAttributes }) {
       const tag = this.name === 'tableHeader' ? 'th' : 'td'
       const colwidth = HTMLAttributes.colwidth
       const widths = Array.isArray(colwidth)
@@ -72,12 +118,16 @@ function withCellLayout(CellExtension) {
           .map((item) => Number.parseInt(item, 10))
           .filter((item) => Number.isFinite(item) && item > 0)
       const width = widths[0]
+      const borderStyle = cellBorderInlineStyle(node.attrs.borderSides, node.attrs.borderWidth)
+      const style = [width ? `width: ${width}px` : '', HTMLAttributes.style, borderStyle]
+        .filter(Boolean)
+        .join('; ')
       return [
         tag,
         mergeAttributes(
           this.options.HTMLAttributes,
-          width ? { style: `width: ${width}px` } : {},
           HTMLAttributes,
+          style ? { style } : {},
         ),
         0,
       ]
@@ -245,10 +295,12 @@ function parsePercent(value) {
   return Number.isFinite(num) ? String(num) : null
 }
 
-function logoPositionStyle(attrs) {
-  const left = attrs.left ?? '0'
-  const top = attrs.top ?? '0'
-  return `position:absolute;left:${left}%;top:${top}%;z-index:1;width:max-content;margin:0;`
+function parseLogoPosition(el, axis) {
+  const fromData = parsePercent(el.getAttribute(`data-${axis}`))
+  if (fromData != null) return fromData
+  const raw = el.style?.[axis] || ''
+  if (String(raw).includes('mm')) return '0'
+  return parsePercent(raw) || '0'
 }
 
 export const LogoVariable = Node.create({
@@ -265,59 +317,86 @@ export const LogoVariable = Node.create({
       previewUrl: { default: '' },
       left: {
         default: '0',
-        parseHTML: (element) => parsePercent(element.getAttribute('data-left') || element.style.left) || '0',
+        parseHTML: (element) => parseLogoPosition(element, 'left'),
       },
       top: {
         default: '0',
-        parseHTML: (element) => parsePercent(element.getAttribute('data-top') || element.style.top) || '0',
+        parseHTML: (element) => parseLogoPosition(element, 'top'),
+      },
+      page: {
+        default: '1',
+        parseHTML: (element) => element.getAttribute('data-page') || '1',
       },
     }
   },
   parseHTML() {
+    const logoAttrs = (el) => ({
+      key: el.getAttribute('data-sgaf-logo'),
+      label: el.getAttribute('alt') || '',
+      width: el.getAttribute('width') || '140',
+      previewUrl: el.getAttribute('data-preview') || el.getAttribute('src') || '',
+      left: parseLogoPosition(el, 'left'),
+      top: parseLogoPosition(el, 'top'),
+      page: el.getAttribute('data-page') || '1',
+    })
+
     return [
       {
         tag: 'img[data-sgaf-logo]',
-        getAttrs: (el) => ({
-          key: el.getAttribute('data-sgaf-logo'),
-          label: el.getAttribute('alt') || '',
-          width: el.getAttribute('width') || '140',
-          previewUrl: el.getAttribute('data-preview') || el.getAttribute('src') || '',
-          left: parsePercent(el.getAttribute('data-left') || el.style.left) || '0',
-          top: parsePercent(el.getAttribute('data-top') || el.style.top) || '0',
-        }),
+        getAttrs: logoAttrs,
+      },
+      {
+        tag: 'div.sgaf-logo-slot',
+        getAttrs: (el) => {
+          const img = el.querySelector('img[data-sgaf-logo]')
+          if (!img) return false
+          return logoAttrs(img)
+        },
       },
     ]
   },
   renderHTML({ HTMLAttributes }) {
     const left = HTMLAttributes.left ?? '0'
     const top = HTMLAttributes.top ?? '0'
+    const page = HTMLAttributes.page ?? '1'
     const width = HTMLAttributes.width || '140'
     return [
-      'img',
-      mergeAttributes({
-        'data-sgaf-logo': HTMLAttributes.key,
-        'data-preview': HTMLAttributes.previewUrl || '',
-        'data-left': left,
-        'data-top': top,
-        class: 'sgaf-logo-var',
-        alt: HTMLAttributes.label || HTMLAttributes.key,
-        width,
-        src: HTMLAttributes.previewUrl || '',
-        style: `position:absolute;left:${left}%;top:${top}%;width:${width}px;height:auto;`,
-      }),
+      'div',
+      {
+        class: 'sgaf-logo-slot',
+        style: 'display:block;width:0;height:0;overflow:visible;margin:0;padding:0;border:0;',
+      },
+      [
+        'img',
+        mergeAttributes({
+          'data-sgaf-logo': HTMLAttributes.key,
+          'data-preview': HTMLAttributes.previewUrl || '',
+          'data-left': left,
+          'data-top': top,
+          'data-page': page,
+          class: 'sgaf-logo-var',
+          alt: HTMLAttributes.label || HTMLAttributes.key,
+          width,
+          src: HTMLAttributes.previewUrl || '',
+          style: `position:absolute;left:${left}%;top:${top}%;width:${width}px;height:auto;margin:0;`,
+        }),
+      ],
     ]
   },
   addNodeView() {
     return ReactNodeViewRenderer(LogoNodeView, {
       as: 'div',
       className: 'sgaf-logo-node',
-      attrs: ({ node }) => ({
+      attrs: () => ({
         contenteditable: 'false',
-        style: logoPositionStyle(node.attrs),
       }),
       stopEvent: ({ event }) => {
         if (['copy', 'cut', 'paste', 'drop'].includes(event.type)) return false
         return true
+      },
+      ignoreMutation: (mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'style') return true
+        return false
       },
     })
   },
@@ -327,33 +406,17 @@ export const LogoVariable = Node.create({
         (attrs) =>
         ({ editor, tr, dispatch }) => {
           const view = editor.view
-          const box = logoContentBox(editor)
-          let left = '0'
-          let top = '0'
+          const logoW = Number.parseInt(attrs.width, 10) || 140
+          let placement = { page: '1', left: '0', top: '0' }
           try {
             const coords = view.coordsAtPos(view.state.selection.from)
-            if (box) {
-              const next = logoPercentsFromContentPx(
-                coords.left - box.contentLeft,
-                coords.top - box.contentTop,
-                Number.parseInt(attrs.width, 10) || 140,
-                48,
-                box,
-              )
-              left = next.left
-              top = next.top
-            }
+            placement = logoAttrsFromPointer(editor, coords.left, coords.top, logoW, 48)
           } catch {
-            if (box) {
-              const next = logoPercentsFromContentPx(0, 0, Number.parseInt(attrs.width, 10) || 140, 48, box)
-              left = next.left
-              top = next.top
-            }
+            placement = logoAttrsFromPointer(editor, 0, 0, logoW, 48)
           }
           const node = editor.schema.nodes.logoVariable.create({
             ...attrs,
-            left,
-            top,
+            ...placement,
           })
           if (dispatch) dispatch(tr.insert(0, node))
           return true

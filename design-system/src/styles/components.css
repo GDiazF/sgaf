@@ -1212,6 +1212,29 @@
   min-height: 0;
 }
 
+/* Pagos servicios — tabs + fillViewport (Pagos / Recepciones / Reporte) */
+.tabs__panel.is-active.payments-tab-panel,
+.payments-tab-panel {
+  padding-top: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow: hidden;
+}
+
+.payments-tab-panel > .filters,
+.payments-tab-panel > .alert,
+.payments-tab-panel > .payments-bulk-bar {
+  flex-shrink: 0;
+}
+
+.payments-tab-panel > .data-table-shell--fill {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 /* Personal TI ? tabs + fillViewport */
 .tabs__panel.is-active.personal-ti-tab-panel,
 .personal-ti-tab-panel {
@@ -8285,6 +8308,134 @@ body.has-modal-scroll-lock {
   flex: 1 1 auto;
   min-height: 0;
 }
+/* Contratos listado — tabs Vigentes / Borradores / Finalizados */
+.tabs__panel.is-active.contracts-list-tab-panel,
+.contracts-list-tab-panel {
+  padding-top: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow: hidden;
+}
+
+.contracts-list-tab-panel > .filters {
+  flex-shrink: 0;
+}
+
+.contracts-list-tab-panel > .data-table-shell--fill {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.contract-draft-card {
+  padding: var(--space-5);
+}
+
+/* Borrador: scroll normal en app-main (no estirar el wrapper ni empujar la topbar) */
+.app-main > .page.page-layout--full:has([data-contract-draft]) {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.page[data-contract-draft] {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+.contract-draft-layout {
+  width: 100%;
+}
+
+.contract-draft-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.contract-draft-form > .alert {
+  grid-column: 1 / -1;
+}
+
+.contract-draft-form__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.contract-draft-form__panel--wide {
+  grid-column: 1 / -1;
+}
+
+.contract-draft-form .form-grid {
+  gap: var(--space-4);
+}
+
+.contract-draft-form .form-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.contract-draft-form__panel--info {
+  grid-column: 1;
+  grid-row: 2 / 4;
+}
+
+.contract-draft-form__panel--class {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.contract-draft-form__panel--oc {
+  grid-column: 2;
+  grid-row: 3;
+  align-self: start;
+}
+
+.contract-draft-form__panel--providers {
+  grid-column: 1 / -1;
+  grid-row: 4;
+}
+
+.contract-draft-form:not(:has(> .alert)) .contract-draft-form__panel--info {
+  grid-row: 1 / 3;
+}
+
+.contract-draft-form:not(:has(> .alert)) .contract-draft-form__panel--class {
+  grid-row: 1;
+}
+
+.contract-draft-form:not(:has(> .alert)) .contract-draft-form__panel--oc {
+  grid-row: 2;
+}
+
+.contract-draft-form:not(:has(> .alert)) .contract-draft-form__panel--providers {
+  grid-row: 3;
+}
+
+@media (max-width: 1024px) {
+  .contract-draft-form {
+    grid-template-columns: 1fr;
+  }
+
+  .contract-draft-form__panel--info,
+  .contract-draft-form__panel--class,
+  .contract-draft-form__panel--oc,
+  .contract-draft-form__panel--providers,
+  .contract-draft-form__panel--wide {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .contract-draft-form .form-grid--3 {
+    grid-template-columns: 1fr;
+  }
+}
+
 .contracts-tabs {
   position: relative;
   margin-bottom: var(--space-4);
@@ -9100,6 +9251,29 @@ body.has-modal-scroll-lock {
   background: var(--bg);
   color: var(--muted);
 }
+.rutas-detail-day--vol {
+  background: var(--primary-subtle, #eff6ff);
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  color: var(--fg);
+}
+.rutas-detail-day--empty {
+  background: var(--surface);
+  color: var(--muted);
+}
+.rutas-detail-day__vol {
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--primary);
+}
+.rutas-detail-calendar__dot--vol {
+  background: var(--primary-subtle, #eff6ff);
+  border-color: var(--primary);
+}
+.rutas-detail-calendar__dot--empty {
+  background: var(--surface);
+  border-color: var(--border);
+}
 
 .rutas-detail-pay-summary {
   display: flex;
@@ -9538,6 +9712,12 @@ body.has-modal-scroll-lock {
   background: var(--danger-subtle, #fff1f2);
   color: var(--danger-text, #be123c);
 }
+.rutas-detail-matrix__cell.is-vol {
+  background: var(--primary-subtle, #eff6ff);
+  color: var(--primary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
 .rutas-detail-matrix__cell:disabled {
   cursor: not-allowed;
   opacity: 0.6;
@@ -9593,6 +9773,14 @@ body.has-modal-scroll-lock {
 .rutas-detail-matrix-legend__swatch--fer {
   background: var(--warning, #f59e0b);
   border-color: color-mix(in srgb, var(--warning, #f59e0b) 70%, #000);
+}
+.rutas-detail-matrix-legend__swatch--vol {
+  background: var(--primary, #2563eb);
+  border-color: color-mix(in srgb, var(--primary, #2563eb) 70%, #000);
+}
+.rutas-detail-matrix-legend__swatch--empty {
+  background: var(--surface);
+  border-color: var(--border);
 }
 
 .rutas-detail-bulk-layout {

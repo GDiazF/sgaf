@@ -20,6 +20,7 @@ const EMPTY_FORM = {
   establecimientos: [],
   valor_diario: '',
   valor_mensual: '',
+  precio_m3: '',
   itinerario: '',
   dia_inicio_periodo: 21,
   dia_fin_periodo: 20,
@@ -39,6 +40,7 @@ export default function RutaFormModal({
   variant = 'ruta',
   lineasExistentes = [],
   montoMensualOpcional = false,
+  esVolumetrico = false,
 }) {
   const [searchTermEst, setSearchTermEst] = useState('')
   const overlay = useFormOverlay()
@@ -316,6 +318,21 @@ export default function RutaFormModal({
           ) : null}
 
           {esLinea ? (
+            esVolumetrico ? (
+              <Field
+                label="Precio por m³ ($/m³)"
+                required
+                htmlFor={`${formId}-precio-m3`}
+                className="field--full"
+              >
+                <CurrencyInput
+                  id={`${formId}-precio-m3`}
+                  required
+                  value={formData.precio_m3}
+                  onChange={(val) => setFormData({ ...formData, precio_m3: val })}
+                />
+              </Field>
+            ) : (
             <Field
               label={
                 montoMensualOpcional
@@ -340,6 +357,7 @@ export default function RutaFormModal({
                 onChange={(val) => setFormData({ ...formData, valor_mensual: val })}
               />
             </Field>
+            )
           ) : null}
 
           {esLinea ? (

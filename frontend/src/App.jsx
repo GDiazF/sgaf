@@ -14,11 +14,12 @@ import Establishments from './pages/establishments/Establishments';
 import ServicesDashboard from './pages/services/ServicesDashboard';
 import Providers from './pages/services/Providers';
 import PaymentsDashboard from './pages/services/PaymentsDashboard';
-import PaymentsReport from './pages/services/PaymentsReport';
 import CDPManager from './pages/services/CDPManager';
 import FacturasAdquisicionDashboard from './pages/services/FacturasAdquisicionDashboard';
 import DocumentacionServicios from './pages/services/DocumentacionServicios';
 import Contracts from './pages/contracts/Contracts';
+import ContractNewPage from './pages/contracts/ContractNewPage';
+import ContractDraftPage from './pages/contracts/ContractDraftPage';
 import ContractDetail from './pages/contracts/ContractDetail';
 import PeriodoDetallePage from './pages/contracts/PeriodoDetallePage';
 import ServiciosDashboard from './pages/contracts/ServiciosDashboard';
@@ -176,6 +177,8 @@ function App() {
                 {/* Contratos y Compras */}
                 <Route element={<ProtectedRoute permission="contratos.view_contrato" />}>
                   <Route path="contracts" element={<Contracts />} />
+                  <Route path="contracts/new" element={<ContractNewPage />} />
+                  <Route path="contracts/:id/edit" element={<ContractDraftPage />} />
                   <Route path="contracts/:id" element={<ContractDetail />} />
                 </Route>
                 <Route element={<ProtectedRoute permission="servicios.view_proveedor" />}>
@@ -201,7 +204,10 @@ function App() {
                   />
                 </Route>
                 <Route element={<ProtectedRoute permission="servicios.view_registropago" />}>
-                  <Route path="services/reporte-consumos" element={<PaymentsReport />} />
+                  <Route
+                    path="services/reporte-consumos"
+                    element={<Navigate to="/services/payments?tab=reporte" replace />}
+                  />
                 </Route>
                 <Route element={<ProtectedRoute permission="servicios.view_cdp" />}>
                   <Route path="services/cdp" element={<CDPManager />} />

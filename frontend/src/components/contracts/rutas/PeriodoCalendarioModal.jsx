@@ -5,6 +5,7 @@ import { Modal, Button, ConfirmModal, Icon, Field, CurrencyInput, Input, Switch 
 import { usePermission } from '../../../hooks/usePermission'
 import { useNotify } from '../../../hooks/useNotify'
 import api from '../../../api'
+import { formatM3Display, formatM3Input } from '../../../utils/formatM3'
 
 function DiaCelda({ fecha, isTrabajado, isFeriado, isFinDeSemana, onClick, disabled }) {
   let cls = 'rutas-detail-day rutas-detail-day--ok'
@@ -27,6 +28,33 @@ function DiaCelda({ fecha, isTrabajado, isFeriado, isFinDeSemana, onClick, disab
   )
 }
 
+function DiaCeldaVolumen({ fecha, volumen, isFeriado, isFinDeSemana, onClick, disabled }) {
+  const tieneVolumen = volumen != null && volumen !== ''
+  let cls = 'rutas-detail-day'
+  if (isFeriado) cls += ' rutas-detail-day--fer'
+  else if (isFinDeSemana) cls += ' rutas-detail-day--weekend'
+  else if (tieneVolumen) cls += ' rutas-detail-day--vol'
+  else cls += ' rutas-detail-day--empty'
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onClick(fecha)}
+      className={cls}
+      title={tieneVolumen ? `${formatM3Display(volumen)} m³` : 'Registrar m³ del servicio'}
+    >
+      <span className="rutas-detail-day__dow">
+        {format(fecha, 'EEE', { locale: es })}
+      </span>
+      <span className="rutas-detail-day__num">{format(fecha, 'd')}</span>
+      {tieneVolumen ? (
+        <span className="rutas-detail-day__vol">{formatM3Display(volumen)} m³</span>
+      ) : null}
+    </button>
+  )
+}
+
 export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
   const { can } = usePermission()
   const [loading, setLoading] = useState(true)
@@ -43,10 +71,14 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
   const [nroFactura, setNroFactura] = useState('')
   const [fechaServicio, setFechaServicio] = useState('')
   const [incluirPeriodoEnRc, setIncluirPeriodoEnRc] = useState(true)
+  const [diaVolumenEdit, setDiaVolumenEdit] = useState(null)
+  const [savingVolumenDia, setSavingVolumenDia] = useState(false)
   const { notify } = useNotify()
 
   const esMensual = Boolean(calendario?.es_mensual)
+  const esVolumetrico = Boolean(calendario?.es_volumetrico)
   const esMixto = Boolean(calendario?.es_mensual_mixto)
+  const esLineaEst = esMensual || esVolumetrico
   const usaAsistencia = Boolean(calendario?.usa_asistencia) && !esMixto
   const isClosed = calendario?.estado === 'CERRADO'
   const canEditPeriodo = can('contratos.change_periodocobro')
@@ -148,8 +180,48 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
     }
   }
 
+  const handleClickDiaVolumen = (fechaDate) => {
+    if (!canEditPeriodo || isClosed) return
+    const fechaStr = format(fechaDate, 'yyyy-MM-dd')
+    const actual = formatM3Input(calendario?.volumenes_dia?.[fechaStr] || '')
+    setDiaVolumenEdit({ fecha: fechaStr, label: format(fechaDate, "d 'de' MMMM", { locale: es }), value: actual })
+  }
+
+  const handleSaveVolumenDia = async (clear = false) => {
+    if (!diaVolumenEdit) return
+    setSavingVolumenDia(true)
+    try {
+      await api.post(`contratos/periodos/${periodoId}/volumen-dia/`, {
+        fecha: diaVolumenEdit.fecha,
+        volumen_m3: clear
+          ? null
+          : diaVolumenEdit.value === ''
+            ? null
+            : String(diaVolumenEdit.value).replace(',', '.'),
+      })
+      setDiaVolumenEdit(null)
+      await fetchCalendario()
+      await fetchTotal()
+      notify({
+        variant: 'success',
+        text: clear ? 'Registro del día eliminado.' : 'Volumen del día guardado.',
+      })
+    } catch (err) {
+      notify({
+        variant: 'danger',
+        text:
+          err?.response?.data?.volumen_m3 ||
+          err?.response?.data?.fecha ||
+          err?.response?.data?.detail ||
+          'No se pudo guardar el volumen.',
+      })
+    } finally {
+      setSavingVolumenDia(false)
+    }
+  }
+
   const handleSaveDatosRecepcion = async () => {
-    if (!esMensual || isClosed) return
+    if (!esLineaEst || isClosed) return
     setSavingDatos(true)
     try {
       const payload = {
@@ -182,7 +254,11 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
     onClose?.()
   }
 
-  const titlePrefix = usaAsistencia ? 'Control de asistencia' : 'Periodo'
+  const titlePrefix = usaAsistencia
+    ? 'Control de asistencia'
+    : esVolumetrico
+      ? 'Registro volumétrico'
+      : 'Periodo'
 
   return (
     <>
@@ -305,6 +381,58 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
                     />
                   </Field>
                 </div>
+              ) : esVolumetrico ? (
+                <>
+                  <div className="rutas-detail-calendar__head">
+                    <h4 className="rutas-detail-section-title">Servicios del mes (m³ por día)</h4>
+                    <div className="rutas-detail-calendar__legend">
+                      <div className="rutas-detail-calendar__legend-item">
+                        <span className="rutas-detail-calendar__dot rutas-detail-calendar__dot--vol" />{' '}
+                        Con volumen
+                      </div>
+                      <div className="rutas-detail-calendar__legend-item">
+                        <span className="rutas-detail-calendar__dot rutas-detail-calendar__dot--empty" />{' '}
+                        Sin servicio
+                      </div>
+                      <div className="rutas-detail-calendar__legend-item">
+                        <span className="rutas-detail-calendar__dot rutas-detail-calendar__dot--fer" />{' '}
+                        Feriado / no hábil
+                      </div>
+                    </div>
+                  </div>
+                  <p className="field__hint">
+                    Precio unitario:{' '}
+                    <strong>
+                      ${new Intl.NumberFormat('es-CL').format(calendario?.precio_m3 || 0)}
+                    </strong>{' '}
+                    / m³. Haz clic en un día para registrar cuántos m³ se entregaron o
+                    sanitizaron ese día. El total del periodo es la suma de todos los días.
+                  </p>
+                  <div className="rutas-detail-calendar__grid">
+                    {calendario &&
+                      diasGrid.map((dia) => {
+                        const fStr = format(dia, 'yyyy-MM-dd')
+                        const isFinSem = isWeekend(dia)
+                        const isFeriado = feriados.includes(fStr)
+                        const isDisabled =
+                          calendario.estado === 'CERRADO' ||
+                          (!calendario.regla.incluir_fines_semana && isFinSem) ||
+                          (calendario.regla.excluir_feriados && isFeriado)
+
+                        return (
+                          <DiaCeldaVolumen
+                            key={fStr}
+                            fecha={dia}
+                            volumen={calendario.volumenes_dia?.[fStr]}
+                            isFeriado={isFeriado && calendario.regla.excluir_feriados}
+                            isFinDeSemana={isFinSem && !calendario.regla.incluir_fines_semana}
+                            disabled={isDisabled || !canEditPeriodo}
+                            onClick={handleClickDiaVolumen}
+                          />
+                        )
+                      })}
+                  </div>
+                </>
               ) : (
                 <div className="rutas-detail-mixto-form">
                   <h4 className="rutas-detail-section-title">Mensual único</h4>
@@ -315,7 +443,7 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
                 </div>
               )}
 
-              {esMensual ? (
+              {esLineaEst ? (
                 <div className="rutas-detail-mixto-form">
                   <h4 className="rutas-detail-section-title">Datos para recepción</h4>
                   <p className="field__hint">
@@ -392,6 +520,25 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
                     </strong>
                   </div>
                 </>
+              ) : esVolumetrico ? (
+                <>
+                  <div className="rutas-detail-pay-summary__row">
+                    <span>Servicios registrados</span>
+                    <strong>{totalData?.cantidad_servicios ?? '—'}</strong>
+                  </div>
+                  <div className="rutas-detail-pay-summary__row">
+                    <span>Volumen total</span>
+                    <strong>
+                      {formatM3Display(totalData?.volumen_m3 || calendario?.volumen_m3) || '—'} m³
+                    </strong>
+                  </div>
+                  <div className="rutas-detail-pay-summary__row">
+                    <span>Precio / m³</span>
+                    <strong>
+                      ${new Intl.NumberFormat('es-CL').format(totalData?.precio_m3 || calendario?.precio_m3 || 0)}
+                    </strong>
+                  </div>
+                </>
               ) : usaAsistencia ? (
                 <>
                   <div className="rutas-detail-pay-summary__row">
@@ -408,7 +555,7 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
                   </div>
                 </>
               ) : null}
-              {esMensual && nroFactura ? (
+              {esLineaEst && nroFactura ? (
                 <div className="rutas-detail-pay-summary__row">
                   <span>Factura</span>
                   <strong>{nroFactura}</strong>
@@ -436,6 +583,57 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
         confirmLabel="Cerrar periodo"
         danger
       />
+
+      <Modal
+        open={!!diaVolumenEdit}
+        onClose={() => !savingVolumenDia && setDiaVolumenEdit(null)}
+        title="Volumen del día"
+        subheader={diaVolumenEdit ? diaVolumenEdit.label : undefined}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              disabled={savingVolumenDia}
+              onClick={() => setDiaVolumenEdit(null)}
+            >
+              Cancelar
+            </Button>
+            {calendario?.volumenes_dia?.[diaVolumenEdit?.fecha] ? (
+              <Button
+                variant="secondary"
+                disabled={savingVolumenDia}
+                onClick={() => handleSaveVolumenDia(true)}
+              >
+                Quitar registro
+              </Button>
+            ) : null}
+            <Button
+              variant="primary"
+              loading={savingVolumenDia}
+              disabled={savingVolumenDia || !diaVolumenEdit?.value}
+              onClick={() => handleSaveVolumenDia(false)}
+            >
+              Guardar
+            </Button>
+          </>
+        }
+      >
+        <Field label="Metros cúbicos (m³)" htmlFor="dia-volumen-m3" required>
+          <Input
+            id="dia-volumen-m3"
+            type="number"
+            min="0"
+            step="0.001"
+            autoFocus
+            value={diaVolumenEdit?.value ?? ''}
+            disabled={savingVolumenDia}
+            onChange={(e) =>
+              setDiaVolumenEdit((prev) => (prev ? { ...prev, value: e.target.value } : prev))
+            }
+            placeholder="Ej. 8.5"
+          />
+        </Field>
+      </Modal>
     </>
   )
 }

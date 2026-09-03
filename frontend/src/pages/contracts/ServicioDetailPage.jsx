@@ -27,6 +27,7 @@ import api from '../../api'
 import PeriodoCalendarioModal from '../../components/contracts/rutas/PeriodoCalendarioModal'
 import ConsolidadoModal from '../../components/contracts/rutas/ConsolidadoModal'
 import BulkAsistenciaModal from '../../components/contracts/rutas/BulkAsistenciaModal'
+import BulkVolumenModal from '../../components/contracts/rutas/BulkVolumenModal'
 import BulkRouteSettingsModal from '../../components/contracts/rutas/BulkRouteSettingsModal'
 import RutaFormModal, { EMPTY_FORM } from '../../components/contracts/rutas/RutaFormModal'
 import FeriadosModal from '../../components/contracts/rutas/FeriadosModal'
@@ -95,6 +96,7 @@ const ServicioDetailPage = ({
   const [isActaModalOpen, setIsActaModalOpen] = useState(false)
   const [isConsolidadoModalOpen, setIsConsolidadoModalOpen] = useState(false)
   const [isBulkAsistenciaModalOpen, setIsBulkAsistenciaModalOpen] = useState(false)
+  const [isBulkVolumenModalOpen, setIsBulkVolumenModalOpen] = useState(false)
   const [isBulkRouteModalOpen, setIsBulkRouteModalOpen] = useState(false)
   const [generatingActa, setGeneratingActa] = useState(false)
   const [actaSelection, setActaSelection] = useState({
@@ -126,10 +128,12 @@ const ServicioDetailPage = ({
   const [generatingRecepcion, setGeneratingRecepcion] = useState(false)
 
   const esMensual = Boolean(servicio?.es_mensual)
+  const esVolumetric = Boolean(servicio?.es_volumetrico)
+  const esLineaEst = esMensual || esVolumetric
   const esMensualMixto = Boolean(servicio?.es_mensual_mixto)
   const esMensualPorColegio = servicio?.modalidad_cobro === 'MENSUAL_POR_EST'
   /** Asistencia / feriados / config masiva: diario o mensual por colegio. */
-  const usaAsistenciaYFeriados = !esMensual || esMensualPorColegio
+  const usaAsistenciaYFeriados = !esLineaEst || esMensualPorColegio
   const permiteRecepcionServicio = Boolean(servicio?.permite_recepcion_servicio)
   const lineaFormDefaults = {
     ...EMPTY_FORM,
@@ -137,6 +141,7 @@ const ServicioDetailPage = ({
     dia_inicio_periodo: 1,
     dia_fin_periodo: 31,
     valor_mensual: servicio?.monto_mensual || '',
+    precio_m3: '',
     incluir_fines_semana: true,
     excluir_feriados: false,
   }
@@ -503,7 +508,7 @@ const ServicioDetailPage = ({
     const proveedores = contrato?.proveedores_asociados || []
     const unico = proveedores.length === 1 ? String(proveedores[0].proveedor) : ''
     setRutaFormData(
-      esMensual
+      esLineaEst
         ? { ...lineaFormDefaults, proveedor: unico }
         : { ...EMPTY_FORM, proveedor: unico },
     )
@@ -511,6 +516,17 @@ const ServicioDetailPage = ({
   }
 
   const handleCreateRuta = async (data) => {
+    if (esVolumetric) {
+      await api.post('contratos/rutas/bulk-crear-lineas/', {
+        servicio: id,
+        proveedor: data.proveedor,
+        establecimientos: data.establecimientos || [],
+        precio_m3: data.precio_m3,
+        incluir_fines_semana: data.incluir_fines_semana ?? true,
+        excluir_feriados: data.excluir_feriados ?? false,
+      })
+      return
+    }
     if (esMensual) {
       await api.post('contratos/rutas/bulk-crear-lineas/', {
         servicio: id,
@@ -546,7 +562,7 @@ const ServicioDetailPage = ({
       fetchData()
       notify({
         variant: 'success',
-        text: esMensual ? 'Establecimiento eliminado.' : 'Ruta eliminada.',
+        text: esLineaEst ? 'Establecimiento eliminado.' : 'Ruta eliminada.',
       })
     } catch {
       notify({ variant: 'danger', text: 'Error al eliminar la ruta.' })
@@ -584,6 +600,7 @@ const ServicioDetailPage = ({
       incluir_fines_semana: ruta.incluir_fines_semana ?? false,
       excluir_feriados: ruta.excluir_feriados ?? true,
       valor_mensual: ruta.valor_mensual || servicio?.monto_mensual || '',
+      precio_m3: ruta.precio_m3 || '',
     })
     setIsEditModalOpen(true)
   }
@@ -765,7 +782,7 @@ const ServicioDetailPage = ({
     },
     {
       key: 'nombre',
-      header: esMensual ? 'Establecimiento' : 'Nombre de ruta',
+      header: esLineaEst ? 'Establecimiento' : 'Nombre de ruta',
       className: 'col--primary',
       cardRole: 'title',
       priority: 1,
@@ -780,7 +797,7 @@ const ServicioDetailPage = ({
         </button>
       ),
     },
-    ...(esMensual
+    ...(esLineaEst
       ? []
       : [
           {
@@ -802,8 +819,14 @@ const ServicioDetailPage = ({
       render: (ruta) => ruta.proveedor_nombre || '—',
     },
     {
-      key: esMensual ? 'valor_mensual' : 'valor_diario',
-      header: esMensualMixto ? 'Monto sugerido' : esMensual ? 'Monto mensual' : 'Valor diario',
+      key: esVolumetric ? 'precio_m3' : esMensual ? 'valor_mensual' : 'valor_diario',
+      header: esVolumetric
+        ? 'Precio / m³'
+        : esMensualMixto
+          ? 'Monto sugerido'
+          : esMensual
+            ? 'Monto mensual'
+            : 'Valor diario',
       className: 'col--status',
       cardRole: 'status',
       priority: 1,
@@ -812,9 +835,11 @@ const ServicioDetailPage = ({
         <Badge variant="neutral">
           $
           {new Intl.NumberFormat('es-CL').format(
-            esMensual
-              ? ruta.valor_mensual || servicio?.monto_mensual || 0
-              : ruta.valor_diario,
+            esVolumetric
+              ? ruta.precio_m3 || 0
+              : esMensual
+                ? ruta.valor_mensual || servicio?.monto_mensual || 0
+                : ruta.valor_diario,
           )}
         </Badge>
       ),
@@ -860,8 +885,9 @@ const ServicioDetailPage = ({
     },
   ]
 
-  const modalidadLabel =
-    servicio?.modalidad_cobro === 'MENSUAL_UNICO'
+  const modalidadLabel = esVolumetric
+    ? 'Por m³'
+    : servicio?.modalidad_cobro === 'MENSUAL_UNICO'
       ? 'Mensual único'
       : servicio?.modalidad_cobro === 'MENSUAL_FIJO_VARIABLE'
         ? 'Fijo y/o variable'
@@ -869,7 +895,7 @@ const ServicioDetailPage = ({
 
   const toolbarActions = (
     <>
-      {esMensual && can('contratos.change_serviciocontrato') ? (
+      {esMensual && !esVolumetric && can('contratos.change_serviciocontrato') ? (
         <Button
           variant="secondary"
           size="sm"
@@ -912,7 +938,7 @@ const ServicioDetailPage = ({
       {can('contratos.add_rutatransporte') ? (
         <Button variant="primary" size="sm" onClick={openCreateLinea}>
           <Icon name="plus" size="sm" />{' '}
-          {esMensual ? 'Agregar establecimientos' : 'Nueva ruta'}
+          {esLineaEst ? 'Agregar establecimientos' : 'Nueva ruta'}
         </Button>
       ) : null}
     </>
@@ -961,9 +987,11 @@ const ServicioDetailPage = ({
           icon="rutas"
           title={servicio?.nombre || 'Gestión'}
           description={
-            esMensual
-              ? `Gasto mensual por establecimiento (${rutas.length})`
-              : `Control operativo y gestión de periodos (${rutas.length} rutas)`
+            esVolumetric
+              ? `Cobro por m³ por establecimiento (${rutas.length})`
+              : esMensual
+                ? `Gasto mensual por establecimiento (${rutas.length})`
+                : `Control operativo y gestión de periodos (${rutas.length} rutas)`
           }
           breadcrumbs={[
             { label: 'SSGG' },
@@ -1000,7 +1028,7 @@ const ServicioDetailPage = ({
             <Input
               id="ruta-detail-q"
               type="search"
-              placeholder={esMensual ? 'Buscar establecimiento…' : 'Buscar ruta…'}
+              placeholder={esLineaEst ? 'Buscar establecimiento…' : 'Buscar ruta…'}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -1030,11 +1058,13 @@ const ServicioDetailPage = ({
         rows={pageRows}
         totalCount={sortedRutas.length}
         loading={loading}
-        emptyTitle={esMensual ? 'Sin establecimientos' : 'Sin rutas'}
+        emptyTitle={esLineaEst ? 'Sin establecimientos' : 'Sin rutas'}
         emptyDescription={
-          esMensual
-            ? 'Agregue un establecimiento para registrar el gasto mensual.'
-            : 'No hay rutas con los filtros actuales.'
+          esVolumetric
+            ? 'Agregue un establecimiento con precio por m³.'
+            : esMensual
+              ? 'Agregue un establecimiento para registrar el gasto mensual.'
+              : 'No hay rutas con los filtros actuales.'
         }
         emptyAction={
           can('contratos.add_rutatransporte') ? (
@@ -1044,7 +1074,7 @@ const ServicioDetailPage = ({
               onClick={openCreateLinea}
             >
               <Icon name="plus" size="sm" />{' '}
-              {esMensual ? 'Agregar establecimientos' : 'Nueva ruta'}
+              {esLineaEst ? 'Agregar establecimientos' : 'Nueva ruta'}
             </Button>
           ) : undefined
         }
@@ -1063,7 +1093,7 @@ const ServicioDetailPage = ({
         toolbar={
           <div className="table-toolbar__left rutas-detail-toolbar">
             <span className="table-toolbar__title">
-              {esMensual ? 'Establecimientos' : 'Rutas operativas'}
+              {esLineaEst ? 'Establecimientos' : 'Rutas operativas'}
             </span>
             <Badge variant="neutral">{sortedRutas.length}</Badge>
             {selectedRutasTable.length > 0 && can('contratos.add_periodocobro') ? (
@@ -1082,7 +1112,16 @@ const ServicioDetailPage = ({
                 size="sm"
                 onClick={() => setIsBulkAsistenciaModalOpen(true)}
               >
-                <Icon name="reservas" size="sm" /> Gestión asistencia
+                <Icon name="reservas" size="sm" /> Planilla asistencia
+              </Button>
+            ) : null}
+            {esVolumetric && can('contratos.change_periodocobro') ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsBulkVolumenModalOpen(true)}
+              >
+                <Icon name="reservas" size="sm" /> Planilla m³
               </Button>
             ) : null}
             {usaAsistenciaYFeriados && can('contratos.change_rutatransporte') ? (
@@ -1094,7 +1133,7 @@ const ServicioDetailPage = ({
                 <Icon name="procedimientos" size="sm" /> Config. masiva
               </Button>
             ) : null}
-            {!esMensual && canViewServicioOp ? (
+            {!esLineaEst && canViewServicioOp ? (
               <Button variant="secondary" size="sm" onClick={() => setIsActaModalOpen(true)}>
                 <Icon name="file" size="sm" /> Acta
               </Button>
@@ -1282,7 +1321,30 @@ const ServicioDetailPage = ({
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             <div className="rutas-detail-drawer-stats">
-              {esMensual ? (
+              {esVolumetric ? (
+                <>
+                  <div className="rutas-detail-drawer-stat">
+                    <p>Precio / m³</p>
+                    <strong>
+                      $
+                      {new Intl.NumberFormat('es-CL').format(
+                        selectedRoute?.precio_m3 || 0,
+                      )}
+                    </strong>
+                  </div>
+                  <div className="rutas-detail-drawer-stat">
+                    <p>Calendario</p>
+                    <strong>
+                      {selectedRoute?.incluir_fines_semana
+                        ? 'Incluye fines de semana'
+                        : 'Sin fines de semana'}
+                      {selectedRoute?.excluir_feriados
+                        ? ' · sin feriados'
+                        : ' · incluye feriados'}
+                    </strong>
+                  </div>
+                </>
+              ) : esMensual ? (
                 <>
                   <div className="rutas-detail-drawer-stat">
                     <p>Monto mensual</p>
@@ -1377,7 +1439,7 @@ const ServicioDetailPage = ({
                     <EmptyState
                       title="No hay periodos generados"
                       description={
-                        esMensual
+                        esLineaEst
                           ? 'Genera el primer periodo de cobro para este establecimiento.'
                           : 'Genera el primer periodo de cobro para esta ruta.'
                       }
@@ -1444,7 +1506,15 @@ const ServicioDetailPage = ({
         onClose={() => setIsBulkAsistenciaModalOpen(false)}
         rutas={rutas}
         onUpdate={fetchData}
-        rowLabel={esMensual ? 'Establecimientos' : 'Rutas'}
+        rowLabel={esLineaEst ? 'Establecimientos' : 'Rutas'}
+      />
+
+      <BulkVolumenModal
+        open={isBulkVolumenModalOpen}
+        onClose={() => setIsBulkVolumenModalOpen(false)}
+        rutas={rutas}
+        onUpdate={fetchData}
+        rowLabel="Establecimientos"
       />
 
       <BulkRouteSettingsModal
@@ -1454,14 +1524,14 @@ const ServicioDetailPage = ({
           if (result?.saved) fetchData()
         }}
         rutas={rutas}
-        variant={esMensual ? 'establecimiento' : 'ruta'}
+        variant={esLineaEst ? 'establecimiento' : 'ruta'}
       />
 
       <ConsolidadoModal
         open={isConsolidadoModalOpen}
         onClose={() => setIsConsolidadoModalOpen(false)}
         rutas={rutas}
-        variant={esMensual ? 'establecimiento' : 'ruta'}
+        variant={esLineaEst ? 'establecimiento' : 'ruta'}
         esMensualMixto={esMensualMixto}
       />
 
@@ -1473,9 +1543,10 @@ const ServicioDetailPage = ({
         setFormData={setRutaFormData}
         onSave={handleCreateRuta}
         contrato={contrato}
-        variant={esMensual ? 'establecimiento' : 'ruta'}
+        variant={esLineaEst ? 'establecimiento' : 'ruta'}
         lineasExistentes={rutas}
         montoMensualOpcional={esMensualMixto}
+        esVolumetrico={esVolumetric}
       />
 
       <RutaFormModal
@@ -1487,9 +1558,10 @@ const ServicioDetailPage = ({
         onSave={handleUpdateRuta}
         contrato={contrato}
         showEditWarning
-        variant={esMensual ? 'establecimiento' : 'ruta'}
+        variant={esLineaEst ? 'establecimiento' : 'ruta'}
         lineasExistentes={rutas}
         montoMensualOpcional={esMensualMixto}
+        esVolumetrico={esVolumetric}
       />
 
       <FeriadosModal
@@ -1711,7 +1783,7 @@ const ServicioDetailPage = ({
               <div className="rutas-detail-period-preview__range">
                 <div>
                   <p>
-                    {esMensual
+                    {esLineaEst
                       ? `1/${periodoData.mes}/${periodoData.anio}`
                       : `${selectedRoute.dia_inicio_periodo}/${
                           periodoData.mes === 1 ? 12 : periodoData.mes - 1
@@ -1724,7 +1796,7 @@ const ServicioDetailPage = ({
                 <Icon name="chevron" size="sm" />
                 <div>
                   <p>
-                    {esMensual
+                    {esLineaEst
                       ? `${new Date(periodoData.anio, periodoData.mes, 0).getDate()}/${periodoData.mes}/${periodoData.anio}`
                       : `${selectedRoute.dia_fin_periodo}/${periodoData.mes}/${periodoData.anio}`}
                   </p>
@@ -1740,7 +1812,7 @@ const ServicioDetailPage = ({
         open={isBulkModalOpen}
         onClose={closeBulkPeriodoModal}
         title="Apertura masiva"
-        subheader={`${selectedRutasTable.length} ${esMensual ? 'establecimientos seleccionados' : 'rutas seleccionadas'}`}
+        subheader={`${selectedRutasTable.length} ${esLineaEst ? 'establecimientos seleccionados' : 'rutas seleccionadas'}`}
         {...bulkPeriodoOverlay.modalProps}
         onOverlayDismiss={handleBulkPeriodoOverlayDismiss}
         footer={
@@ -2144,9 +2216,9 @@ const ServicioDetailPage = ({
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={confirmDeleteRuta}
-        title={esMensual ? 'Eliminar establecimiento' : 'Eliminar ruta'}
+        title={esLineaEst ? 'Eliminar establecimiento' : 'Eliminar ruta'}
         description={
-          esMensual
+          esLineaEst
             ? '¿Eliminar este establecimiento de la gestión? También se eliminarán sus periodos de cobro.'
             : '¿Está seguro de eliminar esta ruta? Esta acción eliminará también todos sus periodos de cobro asociados.'
         }

@@ -95,6 +95,11 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
         read_only_fields = ('fecha_emision', 'folio')
 
     def _firma_info(self, obj):
+        firma_map = self.context.get('firma_map')
+        if firma_map is not None:
+            from .rc_firma import firma_info_rc
+            return firma_info_rc(obj, latest=firma_map.get(obj.pk), allow_query=False)
+
         cache = getattr(self, '_firma_info_cache', None)
         if cache is None:
             cache = {}
@@ -237,6 +242,17 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
                  )
              
         return rc
+
+class RecepcionConformeListSerializer(RecepcionConformeSerializer):
+    """Listado liviano: sin pagos ni historial anidados."""
+
+    class Meta(RecepcionConformeSerializer.Meta):
+        pass
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in ('registros', 'historial', 'registros_ids'):
+            self.fields.pop(field, None)
 
 class CDPSerializer(serializers.ModelSerializer):
     class Meta:

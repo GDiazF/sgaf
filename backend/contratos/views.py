@@ -9,11 +9,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 from establecimientos.pagination import LargeResultsSetPagination
 from establecimientos.models import Establecimiento
 
+from documentos.context_builders import _fmt_m3
+
 from .models import (
     ProcesoCompra, EstadoContrato, CategoriaContrato, Contrato, 
     OrientacionLicitacion, DocumentoContrato, HistorialContrato, AmpliacionContrato,
     TipoServicioOperativo, ServicioContrato, RutaTransporte, PeriodoCobro, AusenciaRuta,
-    FeriadoNacional, GrupoPresetRutas
+    VolumenDiaPeriodo, FeriadoNacional, GrupoPresetRutas
 )
 from .serializers import (
     ProcesoCompraSerializer, EstadoContratoSerializer, CategoriaContratoSerializer, 
@@ -104,25 +106,85 @@ class _AmpliacionContratoPermission(permissions.BasePermission):
 class ContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
     sgaf_action_permissions = {
         'resumen_periodo': 'contratos.view_contrato',
+        'crear_borrador': 'contratos.add_contrato',
+        'publicar': 'contratos.change_contrato',
     }
-    queryset = Contrato.objects.prefetch_related(
+    queryset = Contrato.objects.select_related(
+        'plantilla_recepcion_servicio',
+        'proceso', 'estado', 'categoria', 'orientacion',
+    ).prefetch_related(
         'ampliaciones', 'documentos', 'historial', 'proveedores_asociados',
     ).all()
     serializer_class = ContratoSerializer
     pagination_class = LargeResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['proceso', 'estado', 'categoria', 'orientacion']
+    filterset_fields = ['proceso', 'estado', 'categoria', 'orientacion', 'es_borrador']
     search_fields = ['codigo_mercado_publico', 'descripcion', 'detalle', 'nro_oc', 'cdp', 'proveedores_asociados__proveedor__nombre']
-    ordering_fields = ['fecha_inicio', 'monto_total', 'created_at']
+    ordering_fields = ['fecha_inicio', 'monto_total', 'created_at', 'updated_at']
+
+    @staticmethod
+    def _finalizado_q():
+        from django.db.models import Q
+        from django.utils import timezone
+        today = timezone.now().date()
+        return (
+            Q(estado__nombre__icontains='finaliz')
+            | Q(estado__nombre__icontains='caduc')
+            | Q(estado__nombre__icontains='cerr')
+            | Q(estado__nombre__icontains='termin')
+            | Q(fecha_termino__lt=today)
+        )
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        vista = self.request.query_params.get('vista')
+        if vista == 'borradores':
+            return qs.filter(es_borrador=True)
+        if vista == 'finalizados':
+            return qs.filter(es_borrador=False).filter(self._finalizado_q())
+        if vista == 'activos':
+            return qs.filter(es_borrador=False).exclude(self._finalizado_q())
+        return qs
+
+    @action(detail=False, methods=['post'], url_path='crear-borrador')
+    def crear_borrador(self, request):
+        contrato = Contrato.objects.create(es_borrador=True, descripcion='')
+        serializer = self.get_serializer(contrato)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='publicar')
+    def publicar(self, request, pk=None):
+        contrato = self.get_object()
+        if not contrato.es_borrador:
+            return Response(
+                {'detail': 'Este contrato ya fue publicado.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = self.get_serializer(
+            contrato,
+            data=request.data,
+            partial=True,
+            context={**self.get_serializer_context(), 'publicar': True},
+        )
+        serializer.is_valid(raise_exception=True)
+        contrato = serializer.save()
+        contrato._current_user = request.user
+        HistorialContrato.objects.create(
+            contrato=contrato,
+            accion='PUBLICACION',
+            detalle=f'Se publicó el contrato {contrato.codigo_mercado_publico}.',
+            usuario=str(request.user),
+        )
+        return Response(serializer.data)
 
     def perform_update(self, serializer):
         user = self.request.user
         instance = self.get_object()
-        # Pasar el usuario al signal via atributo temporal en la instancia
         instance._current_user = user
-        # Re-asignar para que el signal pre_save use la instancia correcta
         serializer.instance._current_user = user
         instance = serializer.save()
+        if instance.es_borrador:
+            return
         HistorialContrato.objects.create(
             contrato=instance,
             accion="MODIFICACION",
@@ -496,7 +558,9 @@ class RutaTransporteViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         'bulk_update': 'contratos.change_rutatransporte',
         'recepcion_servicio': 'contratos.view_rutatransporte',
     }
-    queryset = RutaTransporte.objects.select_related('servicio', 'proveedor').prefetch_related('establecimientos', 'periodos', 'periodos__ausencias').all()
+    queryset = RutaTransporte.objects.select_related('servicio', 'proveedor').prefetch_related(
+        'establecimientos', 'periodos', 'periodos__ausencias', 'periodos__volumenes_dia',
+    ).all()
     serializer_class = RutaTransporteSerializer
     pagination_class = None # Ver todas las rutas sin paginación
     filterset_fields = ['servicio', 'proveedor']
@@ -516,12 +580,20 @@ class RutaTransporteViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
             servicio = ServicioContrato.objects.get(pk=servicio_id)
         except ServicioContrato.DoesNotExist:
             return Response({'servicio': 'Gestión no encontrada.'}, status=status.HTTP_400_BAD_REQUEST)
-        if not valor_mensual and not servicio.es_mensual_mixto:
+        precio_m3 = request.data.get('precio_m3')
+        if servicio.es_volumetrico:
+            if not precio_m3:
+                return Response(
+                    {'precio_m3': 'Indique el precio por metro cúbico ($/m³).'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        elif not valor_mensual and not servicio.es_mensual_mixto:
             return Response(
                 {'valor_mensual': 'Indique el monto mensual.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         valor_mensual = valor_mensual or 0
+        precio_m3 = precio_m3 or 0
         nombres = {
             e.id: e.nombre
             for e in Establecimiento.objects.filter(id__in=est_ids)
@@ -541,7 +613,8 @@ class RutaTransporteViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
                     'proveedor': proveedor_id,
                     'nombre': nombres.get(int(est_id), f'Establecimiento {est_id}'),
                     'establecimientos': [est_id],
-                    'valor_mensual': valor_mensual,
+                    'valor_mensual': valor_mensual if servicio.es_mensual else None,
+                    'precio_m3': precio_m3 if servicio.es_volumetrico else None,
                     'valor_diario': 0,
                     'dia_inicio_periodo': 1,
                     'dia_fin_periodo': 31,
@@ -718,11 +791,15 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         'generate_pdf': 'contratos.view_periodocobro',
         'toggle_dia': 'contratos.change_ausenciaruta',
         'bulk_toggle_dia': 'contratos.change_ausenciaruta',
+        'volumen_dia': 'contratos.change_periodocobro',
+        'bulk_volumen_dia': 'contratos.change_periodocobro',
         'cerrar': 'contratos.change_periodocobro',
         'datos_recepcion': 'contratos.change_periodocobro',
         'montos_mixto': 'contratos.change_periodocobro',
     }
-    queryset = PeriodoCobro.objects.select_related('ruta', 'ruta__servicio').prefetch_related('ausencias').all()
+    queryset = PeriodoCobro.objects.select_related('ruta', 'ruta__servicio').prefetch_related(
+        'ausencias', 'volumenes_dia',
+    ).all()
     serializer_class = PeriodoCobroSerializer
     filterset_fields = ['ruta', 'estado', 'anio_referencia', 'mes_referencia']
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
@@ -735,6 +812,10 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         ruta = periodo.ruta
         servicio = ruta.servicio if ruta.servicio_id else None
         ausencias = periodo.ausencias.values_list('fecha', flat=True)
+        volumenes_dia = {
+            fecha.isoformat(): _fmt_m3(vol)
+            for fecha, vol in periodo.volumenes_dia.values_list('fecha', 'volumen_m3')
+        }
         return Response({
             "fecha_inicio": periodo.fecha_inicio,
             "fecha_fin": periodo.fecha_fin,
@@ -748,15 +829,19 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
             "nombre_estandarizado": periodo.nombre_estandarizado,
             "monto_fijo": periodo.monto_fijo or 0,
             "monto_variable": periodo.monto_variable or 0,
+            "volumen_m3": _fmt_m3(periodo.volumen_m3_total()),
+            "volumenes_dia": volumenes_dia,
+            "precio_m3": ruta.precio_m3 or 0,
             "nro_factura": periodo.nro_factura or '',
             "fecha_servicio": periodo.fecha_servicio,
             "incluir_periodo_en_rc": bool(periodo.incluir_periodo_en_rc),
             "es_mensual_mixto": bool(servicio and servicio.es_mensual_mixto),
             "es_mensual": bool(servicio and servicio.es_mensual),
+            "es_volumetrico": bool(servicio and servicio.es_volumetrico),
             "usa_asistencia": bool(
                 servicio
                 and (
-                    not servicio.es_mensual
+                    not servicio.es_linea_por_establecimiento
                     or servicio.modalidad_cobro == servicio.MODALIDAD_MENSUAL_POR_EST
                 )
             ),
@@ -779,6 +864,17 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
                 "es_mensual_mixto": True,
                 "monto_fijo": periodo.monto_fijo or 0,
                 "monto_variable": periodo.monto_variable or 0,
+            })
+
+        if servicio and servicio.es_volumetrico:
+            vol_total = periodo.volumen_m3_total()
+            return Response({
+                "total": total_dinero,
+                "estado": periodo.estado,
+                "es_volumetrico": True,
+                "volumen_m3": _fmt_m3(vol_total),
+                "cantidad_servicios": periodo.volumenes_dia.count(),
+                "precio_m3": ruta.precio_m3 or 0,
             })
 
         delta = (periodo.fecha_fin - periodo.fecha_inicio).days + 1
@@ -834,9 +930,9 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         """
         periodo = self.get_object()
         servicio = periodo.ruta.servicio if periodo.ruta.servicio_id else None
-        if not servicio or not servicio.es_mensual:
+        if not servicio or not servicio.permite_recepcion_servicio:
             return Response(
-                {'error': 'Solo aplica a gestiones mensuales (no transporte).'},
+                {'error': 'Solo aplica a gestiones mensuales o volumétricas (no transporte).'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if periodo.estado == 'CERRADO':
@@ -887,6 +983,16 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
                         {'monto_variable': 'Valor inválido.'},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
+        if servicio.es_volumetrico and 'volumen_m3' in request.data:
+            return Response(
+                {
+                    'volumen_m3': (
+                        'Use el calendario del periodo para registrar m³ por día '
+                        '(varios servicios en el mes).'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if not data:
             return Response({'detail': 'Sin cambios.'}, status=status.HTTP_400_BAD_REQUEST)
         for key, value in data.items():
@@ -930,6 +1036,148 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
                 return Response({"status": "creada"})
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'], url_path='volumen-dia')
+    def volumen_dia(self, request, pk=None):
+        """Registra o elimina m³ de un día (modalidad volumétrica)."""
+        fecha_str = request.data.get('fecha')
+        raw_vol = request.data.get('volumen_m3')
+        if not fecha_str:
+            return Response({'fecha': 'Requerido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            fecha = datetime.datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'fecha': 'Formato inválido (YYYY-MM-DD).'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                periodo = PeriodoCobro.objects.select_for_update().prefetch_related(
+                    'volumenes_dia',
+                ).get(pk=pk)
+                servicio = periodo.ruta.servicio if periodo.ruta.servicio_id else None
+                if not servicio or not servicio.es_volumetrico:
+                    return Response(
+                        {'error': 'Solo aplica a gestiones volumétricas.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if periodo.estado == 'CERRADO':
+                    return Response({'detail': 'Periodo cerrado.'}, status=status.HTTP_400_BAD_REQUEST)
+                if not (periodo.fecha_inicio <= fecha <= periodo.fecha_fin):
+                    return Response({'fecha': 'Fuera de rango.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                ruta = periodo.ruta
+                if not ruta.incluir_fines_semana and fecha.weekday() >= 5:
+                    return Response({'fecha': 'Fin de semana excluido por la línea.'}, status=status.HTTP_400_BAD_REQUEST)
+                if ruta.excluir_feriados and FeriadoNacional.objects.filter(fecha=fecha).exists():
+                    return Response({'fecha': 'Feriado excluido por la línea.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                if raw_vol in (None, '', 0, '0'):
+                    VolumenDiaPeriodo.objects.filter(periodo=periodo, fecha=fecha).delete()
+                    status_label = 'eliminado'
+                else:
+                    from decimal import Decimal, InvalidOperation
+                    try:
+                        vol = Decimal(str(raw_vol).replace(',', '.'))
+                        if vol <= 0:
+                            raise InvalidOperation
+                    except (InvalidOperation, ValueError):
+                        return Response(
+                            {'volumen_m3': 'Indique un volumen válido en m³.'},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                    VolumenDiaPeriodo.objects.update_or_create(
+                        periodo=periodo,
+                        fecha=fecha,
+                        defaults={'volumen_m3': vol},
+                    )
+                    status_label = 'guardado'
+
+                periodo.sync_volumen_m3_cache()
+                periodo.save(update_fields=['volumen_m3'])
+                vol_total = periodo.volumen_m3_total()
+                return Response({
+                    'status': status_label,
+                    'volumen_m3': _fmt_m3(vol_total),
+                    'cantidad_servicios': periodo.volumenes_dia.count(),
+                    'total': periodo.calcular_total_dinamico(),
+                })
+        except PeriodoCobro.DoesNotExist:
+            return Response({'detail': 'Periodo no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        except DjangoValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, 'message_dict') else {'detail': exc.messages}
+            return Response(detail, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'], url_path='bulk-volumen-dia')
+    def bulk_volumen_dia(self, request):
+        """Registra o elimina m³ de un día en varios periodos (planilla volumétrica)."""
+        periodo_ids = request.data.get('periodo_ids') or []
+        fecha_str = request.data.get('fecha')
+        raw_vol = request.data.get('volumen_m3')
+        if not periodo_ids or not fecha_str:
+            return Response(
+                {'detail': 'periodo_ids y fecha son requeridos.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            fecha = datetime.datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'fecha': 'Formato inválido (YYYY-MM-DD).'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from decimal import Decimal, InvalidOperation
+        vol = None
+        if raw_vol not in (None, '', 0, '0'):
+            try:
+                vol = Decimal(str(raw_vol).replace(',', '.'))
+                if vol <= 0:
+                    raise InvalidOperation
+            except (InvalidOperation, ValueError):
+                return Response(
+                    {'volumen_m3': 'Indique un volumen válido en m³.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        results = []
+        try:
+            with transaction.atomic():
+                periodos = PeriodoCobro.objects.select_for_update().filter(
+                    id__in=periodo_ids,
+                ).select_related('ruta', 'ruta__servicio').prefetch_related('volumenes_dia')
+                for periodo in periodos:
+                    servicio = periodo.ruta.servicio if periodo.ruta.servicio_id else None
+                    if not servicio or not servicio.es_volumetrico:
+                        results.append({'id': periodo.id, 'status': 'error', 'detail': 'No volumétrico'})
+                        continue
+                    if periodo.estado == 'CERRADO':
+                        results.append({'id': periodo.id, 'status': 'error', 'detail': 'Periodo cerrado'})
+                        continue
+                    if not (periodo.fecha_inicio <= fecha <= periodo.fecha_fin):
+                        results.append({'id': periodo.id, 'status': 'error', 'detail': 'Fuera de rango'})
+                        continue
+                    ruta = periodo.ruta
+                    if not ruta.incluir_fines_semana and fecha.weekday() >= 5:
+                        results.append({'id': periodo.id, 'status': 'error', 'detail': 'Fin de semana'})
+                        continue
+                    if ruta.excluir_feriados and FeriadoNacional.objects.filter(fecha=fecha).exists():
+                        results.append({'id': periodo.id, 'status': 'error', 'detail': 'Feriado'})
+                        continue
+                    if vol is None:
+                        VolumenDiaPeriodo.objects.filter(periodo=periodo, fecha=fecha).delete()
+                        results.append({'id': periodo.id, 'status': 'eliminado'})
+                    else:
+                        VolumenDiaPeriodo.objects.update_or_create(
+                            periodo=periodo,
+                            fecha=fecha,
+                            defaults={'volumen_m3': vol},
+                        )
+                        results.append({'id': periodo.id, 'status': 'guardado'})
+                    periodo.sync_volumen_m3_cache()
+                    periodo.save(update_fields=['volumen_m3'])
+            return Response({'results': results}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=['post'], url_path='bulk-toggle-dia')
     def bulk_toggle_dia(self, request):
@@ -996,11 +1244,18 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
                 if periodo.estado == 'CERRADO':
                     return Response({"detail": "El periodo ya está cerrado."}, status=status.HTTP_400_BAD_REQUEST)
 
+                servicio = periodo.ruta.servicio if periodo.ruta.servicio_id else None
+                if servicio and servicio.es_volumetrico:
+                    periodo.sync_volumen_m3_cache()
+
                 monto_total = periodo.calcular_total_dinamico()
 
                 periodo.estado = 'CERRADO'
                 periodo.monto_total_calculado = monto_total
-                periodo.save()
+                update_fields = ['estado', 'monto_total_calculado']
+                if servicio and servicio.es_volumetrico:
+                    update_fields.append('volumen_m3')
+                periodo.save(update_fields=update_fields)
 
                 logger.info(f"Periodo {periodo.id} CERRADO exitosamente. Monto total congelado: {monto_total}. Usuario: {request.user}")
                 return Response({"status": "cerrado", "monto_total": monto_total})

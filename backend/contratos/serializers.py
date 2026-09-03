@@ -288,6 +288,7 @@ class ContratoSerializer(serializers.ModelSerializer):
     estado_nombre = serializers.ReadOnlyField(source='estado.nombre')
     categoria_nombre = serializers.ReadOnlyField(source='categoria.nombre')
     orientacion_nombre = serializers.ReadOnlyField(source='orientacion.nombre')
+    plantilla_recepcion_servicio_nombre = serializers.SerializerMethodField()
     
     proveedores_asociados = ContratoProveedorSerializer(many=True, required=False)
     monto_total = serializers.ReadOnlyField()
@@ -306,40 +307,118 @@ class ContratoSerializer(serializers.ModelSerializer):
     from servicios.serializers import FacturaAdquisicionSerializer
     recepciones = FacturaAdquisicionSerializer(many=True, read_only=True)
 
+    PUBLISH_REQUIRED = {
+        'codigo_mercado_publico': 'Código Mercado Público',
+        'descripcion': 'Descripción',
+        'proceso': 'Proceso de compra',
+        'estado': 'Estado',
+        'categoria': 'Categoría',
+        'fecha_adjudicacion': 'Fecha de adjudicación',
+        'fecha_inicio': 'Fecha de inicio',
+        'fecha_termino': 'Fecha de término',
+        'plantilla_cobro': 'Plantilla de cobro',
+    }
+
     class Meta:
         model = Contrato
         fields = '__all__'
+        read_only_fields = ['created_at', 'updated_at']
 
-    def create(self, validated_data):
-        proveedores_data = validated_data.pop('proveedores_asociados', [])
-        
-        contrato = Contrato.objects.create(**validated_data)
-            
+    def _effective(self, attrs):
+        inst = self.instance
+        if not inst:
+            return attrs
+        merged = {}
+        for field in self.PUBLISH_REQUIRED:
+            merged[field] = attrs[field] if field in attrs else getattr(inst, field)
+        return merged
+
+    def _validate_publicado(self, data):
+        errors = {}
+        for field, label in self.PUBLISH_REQUIRED.items():
+            val = data.get(field)
+            if val is None or val == '':
+                errors[field] = f'{label} es obligatorio para crear el contrato.'
+        if not errors and data.get('fecha_inicio') and data.get('fecha_termino'):
+            if data['fecha_termino'] < data['fecha_inicio']:
+                errors['fecha_termino'] = 'La fecha de término debe ser posterior al inicio.'
+        if errors:
+            raise serializers.ValidationError(errors)
+
+    def get_plantilla_recepcion_servicio_nombre(self, obj):
+        plantilla = getattr(obj, 'plantilla_recepcion_servicio', None)
+        return plantilla.nombre if plantilla else None
+
+    def validate_codigo_mercado_publico(self, value):
+        if not value or not str(value).strip():
+            return None
+        value = str(value).strip()
+        qs = Contrato.objects.filter(codigo_mercado_publico=value, es_borrador=False)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                'Ya existe un contrato publicado con este código de Mercado Público.'
+            )
+        return value
+
+    def validate_plantilla_recepcion_servicio(self, value):
+        if value is None:
+            return value
+        if value.proposito != 'recepcion_servicio':
+            raise serializers.ValidationError(
+                'La plantilla debe tener propósito «Recepción de servicio».'
+            )
+        if not value.activa:
+            raise serializers.ValidationError('La plantilla seleccionada debe estar activa.')
+        return value
+
+    def validate(self, attrs):
+        publicar = self.context.get('publicar', False)
+        if publicar:
+            self._validate_publicado(self._effective(attrs))
+        elif not self.partial:
+            es_borrador = attrs.get(
+                'es_borrador',
+                getattr(self.instance, 'es_borrador', False) if self.instance else False,
+            )
+            if not es_borrador:
+                self._validate_publicado(self._effective(attrs))
+        return attrs
+
+    def _save_proveedores(self, contrato, proveedores_data):
+        if proveedores_data is None:
+            return
+        contrato.proveedores_asociados.all().delete()
         for prov_data in proveedores_data:
             est_data = prov_data.pop('establecimientos', [])
             cp = ContratoProveedor.objects.create(contrato=contrato, **prov_data)
             if est_data:
                 cp.establecimientos.set(est_data)
 
-        contrato.ensure_gestion_operativa()
+    def create(self, validated_data):
+        proveedores_data = validated_data.pop('proveedores_asociados', [])
+        es_borrador = validated_data.get('es_borrador', False)
+        contrato = Contrato.objects.create(**validated_data)
+        self._save_proveedores(contrato, proveedores_data)
+        if not es_borrador:
+            contrato.ensure_gestion_operativa()
         return contrato
 
     def update(self, instance, validated_data):
         proveedores_data = validated_data.pop('proveedores_asociados', None)
-        
+        publicar = self.context.get('publicar', False)
+        if publicar:
+            validated_data['es_borrador'] = False
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-            
-        if proveedores_data is not None:
-            instance.proveedores_asociados.all().delete()
-            for prov_data in proveedores_data:
-                est_data = prov_data.pop('establecimientos', [])
-                cp = ContratoProveedor.objects.create(contrato=instance, **prov_data)
-                if est_data:
-                    cp.establecimientos.set(est_data)
 
-        instance.ensure_gestion_operativa()
+        self._save_proveedores(instance, proveedores_data)
+
+        if not instance.es_borrador:
+            instance.ensure_gestion_operativa()
         return instance
 
 # =====================================================================
@@ -365,6 +444,8 @@ class ServicioContratoSerializer(serializers.ModelSerializer):
     es_transporte = serializers.ReadOnlyField()
     es_mensual = serializers.ReadOnlyField()
     es_mensual_mixto = serializers.ReadOnlyField()
+    es_volumetrico = serializers.ReadOnlyField()
+    es_linea_por_establecimiento = serializers.ReadOnlyField()
     permite_recepcion_servicio = serializers.ReadOnlyField()
 
     class Meta:
@@ -385,8 +466,14 @@ class ServicioContratoSerializer(serializers.ModelSerializer):
         es_transporte = False
         if tipo:
             es_transporte = bool(tipo.es_transporte) or 'transporte' in (tipo.nombre or '').lower()
+        plantilla = None
+        if contrato:
+            plantilla = getattr(contrato, 'plantilla_cobro', None)
         if es_transporte:
             data['modalidad_cobro'] = ServicioContrato.MODALIDAD_DIARIO
+            data['monto_mensual'] = None
+        elif plantilla == Contrato.PLANTILLA_VOLUMETRICO:
+            data['modalidad_cobro'] = ServicioContrato.MODALIDAD_POR_M3
             data['monto_mensual'] = None
         else:
             modalidad = data.get('modalidad_cobro')
@@ -410,6 +497,7 @@ class PeriodoCobroSerializer(serializers.ModelSerializer):
     dias_base = serializers.ReadOnlyField()
     monto_total = serializers.ReadOnlyField()
     ausencias = serializers.SerializerMethodField()
+    volumenes_dia = serializers.SerializerMethodField()
 
     class Meta:
         model = PeriodoCobro
@@ -417,6 +505,13 @@ class PeriodoCobroSerializer(serializers.ModelSerializer):
 
     def get_ausencias(self, obj):
         return [ausencia.fecha.strftime('%Y-%m-%d') for ausencia in obj.ausencias.all()]
+
+    def get_volumenes_dia(self, obj):
+        from documentos.context_builders import _fmt_m3
+        return {
+            vd.fecha.strftime('%Y-%m-%d'): _fmt_m3(vd.volumen_m3)
+            for vd in obj.volumenes_dia.all()
+        }
 
 class RutaTransporteSerializer(serializers.ModelSerializer):
     proveedor_nombre = serializers.ReadOnlyField(source='proveedor.nombre')
@@ -437,7 +532,30 @@ class RutaTransporteSerializer(serializers.ModelSerializer):
         for item in establecimientos or []:
             est_ids.append(item.pk if hasattr(item, 'pk') else int(item))
 
-        if servicio and servicio.es_mensual:
+        if servicio and servicio.es_volumetrico:
+            if len(est_ids) != 1:
+                raise serializers.ValidationError(
+                    {'establecimientos': 'Seleccione un solo establecimiento.'}
+                )
+            if not (data.get('precio_m3') or getattr(self.instance, 'precio_m3', None)):
+                raise serializers.ValidationError(
+                    {'precio_m3': 'Indique el precio por metro cúbico ($/m³).'}
+                )
+            data['valor_diario'] = data.get('valor_diario') or 0
+            data['valor_mensual'] = None
+            if proveedor:
+                qs = RutaTransporte.objects.filter(
+                    servicio=servicio,
+                    proveedor=proveedor,
+                    establecimientos__in=est_ids,
+                )
+                if self.instance:
+                    qs = qs.exclude(pk=self.instance.pk)
+                if qs.exists():
+                    raise serializers.ValidationError(
+                        {'establecimientos': 'Este establecimiento ya está en la gestión para este proveedor.'}
+                    )
+        elif servicio and servicio.es_mensual:
             if len(est_ids) != 1:
                 raise serializers.ValidationError(
                     {'establecimientos': 'Seleccione un solo establecimiento.'}

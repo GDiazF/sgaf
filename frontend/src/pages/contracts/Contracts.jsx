@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../../api'
 import { usePermission } from '../../hooks/usePermission'
 import useDebouncedValue from '../../hooks/useDebouncedValue'
 import { useNotify } from '../../hooks/useNotify'
 import ContractModal from '../../components/contracts/ContractModal'
+import {
+  prepareContractPayload,
+  contractToFormData,
+  contractLabel,
+} from '../../utils/contractForm'
 import {
   PageHeader,
   FiltersBar,
@@ -15,35 +20,14 @@ import {
   Input,
   Select,
   ConfirmModal,
-  Icon
+  Icon,
 } from '@slep/ui'
-
-const emptyForm = (lookups = {}) => ({
-  codigo_mercado_publico: '',
-  descripcion: '',
-  detalle: '',
-  aplica_iva: true,
-  proceso: lookups.procesos?.[0]?.id || '',
-  estado: lookups.estados?.[0]?.id || '',
-  categoria: lookups.categorias?.[0]?.id || '',
-  orientacion: '',
-  proveedor: '',
-  fecha_adjudicacion: '',
-  fecha_inicio: '',
-  fecha_termino: '',
-  tipo_oc: 'UNICA',
-  nro_oc: '',
-  cdp: '',
-  plantilla_cobro: '',
-  proveedores_asociados: [],
-  establecimientos: [],
-})
 
 const estadoVariant = (nombre) => {
   const n = (nombre || '').toLowerCase()
   if (n.includes('activo') || n.includes('vigente')) return 'success'
   if (n.includes('pendiente')) return 'warning'
-  if (n.includes('caducado') || n.includes('anul')) return 'danger'
+  if (n.includes('caducado') || n.includes('anul') || n.includes('finaliz')) return 'danger'
   return 'neutral'
 }
 
@@ -60,13 +44,15 @@ const providersLabel = (item) => {
 
 const Contracts = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { can } = usePermission()
+  const vista = searchParams.get('vista') || 'activos'
 
   const [contracts, setContracts] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
-  const [formData, setFormData] = useState(emptyForm())
+  const [formData, setFormData] = useState({})
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const { notify } = useNotify()
@@ -88,6 +74,7 @@ const Contracts = () => {
   const [filterOrientacion, setFilterOrientacion] = useState('')
 
   const debouncedSearch = useDebouncedValue(searchQuery)
+  const isDraftsView = vista === 'borradores'
 
   const lookups = useMemo(
     () => ({
@@ -110,6 +97,14 @@ const Contracts = () => {
     ],
   )
 
+  const selectVista = (id) => {
+    const next = new URLSearchParams(searchParams)
+    if (id === 'activos') next.delete('vista')
+    else next.set('vista', id)
+    navigate({ search: next.toString() ? `?${next.toString()}` : '' }, { replace: true })
+    setCurrentPage(1)
+  }
+
   const fetchData = async (page = 1, size = pageSize, search = debouncedSearch) => {
     setLoading(true)
     try {
@@ -117,8 +112,13 @@ const Contracts = () => {
         page,
         page_size: size,
         search,
+        vista,
         ordering:
-          ordering === 'vigente_first' ? '-estado__nombre, -fecha_inicio' : ordering,
+          vista === 'borradores'
+            ? '-updated_at'
+            : ordering === 'vigente_first'
+              ? '-estado__nombre, -fecha_inicio'
+              : ordering,
         ...(filterCategoria && { categoria: filterCategoria }),
         ...(filterOrientacion && { orientacion: filterOrientacion }),
       }
@@ -160,7 +160,8 @@ const Contracts = () => {
 
   useEffect(() => {
     fetchData(1, pageSize, debouncedSearch)
-  }, [ordering, filterCategoria, filterOrientacion, pageSize, debouncedSearch])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordering, filterCategoria, filterOrientacion, pageSize, debouncedSearch, vista])
 
   useEffect(() => {
     fetchLookups()
@@ -174,55 +175,27 @@ const Contracts = () => {
   }
 
   const handleNew = () => {
-    setFormData(emptyForm(lookups))
-    setEditingId(null)
-    setShowForm(true)
+    navigate('/contracts/new')
   }
 
   const handleEdit = (item) => {
-    setFormData({
-      codigo_mercado_publico: item.codigo_mercado_publico,
-      descripcion: item.descripcion,
-      detalle: item.detalle || '',
-      aplica_iva: item.aplica_iva !== false,
-      proceso: item.proceso,
-      estado: item.estado,
-      categoria: item.categoria,
-      orientacion: item.orientacion || '',
-      proveedor: item.proveedor || '',
-      fecha_adjudicacion: item.fecha_adjudicacion,
-      fecha_inicio: item.fecha_inicio,
-      fecha_termino: item.fecha_termino,
-      tipo_oc: item.tipo_oc || 'UNICA',
-      nro_oc: item.nro_oc || '',
-      cdp: item.cdp || '',
-      plantilla_cobro: item.plantilla_cobro || '',
-      proveedores_asociados: item.proveedores_asociados || [],
-      establecimientos: item.establecimientos || [],
-    })
+    if (item.es_borrador) {
+      navigate(`/contracts/${item.id}/edit`)
+      return
+    }
+    setFormData(contractToFormData(item))
     setEditingId(item.id)
     setShowForm(true)
   }
 
   const handleSave = async (dataToSubmit) => {
-    const finalData = { ...dataToSubmit }
-    if (finalData.orientacion === '') delete finalData.orientacion
-    if (finalData.plantilla_cobro === '') finalData.plantilla_cobro = null
-
-    try {
-      if (editingId) {
-        await api.put(`contratos/contratos/${editingId}/`, finalData)
-      } else {
-        await api.post('contratos/contratos/', finalData)
-      }
-    } catch (error) {
-      console.error(error)
-      throw error
-    }
+    const finalData = prepareContractPayload(dataToSubmit)
+    await api.put(`contratos/contratos/${editingId}/`, finalData)
   }
 
   const handleFormClose = (result) => {
     setShowForm(false)
+    setEditingId(null)
     if (result?.saved) {
       fetchData(currentPage, pageSize, debouncedSearch)
     }
@@ -234,11 +207,14 @@ const Contracts = () => {
     try {
       await api.delete(`contratos/contratos/${deleteTarget.id}/`)
       setDeleteTarget(null)
-      notify({ variant: 'success', text: 'Contrato eliminado.' })
-      await fetchData(currentPage, pageSize, searchQuery)
+      notify({
+        variant: 'success',
+        text: deleteTarget.es_borrador ? 'Borrador eliminado.' : 'Contrato eliminado.',
+      })
+      await fetchData(currentPage, pageSize, debouncedSearch)
     } catch (error) {
       console.error(error)
-      notify({ variant: 'danger', text: 'Error al eliminar el contrato.' })
+      notify({ variant: 'danger', text: 'Error al eliminar.' })
     } finally {
       setDeleting(false)
     }
@@ -248,19 +224,25 @@ const Contracts = () => {
     () => [
       {
         key: 'codigo',
-        header: 'Código / Referencia',
+        header: isDraftsView ? 'Borrador' : 'Código / Referencia',
         className: 'col--primary',
         cardRole: 'title',
         priority: 1,
-        sortable: true,
+        sortable: !isDraftsView,
         render: (item) => (
           <button
             type="button"
             className="table-link"
-            onClick={() => navigate(`/contracts/${item.id}`)}
+            onClick={() =>
+              item.es_borrador
+                ? navigate(`/contracts/${item.id}/edit`)
+                : navigate(`/contracts/${item.id}`)
+            }
           >
-            <span className="contracts-code">{item.codigo_mercado_publico}</span>
-            <span className="contracts-desc">{item.descripcion}</span>
+            <span className="contracts-code">{contractLabel(item)}</span>
+            <span className="contracts-desc">
+              {item.descripcion?.trim() || 'Sin descripción'}
+            </span>
           </button>
         ),
       },
@@ -270,76 +252,105 @@ const Contracts = () => {
         className: 'col--status',
         cardRole: 'status',
         priority: 1,
-        sortable: true,
-        render: (item) => (
-          <Badge variant={estadoVariant(item.estado_nombre)} dot>
-            {item.estado_nombre || 'N/A'}
-          </Badge>
-        ),
+        sortable: !isDraftsView,
+        render: (item) =>
+          item.es_borrador ? (
+            <Badge variant="warning" dot>
+              Borrador
+            </Badge>
+          ) : (
+            <Badge variant={estadoVariant(item.estado_nombre)} dot>
+              {item.estado_nombre || 'N/A'}
+            </Badge>
+          ),
       },
-      {
-        key: 'categoria',
-        header: 'Categoría',
-        className: 'col--secondary',
-        cardRole: 'subtitle',
-        priority: 1,
-        sortable: true,
-        render: (item) => (
-          <Badge variant="accent">{item.categoria_nombre || '—'}</Badge>
-        ),
-      },
-      {
-        key: 'proceso',
-        header: 'Proceso',
-        className: 'col--tablet-hide',
-        cardRole: 'field',
-        priority: 2,
-        sortable: true,
-        render: (item) => item.proceso_nombre || '—',
-      },
-      {
-        key: 'proveedores',
-        header: 'Proveedores',
-        className: 'col--tablet-hide',
-        cardRole: 'field',
-        priority: 2,
-        render: (item) => (
-          <span className="contracts-providers" title={providersLabel(item)}>
-            {providersLabel(item)}
-          </span>
-        ),
-      },
-      {
-        key: 'fecha_termino',
-        header: 'Vencimiento',
-        className: 'col--tablet-hide',
-        cardRole: 'field',
-        priority: 2,
-        sortable: true,
-        render: (item) => formatDate(item.fecha_termino),
-      },
-      {
-        key: 'plazo',
-        header: 'Plazo',
-        className: 'col--tablet-hide',
-        cardRole: 'field',
-        priority: 2,
-        render: (item) => (item.plazo_meses != null ? `${item.plazo_meses} meses` : '—'),
-      },
+      ...(isDraftsView
+        ? [
+            {
+              key: 'updated',
+              header: 'Última edición',
+              className: 'col--tablet-hide',
+              cardRole: 'field',
+              priority: 2,
+              render: (item) => formatDate(item.updated_at),
+            },
+          ]
+        : [
+            {
+              key: 'categoria',
+              header: 'Categoría',
+              className: 'col--secondary',
+              cardRole: 'subtitle',
+              priority: 1,
+              sortable: true,
+              render: (item) => (
+                <Badge variant="accent">{item.categoria_nombre || '—'}</Badge>
+              ),
+            },
+            {
+              key: 'proceso',
+              header: 'Proceso',
+              className: 'col--tablet-hide',
+              cardRole: 'field',
+              priority: 2,
+              sortable: true,
+              render: (item) => item.proceso_nombre || '—',
+            },
+            {
+              key: 'proveedores',
+              header: 'Proveedores',
+              className: 'col--tablet-hide',
+              cardRole: 'field',
+              priority: 2,
+              render: (item) => (
+                <span className="contracts-providers" title={providersLabel(item)}>
+                  {providersLabel(item)}
+                </span>
+              ),
+            },
+            {
+              key: 'fecha_termino',
+              header: 'Vencimiento',
+              className: 'col--tablet-hide',
+              cardRole: 'field',
+              priority: 2,
+              sortable: true,
+              render: (item) => formatDate(item.fecha_termino),
+            },
+            {
+              key: 'plazo',
+              header: 'Plazo',
+              className: 'col--tablet-hide',
+              cardRole: 'field',
+              priority: 2,
+              render: (item) =>
+                item.plazo_meses != null ? `${item.plazo_meses} meses` : '—',
+            },
+          ]),
       {
         key: 'actions',
         header: 'Acciones',
         className: 'col--actions',
         render: (item) => (
           <div className="data-table__actions">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/contracts/${item.id}`)}
-            >
-              Ver
-            </Button>
-            {can('contratos.change_contrato') ? (
+            {item.es_borrador ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/contracts/${item.id}/edit`)}
+              >
+                Continuar
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/contracts/${item.id}`)}
+              >
+                Ver
+              </Button>
+            )}
+            {!item.es_borrador && can('contratos.change_contrato') ? (
               <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
                 <Icon name="edit" size="sm" />
               </Button>
@@ -357,7 +368,7 @@ const Contracts = () => {
         ),
       },
     ],
-    [can, navigate],
+    [can, navigate, isDraftsView],
   )
 
   const sortKeyMap = {
@@ -369,6 +380,7 @@ const Contracts = () => {
   }
 
   const handleSort = (colKey) => {
+    if (isDraftsView) return
     const apiKey = sortKeyMap[colKey]
     if (!apiKey) return
     const next =
@@ -381,12 +393,33 @@ const Contracts = () => {
     ([, apiKey]) => ordering === apiKey || ordering === `-${apiKey}`,
   )?.[0]
 
+  const vistaDescription = {
+    activos: 'Contratos vigentes en curso',
+    borradores: 'Borradores guardados automáticamente',
+    finalizados: 'Contratos finalizados, caducados o vencidos',
+  }[vista]
+
+  const emptyCopy = {
+    activos: {
+      title: 'Sin contratos vigentes',
+      description: 'No hay contratos activos con los filtros actuales.',
+    },
+    borradores: {
+      title: 'Sin borradores',
+      description: 'Creá un contrato nuevo para generar un borrador automático.',
+    },
+    finalizados: {
+      title: 'Sin contratos finalizados',
+      description: 'No hay contratos finalizados con los filtros actuales.',
+    },
+  }[vista]
+
   return (
     <div className="page" data-od-id="contracts-page" data-fill-viewport>
       <PageHeader
         icon="contratos"
         title="Contratos"
-        description={`Gestión de convenios y compras (${totalCount})`}
+        description={`${vistaDescription} (${totalCount})`}
         breadcrumbs={[{ label: 'SSGG' }, { label: 'Contratos' }]}
         linkComponent={Link}
         split
@@ -399,101 +432,154 @@ const Contracts = () => {
         }
       />
 
-      
-
-      <FiltersBar onSearch={() => setCurrentPage(1)} onClear={clearFilters} advanced={
-        <>
-          <Field label="Orientación" htmlFor="c-ori">
-            <Select
-              id="c-ori"
-              value={filterOrientacion}
-              onChange={(e) => {
-                setFilterOrientacion(e.target.value)
-                setCurrentPage(1)
-              }}
+      <div className="tabs">
+        <ul className="tabs__list" role="tablist" aria-label="Vistas de contratos">
+          <li>
+            <button
+              type="button"
+              role="tab"
+              className={`tabs__btn${vista === 'activos' ? ' is-active' : ''}`}
+              aria-selected={vista === 'activos'}
+              onClick={() => selectVista('activos')}
             >
-              <option value="">Todas</option>
-              {orientaciones.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.nombre}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Categoría" htmlFor="c-cat">
-            <Select
-              id="c-cat"
-              value={filterCategoria}
-              onChange={(e) => {
-                setFilterCategoria(e.target.value)
-                setCurrentPage(1)
-              }}
+              Vigentes
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              role="tab"
+              className={`tabs__btn${vista === 'borradores' ? ' is-active' : ''}`}
+              aria-selected={vista === 'borradores'}
+              onClick={() => selectVista('borradores')}
             >
-              <option value="">Todas</option>
-              {categorias.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </>
-      }>
-        <Field label="Buscar" htmlFor="c-q">
-          <div className="input-wrap">
-            <Icon name="search" className="input-wrap__icon" size="sm" />
-            <Input
-              id="c-q"
-              type="search"
-              placeholder="Código o descripción…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </Field>
-      </FiltersBar>
+              Borradores
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              role="tab"
+              className={`tabs__btn${vista === 'finalizados' ? ' is-active' : ''}`}
+              aria-selected={vista === 'finalizados'}
+              onClick={() => selectVista('finalizados')}
+            >
+              Finalizados
+            </button>
+          </li>
+        </ul>
+      </div>
 
-      <DataTable
-        columns={columns}
-        rows={contracts}
-        loading={loading}
-        totalCount={totalCount}
-        emptyTitle="Sin contratos"
-        emptyDescription="No hay contratos con los filtros actuales."
-        emptyAction={
-          can('contratos.add_contrato') ? (
-            <Button variant="primary" size="sm" onClick={handleNew}>
-              <Icon name="plus" size="sm" /> Nuevo contrato
-            </Button>
-          ) : (
-            <Button variant="quiet" onClick={clearFilters}>
-              Limpiar filtros
-            </Button>
-          )
-        }
-        page={currentPage}
-        pageSize={pageSize}
-        pageSizeId="contracts-page-size"
-        onPageChange={(p) => fetchData(p, pageSize, debouncedSearch)}
-        onPageSizeChange={(n) => {
-          setPageSize(n)
-          setCurrentPage(1)
-        }}
-        sortKey={activeSortKey}
-        onSort={handleSort}
-        mobileCardActions={(item) => ({
-          primary: { label: 'Ver', onClick: () => navigate(`/contracts/${item.id}`) },
-          secondary: can('contratos.change_contrato')
-            ? { label: 'Editar', onClick: () => handleEdit(item) }
-            : undefined,
-        })}
-        toolbar={
-          <div className="table-toolbar__left">
-            <span className="table-toolbar__title">Listado</span>
-            <Badge variant="neutral">{totalCount}</Badge>
-          </div>
-        }
-      />
+      <div className="tabs__panel is-active contracts-list-tab-panel" role="tabpanel">
+        <FiltersBar
+          onSearch={() => setCurrentPage(1)}
+          onClear={clearFilters}
+          advanced={
+            isDraftsView ? null : (
+              <>
+                <Field label="Orientación" htmlFor="c-ori">
+                  <Select
+                    id="c-ori"
+                    value={filterOrientacion}
+                    onChange={(e) => {
+                      setFilterOrientacion(e.target.value)
+                      setCurrentPage(1)
+                    }}
+                  >
+                    <option value="">Todas</option>
+                    {orientaciones.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.nombre}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="Categoría" htmlFor="c-cat">
+                  <Select
+                    id="c-cat"
+                    value={filterCategoria}
+                    onChange={(e) => {
+                      setFilterCategoria(e.target.value)
+                      setCurrentPage(1)
+                    }}
+                  >
+                    <option value="">Todas</option>
+                    {categorias.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              </>
+            )
+          }
+        >
+          <Field label="Buscar" htmlFor="c-q">
+            <div className="input-wrap">
+              <Icon name="search" className="input-wrap__icon" size="sm" />
+              <Input
+                id="c-q"
+                type="search"
+                placeholder={
+                  isDraftsView ? 'Descripción o código…' : 'Código o descripción…'
+                }
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </Field>
+        </FiltersBar>
+
+        <DataTable
+          columns={columns}
+          rows={contracts}
+          loading={loading}
+          totalCount={totalCount}
+          emptyTitle={emptyCopy.title}
+          emptyDescription={emptyCopy.description}
+          emptyAction={
+            can('contratos.add_contrato') && vista === 'borradores' ? (
+              <Button variant="primary" size="sm" onClick={handleNew}>
+                <Icon name="plus" size="sm" /> Nuevo contrato
+              </Button>
+            ) : vista !== 'borradores' ? (
+              <Button variant="quiet" onClick={clearFilters}>
+                Limpiar filtros
+              </Button>
+            ) : null
+          }
+          fillViewport
+          page={currentPage}
+          pageSize={pageSize}
+          pageSizeId="contracts-page-size"
+          onPageChange={(p) => fetchData(p, pageSize, debouncedSearch)}
+          onPageSizeChange={(n) => {
+            setPageSize(n)
+            setCurrentPage(1)
+          }}
+          sortKey={activeSortKey}
+          onSort={handleSort}
+          mobileCardActions={(item) => ({
+            primary: item.es_borrador
+              ? {
+                  label: 'Continuar',
+                  onClick: () => navigate(`/contracts/${item.id}/edit`),
+                }
+              : { label: 'Ver', onClick: () => navigate(`/contracts/${item.id}`) },
+            secondary:
+              can('contratos.delete_contrato')
+                ? { label: 'Eliminar', onClick: () => setDeleteTarget(item) }
+                : undefined,
+          })}
+          toolbar={
+            <div className="table-toolbar__left">
+              <span className="table-toolbar__title">Listado</span>
+              <Badge variant="neutral">{totalCount}</Badge>
+            </div>
+          }
+        />
+      </div>
 
       <ContractModal
         open={showForm}
@@ -510,10 +596,12 @@ const Contracts = () => {
           if (!deleting) setDeleteTarget(null)
         }}
         onConfirm={confirmDelete}
-        title="Eliminar contrato"
+        title={deleteTarget?.es_borrador ? 'Eliminar borrador' : 'Eliminar contrato'}
         description={
           deleteTarget
-            ? `¿Eliminar el contrato ${deleteTarget.codigo_mercado_publico}?`
+            ? deleteTarget.es_borrador
+              ? `¿Eliminar el borrador ${contractLabel(deleteTarget)}? Esta acción no se puede deshacer.`
+              : `¿Eliminar el contrato ${contractLabel(deleteTarget)}?`
             : ''
         }
         confirmLabel={deleting ? 'Eliminando…' : 'Eliminar'}

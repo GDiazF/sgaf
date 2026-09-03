@@ -28,6 +28,17 @@ def _fmt_date(value):
     return str(value)
 
 
+def _fmt_m3(value):
+    if value is None or value == '':
+        return ''
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    text = f'{num:.3f}'.rstrip('0').rstrip('.')
+    return text.replace('.', ',')
+
+
 def _usuario_emite(user):
     """Nombre del usuario que emite; ignora AnonymousUser y sesiones no autenticadas."""
     if user is None or not getattr(user, 'is_authenticated', False):
@@ -44,11 +55,101 @@ def _fmt_clp(valor):
         return str(valor or '')
 
 
+def _proveedor_fields(proveedor):
+    if not proveedor:
+        return {
+            'proveedor_nombre': '',
+            'proveedor_rut': '',
+            'proveedor_tipo': '',
+            'proveedor_contacto': '',
+            'proveedor_acronimo': '',
+        }
+    acronimo = (getattr(proveedor, 'acronimo', None) or '').strip()
+    return {
+        'proveedor_nombre': proveedor.nombre or '',
+        'proveedor_rut': (proveedor.rut or '') if proveedor else '',
+        'proveedor_tipo': str(getattr(proveedor, 'tipo_proveedor', None) or ''),
+        'proveedor_contacto': (
+            getattr(proveedor, 'contacto', None)
+            or getattr(proveedor, 'nombre_contacto', None)
+            or ''
+        ),
+        'proveedor_acronimo': acronimo or (proveedor.nombre or ''),
+    }
+
+
+def _iva_desde_monto_con_iva(monto):
+    """IVA (19%) contenido en un monto bruto con impuesto incluido."""
+    try:
+        bruto = int(monto or 0)
+    except (TypeError, ValueError):
+        return 0
+    if bruto <= 0:
+        return 0
+    return round(bruto * 19 / 119)
+
+
+def _neto_desde_monto_con_iva(monto):
+    """Neto cuando el monto total incluye IVA 19%."""
+    try:
+        bruto = int(monto or 0)
+    except (TypeError, ValueError):
+        return 0
+    if bruto <= 0:
+        return 0
+    return bruto - _iva_desde_monto_con_iva(bruto)
+
+
+def _sum_iva_pagos(registros):
+    """Suma IVA de boletas RLB (19% incluido en monto_total de cada boleta)."""
+    total = 0
+    for pago in registros:
+        total += _iva_desde_monto_con_iva(pago.monto_total)
+    return total
+
+
+def _sum_neto_pagos(registros):
+    """Total neto: suma de montos totales menos IVA (19% incluido)."""
+    bruto = 0
+    for pago in registros:
+        try:
+            bruto += int(pago.monto_total or 0)
+        except (TypeError, ValueError):
+            continue
+    return bruto - _sum_iva_pagos(registros)
+
+
 def _est_ciudad(est):
     """Ciudad del establecimiento; fallback Iquique. También alimenta comuna en plantillas legacy."""
     if not est:
         return ''
     return (getattr(est, 'ciudad', None) or '').strip() or 'Iquique'
+
+
+def _est_director(est):
+    if not est:
+        return ''
+    return (getattr(est, 'director', None) or '').strip()
+
+
+def _est_context_fields(est=None, establecimientos=None):
+    """Campos planos de establecimiento para plantillas."""
+    ests = list(establecimientos or [])
+    if not ests and est is not None:
+        ests = [est]
+    principal = ests[0] if ests else None
+    return {
+        'establecimiento_nombre': (principal.nombre if principal else '') or '',
+        'establecimiento_rbd': str(getattr(principal, 'rbd', '') or '') if principal else '',
+        'establecimiento_direccion': (getattr(principal, 'direccion', None) or '') if principal else '',
+        'establecimiento_ciudad': _est_ciudad(principal),
+        'establecimiento_comuna': _est_ciudad(principal),
+        'establecimiento_director': _est_director(principal),
+        'establecimientos_nombres': ', '.join(e.nombre for e in ests if e and e.nombre),
+        'establecimientos_directores': ', '.join(
+            d for e in ests if e for d in [_est_director(e)] if d
+        ),
+    }
 
 
 def _contrato_detalle(contrato):
@@ -120,6 +221,18 @@ def context_from_factura_adq(factura, user=None):
     if not nro_oc and contrato:
         nro_oc = contrato.nro_oc or ''
 
+    total_pagar = int(factura.total_pagar or 0)
+    iva_val = factura.iva
+    if iva_val is None or iva_val == '':
+        iva_val = _iva_desde_monto_con_iva(total_pagar)
+    else:
+        iva_val = int(iva_val)
+    neto_val = factura.total_neto
+    if neto_val is None or neto_val == '':
+        neto_val = total_pagar - iva_val if total_pagar else 0
+    else:
+        neto_val = int(neto_val)
+
     ctx.update({
         'institucion_nombre': 'Servicio Local de Educación Pública Iquique',
         'contrato_codigo_mp': (getattr(contrato, 'codigo_mercado_publico', None) or '') if contrato else '',
@@ -135,14 +248,10 @@ def context_from_factura_adq(factura, user=None):
         'proveedor_rut': (proveedor.rut if proveedor else '') or '',
         'proveedor_tipo': str(getattr(proveedor, 'tipo_proveedor', None) or '') if proveedor else '',
         'proveedor_contacto': getattr(proveedor, 'contacto', None) or getattr(proveedor, 'nombre_contacto', None) or '',
+        'proveedor_acronimo': _proveedor_fields(proveedor)['proveedor_acronimo'],
         'proveedor_email': getattr(proveedor, 'email', None) or '',
         'proveedor_telefono': getattr(proveedor, 'telefono', None) or '',
-        'establecimiento_nombre': est_principal.nombre if est_principal else '',
-        'establecimiento_rbd': (getattr(est_principal, 'rbd', None) or '') if est_principal else '',
-        'establecimiento_direccion': (getattr(est_principal, 'direccion', None) or '') if est_principal else '',
-        'establecimiento_ciudad': _est_ciudad(est_principal),
-        'establecimiento_comuna': _est_ciudad(est_principal),
-        'establecimientos_nombres': ', '.join(e.nombre for e in establecimientos if e and e.nombre),
+        **_est_context_fields(est=est_principal, establecimientos=establecimientos),
         'rc_folio': factura.folio or '',
         'rc_tipo': _rc_tipo(factura),
         'rc_nro_factura': factura.nro_factura or '',
@@ -153,10 +262,12 @@ def context_from_factura_adq(factura, user=None):
         'rc_fecha_plazo': '',
         'rc_fecha_fin_proceso': '',
         'rc_lugar': '',
-        'rc_neto': _fmt_clp(factura.total_neto),
-        'rc_iva': _fmt_clp(factura.iva),
+        'rc_neto': _fmt_clp(neto_val),
+        'rc_iva': _fmt_clp(iva_val),
         'rc_otros': _fmt_clp(0),
-        'rc_total': _fmt_clp(factura.total_pagar),
+        'rc_total': _fmt_clp(total_pagar),
+        'rc_iva_total': _fmt_clp(iva_val),
+        'rc_total_neto': _fmt_clp(neto_val),
         'rc_estado_pago': '',
         'firmante_nombre': (firmante.nombre_funcionario if firmante else '') or '',
         'firmante_rut': (firmante.rut if firmante else '') or '',
@@ -181,11 +292,14 @@ def _pago_row_context(pago):
         'pago_nro_cliente': str(cliente),
         'pago_rbd': str(getattr(est, 'rbd', '') or '') if est else '',
         'pago_establecimiento': (getattr(est, 'nombre', '') or '') if est else '',
+        'pago_director': _est_director(est),
         'pago_nro_documento': pago.nro_documento or '',
         'pago_fecha_vencimiento': _fmt_date(pago.fecha_vencimiento),
         'pago_interes': _fmt_clp(interes),
         'pago_monto_junji': _fmt_clp(junji),
         'pago_monto_total': _fmt_clp(monto),
+        'pago_iva': _fmt_clp(_iva_desde_monto_con_iva(monto)),
+        'pago_neto': _fmt_clp(_neto_desde_monto_con_iva(monto)),
     }
 
 
@@ -196,8 +310,10 @@ def _attach_pagos_rows(ctx, registros):
         ctx.update(rows[0])
     else:
         for key in (
-            'pago_nro_cliente', 'pago_rbd', 'pago_establecimiento', 'pago_nro_documento',
+            'pago_nro_cliente', 'pago_rbd', 'pago_establecimiento', 'pago_director',
+            'pago_nro_documento',
             'pago_fecha_vencimiento', 'pago_interes', 'pago_monto_junji', 'pago_monto_total',
+            'pago_iva', 'pago_neto',
         ):
             ctx.setdefault(key, '')
     return ctx
@@ -309,16 +425,8 @@ def context_from_recepcion_conforme(rc, user=None, tipo=None):
 
     ctx.update({
         'institucion_nombre': 'Servicio Local de Educación Pública Iquique',
-        'proveedor_nombre': prov_name,
-        'proveedor_rut': (proveedor.rut if proveedor else '') or '',
-        'proveedor_tipo': str(getattr(proveedor, 'tipo_proveedor', None) or '') if proveedor else '',
-        'proveedor_contacto': (getattr(proveedor, 'contacto', None) or '') if proveedor else '',
-        'establecimiento_nombre': est_principal.nombre if est_principal else '',
-        'establecimiento_rbd': (getattr(est_principal, 'rbd', None) or '') if est_principal else '',
-        'establecimiento_direccion': (getattr(est_principal, 'direccion', None) or '') if est_principal else '',
-        'establecimiento_ciudad': _est_ciudad(est_principal),
-        'establecimiento_comuna': _est_ciudad(est_principal),
-        'establecimientos_nombres': ', '.join(e.nombre for e in establecimientos if e and e.nombre),
+        **_proveedor_fields(proveedor),
+        **_est_context_fields(est=est_principal, establecimientos=establecimientos),
         'rc_folio': rc.folio or '',
         'rc_tipo': 'RLB' if tipo_fmt == 'PAGO' else 'JUNJI',
         'rc_fecha_recepcion': _fmt_date(fecha),
@@ -327,6 +435,8 @@ def context_from_recepcion_conforme(rc, user=None, tipo=None):
         'rc_total_interes': _fmt_clp(total_interes),
         'rc_total_junji': _fmt_clp(total_junji),
         'rc_total': _fmt_clp(total_monto),
+        'rc_iva_total': _fmt_clp(_sum_iva_pagos(registros)),
+        'rc_total_neto': _fmt_clp(_sum_neto_pagos(registros)),
         'rc_listado_html': listado_html,
         'rc_estado_pago': rc.estado or '',
         'observaciones': rc.observaciones or '',
@@ -379,16 +489,8 @@ def context_from_registro_pago(pago, user=None, tipo=None):
 
     ctx.update({
         'institucion_nombre': 'Servicio Local de Educación Pública Iquique',
-        'proveedor_nombre': prov_name,
-        'proveedor_rut': (proveedor.rut if proveedor else '') or '',
-        'proveedor_tipo': str(getattr(proveedor, 'tipo_proveedor', None) or '') if proveedor else '',
-        'proveedor_contacto': (getattr(proveedor, 'contacto', None) or '') if proveedor else '',
-        'establecimiento_nombre': est.nombre if est else '',
-        'establecimiento_rbd': (getattr(est, 'rbd', None) or '') if est else '',
-        'establecimiento_direccion': (getattr(est, 'direccion', None) or '') if est else '',
-        'establecimiento_ciudad': _est_ciudad(est),
-        'establecimiento_comuna': _est_ciudad(est),
-        'establecimientos_nombres': est.nombre if est else '',
+        **_proveedor_fields(proveedor),
+        **_est_context_fields(est=est),
         'rc_folio': folio,
         'rc_tipo': 'RLB' if tipo_fmt == 'PAGO' else 'JUNJI',
         'rc_fecha_recepcion': _fmt_date(fecha),
@@ -397,6 +499,8 @@ def context_from_registro_pago(pago, user=None, tipo=None):
         'rc_total_interes': _fmt_clp(total_interes),
         'rc_total_junji': _fmt_clp(total_junji),
         'rc_total': _fmt_clp(total_monto),
+        'rc_iva_total': _fmt_clp(_sum_iva_pagos([pago])),
+        'rc_total_neto': _fmt_clp(_sum_neto_pagos([pago])),
         'rc_listado_html': listado_html,
         'rc_estado_pago': (rc.estado if rc else '') or '',
         'observaciones': (rc.observaciones if rc else '') or '',
@@ -448,10 +552,19 @@ def context_from_ruta_establecimiento(
 
     if periodo is not None and servicio and servicio.es_mensual_mixto:
         monto = int(periodo.monto_fijo or 0) + int(periodo.monto_variable or 0)
+    elif periodo is not None and servicio and servicio.es_volumetrico:
+        monto = int(periodo.monto_total or 0)
     elif periodo is not None and servicio and servicio.es_mensual:
         monto = int(periodo.monto_total or 0)
     else:
         monto = int(ruta.valor_mensual or (servicio.monto_mensual if servicio else 0) or 0)
+
+    volumen_m3 = ''
+    precio_m3 = 0
+    if periodo is not None and servicio and servicio.es_volumetrico:
+        volumen_m3 = _fmt_m3(periodo.volumen_m3_total())
+        precio_m3 = int(ruta.precio_m3 or 0)
+        monto = int(periodo.monto_total or 0)
 
     # Override opcional solo tiene sentido en jardín; colegio siempre 0
     if monto_junji is not None and _es_jardin(establecimiento):
@@ -480,16 +593,16 @@ def context_from_ruta_establecimiento(
         'contrato_detalle': _contrato_detalle(contrato),
         'proveedor_nombre': (proveedor.nombre if proveedor else '') or '',
         'proveedor_rut': (proveedor.rut if proveedor else '') or '',
-        'establecimiento_nombre': (establecimiento.nombre if establecimiento else '') or '',
-        'establecimiento_rbd': (getattr(establecimiento, 'rbd', None) or '') if establecimiento else '',
-        'establecimiento_direccion': (getattr(establecimiento, 'direccion', None) or '') if establecimiento else '',
-        'establecimiento_ciudad': _est_ciudad(establecimiento),
-        'establecimiento_comuna': _est_ciudad(establecimiento),
+        'proveedor_acronimo': _proveedor_fields(proveedor)['proveedor_acronimo'],
+        **_est_context_fields(est=establecimiento),
         'rs_periodo': periodo_label if escribir_periodo else '',
         'rs_fecha_servicio': _fmt_date(periodo.fecha_servicio) if periodo is not None else '',
         'rs_nro_factura': (periodo.nro_factura if periodo is not None else '') or '',
         'rs_glosa': f'Recepción conforme del servicio — {ruta.nombre}',
         'rs_monto': _fmt_clp(monto),
+        'volumen_m3': volumen_m3,
+        'precio_m3': _fmt_clp(precio_m3) if precio_m3 else '',
+        'unidad_cobro': 'm³' if servicio and servicio.es_volumetrico else '',
         'monto_junji': _fmt_clp(junji),
         'rs_servicio_nombre': (servicio.nombre if servicio else '') or '',
         'rs_ruta_nombre': ruta.nombre or '',
@@ -512,6 +625,12 @@ def context_from_periodo_cobro(periodo, user=None):
     est = establecimientos[0] if establecimientos else None
 
     monto = int(periodo.monto_total or 0)
+    volumen_m3 = ''
+    precio_m3 = 0
+    if servicio and servicio.es_volumetrico:
+        volumen_m3 = _fmt_m3(periodo.volumen_m3_total())
+        precio_m3 = int(ruta.precio_m3 or 0)
+
     ctx.update({
         'institucion_nombre': 'Servicio Local de Educación Pública Iquique',
         'contrato_codigo_mp': (contrato.codigo_mercado_publico if contrato else '') or '',
@@ -520,12 +639,8 @@ def context_from_periodo_cobro(periodo, user=None):
         'contrato_detalle': _contrato_detalle(contrato),
         'proveedor_nombre': (proveedor.nombre if proveedor else '') or '',
         'proveedor_rut': (proveedor.rut if proveedor else '') or '',
-        'establecimiento_nombre': (est.nombre if est else '') or '',
-        'establecimiento_rbd': (getattr(est, 'rbd', None) or '') if est else '',
-        'establecimiento_direccion': (getattr(est, 'direccion', None) or '') if est else '',
-        'establecimiento_ciudad': _est_ciudad(est),
-        'establecimiento_comuna': _est_ciudad(est),
-        'establecimientos_nombres': ', '.join(e.nombre for e in establecimientos if e and e.nombre),
+        'proveedor_acronimo': _proveedor_fields(proveedor)['proveedor_acronimo'],
+        **_est_context_fields(est=est, establecimientos=establecimientos),
         'periodo_nombre': periodo.nombre_estandarizado,
         'periodo_mes': str(periodo.mes_referencia),
         'periodo_anio': str(periodo.anio_referencia),
@@ -540,6 +655,9 @@ def context_from_periodo_cobro(periodo, user=None):
         'valor_mensual': _fmt_clp(ruta.valor_mensual or (servicio.monto_mensual if servicio else 0) or 0),
         'monto_fijo': _fmt_clp(int(periodo.monto_fijo or 0)),
         'monto_variable': _fmt_clp(int(periodo.monto_variable or 0)),
+        'volumen_m3': volumen_m3,
+        'precio_m3': _fmt_clp(precio_m3) if precio_m3 else '',
+        'unidad_cobro': 'm³' if servicio and servicio.es_volumetrico else '',
         'hoy': date.today().strftime('%d-%m-%Y'),
         'usuario_emite': usuario,
     })

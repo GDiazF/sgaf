@@ -20,10 +20,17 @@ def get_plantilla_activa(proposito):
     key = normalize_proposito(proposito)
     plantilla = (
         PlantillaDocumento.objects
-        .filter(proposito=key, activa=True)
+        .filter(proposito=key, activa=True, es_default=True)
         .order_by('nombre')
         .first()
     )
+    if not plantilla:
+        plantilla = (
+            PlantillaDocumento.objects
+            .filter(proposito=key, activa=True)
+            .order_by('nombre')
+            .first()
+        )
     # Compat: plantillas antiguas guardadas como recepcion_adq
     if not plantilla and proposito in ('recepcion_roc', 'recepcion_rcf', 'recepcion_rca'):
         plantilla = (
@@ -35,3 +42,18 @@ def get_plantilla_activa(proposito):
     if not plantilla:
         raise PlantillaNoConfigurada(key)
     return plantilla
+
+
+def get_plantilla_recepcion_servicio(contrato=None):
+    """Plantilla para PDF sin folio: override del contrato o predeterminada del sistema."""
+    from .propositos import normalize_proposito
+
+    if contrato is not None and getattr(contrato, 'plantilla_recepcion_servicio_id', None):
+        plantilla = contrato.plantilla_recepcion_servicio
+        if (
+            plantilla
+            and plantilla.activa
+            and normalize_proposito(plantilla.proposito) == 'recepcion_servicio'
+        ):
+            return plantilla
+    return get_plantilla_activa('recepcion_servicio')

@@ -46,6 +46,14 @@ class PlantillaDocumento(models.Model):
     margen_izquierdo_mm = models.DecimalField(max_digits=6, decimal_places=2, default=20)
     margen_derecho_mm = models.DecimalField(max_digits=6, decimal_places=2, default=20)
     activa = models.BooleanField(default=True)
+    es_default = models.BooleanField(
+        default=False,
+        verbose_name='Predeterminada del sistema',
+        help_text=(
+            'Plantilla usada cuando ningún contrato elige otra. '
+            'Solo una predeterminada por propósito.'
+        ),
+    )
     creado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -73,8 +81,8 @@ class PlantillaDocumento(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=['proposito'],
-                condition=~models.Q(proposito=BORRADOR_PROPOSITO),
-                name='uniq_plantilla_proposito_asignado',
+                condition=models.Q(es_default=True) & ~models.Q(proposito=BORRADOR_PROPOSITO),
+                name='uniq_plantilla_proposito_default',
             ),
         ]
 

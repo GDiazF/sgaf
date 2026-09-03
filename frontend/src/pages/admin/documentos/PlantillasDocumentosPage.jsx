@@ -17,16 +17,21 @@ import {
   Modal,
   ConfirmModal,
   PermissionBlock,
+  FileInput,
+  Switch,
+  FormStatus,
   useFormOverlay,
   formatApiFormError,
 } from '@slep/ui'
 
 const PAGE_SIZE = 20
+const PLANTILLA_EXPORT_VERSION = 1
 
 const PlantillasDocumentosPage = () => {
   const { can } = usePermission()
   const { notify } = useNotify()
   const overlay = useFormOverlay()
+  const importOverlay = useFormOverlay()
   const navigate = useNavigate()
 
   const canView = can('documentos.view_plantilladocumento')
@@ -48,6 +53,11 @@ const PlantillasDocumentosPage = () => {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [ocupados, setOcupados] = useState([])
+  const [importOpen, setImportOpen] = useState(false)
+  const [importPreview, setImportPreview] = useState(null)
+  const [importNombre, setImportNombre] = useState('')
+  const [importMantenerProposito, setImportMantenerProposito] = useState(false)
+  const [importFileName, setImportFileName] = useState('')
 
   const fetchList = async () => {
     setLoading(true)
@@ -127,6 +137,112 @@ const PlantillasDocumentosPage = () => {
     }
   }
 
+  const handleExport = async (item) => {
+    try {
+      const res = await api.get(`documentos/plantillas/${item.id}/exportar/`, {
+        responseType: 'blob',
+      })
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/json' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${(item.nombre || 'plantilla').replace(/\s+/g, '-')}.sgaf-plantilla.json`
+      link.click()
+      window.URL.revokeObjectURL(url)
+      notify({ variant: 'success', text: 'Plantilla exportada.' })
+    } catch {
+      notify({ variant: 'danger', text: 'No se pudo exportar la plantilla.' })
+    }
+  }
+
+  const resetImport = () => {
+    setImportPreview(null)
+    setImportNombre('')
+    setImportMantenerProposito(false)
+    setImportFileName('')
+    importOverlay.reset()
+  }
+
+  const openImport = () => {
+    resetImport()
+    setImportOpen(true)
+  }
+
+  const parseImportFile = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(String(reader.result || ''))
+          if (data.sgaf_plantilla_version !== PLANTILLA_EXPORT_VERSION) {
+            reject(new Error('Versión de archivo no soportada.'))
+            return
+          }
+          if (!data.plantilla || typeof data.plantilla !== 'object') {
+            reject(new Error('El archivo no contiene una plantilla válida.'))
+            return
+          }
+          resolve(data)
+        } catch {
+          reject(new Error('El archivo no es un JSON válido.'))
+        }
+      }
+      reader.onerror = () => reject(new Error('No se pudo leer el archivo.'))
+      reader.readAsText(file)
+    })
+
+  const handleImportFile = async (file) => {
+    if (!file) {
+      resetImport()
+      return
+    }
+    try {
+      const data = await parseImportFile(file)
+      setImportPreview(data)
+      setImportNombre(data.plantilla?.nombre || '')
+      setImportFileName(file.name)
+      setImportMantenerProposito(false)
+      importOverlay.reset()
+    } catch (err) {
+      resetImport()
+      notify({ variant: 'danger', text: err.message || 'Archivo inválido.' })
+    }
+  }
+
+  const handleImportSubmit = async (e) => {
+    e.preventDefault()
+    if (!importPreview?.plantilla) return
+    const blob = new Blob([JSON.stringify(importPreview)], { type: 'application/json' })
+    const form = new FormData()
+    form.append('archivo', blob, importFileName || 'plantilla.sgaf-plantilla.json')
+    form.append('mantener_proposito', importMantenerProposito ? 'true' : 'false')
+    if (importNombre.trim()) form.append('nombre', importNombre.trim())
+
+    try {
+      await importOverlay.run(
+        async () => {
+          const res = await api.post('documentos/plantillas/importar/', form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          })
+          setImportOpen(false)
+          resetImport()
+          notify({ variant: 'success', text: 'Plantilla importada.' })
+          navigate(`/admin/documentos/${res.data.id}`)
+        },
+        {
+          formatError: (err) => formatApiFormError(err, 'No se pudo importar la plantilla.'),
+        },
+      )
+    } catch {
+      /* FormOverlay */
+    }
+  }
+
+  const importPropositoLabel = useMemo(() => {
+    if (!importPreview?.plantilla?.proposito) return '—'
+    const key = importPreview.plantilla.proposito
+    return propositos.find((p) => p.key === key)?.label || key
+  }, [importPreview, propositos])
+
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return
     setDeleting(true)
@@ -197,6 +313,11 @@ const PlantillasDocumentosPage = () => {
                 <Icon name="eye" size={14} />
               </IconButton>
             )}
+            {canView ? (
+              <IconButton aria-label="Exportar" onClick={() => handleExport(item)}>
+                <Icon name="download" size={14} />
+              </IconButton>
+            ) : null}
             {canAdd ? (
               <IconButton aria-label="Duplicar" onClick={() => handleDuplicate(item)}>
                 <Icon name="file" size={14} />
@@ -211,7 +332,7 @@ const PlantillasDocumentosPage = () => {
         ),
       },
     ],
-    [canAdd, canChange, canDelete, navigate, propositos],
+    [canAdd, canChange, canDelete, canView, navigate, propositos],
   )
 
   if (!canView) {
@@ -240,9 +361,14 @@ const PlantillasDocumentosPage = () => {
         split
         actions={
           canAdd ? (
-            <Button variant="primary" size="sm" onClick={openCreate}>
-              <Icon name="plus" size="sm" /> Nueva plantilla
-            </Button>
+            <>
+              <Button variant="secondary" size="sm" onClick={openImport}>
+                <Icon name="upload" size="sm" /> Importar
+              </Button>
+              <Button variant="primary" size="sm" onClick={openCreate}>
+                <Icon name="plus" size="sm" /> Nueva plantilla
+              </Button>
+            </>
           ) : null
         }
       />
@@ -335,7 +461,7 @@ const PlantillasDocumentosPage = () => {
             htmlFor="doc-tpl-proposito"
             hint={
               (propositos.find((p) => p.key === newProposito)?.description)
-              || 'Borrador = todas las variables, sin módulo. Un propósito asignable = una sola plantilla.'
+              || 'Borrador = todas las variables, sin módulo. Recepción de servicio admite varias plantillas.'
             }
           >
             <Select
@@ -344,7 +470,8 @@ const PlantillasDocumentosPage = () => {
               onChange={(e) => setNewProposito(e.target.value)}
             >
               {propositos.map((item) => {
-                const ocupado = ocupados.includes(item.key) && item.key !== 'borrador'
+                const multi = item.key === 'recepcion_servicio'
+                const ocupado = !multi && ocupados.includes(item.key) && item.key !== 'borrador'
                 return (
                   <option key={item.key} value={item.key} disabled={ocupado}>
                     {item.label}{ocupado ? ' (ya asignada)' : ''}
@@ -367,6 +494,83 @@ const PlantillasDocumentosPage = () => {
           </Field>
           {overlay.status === 'error' ? (
             <p className="field__hint">{overlay.description}</p>
+          ) : null}
+        </form>
+      </Modal>
+
+      <Modal
+        open={importOpen}
+        onClose={() => !importOverlay.busy && setImportOpen(false)}
+        title="Importar plantilla"
+        size="sm"
+        {...importOverlay.modalProps}
+        onOverlayDismiss={() => importOverlay.dismiss()}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setImportOpen(false)}
+              disabled={importOverlay.busy}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              form="doc-tpl-import"
+              type="submit"
+              disabled={importOverlay.busy || !importPreview}
+              loading={importOverlay.busy}
+            >
+              Importar y editar
+            </Button>
+          </>
+        }
+      >
+        <form id="doc-tpl-import" className="crud-form" onSubmit={handleImportSubmit}>
+          <FormStatus
+            variant="info"
+            title="Estructura sin logos"
+            description="Se importa la maqueta HTML, variables, tablas y posición de logos (por clave). Los archivos de imagen se resuelven en este servidor al generar el PDF."
+          />
+          <Field
+            label="Archivo JSON"
+            htmlFor="doc-tpl-import-file"
+            hint="Archivo .sgaf-plantilla.json exportado desde SGAF."
+          >
+            <FileInput
+              id="doc-tpl-import-file"
+              label={importFileName || 'Seleccionar archivo'}
+              accept=".json,application/json"
+              onChange={(e) => handleImportFile(e.target.files?.[0] || null)}
+            />
+          </Field>
+          {importPreview ? (
+            <>
+              <Field label="Nombre" htmlFor="doc-tpl-import-name" required>
+                <Input
+                  id="doc-tpl-import-name"
+                  value={importNombre}
+                  onChange={(e) => setImportNombre(e.target.value)}
+                  required
+                />
+              </Field>
+              <Field label="Propósito en el archivo">
+                <Input value={importPropositoLabel} readOnly disabled />
+              </Field>
+              <Switch
+                label="Conservar propósito del archivo"
+                checked={importMantenerProposito}
+                onChange={(e) => setImportMantenerProposito(e.target.checked)}
+              />
+              {!importMantenerProposito ? (
+                <p className="field__hint">
+                  Por defecto se importa como borrador para revisar antes de asignarla a un módulo.
+                </p>
+              ) : null}
+            </>
+          ) : null}
+          {importOverlay.status === 'error' ? (
+            <p className="field__hint">{importOverlay.description}</p>
           ) : null}
         </form>
       </Modal>

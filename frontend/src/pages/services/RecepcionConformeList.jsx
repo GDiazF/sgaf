@@ -79,6 +79,7 @@ const RecepcionConformeList = ({ embedded = false }) => {
   const editOverlay = useFormOverlay()
 
   const [historyRC, setHistoryRC] = useState(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
   const [processingIds, setProcessingIds] = useState([])
   const [confirmTarget, setConfirmTarget] = useState(null)
   const [confirming, setConfirming] = useState(false)
@@ -104,17 +105,13 @@ const RecepcionConformeList = ({ embedded = false }) => {
         params.estado = status
       }
 
-      const [rcRes, grpRes] = await Promise.all([
-        api.get('recepciones-conformes/', { params }),
-        api.get('grupos/', { params: { page_size: 1000 } }),
-      ])
+      const rcRes = await api.get('recepciones-conformes/', { params })
 
       const rcData = rcRes.data.results || rcRes.data
       const rcCount = rcRes.data.count ?? (Array.isArray(rcRes.data) ? rcRes.data.length : 0)
 
       setRcs(Array.isArray(rcData) ? rcData : [])
       setTotalCount(rcCount)
-      setGroups(grpRes.data.results || grpRes.data || [])
     } catch (error) {
       console.error('Error fetching RCs:', error)
       setRcs([])
@@ -129,6 +126,18 @@ const RecepcionConformeList = ({ embedded = false }) => {
     fetchData(currentPage, pageSize, debouncedSearch, ordering, statusFilter)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, pageSize, ordering, debouncedSearch, searchQuery, statusFilter])
+
+  useEffect(() => {
+    const loadGroups = async () => {
+      try {
+        const grpRes = await api.get('grupos/', { params: { page_size: 1000 } })
+        setGroups(grpRes.data.results || grpRes.data || [])
+      } catch (error) {
+        console.error('Error fetching groups:', error)
+      }
+    }
+    loadGroups()
+  }, [])
 
   const clearFilters = () => {
     setSearchQuery('')
@@ -244,18 +253,44 @@ const RecepcionConformeList = ({ embedded = false }) => {
     }
   }
 
-  const handleEdit = (rc) => {
+  const handleEdit = async (rc) => {
     editOverlay.reset()
     setEditingRC(rc)
-    setEditForm({
-      observaciones: rc.observaciones || '',
-      registros_ids: (rc.registros || []).map((r) => r.id),
-      grupo_firmante: rc.grupo_firmante || '',
-      firmante: rc.firmante || '',
-      folio: rc.folio || '',
-    })
-    setCurrentPayments(rc.registros || [])
-    fetchAvailablePayments(rc.proveedor)
+    setCurrentPayments([])
+    setAvailablePayments([])
+    try {
+      const res = await api.get(`recepciones-conformes/${rc.id}/`)
+      const full = res.data
+      setEditingRC(full)
+      setEditForm({
+        observaciones: full.observaciones || '',
+        registros_ids: (full.registros || []).map((r) => r.id),
+        grupo_firmante: full.grupo_firmante || '',
+        firmante: full.firmante || '',
+        folio: full.folio || '',
+      })
+      setCurrentPayments(full.registros || [])
+      fetchAvailablePayments(full.proveedor)
+    } catch (error) {
+      console.error('Error loading RC detail:', error)
+      setEditingRC(null)
+      notify({ variant: 'danger', text: 'No se pudo cargar el detalle de la recepción.' })
+    }
+  }
+
+  const openHistory = async (item) => {
+    setHistoryRC(item)
+    setHistoryLoading(true)
+    try {
+      const res = await api.get(`recepciones-conformes/${item.id}/`)
+      setHistoryRC(res.data)
+    } catch (error) {
+      console.error('Error loading RC history:', error)
+      notify({ variant: 'danger', text: 'No se pudo cargar el historial.' })
+      setHistoryRC(null)
+    } finally {
+      setHistoryLoading(false)
+    }
   }
 
   const handleRemovePayment = (paymentId) => {
@@ -516,16 +551,6 @@ const RecepcionConformeList = ({ embedded = false }) => {
         ),
       },
       {
-        key: 'pagos',
-        header: 'Pagos',
-        cardRole: 'field',
-        priority: 5,
-        className: 'col--tablet-hide',
-        render: (item) => (
-          <Badge variant="accent">{item.registros?.length || 0}</Badge>
-        ),
-      },
-      {
         key: 'actions',
         header: 'Acciones',
         className: 'col--actions',
@@ -539,7 +564,7 @@ const RecepcionConformeList = ({ embedded = false }) => {
                   variant="ghost"
                   size="sm"
                   title="Historial"
-                  onClick={() => setHistoryRC(item)}
+                  onClick={() => openHistory(item)}
                 >
                   <Icon name="activity" size="sm" />
                 </Button>
@@ -768,7 +793,7 @@ const RecepcionConformeList = ({ embedded = false }) => {
               ? {
                   primary: {
                     label: 'Historial',
-                    onClick: () => setHistoryRC(item),
+                    onClick: () => openHistory(item),
                   },
                 }
               : {}
@@ -793,7 +818,7 @@ const RecepcionConformeList = ({ embedded = false }) => {
               },
               secondary: {
                 label: 'Historial',
-                onClick: () => setHistoryRC(item),
+                onClick: () => openHistory(item),
               },
             }
           }
@@ -812,7 +837,7 @@ const RecepcionConformeList = ({ embedded = false }) => {
             secondary: canView
               ? {
                   label: 'Historial',
-                  onClick: () => setHistoryRC(item),
+                  onClick: () => openHistory(item),
                 }
               : undefined,
           }
@@ -827,13 +852,18 @@ const RecepcionConformeList = ({ embedded = false }) => {
 
       <Modal
         open={!!historyRC}
-        onClose={() => setHistoryRC(null)}
+        onClose={() => {
+          setHistoryRC(null)
+          setHistoryLoading(false)
+        }}
         title="Trazabilidad"
         size="lg"
         subheader={historyRC?.folio || 'RC sin folio'}
       >
         <div className="rc-history-timeline">
-          {historyRC?.historial?.length > 0 ? (
+          {historyLoading ? (
+            <p>Cargando historial…</p>
+          ) : historyRC?.historial?.length > 0 ? (
             historyRC.historial.map((ev, i) => (
               <div key={i} className="rc-history-timeline__item">
                 <div

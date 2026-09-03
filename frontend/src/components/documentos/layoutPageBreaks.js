@@ -1,5 +1,6 @@
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { readPageLayout } from './pageMetrics.js'
 
 export const PAGE_GAP_PX = 32
 
@@ -24,14 +25,16 @@ function notifyPageChrome(page, detail) {
   if (set) set.forEach((fn) => fn(detail))
 }
 
-function measureVar(page, name, fallback) {
-  const value = getComputedStyle(page).getPropertyValue(name).trim() || fallback
-  const probe = document.createElement('div')
-  probe.style.cssText = `position:absolute;visibility:hidden;height:${value}`
-  page.appendChild(probe)
-  const px = probe.offsetHeight
-  probe.remove()
-  return Math.max(1, px)
+function measureVar(page, name, fallbackPx) {
+  const layout = readPageLayout(page)
+  if (!layout) return fallbackPx
+  if (name === '--doc-page-h') return layout.pageH
+  if (name === '--doc-page-w') return layout.pageW
+  if (name === '--doc-margin-top') return layout.padTop
+  if (name === '--doc-margin-bottom') return layout.padBottom
+  if (name === '--doc-margin-left') return layout.padLeft
+  if (name === '--doc-margin-right') return layout.padRight
+  return fallbackPx
 }
 
 function topInPage(el, pageEl) {
@@ -42,20 +45,23 @@ function heightOf(el) {
   return Math.max(0, el.getBoundingClientRect().height)
 }
 
-export function ensureSheets(page, count, pageH, gap = PAGE_GAP_PX, contentBottom = null) {
+export function ensureSheets(page, count, pageH, gap = PAGE_GAP_PX, options = {}) {
   const safeCount = Math.max(1, Math.round(count) || 1)
   const lastTop = (safeCount - 1) * (pageH + gap)
-  let lastHeight = pageH
-  let minHeight = safeCount * pageH + Math.max(0, safeCount - 1) * gap
+  const gridMinHeight = safeCount * pageH + Math.max(0, safeCount - 1) * gap
 
-  if (contentBottom != null && contentBottom > lastTop + pageH) {
-    lastHeight = Math.ceil(contentBottom - lastTop)
-    minHeight = Math.ceil(contentBottom)
-  }
+  let lastHeight = Number.isFinite(options.lastHeight) ? options.lastHeight : pageH
+  lastHeight = Math.max(pageH, lastHeight)
 
-  minHeight = Math.max(minHeight, pageH)
+  const minHeight = Math.max(gridMinHeight, lastTop + lastHeight)
+
   if (page.style.minHeight !== `${minHeight}px`) {
     page.style.minHeight = `${minHeight}px`
+  }
+
+  const pm = page.querySelector('.ProseMirror')
+  if (pm && pm.style.minHeight !== `${minHeight}px`) {
+    pm.style.minHeight = `${minHeight}px`
   }
 
   const detail = {
@@ -80,8 +86,8 @@ export function ensureSheets(page, count, pageH, gap = PAGE_GAP_PX, contentBotto
 
 export function publishDefaultChrome(page) {
   if (!page || page.classList.contains('doc-editor__hf')) return
-  const pageH = measureVar(page, '--doc-page-h', '297mm')
-  ensureSheets(page, 1, pageH, PAGE_GAP_PX, pageH)
+  const pageH = measureVar(page, '--doc-page-h', 1056)
+  ensureSheets(page, 1, pageH, PAGE_GAP_PX)
 }
 
 function isFlowDom(el) {
@@ -91,6 +97,7 @@ function isFlowDom(el) {
   if (el.classList?.contains('sgaf-shape-node') || el.classList?.contains('node-documentShape')) return false
   if (el.hasAttribute?.('data-sgaf-shape')) return false
   if (el.classList?.contains('doc-page__sheets') || el.classList?.contains('doc-page__gutters')) return false
+  if (el.classList?.contains('sgaf-logo-slot')) return false
   const pos = getComputedStyle(el).position
   if (pos === 'absolute' || pos === 'fixed') return false
   return true
@@ -106,6 +113,26 @@ function pageContentStart(index, pageH, gap, padTop) {
 
 function pageContentEnd(index, pageH, gap, padBottom) {
   return index * (pageH + gap) + pageH - padBottom
+}
+
+function minPagesForOverlays(pm, page, pageH, gap, padTop) {
+  let maxPage = 1
+  pm.querySelectorAll('.sgaf-logo-node, .sgaf-shape-node, .node-logoVariable, .node-documentShape').forEach((el) => {
+    const dataPage = Number.parseInt(el.getAttribute('data-page') || '', 10)
+    if (Number.isFinite(dataPage) && dataPage > 0) {
+      maxPage = Math.max(maxPage, dataPage)
+      return
+    }
+    const top = topInPage(el, page)
+    const pageIdx = Math.max(0, Math.floor((top - padTop + 2) / (pageH + gap)))
+    maxPage = Math.max(maxPage, pageIdx + 1)
+  })
+  return maxPage
+}
+
+function sheetCountForFlow(flowBottom, pageH, gap) {
+  if (flowBottom <= pageH + 1) return 1
+  return Math.max(1, Math.ceil((flowBottom - pageH) / (pageH + gap)) + 1)
 }
 
 function targetForBlock(top, height, pageH, padTop, padBottom) {
@@ -154,10 +181,10 @@ export function layoutEditorPagination(view) {
   const page = pm.closest('.doc-page')
   if (!page || page.classList.contains('doc-editor__hf')) return
 
-  const pageH = measureVar(page, '--doc-page-h', '297mm')
+  const pageH = measureVar(page, '--doc-page-h', 1122)
   const pmStyle = getComputedStyle(pm)
-  const padTop = parseFloat(pmStyle.paddingTop) || measureVar(page, '--doc-margin-top', '20mm')
-  const padBottom = parseFloat(pmStyle.paddingBottom) || measureVar(page, '--doc-margin-bottom', '20mm')
+  const padTop = parseFloat(pmStyle.paddingTop) || measureVar(page, '--doc-margin-top', 75)
+  const padBottom = parseFloat(pmStyle.paddingBottom) || measureVar(page, '--doc-margin-bottom', 75)
 
   const observer = view.domObserver
   try {
@@ -198,16 +225,23 @@ export function layoutEditorPagination(view) {
     }
 
     const pageTop = page.getBoundingClientRect().top
-    let contentBottom = pm.getBoundingClientRect().bottom - pageTop
+    let flowBottom = 0
     for (const el of [...pm.children].filter(isFlowDom)) {
-      contentBottom = Math.max(contentBottom, topInPage(el, page) + heightOf(el))
+      flowBottom = Math.max(flowBottom, topInPage(el, page) + heightOf(el))
     }
 
-    const sheetCount = contentBottom <= pageH + 1
-      ? 1
-      : Math.max(1, Math.ceil((contentBottom - pageH) / (pageH + PAGE_GAP_PX)) + 1)
+    const gap = PAGE_GAP_PX
+    const sheetFromFlow = sheetCountForFlow(flowBottom, pageH, gap)
+    const sheetFromOverlays = minPagesForOverlays(pm, page, pageH, gap, padTop)
+    const sheetCount = Math.max(sheetFromFlow, sheetFromOverlays)
 
-    ensureSheets(page, sheetCount, pageH, PAGE_GAP_PX, contentBottom)
+    const lastPageStart = (sheetCount - 1) * (pageH + gap)
+    const flowOnLastPage = flowBottom - lastPageStart
+    const lastPageOverflow = flowOnLastPage > pageH + 1 ? Math.ceil(flowOnLastPage - pageH) : 0
+
+    ensureSheets(page, sheetCount, pageH, gap, {
+      lastHeight: pageH + lastPageOverflow,
+    })
   } finally {
     try {
       observer?.start?.()
@@ -266,6 +300,8 @@ export const DocumentPagination = Extension.create({
             if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
               if (t.hasAttribute('data-sgaf-auto-break')) return true
               if (t.classList?.contains('sgaf-page-break')) return true
+              if (t.classList?.contains('sgaf-logo-node') || t.classList?.contains('sgaf-shape-node')) return true
+              if (t.classList?.contains('sgaf-logo-view')) return true
             }
             return false
           },

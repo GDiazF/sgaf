@@ -6,7 +6,17 @@ import TextAlign from '@tiptap/extension-text-align'
 import { Color } from '@tiptap/extension-color'
 import TextStyle from '@tiptap/extension-text-style'
 import FontFamily from '@tiptap/extension-font-family'
-import { SgafTable, SgafTableView, SgafTableRow, TABLE_BORDER_PRESETS, normalizeTableBorders } from './tableLayout'
+import {
+  SgafTable,
+  SgafTableView,
+  SgafTableRow,
+  TABLE_BORDER_PRESETS,
+  TABLE_BORDER_WIDTH_PRESETS,
+  normalizeTableBorders,
+  normalizeTableBorderWidth,
+  borderSidesToPreset,
+  hydrateTableColwidthInHtml,
+} from './tableLayout'
 import { CellSelection } from '@tiptap/pm/tables'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Icon, IconButton, Input, Select } from '@slep/ui'
@@ -336,8 +346,8 @@ function TableBorderPicker({ disabled, value, onChange }) {
   return (
     <div className={`doc-table-borders${open ? ' is-open' : ''}`} ref={rootRef}>
       <IconButton
-        aria-label="Bordes de tabla"
-        title={disabled ? 'Seleccione una tabla' : 'Bordes de tabla'}
+        aria-label="Bordes de celda"
+        title={disabled ? 'Seleccione una celda' : 'Bordes de la celda o selección'}
         aria-expanded={open}
         aria-haspopup="true"
         disabled={disabled}
@@ -346,7 +356,7 @@ function TableBorderPicker({ disabled, value, onChange }) {
       >
         <Icon name="table-borders" size={16} />
       </IconButton>
-      <div className="doc-table-borders__panel" role="dialog" aria-label="Bordes de tabla">
+      <div className="doc-table-borders__panel" role="dialog" aria-label="Bordes de celda">
         {TABLE_BORDER_PRESETS.map((preset) => (
           <button
             key={preset.value}
@@ -545,8 +555,17 @@ export function DocumentToolbar({ editor, pageSetup }) {
   const inTable = isSelectionInTable(editor)
   const pagosRepeatRow = inTable && isPagosRepeatRow(editor)
   const tableBorderStyle = inTable
-    ? normalizeTableBorders(editor.getAttributes('table').borders)
+    ? borderSidesToPreset(
+      editor.getAttributes('tableCell').borderSides
+      ?? editor.getAttributes('tableHeader').borderSides,
+    )
     : 'all'
+  const tableBorderWidth = inTable
+    ? normalizeTableBorderWidth(
+      editor.getAttributes('tableCell').borderWidth
+      ?? editor.getAttributes('tableHeader').borderWidth,
+    )
+    : 1
   const cellColor =
     editor.getAttributes('tableCell').backgroundColor
     || editor.getAttributes('tableHeader').backgroundColor
@@ -746,8 +765,20 @@ export function DocumentToolbar({ editor, pageSetup }) {
               <TableBorderPicker
                 disabled={!inTable}
                 value={tableBorderStyle}
-                onChange={(style) => editor.chain().focus().setTableBorders(style).run()}
+                onChange={(style) => editor.chain().focus().setCellBorders(style).run()}
               />
+              <Select
+                className="doc-editor__border-width-select"
+                aria-label="Grosor de borde"
+                title="Grosor de borde de celda seleccionada"
+                disabled={!inTable}
+                value={String(tableBorderWidth)}
+                onChange={(e) => editor.chain().focus().setCellBorderWidth(Number(e.target.value)).run()}
+              >
+                {TABLE_BORDER_WIDTH_PRESETS.map((preset) => (
+                  <option key={preset.value} value={preset.value}>{preset.label}</option>
+                ))}
+              </Select>
               <IconButton
                 aria-label="Alinear arriba"
                 disabled={!inTable}
@@ -827,7 +858,7 @@ export default function DocumentRichEditor({
     () => buildExtensions(placeholder, { paginate: !compact }),
     [placeholder, compact],
   )
-  const initialContent = useRef(content || '<p></p>')
+  const initialContent = useRef(hydrateTableColwidthInHtml(content || '<p></p>'))
   const onChangeRef = useRef(onChange)
   const onFocusRef = useRef(onFocus)
   onChangeRef.current = onChange
