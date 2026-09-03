@@ -192,10 +192,11 @@ class ConfiguracionSelloFirmaAdmin(admin.ModelAdmin):
     def preview_sello_completo(self, obj):
         if not obj:
             return '—'
-        w_pt = obj.ancho_pt or 205
-        h_pt = obj.alto_pt or 84
-        w_mm = w_pt * 0.352777778
-        h_mm = h_pt * 0.352777778
+        w_pt = int(obj.ancho_pt or 205)
+        h_pt = int(obj.alto_pt or 84)
+        # Preformatear: format_html no admite especificadores tipo {:.1f} sobre floats.
+        w_mm = f'{w_pt * 0.352777778:.1f}'
+        h_mm = f'{h_pt * 0.352777778:.1f}'
         w_px = w_pt * 3
         h_px = h_pt * 3
 
@@ -204,17 +205,16 @@ class ConfiguracionSelloFirmaAdmin(admin.ModelAdmin):
 
             png = build_sello_preview_png(obj)
             data_url = 'data:image/png;base64,' + base64.b64encode(png).decode('ascii')
-            img = format_html(
-                '<img src="{}" alt="Vista previa del sello" '
-                'style="width:{}px;height:{}px;max-width:100%;'
-                'background:#fff;border:1px solid #cbd5e1;border-radius:6px;" />',
-                data_url,
-                w_px,
-                h_px,
-            )
-        except Exception:
+            # mark_safe: data URLs largas no deben pasar por format_html (rompe / escapa).
             img = mark_safe(
-                '<div style="color:#b91c1c;padding:12px;">No se pudo generar la previsualización.</div>'
+                f'<img src="{data_url}" alt="Vista previa del sello" '
+                f'style="width:{w_px}px;height:{h_px}px;max-width:100%;'
+                f'height:auto;background:#fff;border:1px solid #cbd5e1;border-radius:6px;" />'
+            )
+        except Exception as exc:
+            img = format_html(
+                '<div style="color:#b91c1c;padding:12px;">No se pudo generar la previsualización: {}</div>',
+                str(exc),
             )
 
         return format_html(
@@ -224,7 +224,7 @@ class ConfiguracionSelloFirmaAdmin(admin.ModelAdmin):
             '<tr><th style="text-align:left;padding:2px 12px 2px 0;color:#64748b;font-weight:500;">'
             'Recuadro enviado</th><td>{} × {} pt</td></tr>'
             '<tr><th style="text-align:left;padding:2px 12px 2px 0;color:#64748b;font-weight:500;">'
-            'Equiv. aproximado</th><td>{:.1f} × {:.1f} mm</td></tr>'
+            'Equiv. aproximado</th><td>{} × {} mm</td></tr>'
             '<tr><th style="text-align:left;padding:2px 12px 2px 0;color:#64748b;font-weight:500;">'
             'PNG a escala 3×</th><td>{} × {} px</td></tr>'
             '</table>'
