@@ -84,6 +84,85 @@ def _letterbox(src: Image.Image, box_w: int, box_h: int) -> Image.Image:
     return canvas
 
 
+def _fit_left(src: Image.Image, max_w: int, box_h: int) -> tuple[Image.Image, int]:
+    """Escala para llenar el alto (sin deformar), limitado por max_w. Alineado a la izquierda."""
+    if src.width <= 0 or src.height <= 0 or max_w <= 0 or box_h <= 0:
+        return Image.new('RGBA', (1, max(1, box_h)), (0, 0, 0, 0)), 1
+    # Prioriza llenar el alto del sello; el % solo topea el ancho.
+    scale = box_h / src.height
+    nw = max(1, int(src.width * scale))
+    nh = max(1, int(src.height * scale))
+    if nw > max_w:
+        scale = max_w / src.width
+        nw = max(1, int(src.width * scale))
+        nh = max(1, int(src.height * scale))
+    resized = src.resize((nw, nh), Image.Resampling.LANCZOS)
+    canvas = Image.new('RGBA', (nw, box_h), (0, 0, 0, 0))
+    canvas.paste(resized, (0, (box_h - nh) // 2), resized)
+    return canvas, nw
+
+
+def _png_bytes(img: Image.Image, *, opaque_white: bool = True) -> bytes:
+    if opaque_white:
+        rgb = Image.new('RGB', img.size, (255, 255, 255))
+        if img.mode == 'RGBA':
+            rgb.paste(img, mask=img.split()[3])
+        else:
+            rgb.paste(img.convert('RGB'))
+        out = rgb
+    else:
+        out = img.convert('RGBA')
+    buf = io.BytesIO()
+    out.save(buf, format='PNG', optimize=True)
+    return buf.getvalue()
+
+
+def _fit_contain(src: Image.Image, max_w: int, max_h: int) -> Image.Image:
+    """Escala sin deformar para caber en max_w × max_h (sin padding extra)."""
+    if src.width <= 0 or src.height <= 0 or max_w <= 0 or max_h <= 0:
+        return Image.new('RGBA', (1, 1), (0, 0, 0, 0))
+    scale = min(max_w / src.width, max_h / src.height)
+    nw = max(1, int(src.width * scale))
+    nh = max(1, int(src.height * scale))
+    return src.resize((nw, nh), Image.Resampling.LANCZOS)
+
+
+def compose_sello_logo_png(
+    *,
+    logo=None,
+    imagen_firma=None,
+    width_pt: int = 205,
+    height_pt: int = 84,
+    image_zone_ratio: float | None = None,
+) -> bytes | None:
+    """PNG **solo del logo**, redimensionado al alto del sello (ancho topeado por %).
+
+    FirmaGob espera la imagen del sello (no un 400×400 crudo ni un lienzo de toda la caja).
+    La caja completa se define aparte con sealWidthPt / sealHeightPt.
+    """
+    left = _image_from_field(logo)
+    right = _image_from_field(imagen_firma)
+    if left is None and right is None:
+        return None
+
+    ratio = _clamp_image_zone_ratio(image_zone_ratio)
+    target_h = max(40, int(height_pt)) * FONDO_SCALE
+    max_w = max(1, int(max(80, int(width_pt)) * ratio * FONDO_SCALE))
+    pad = max(2, FONDO_SCALE)
+
+    if left is not None and right is not None:
+        gap = pad
+        col_w = max(1, (max_w - gap) // 2)
+        out = Image.new('RGBA', (max_w, target_h), (255, 255, 255, 255))
+        out.alpha_composite(_letterbox(left, col_w, target_h), (0, 0))
+        out.alpha_composite(_letterbox(right, col_w, target_h), (col_w + gap, 0))
+        return _png_bytes(out)
+
+    src = left if left is not None else right
+    fitted = _fit_contain(src, max_w, target_h)
+    return _png_bytes(fitted)
+
+
 def compose_sello_fondo_png(
     *,
     logo=None,
@@ -92,7 +171,7 @@ def compose_sello_fondo_png(
     height_pt: int = 84,
     image_zone_ratio: float | None = None,
 ) -> bytes | None:
-    """Compone logo/imagen a la izquierda; deja la derecha libre para el texto de FirmaGob."""
+    """Lienzo completo del sello (logo izq. + blanco der.) — solo para preview admin."""
     left = _image_from_field(logo)
     right = _image_from_field(imagen_firma)
     if left is None and right is None:
@@ -104,25 +183,23 @@ def compose_sello_fondo_png(
     pad = max(4, FONDO_SCALE * 2)
     inner_w = w - 2 * pad
     inner_h = h - 2 * pad
-    zone_w = max(1, int(inner_w * ratio))
+    max_zone_w = max(1, int(inner_w * ratio))
 
     out = Image.new('RGBA', (w, h), (255, 255, 255, 255))
 
     if left is not None and right is not None:
         gap = pad
-        col_w = max(1, (zone_w - gap) // 2)
+        col_w = max(1, (max_zone_w - gap) // 2)
         out.alpha_composite(_letterbox(left, col_w, inner_h), (pad, pad))
         out.alpha_composite(_letterbox(right, col_w, inner_h), (pad + col_w + gap, pad))
     elif left is not None:
-        out.alpha_composite(_letterbox(left, zone_w, inner_h), (pad, pad))
+        fitted, _used_w = _fit_left(left, max_zone_w, inner_h)
+        out.alpha_composite(fitted, (pad, pad))
     else:
-        out.alpha_composite(_letterbox(right, zone_w, inner_h), (pad, pad))
+        fitted, _used_w = _fit_left(right, max_zone_w, inner_h)
+        out.alpha_composite(fitted, (pad, pad))
 
-    rgb = Image.new('RGB', out.size, (255, 255, 255))
-    rgb.paste(out, mask=out.split()[3])
-    buf = io.BytesIO()
-    rgb.save(buf, format='PNG', optimize=True)
-    return buf.getvalue()
+    return _png_bytes(out)
 
 
 def seal_image_base64_from_config() -> str | None:
@@ -131,7 +208,8 @@ def seal_image_base64_from_config() -> str | None:
     cfg = ConfiguracionSelloFirma.get_solo()
     if not cfg:
         return None
-    png = compose_sello_fondo_png(
+    # Logo redimensionado (no el archivo 400×400 ni un lienzo blanco del sello entero).
+    png = compose_sello_logo_png(
         logo=cfg.logo,
         imagen_firma=cfg.imagen_firma,
         width_pt=cfg.ancho_pt,
@@ -142,6 +220,13 @@ def seal_image_base64_from_config() -> str | None:
         return None
     import base64
 
+    logger.info(
+        'Sello FirmaGob: logo redimensionado %s bytes (caja %s×%s pt, logo máx %s%%)',
+        len(png),
+        cfg.ancho_pt,
+        cfg.alto_pt,
+        cfg.proporcion_logo_pct,
+    )
     return base64.b64encode(png).decode('ascii')
 
 
@@ -224,8 +309,16 @@ def build_sello_preview_png(
     draw = ImageDraw.Draw(canvas)
     pad = max(4, FONDO_SCALE * 2)
     inner_w = w - 2 * pad
+    inner_h = h - 2 * pad
     has_image = bool(getattr(logo, 'name', None) or getattr(imagen_firma, 'name', None))
-    if has_image:
+    # Preview: el texto de ejemplo empieza tras el logo real dibujado (no tras el % vacío).
+    if has_image and fondo:
+        # Estimar ancho usado por el logo: alto del sello, topeado por el %.
+        max_zone_w = max(1, int(inner_w * ratio))
+        # Logo cuadrado típico → min(alto, max_zone).
+        approx_logo_w = min(inner_h, max_zone_w)
+        text_left = pad + approx_logo_w + pad
+    elif has_image:
         zone_w = max(1, int(inner_w * ratio))
         text_left = pad + zone_w + pad
     else:
@@ -257,7 +350,7 @@ def build_sello_preview_png(
         draw.text((text_left, y), text, font=font, fill=ink)
         y += th + line_gap
 
-    # Guía visual de la proporción logo | texto.
+    # Guía: tope del % del logo (FirmaGob puede empezar el texto más a la derecha).
     if has_image:
         guide_x = pad + max(1, int(inner_w * ratio))
         draw.line([(guide_x, 0), (guide_x, h - 1)], fill=(148, 163, 184, 180), width=1)

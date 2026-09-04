@@ -316,12 +316,14 @@ class ConfiguracionSelloFirma(models.Model):
         ),
     )
     proporcion_logo_pct = models.PositiveIntegerField(
-        '% ancho para logo / imágenes',
+        '% máx. ancho del logo',
         default=40,
         help_text=(
-            'Porcentaje del ancho del sello reservado a logo e imagen de firma (izquierda). '
-            'El resto (~texto) queda en blanco para FirmaGob. Ej.: 35 = logo 35% / texto 65%. '
-            'Rango 15–70. Default 40.'
+            'Ancho máximo del logo como % del sello (izquierda, sin deformar; intenta llenar el alto). '
+            'No controla dónde FirmaGob escribe el texto: ese layout es del proveedor y suele '
+            'empezar ~al centro/derecha de la caja. Si pone 20% en un sello de 280 pt, el logo '
+            'cuadrado solo tendrá ~56 pt de lado y verá un hueco grande hasta el texto. '
+            'Pruebe 35–45% para acercar el logo al texto. Rango 15–70.'
         ),
     )
     actualizado_en = models.DateTimeField(auto_now=True)
