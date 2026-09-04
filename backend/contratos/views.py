@@ -124,15 +124,13 @@ class ContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
 
     @staticmethod
     def _finalizado_q():
+        """Solo por estado (p. ej. Finalizado). La fecha de término no mueve de tab."""
         from django.db.models import Q
-        from django.utils import timezone
-        today = timezone.now().date()
         return (
             Q(estado__nombre__icontains='finaliz')
             | Q(estado__nombre__icontains='caduc')
             | Q(estado__nombre__icontains='cerr')
             | Q(estado__nombre__icontains='termin')
-            | Q(fecha_termino__lt=today)
         )
 
     def get_queryset(self):

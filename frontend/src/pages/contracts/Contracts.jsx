@@ -396,7 +396,7 @@ const Contracts = () => {
   const vistaDescription = {
     activos: 'Contratos vigentes en curso',
     borradores: 'Borradores guardados automáticamente',
-    finalizados: 'Contratos finalizados, caducados o vencidos',
+    finalizados: 'Contratos marcados como finalizados',
   }[vista]
 
   const emptyCopy = {
@@ -406,11 +406,11 @@ const Contracts = () => {
     },
     borradores: {
       title: 'Sin borradores',
-      description: 'Creá un contrato nuevo para generar un borrador automático.',
+      description: 'Cree un contrato nuevo para generar un borrador automático.',
     },
     finalizados: {
       title: 'Sin contratos finalizados',
-      description: 'No hay contratos finalizados con los filtros actuales.',
+      description: 'No hay contratos finalizados con los filtros actuales. Cambie el estado del contrato para moverlo aquí.',
     },
   }[vista]
 

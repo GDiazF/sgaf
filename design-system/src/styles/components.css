@@ -874,7 +874,7 @@
   }
 }
 
-/* Pagos ? selecci?n y barra de acci?n masiva (RC) */
+/* Pagos — selección y barra de acción masiva (RC) */
 .payments-select-all {
   display: inline-flex;
   align-items: center;
@@ -890,6 +890,53 @@
   height: 1rem;
   accent-color: var(--primary);
   cursor: pointer;
+}
+
+/*
+ * Pagos: tabs Pagos / Recepciones / Reporte.
+ * Especificidad > .tabs__panel.is-active { display: block } para fillViewport
+ * y que el footer de paginación del DataTable no quede fuera de vista.
+ */
+.tabs__panel.is-active.payments-tab-panel,
+.payments-tab-panel {
+  padding-top: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow: hidden;
+}
+
+.payments-tab-panel > .filters,
+.payments-tab-panel > .alert {
+  flex-shrink: 0;
+}
+
+.payments-tab-panel > .data-table-shell--fill {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Contratos listado — mismo patrón fill + paginación */
+.tabs__panel.is-active.contracts-list-tab-panel,
+.contracts-list-tab-panel {
+  padding-top: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow: hidden;
+}
+
+.contracts-list-tab-panel > .filters {
+  flex-shrink: 0;
+}
+
+.contracts-list-tab-panel > .data-table-shell--fill {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .payments-bulk-bar {

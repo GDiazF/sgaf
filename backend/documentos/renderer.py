@@ -15,6 +15,44 @@ from .variables import known_variable_keys
 
 VAR_RE = re.compile(r'\{\{\s*([a-zA-Z0-9_]+)\s*\}\}')
 
+# Tipografías con buena cobertura cruzada Windows + Ubuntu (sin instalar nada extra).
+# Windows suele resolver Arial / Times / Courier; Ubuntu Liberation* o DejaVu.
+DOCUMENT_SANS_STACK = 'Arial, "Liberation Sans", "DejaVu Sans", Helvetica, sans-serif'
+DOCUMENT_SERIF_STACK = '"Times New Roman", "Liberation Serif", "DejaVu Serif", Times, serif'
+DOCUMENT_MONO_STACK = '"Courier New", "Liberation Mono", "DejaVu Sans Mono", monospace'
+
+# Familias típicas de plantillas Windows-only → stack compartido al generar PDF.
+_PDF_FONT_FAMILY_REWRITES = (
+    (re.compile(r'(?i)(["\']?)Calibri\1(?:\s*,\s*sans-serif)?'), DOCUMENT_SANS_STACK),
+    (re.compile(r'(?i)(["\']?)Segoe UI\1(?:\s*,\s*sans-serif)?'), DOCUMENT_SANS_STACK),
+    (re.compile(r'(?i)(["\']?)Source Sans 3\1(?:\s*,\s*sans-serif)?'), DOCUMENT_SANS_STACK),
+    (re.compile(r'(?i)(["\']?)Arial\1(?:\s*,\s*sans-serif)?'), DOCUMENT_SANS_STACK),
+    (re.compile(r'(?i)(["\']?)Helvetica\1(?:\s*,\s*sans-serif)?'), DOCUMENT_SANS_STACK),
+    (re.compile(r'(?i)(["\']?)Times New Roman\1(?:\s*,\s*serif)?'), DOCUMENT_SERIF_STACK),
+    (re.compile(r'(?i)(["\']?)Georgia\1(?:\s*,\s*serif)?'), DOCUMENT_SERIF_STACK),
+    (re.compile(r'(?i)(["\']?)Courier New\1(?:\s*,\s*monospace)?'), DOCUMENT_MONO_STACK),
+)
+
+
+def _normalize_font_families_for_pdf(html):
+    """Reescribe font-family inline a stacks disponibles en Windows y Ubuntu."""
+    if not html:
+        return html
+
+    def _rewrite_decl(match):
+        value = match.group(1)
+        for pattern, replacement in _PDF_FONT_FAMILY_REWRITES:
+            if pattern.search(value):
+                return f'font-family: {replacement}'
+        return match.group(0)
+
+    return re.sub(
+        r'font-family\s*:\s*([^;\"\']+)',
+        _rewrite_decl,
+        html,
+        flags=re.IGNORECASE,
+    )
+
 
 def _file_to_data_uri(path):
     if not path or not os.path.isfile(path):
@@ -459,13 +497,16 @@ def fill_html(html, context, *, header_footer=False, page_metrics=None, hf_band_
     )
     filled = _substitute_text(body, global_ctx)
     filled = _fill_sgaf_var_spans(filled, global_ctx)
-    return _apply_logos(
+    filled = _apply_logos(
         filled, context,
         header_footer=header_footer,
         page_metrics=page_metrics,
         hf_band_mm=hf_band_mm,
         pdf_print=pdf_print,
     )
+    if pdf_print:
+        filled = _normalize_font_families_for_pdf(filled)
+    return filled
 
 
 def _page_css(width_mm, height_mm, margins, pdf_page_margins=None, has_header=False, has_footer=False):
@@ -492,7 +533,7 @@ def _page_css(width_mm, height_mm, margins, pdf_page_margins=None, has_header=Fa
         margin: 0;
         padding: 0;
         color: #111;
-        font-family: "Calibri", "Source Sans 3", "Segoe UI", sans-serif;
+        font-family: {DOCUMENT_SANS_STACK};
         font-size: 11pt;
         line-height: 1.35;
       }}
@@ -1279,6 +1320,7 @@ def _header_footer_template(html, context, kind, page_metrics=None, pdf_print=Fa
     return (
         f'<div style="position:relative;width:100%;{margin_style}'
         f'padding:0 {right_m}mm 0 {left_m}mm;color:#111;'
+        f'font-family:{DOCUMENT_SANS_STACK};'
         f'font-size:10pt;height:{min_h};box-sizing:border-box;'
         f'overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact;">'
         f'{filled}{page_bits}</div>'

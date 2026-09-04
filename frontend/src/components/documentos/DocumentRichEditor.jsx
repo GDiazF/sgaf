@@ -35,12 +35,10 @@ import {
 import { DocumentPagination } from './layoutPageBreaks.js'
 
 const FONT_OPTIONS = [
-  { value: 'Calibri, sans-serif', label: 'Calibri' },
-  { value: 'Arial, sans-serif', label: 'Arial' },
-  { value: '"Times New Roman", serif', label: 'Times New Roman' },
-  { value: 'Georgia, serif', label: 'Georgia' },
-  { value: '"Source Sans 3", sans-serif', label: 'Source Sans 3' },
-  { value: '"Courier New", monospace', label: 'Courier New' },
+  { value: 'Arial, "Liberation Sans", "DejaVu Sans", Helvetica, sans-serif', label: 'Arial' },
+  { value: '"Times New Roman", "Liberation Serif", "DejaVu Serif", Times, serif', label: 'Times New Roman' },
+  { value: 'Georgia, "Liberation Serif", "DejaVu Serif", serif', label: 'Georgia' },
+  { value: '"Courier New", "Liberation Mono", "DejaVu Sans Mono", monospace', label: 'Courier New' },
 ]
 
 const SIZE_OPTIONS = ['8pt', '9pt', '10pt', '11pt', '12pt', '14pt', '16pt', '18pt', '20pt', '24pt', '28pt', '36pt']
