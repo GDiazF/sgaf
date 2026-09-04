@@ -660,7 +660,7 @@ export default function FirmaPrueba() {
         }
       >
         <div className="firma-prueba__grid">
-          <div>
+          <div className="firma-prueba__viewer">
             {previewLoading && !preview ? (
               <Alert variant="info" title="Vista previa">
                 Generando vista previa…
@@ -741,6 +741,7 @@ export default function FirmaPrueba() {
                 </div>
                 <p className="firma-placement__hint">
                   Vista ampliada al {ZOOM_DEFAULT}% al abrir. Use + / − o «Ajustar» ({ZOOM_FIT}%).
+                  Desplace el documento dentro del recuadro para ver el resto de la página.
                 </p>
               </>
             ) : (

@@ -12307,6 +12307,28 @@ body.has-modal-scroll-lock {
   min-height: 0;
   max-height: none;
   height: auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* Columna del visor: debe ser flex para que el viewport tenga altura y pueda scrollear */
+.modal--firma-sign .firma-prueba__grid > .firma-prueba__viewer,
+.modal--firma-sign .firma-sign-layout__viewer {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.modal--firma-sign .firma-prueba__viewer {
+  padding: var(--space-3);
+  gap: var(--space-2);
+}
+
+.modal--firma-sign .firma-prueba__viewer .firma-placement-toolbar,
+.modal--firma-sign .firma-prueba__viewer .firma-placement__hint {
+  flex-shrink: 0;
 }
 
 .page[data-od-id='firma-prueba-page'] .firma-placement-viewport {
@@ -12442,7 +12464,8 @@ body.has-modal-scroll-lock {
   background: var(--surface);
   overflow: hidden;
   user-select: none;
-  touch-action: none;
+  /* Permitir pan/scroll del viewport; el sello anula con touch-action: none */
+  touch-action: pan-x pan-y;
 }
 
 .firma-placement__img {
@@ -12471,6 +12494,7 @@ body.has-modal-scroll-lock {
   line-height: 1.25;
   min-width: 48px;
   min-height: 28px;
+  touch-action: none;
 }
 
 .firma-placement__stamp:active {
