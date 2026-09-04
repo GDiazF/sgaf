@@ -44,6 +44,33 @@ def _fmt_clp(valor):
         return str(valor or '')
 
 
+def _proveedor_acronimo(proveedor):
+    if not proveedor:
+        return ''
+    return (getattr(proveedor, 'acronimo', None) or '') or ''
+
+
+def _neto_iva_desde_bruto(monto_bruto):
+    """
+    Desglosa neto e IVA (19%) asumiendo que el monto ya incluye IVA.
+    Se redondea por boleta (como en datos de ejemplo del catálogo).
+    """
+    monto = int(monto_bruto or 0)
+    neto = int(round(monto / 1.19))
+    iva = monto - neto
+    return neto, iva
+
+
+def _sum_neto_iva(registros):
+    total_neto = 0
+    total_iva = 0
+    for pago in registros:
+        neto, iva = _neto_iva_desde_bruto(getattr(pago, 'monto_total', None))
+        total_neto += neto
+        total_iva += iva
+    return total_neto, total_iva
+
+
 def _fmt_m3(valor):
     if valor is None or valor == '':
         return ''
@@ -147,6 +174,7 @@ def context_from_factura_adq(factura, user=None):
         'contrato_fecha_inicio': _fmt_date(getattr(contrato, 'fecha_inicio', None)) if contrato else '',
         'contrato_fecha_termino': _fmt_date(getattr(contrato, 'fecha_termino', None)) if contrato else '',
         'proveedor_nombre': proveedor.nombre if proveedor else '',
+        'proveedor_acronimo': _proveedor_acronimo(proveedor),
         'proveedor_rut': (proveedor.rut if proveedor else '') or '',
         'proveedor_tipo': str(getattr(proveedor, 'tipo_proveedor', None) or '') if proveedor else '',
         'proveedor_contacto': getattr(proveedor, 'contacto', None) or getattr(proveedor, 'nombre_contacto', None) or '',
@@ -172,6 +200,8 @@ def context_from_factura_adq(factura, user=None):
         'rc_iva': _fmt_clp(factura.iva),
         'rc_otros': _fmt_clp(0),
         'rc_total': _fmt_clp(factura.total_pagar),
+        'rc_total_neto': _fmt_clp(factura.total_neto),
+        'rc_iva_total': _fmt_clp(factura.iva),
         'rc_estado_pago': '',
         'firmante_nombre': (firmante.nombre_funcionario if firmante else '') or '',
         'firmante_rut': (firmante.rut if firmante else '') or '',
@@ -190,6 +220,7 @@ def _pago_row_context(pago):
     interes = int(pago.monto_interes or 0)
     monto = int(pago.monto_total or 0)
     junji = monto - interes
+    neto, iva = _neto_iva_desde_bruto(monto)
     est = pago.establecimiento
     cliente = getattr(getattr(pago, 'servicio', None), 'numero_cliente', None) or ''
     return {
@@ -201,6 +232,8 @@ def _pago_row_context(pago):
         'pago_interes': _fmt_clp(interes),
         'pago_monto_junji': _fmt_clp(junji),
         'pago_monto_total': _fmt_clp(monto),
+        'pago_iva': _fmt_clp(iva),
+        'pago_neto': _fmt_clp(neto),
     }
 
 
@@ -213,6 +246,7 @@ def _attach_pagos_rows(ctx, registros):
         for key in (
             'pago_nro_cliente', 'pago_rbd', 'pago_establecimiento', 'pago_nro_documento',
             'pago_fecha_vencimiento', 'pago_interes', 'pago_monto_junji', 'pago_monto_total',
+            'pago_iva', 'pago_neto',
         ):
             ctx.setdefault(key, '')
     return ctx
@@ -321,10 +355,12 @@ def context_from_recepcion_conforme(rc, user=None, tipo=None):
     listado_html, total_interes, total_monto, total_junji = _build_listado_pagos_html(
         registros, tipo=tipo_fmt,
     )
+    total_neto, total_iva = _sum_neto_iva(registros)
 
     ctx.update({
         'institucion_nombre': 'Servicio Local de Educación Pública Iquique',
         'proveedor_nombre': prov_name,
+        'proveedor_acronimo': _proveedor_acronimo(proveedor),
         'proveedor_rut': (proveedor.rut if proveedor else '') or '',
         'proveedor_tipo': str(getattr(proveedor, 'tipo_proveedor', None) or '') if proveedor else '',
         'proveedor_contacto': (getattr(proveedor, 'contacto', None) or '') if proveedor else '',
@@ -342,6 +378,8 @@ def context_from_recepcion_conforme(rc, user=None, tipo=None):
         'rc_total_interes': _fmt_clp(total_interes),
         'rc_total_junji': _fmt_clp(total_junji),
         'rc_total': _fmt_clp(total_monto),
+        'rc_total_neto': _fmt_clp(total_neto),
+        'rc_iva_total': _fmt_clp(total_iva),
         'rc_listado_html': listado_html,
         'rc_estado_pago': rc.estado or '',
         'observaciones': rc.observaciones or '',
@@ -386,6 +424,7 @@ def context_from_registro_pago(pago, user=None, tipo=None):
     listado_html, total_interes, total_monto, total_junji = _build_listado_pagos_html(
         [pago], tipo=tipo_fmt,
     )
+    total_neto, total_iva = _sum_neto_iva([pago])
 
     # Folio RC: en formato unitario PAGO se muestra; en JUNJI el PDF antiguo lo omitía
     folio = ''
@@ -395,6 +434,7 @@ def context_from_registro_pago(pago, user=None, tipo=None):
     ctx.update({
         'institucion_nombre': 'Servicio Local de Educación Pública Iquique',
         'proveedor_nombre': prov_name,
+        'proveedor_acronimo': _proveedor_acronimo(proveedor),
         'proveedor_rut': (proveedor.rut if proveedor else '') or '',
         'proveedor_tipo': str(getattr(proveedor, 'tipo_proveedor', None) or '') if proveedor else '',
         'proveedor_contacto': (getattr(proveedor, 'contacto', None) or '') if proveedor else '',
@@ -412,6 +452,8 @@ def context_from_registro_pago(pago, user=None, tipo=None):
         'rc_total_interes': _fmt_clp(total_interes),
         'rc_total_junji': _fmt_clp(total_junji),
         'rc_total': _fmt_clp(total_monto),
+        'rc_total_neto': _fmt_clp(total_neto),
+        'rc_iva_total': _fmt_clp(total_iva),
         'rc_listado_html': listado_html,
         'rc_estado_pago': (rc.estado if rc else '') or '',
         'observaciones': (rc.observaciones if rc else '') or '',
@@ -494,6 +536,7 @@ def context_from_ruta_establecimiento(
         'contrato_descripcion': (getattr(contrato, 'descripcion', None) or '') if contrato else '',
         'contrato_detalle': _contrato_detalle(contrato),
         'proveedor_nombre': (proveedor.nombre if proveedor else '') or '',
+        'proveedor_acronimo': _proveedor_acronimo(proveedor),
         'proveedor_rut': (proveedor.rut if proveedor else '') or '',
         'establecimiento_nombre': (establecimiento.nombre if establecimiento else '') or '',
         'establecimiento_rbd': (getattr(establecimiento, 'rbd', None) or '') if establecimiento else '',
@@ -534,6 +577,7 @@ def context_from_periodo_cobro(periodo, user=None):
         'contrato_cdp': (getattr(contrato, 'cdp', None) or '') if contrato else '',
         'contrato_detalle': _contrato_detalle(contrato),
         'proveedor_nombre': (proveedor.nombre if proveedor else '') or '',
+        'proveedor_acronimo': _proveedor_acronimo(proveedor),
         'proveedor_rut': (proveedor.rut if proveedor else '') or '',
         'establecimiento_nombre': (est.nombre if est else '') or '',
         'establecimiento_rbd': (getattr(est, 'rbd', None) or '') if est else '',
