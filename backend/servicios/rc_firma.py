@@ -14,11 +14,11 @@ from .models import HistorialRecepcionConforme, RecepcionConforme, RegistroPago
 logger = logging.getLogger(__name__)
 
 
-def _pdf_rc_desde_pago(pago, user, tipo: str = 'PAGO') -> bytes:
-    """Genera el PDF de RC (un pago) sin pasar por ViewSet — evita AnonymousUser sin JWT."""
-    from servicios.pdf import build_registro_pago_rc_pdf
+def _pdf_rc_desde_recepcion(rc, user, tipo: str = 'PAGO') -> bytes:
+    """PDF de la RC completa (propósito RLB 1 o más pagos), no el unitario de un pago."""
+    from servicios.pdf import build_recepcion_conforme_pdf
 
-    response = build_registro_pago_rc_pdf(pago, user=user, tipo=tipo or None)
+    response = build_recepcion_conforme_pdf(rc, user=user, tipo=tipo or None)
 
     from rest_framework.response import Response as DRFResponse
 
@@ -26,7 +26,6 @@ def _pdf_rc_desde_pago(pago, user, tipo: str = 'PAGO') -> bytes:
         data = response.data
         err = data.get('error', str(data)) if isinstance(data, dict) else str(data)
         raise ValueError(err or 'No se pudo generar el PDF de la recepción conforme.')
-        response.render()
 
     if hasattr(response, 'file') and response.file is not None:
         response.file.seek(0)
@@ -72,7 +71,7 @@ def construir_paquete_rc(rc: RecepcionConforme, user, tipo: str = 'PAGO') -> tup
     parts: list[bytes] = []
     anexos_meta = []
 
-    rc_pdf = _pdf_rc_desde_pago(pagos[0], user, tipo=tipo)
+    rc_pdf = _pdf_rc_desde_recepcion(rc, user, tipo=tipo)
     parts.append(rc_pdf)
 
     for pago in pagos:
