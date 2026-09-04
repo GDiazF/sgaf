@@ -10,6 +10,8 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 FONDO_SCALE = 3
+# Zona izquierda para logo/imagen; la derecha queda libre para el texto de FirmaGob.
+IMAGE_ZONE_RATIO = 0.40
 
 
 def _open_image_bytes(data: bytes, filename: str = '') -> Image.Image | None:
@@ -73,7 +75,7 @@ def _letterbox(src: Image.Image, box_w: int, box_h: int) -> Image.Image:
 
 
 def compose_sello_fondo_png(*, logo=None, imagen_firma=None, width_pt: int = 205, height_pt: int = 84) -> bytes | None:
-    """Compone logo (izq) + imagen de firma (der) en un PNG. None si no hay imágenes."""
+    """Compone logo/imagen a la izquierda; deja la derecha libre para el texto de FirmaGob."""
     left = _image_from_field(logo)
     right = _image_from_field(imagen_firma)
     if left is None and right is None:
@@ -84,18 +86,20 @@ def compose_sello_fondo_png(*, logo=None, imagen_firma=None, width_pt: int = 205
     pad = max(4, FONDO_SCALE * 2)
     inner_w = w - 2 * pad
     inner_h = h - 2 * pad
+    # Solo la fracción izquierda: el resto es espacio para “Firmado por / nombre / fecha”.
+    zone_w = max(1, int(inner_w * IMAGE_ZONE_RATIO))
 
     out = Image.new('RGBA', (w, h), (255, 255, 255, 255))
 
     if left is not None and right is not None:
         gap = pad
-        col_w = max(1, (inner_w - gap) // 2)
+        col_w = max(1, (zone_w - gap) // 2)
         out.alpha_composite(_letterbox(left, col_w, inner_h), (pad, pad))
         out.alpha_composite(_letterbox(right, col_w, inner_h), (pad + col_w + gap, pad))
     elif left is not None:
-        out.alpha_composite(_letterbox(left, inner_w, inner_h), (pad, pad))
+        out.alpha_composite(_letterbox(left, zone_w, inner_h), (pad, pad))
     else:
-        out.alpha_composite(_letterbox(right, inner_w, inner_h), (pad, pad))
+        out.alpha_composite(_letterbox(right, zone_w, inner_h), (pad, pad))
 
     rgb = Image.new('RGB', out.size, (255, 255, 255))
     rgb.paste(out, mask=out.split()[3])
@@ -195,9 +199,14 @@ def build_sello_preview_png(
 
     draw = ImageDraw.Draw(canvas)
     pad = max(4, FONDO_SCALE * 2)
-    # Si hay logo, el texto simulado ocupa la zona derecha (como suele verse el sello).
-    has_logo = bool(getattr(logo, 'name', None))
-    text_left = int(w * 0.42) if has_logo else pad + FONDO_SCALE
+    inner_w = w - 2 * pad
+    has_image = bool(getattr(logo, 'name', None) or getattr(imagen_firma, 'name', None))
+    # Misma zona que compose: texto empieza justo a la derecha del bloque de imágenes.
+    if has_image:
+        zone_w = max(1, int(inner_w * IMAGE_ZONE_RATIO))
+        text_left = pad + zone_w + pad
+    else:
+        text_left = pad + FONDO_SCALE
     text_right = w - pad
     max_text_w = max(40, text_right - text_left)
 
@@ -213,7 +222,6 @@ def build_sello_preview_png(
     lines.append((sample_date, font_body))
     lines.append((sample_time, font_body))
 
-    # Centrar verticalmente el bloque de texto en el alto disponible.
     heights = []
     for text, font in lines:
         bbox = draw.textbbox((0, 0), text, font=font)
@@ -226,7 +234,6 @@ def build_sello_preview_png(
         draw.text((text_left, y), text, font=font, fill=ink)
         y += th + line_gap
 
-    # Marco para visualizar la caja exacta en pt.
     draw.rectangle((0, 0, w - 1, h - 1), outline=(13, 110, 122, 255), width=max(1, FONDO_SCALE // 2))
 
     rgb = Image.new('RGB', canvas.size, (255, 255, 255))

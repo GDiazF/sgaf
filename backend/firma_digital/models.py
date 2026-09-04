@@ -284,14 +284,14 @@ class ConfiguracionSelloFirma(models.Model):
         upload_to=sello_fondo_upload_to,
         blank=True,
         validators=[_sello_image_validator],
-        help_text='SVG, PNG o JPG. Se coloca a la izquierda del recuadro, sin deformar.',
+        help_text='SVG, PNG o JPG. Se coloca a la izquierda del recuadro (~40%), sin deformar. La derecha queda para el texto de FirmaGob.',
     )
     imagen_firma = models.FileField(
         'Imagen de firma',
         upload_to=sello_fondo_upload_to,
         blank=True,
         validators=[_sello_image_validator],
-        help_text='SVG, PNG o JPG. Se coloca a la derecha del recuadro, sin deformar.',
+        help_text='SVG, PNG o JPG. También en la zona izquierda (junto al logo). La derecha es para el texto.',
     )
     ancho_pt = models.PositiveIntegerField(
         'Ancho del recuadro (pt)',

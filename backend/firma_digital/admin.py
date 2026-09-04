@@ -246,7 +246,7 @@ class ConfiguracionSelloFirmaAdmin(admin.ModelAdmin):
         return _preview_panel(
             'Logo institucional',
             obj.logo if obj else None,
-            box_hint='Columna izquierda del recuadro (mitad del ancho si hay ambas imágenes)',
+            box_hint='Columna izquierda (~40% del recuadro); la derecha queda para el texto de FirmaGob',
         )
 
     @admin.display(description='Imagen de firma (actual)')
@@ -254,7 +254,7 @@ class ConfiguracionSelloFirmaAdmin(admin.ModelAdmin):
         return _preview_panel(
             'Imagen de firma',
             obj.imagen_firma if obj else None,
-            box_hint='Columna derecha del recuadro (mitad del ancho si hay ambas imágenes)',
+            box_hint='También en la zona izquierda (junto al logo si hay ambos); la derecha es para el texto',
         )
 
     def has_add_permission(self, request):
