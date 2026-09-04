@@ -284,30 +284,44 @@ class ConfiguracionSelloFirma(models.Model):
         upload_to=sello_fondo_upload_to,
         blank=True,
         validators=[_sello_image_validator],
-        help_text='SVG, PNG o JPG. Se coloca a la izquierda del recuadro (~40%), sin deformar. La derecha queda para el texto de FirmaGob.',
+        help_text=(
+            'SVG, PNG o JPG. Se coloca a la izquierda según “% ancho para logo”. '
+            'La derecha queda libre para el texto de FirmaGob.'
+        ),
     )
     imagen_firma = models.FileField(
         'Imagen de firma',
         upload_to=sello_fondo_upload_to,
         blank=True,
         validators=[_sello_image_validator],
-        help_text='SVG, PNG o JPG. También en la zona izquierda (junto al logo). La derecha es para el texto.',
+        help_text=(
+            'SVG, PNG o JPG. Comparte la zona del logo (izquierda). '
+            'La derecha es para el texto.'
+        ),
     )
     ancho_pt = models.PositiveIntegerField(
-        'Ancho del recuadro (pt)',
+        'Ancho del sello completo (pt)',
         default=205,
         help_text=(
-            'Ancho de la caja que FirmaGob usa para dibujar el texto. '
-            'A mayor ancho, el nombre se parte menos. Default oficial 205×84. '
-            'Sugeridos: 280×100 o 320×110.'
+            'Ancho total de la caja en el PDF. A mayor ancho, el nombre se parte menos. '
+            'Default oficial 205. Sugeridos: 280 o 320.'
         ),
     )
     alto_pt = models.PositiveIntegerField(
-        'Alto del recuadro (pt)',
+        'Alto del sello completo (pt)',
         default=84,
         help_text=(
-            'Alto de la caja del sello en puntos PDF. Default oficial 84. '
+            'Alto total de la caja en el PDF. Default oficial 84. '
             'Sugeridos junto al ancho: 280×100 o 320×110.'
+        ),
+    )
+    proporcion_logo_pct = models.PositiveIntegerField(
+        '% ancho para logo / imágenes',
+        default=40,
+        help_text=(
+            'Porcentaje del ancho del sello reservado a logo e imagen de firma (izquierda). '
+            'El resto (~texto) queda en blanco para FirmaGob. Ej.: 35 = logo 35% / texto 65%. '
+            'Rango 15–70. Default 40.'
         ),
     )
     actualizado_en = models.DateTimeField(auto_now=True)
@@ -324,6 +338,8 @@ class ConfiguracionSelloFirma(models.Model):
             raise ValidationError('El recuadro del sello es demasiado pequeño (mín. 80×40 pt).')
         if self.ancho_pt > 400 or self.alto_pt > 200:
             raise ValidationError('El recuadro del sello es demasiado grande (máx. 400×200 pt).')
+        if self.proporcion_logo_pct < 15 or self.proporcion_logo_pct > 70:
+            raise ValidationError('La proporción del logo debe estar entre 15% y 70%.')
         if not self.pk and ConfiguracionSelloFirma.objects.exists():
             raise ValidationError('Solo puede existir una configuración de sello.')
 
@@ -334,3 +350,7 @@ class ConfiguracionSelloFirma(models.Model):
     @classmethod
     def get_solo(cls):
         return cls.objects.first()
+
+    def image_zone_ratio(self) -> float:
+        pct = int(self.proporcion_logo_pct or 40)
+        return max(0.15, min(0.70, pct / 100.0))

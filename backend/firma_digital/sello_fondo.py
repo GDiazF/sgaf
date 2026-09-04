@@ -10,8 +10,18 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 FONDO_SCALE = 3
-# Zona izquierda para logo/imagen; la derecha queda libre para el texto de FirmaGob.
-IMAGE_ZONE_RATIO = 0.40
+# Default si no hay configuración: zona izquierda para logo/imágenes.
+DEFAULT_IMAGE_ZONE_RATIO = 0.40
+
+
+def _clamp_image_zone_ratio(ratio: float | None) -> float:
+    if ratio is None:
+        return DEFAULT_IMAGE_ZONE_RATIO
+    try:
+        value = float(ratio)
+    except (TypeError, ValueError):
+        return DEFAULT_IMAGE_ZONE_RATIO
+    return max(0.15, min(0.70, value))
 
 
 def _open_image_bytes(data: bytes, filename: str = '') -> Image.Image | None:
@@ -74,20 +84,27 @@ def _letterbox(src: Image.Image, box_w: int, box_h: int) -> Image.Image:
     return canvas
 
 
-def compose_sello_fondo_png(*, logo=None, imagen_firma=None, width_pt: int = 205, height_pt: int = 84) -> bytes | None:
+def compose_sello_fondo_png(
+    *,
+    logo=None,
+    imagen_firma=None,
+    width_pt: int = 205,
+    height_pt: int = 84,
+    image_zone_ratio: float | None = None,
+) -> bytes | None:
     """Compone logo/imagen a la izquierda; deja la derecha libre para el texto de FirmaGob."""
     left = _image_from_field(logo)
     right = _image_from_field(imagen_firma)
     if left is None and right is None:
         return None
 
+    ratio = _clamp_image_zone_ratio(image_zone_ratio)
     w = max(80, int(width_pt)) * FONDO_SCALE
     h = max(40, int(height_pt)) * FONDO_SCALE
     pad = max(4, FONDO_SCALE * 2)
     inner_w = w - 2 * pad
     inner_h = h - 2 * pad
-    # Solo la fracción izquierda: el resto es espacio para “Firmado por / nombre / fecha”.
-    zone_w = max(1, int(inner_w * IMAGE_ZONE_RATIO))
+    zone_w = max(1, int(inner_w * ratio))
 
     out = Image.new('RGBA', (w, h), (255, 255, 255, 255))
 
@@ -119,6 +136,7 @@ def seal_image_base64_from_config() -> str | None:
         imagen_firma=cfg.imagen_firma,
         width_pt=cfg.ancho_pt,
         height_pt=cfg.alto_pt,
+        image_zone_ratio=cfg.image_zone_ratio(),
     )
     if not png:
         return None
@@ -180,12 +198,18 @@ def build_sello_preview_png(
     height_pt = int(getattr(cfg, 'alto_pt', None) or 84) if cfg else 84
     logo = getattr(cfg, 'logo', None) if cfg else None
     imagen_firma = getattr(cfg, 'imagen_firma', None) if cfg else None
+    if cfg is not None and hasattr(cfg, 'image_zone_ratio'):
+        ratio = cfg.image_zone_ratio()
+    else:
+        pct = int(getattr(cfg, 'proporcion_logo_pct', None) or 40) if cfg else 40
+        ratio = _clamp_image_zone_ratio(pct / 100.0)
 
     fondo = compose_sello_fondo_png(
         logo=logo,
         imagen_firma=imagen_firma,
         width_pt=width_pt,
         height_pt=height_pt,
+        image_zone_ratio=ratio,
     )
     w = max(80, width_pt) * FONDO_SCALE
     h = max(40, height_pt) * FONDO_SCALE
@@ -201,9 +225,8 @@ def build_sello_preview_png(
     pad = max(4, FONDO_SCALE * 2)
     inner_w = w - 2 * pad
     has_image = bool(getattr(logo, 'name', None) or getattr(imagen_firma, 'name', None))
-    # Misma zona que compose: texto empieza justo a la derecha del bloque de imágenes.
     if has_image:
-        zone_w = max(1, int(inner_w * IMAGE_ZONE_RATIO))
+        zone_w = max(1, int(inner_w * ratio))
         text_left = pad + zone_w + pad
     else:
         text_left = pad + FONDO_SCALE
@@ -233,6 +256,11 @@ def build_sello_preview_png(
     for (text, font), th in zip(lines, heights):
         draw.text((text_left, y), text, font=font, fill=ink)
         y += th + line_gap
+
+    # Guía visual de la proporción logo | texto.
+    if has_image:
+        guide_x = pad + max(1, int(inner_w * ratio))
+        draw.line([(guide_x, 0), (guide_x, h - 1)], fill=(148, 163, 184, 180), width=1)
 
     draw.rectangle((0, 0, w - 1, h - 1), outline=(13, 110, 122, 255), width=max(1, FONDO_SCALE // 2))
 

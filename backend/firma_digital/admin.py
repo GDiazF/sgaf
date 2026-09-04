@@ -128,15 +128,24 @@ class SelloFirmaAdmin(admin.ModelAdmin):
 
 @admin.register(ConfiguracionSelloFirma)
 class ConfiguracionSelloFirmaAdmin(admin.ModelAdmin):
-    list_display = ('id', 'logo_thumb', 'firma_thumb', 'ancho_pt', 'alto_pt', 'actualizado_en')
+    list_display = (
+        'id',
+        'logo_thumb',
+        'firma_thumb',
+        'ancho_pt',
+        'alto_pt',
+        'proporcion_logo_pct',
+        'actualizado_en',
+    )
     fieldsets = (
         (
             'Vista previa del sello completo',
             {
                 'description': (
                     'Simulación local del fondo + texto de ejemplo. '
-                    'El texto real lo pinta FirmaGob al firmar; el tamaño de caja sí es el que se enviará. '
-                    'Default oficial 205×84 pt. Sugeridos: 280×100 o 320×110.'
+                    'El texto real lo pinta FirmaGob al firmar; el tamaño de caja y la proporción '
+                    'logo/texto del fondo sí son los que se usarán. '
+                    'Guarde para actualizar la vista previa tras cambiar medidas o proporción.'
                 ),
                 'fields': ('preview_sello_completo',),
             },
@@ -146,7 +155,7 @@ class ConfiguracionSelloFirmaAdmin(admin.ModelAdmin):
             {
                 'description': (
                     'Revise logo e imagen de firma. Se encajan sin deformar (letterbox) '
-                    'dentro del recuadro definido abajo.'
+                    'en la zona izquierda según el % configurado abajo.'
                 ),
                 'fields': (
                     'preview_logo',
@@ -162,14 +171,15 @@ class ConfiguracionSelloFirmaAdmin(admin.ModelAdmin):
             },
         ),
         (
-            'Tamaño del recuadro en el PDF',
+            'Tamaño del sello y proporción logo / texto',
             {
                 'description': (
-                    'Estas medidas se envían a firma-dep como sealWidthPt / sealHeightPt. '
-                    'A mayor ancho, FirmaGob parte menos el nombre. Default 205×84. '
-                    'Pruebe p. ej. 280×100 o 320×110.'
+                    '1) Defina el tamaño total del sello (enviado a firma-dep). '
+                    '2) Elija qué % del ancho ocupa el logo (izquierda); el resto queda para el texto. '
+                    'Ej.: sello 280×100 y logo 30% → más espacio para el nombre. '
+                    'Nota: FirmaGob dibuja el texto real; nosotros dejamos el fondo en blanco a la derecha.'
                 ),
-                'fields': ('ancho_pt', 'alto_pt', 'actualizado_en'),
+                'fields': ('ancho_pt', 'alto_pt', 'proporcion_logo_pct', 'actualizado_en'),
             },
         ),
     )
@@ -194,6 +204,8 @@ class ConfiguracionSelloFirmaAdmin(admin.ModelAdmin):
             return '—'
         w_pt = int(obj.ancho_pt or 205)
         h_pt = int(obj.alto_pt or 84)
+        logo_pct = int(obj.proporcion_logo_pct or 40)
+        texto_pct = 100 - logo_pct
         # Preformatear: format_html no admite especificadores tipo {:.1f} sobre floats.
         w_mm = f'{w_pt * 0.352777778:.1f}'
         h_mm = f'{h_pt * 0.352777778:.1f}'
@@ -222,7 +234,9 @@ class ConfiguracionSelloFirmaAdmin(admin.ModelAdmin):
             '<div style="margin-bottom:10px;">{}</div>'
             '<table style="font-size:13px;line-height:1.45;">'
             '<tr><th style="text-align:left;padding:2px 12px 2px 0;color:#64748b;font-weight:500;">'
-            'Recuadro enviado</th><td>{} × {} pt</td></tr>'
+            'Sello completo</th><td>{} × {} pt</td></tr>'
+            '<tr><th style="text-align:left;padding:2px 12px 2px 0;color:#64748b;font-weight:500;">'
+            'Proporción</th><td>logo {}% · texto {}%</td></tr>'
             '<tr><th style="text-align:left;padding:2px 12px 2px 0;color:#64748b;font-weight:500;">'
             'Equiv. aproximado</th><td>{} × {} mm</td></tr>'
             '<tr><th style="text-align:left;padding:2px 12px 2px 0;color:#64748b;font-weight:500;">'
@@ -230,11 +244,13 @@ class ConfiguracionSelloFirmaAdmin(admin.ModelAdmin):
             '</table>'
             '<p style="margin:10px 0 0;font-size:12px;color:#64748b;max-width:520px;">'
             'Simulación local. El texto real lo pinta FirmaGob al firmar; '
-            'el tamaño de caja sí es el que se enviará.'
+            'el tamaño de caja y el espacio en blanco a la derecha sí se enviarán.'
             '</p></div>',
             img,
             w_pt,
             h_pt,
+            logo_pct,
+            texto_pct,
             w_mm,
             h_mm,
             w_px,
@@ -243,18 +259,20 @@ class ConfiguracionSelloFirmaAdmin(admin.ModelAdmin):
 
     @admin.display(description='Logo institucional (actual)')
     def preview_logo(self, obj):
+        pct = int(getattr(obj, 'proporcion_logo_pct', None) or 40) if obj else 40
         return _preview_panel(
             'Logo institucional',
             obj.logo if obj else None,
-            box_hint='Columna izquierda (~40% del recuadro); la derecha queda para el texto de FirmaGob',
+            box_hint=f'Zona izquierda (~{pct}% del ancho); la derecha queda para el texto de FirmaGob',
         )
 
     @admin.display(description='Imagen de firma (actual)')
     def preview_imagen_firma(self, obj):
+        pct = int(getattr(obj, 'proporcion_logo_pct', None) or 40) if obj else 40
         return _preview_panel(
             'Imagen de firma',
             obj.imagen_firma if obj else None,
-            box_hint='También en la zona izquierda (junto al logo si hay ambos); la derecha es para el texto',
+            box_hint=f'Comparte la zona izquierda (~{pct}%) con el logo; la derecha es para el texto',
         )
 
     def has_add_permission(self, request):
