@@ -127,6 +127,25 @@ def _fit_contain(src: Image.Image, max_w: int, max_h: int) -> Image.Image:
     return src.resize((nw, nh), Image.Resampling.LANCZOS)
 
 
+def _center_on_canvas(src: Image.Image, canvas_w: int, canvas_h: int) -> Image.Image:
+    """Pega la imagen centrada (horizontal y vertical) sobre un lienzo blanco."""
+    canvas_w = max(1, int(canvas_w))
+    canvas_h = max(1, int(canvas_h))
+    out = Image.new('RGBA', (canvas_w, canvas_h), (255, 255, 255, 255))
+    x = (canvas_w - src.width) // 2
+    y = (canvas_h - src.height) // 2
+    if src.mode == 'RGBA':
+        out.alpha_composite(src, (x, y))
+    else:
+        out.paste(src.convert('RGBA'), (x, y))
+    return out
+
+
+# FirmaGob alinea el texto arriba del recuadro; el logo suele llenar todo el alto y se ve
+# “más abajo” que el bloque de texto. Lo dibujamos un poco más chico y centrado en el alto.
+LOGO_VISUAL_HEIGHT_FACTOR = 0.72
+
+
 def compose_sello_logo_png(
     *,
     logo=None,
@@ -135,10 +154,11 @@ def compose_sello_logo_png(
     height_pt: int = 84,
     image_zone_ratio: float | None = None,
 ) -> bytes | None:
-    """PNG **solo del logo**, redimensionado al alto del sello (ancho topeado por %).
+    """PNG del logo, centrado en el alto del sello (para alinear ópticamente con el texto).
 
-    FirmaGob espera la imagen del sello (no un 400×400 crudo ni un lienzo de toda la caja).
-    La caja completa se define aparte con sealWidthPt / sealHeightPt.
+    FirmaGob escribe el texto arriba a la derecha; si el logo ocupa el 100% del alto,
+    el centro del círculo queda más abajo que el centro del texto. Aquí el logo usa ~72%
+    del alto y se centra en un lienzo del alto completo del sello.
     """
     left = _image_from_field(logo)
     right = _image_from_field(imagen_firma)
@@ -146,21 +166,26 @@ def compose_sello_logo_png(
         return None
 
     ratio = _clamp_image_zone_ratio(image_zone_ratio)
-    target_h = max(40, int(height_pt)) * FONDO_SCALE
+    canvas_h = max(40, int(height_pt)) * FONDO_SCALE
     max_w = max(1, int(max(80, int(width_pt)) * ratio * FONDO_SCALE))
+    logo_max_h = max(1, int(canvas_h * LOGO_VISUAL_HEIGHT_FACTOR))
     pad = max(2, FONDO_SCALE)
 
     if left is not None and right is not None:
         gap = pad
         col_w = max(1, (max_w - gap) // 2)
-        out = Image.new('RGBA', (max_w, target_h), (255, 255, 255, 255))
-        out.alpha_composite(_letterbox(left, col_w, target_h), (0, 0))
-        out.alpha_composite(_letterbox(right, col_w, target_h), (col_w + gap, 0))
-        return _png_bytes(out)
+        pair = Image.new('RGBA', (max_w, logo_max_h), (255, 255, 255, 255))
+        pair.alpha_composite(_letterbox(left, col_w, logo_max_h), (0, 0))
+        pair.alpha_composite(_letterbox(right, col_w, logo_max_h), (col_w + gap, 0))
+        # Lienzo del alto del sello; el par logo+firma queda centrado en vertical.
+        centered = _center_on_canvas(pair, max_w, canvas_h)
+        return _png_bytes(centered)
 
     src = left if left is not None else right
-    fitted = _fit_contain(src, max_w, target_h)
-    return _png_bytes(fitted)
+    fitted = _fit_contain(src, max_w, logo_max_h)
+    # Ancho del lienzo = ancho del logo; alto = alto del sello → centrado vertical.
+    centered = _center_on_canvas(fitted, fitted.width, canvas_h)
+    return _png_bytes(centered)
 
 
 def compose_sello_fondo_png(
@@ -171,7 +196,7 @@ def compose_sello_fondo_png(
     height_pt: int = 84,
     image_zone_ratio: float | None = None,
 ) -> bytes | None:
-    """Lienzo completo del sello (logo izq. + blanco der.) — solo para preview admin."""
+    """Lienzo completo del sello (logo izq. centrado en vertical + blanco der.) — preview admin."""
     left = _image_from_field(logo)
     right = _image_from_field(imagen_firma)
     if left is None and right is None:
@@ -184,20 +209,24 @@ def compose_sello_fondo_png(
     inner_w = w - 2 * pad
     inner_h = h - 2 * pad
     max_zone_w = max(1, int(inner_w * ratio))
+    logo_max_h = max(1, int(inner_h * LOGO_VISUAL_HEIGHT_FACTOR))
 
     out = Image.new('RGBA', (w, h), (255, 255, 255, 255))
 
     if left is not None and right is not None:
         gap = pad
         col_w = max(1, (max_zone_w - gap) // 2)
-        out.alpha_composite(_letterbox(left, col_w, inner_h), (pad, pad))
-        out.alpha_composite(_letterbox(right, col_w, inner_h), (pad + col_w + gap, pad))
-    elif left is not None:
-        fitted, _used_w = _fit_left(left, max_zone_w, inner_h)
-        out.alpha_composite(fitted, (pad, pad))
+        pair = Image.new('RGBA', (max_zone_w, logo_max_h), (0, 0, 0, 0))
+        pair.alpha_composite(_letterbox(left, col_w, logo_max_h), (0, 0))
+        pair.alpha_composite(_letterbox(right, col_w, logo_max_h), (col_w + gap, 0))
+        y = pad + (inner_h - logo_max_h) // 2
+        out.alpha_composite(pair, (pad, y))
     else:
-        fitted, _used_w = _fit_left(right, max_zone_w, inner_h)
-        out.alpha_composite(fitted, (pad, pad))
+        src = left if left is not None else right
+        fitted = _fit_contain(src, max_zone_w, logo_max_h)
+        x = pad
+        y = pad + (inner_h - fitted.height) // 2
+        out.alpha_composite(fitted, (x, y))
 
     return _png_bytes(out)
 
