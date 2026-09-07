@@ -12355,6 +12355,51 @@ body.has-modal-scroll-lock {
   color: var(--accent);
 }
 
+/* Expediente RC / bandeja de firmas */
+.expediente-modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.expediente-modal__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.expediente-modal__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.expediente-modal__label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heading);
+  color: var(--fg);
+}
+
+.expediente-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.expediente-modal__empty {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
 .firma-sign-presets {
   display: grid;
   grid-template-columns: 1fr 1fr;

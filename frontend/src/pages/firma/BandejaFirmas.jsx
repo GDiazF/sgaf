@@ -15,7 +15,6 @@ import {
   Field,
   Textarea,
   Modal,
-  Alert,
 } from '@slep/ui'
 
 const TABS = [
@@ -449,20 +448,27 @@ export default function BandejaFirmas() {
         open={Boolean(expedienteTarget)}
         onClose={() => setExpedienteTarget(null)}
         title="Expediente"
-        size="md"
+        size="sm"
         subheader={
           expedienteTarget?.titulo || expedienteTarget?.codigo_interno || 'Documento firmado'
         }
+        footer={
+          <Button variant="quiet" size="sm" onClick={() => setExpedienteTarget(null)}>
+            Cerrar
+          </Button>
+        }
       >
-        <Alert variant="info" title="Documento firmado y anexos">
-          La firma digital aplica a la recepción conforme. Los comprobantes se agrupan en un
-          PDF de soporte del expediente.
-        </Alert>
-        <div className="crud-form">
-          <Field label="Documento firmado">
-            <div className="data-table__actions">
+        <div className="expediente-modal">
+          <div className="expediente-modal__row">
+            <div className="expediente-modal__meta">
+              <span className="expediente-modal__label">Documento firmado</span>
+              {expedienteTarget?.codigo_validacion ? (
+                <Badge variant="success">{expedienteTarget.codigo_validacion}</Badge>
+              ) : null}
+            </div>
+            <div className="expediente-modal__actions">
               <Button
-                variant="outline"
+                variant="primary"
                 size="sm"
                 type="button"
                 onClick={() => {
@@ -471,26 +477,35 @@ export default function BandejaFirmas() {
                   if (item) handleRevisar(item)
                 }}
               >
-                Abrir PDF firmado
+                Abrir PDF
               </Button>
               {expedienteTarget?.codigo_validacion ? (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   type="button"
                   onClick={() =>
                     window.open(`/validar/${expedienteTarget.codigo_validacion}`, '_blank')
                   }
                 >
-                  Validar {expedienteTarget.codigo_validacion}
+                  Validar
                 </Button>
               ) : null}
             </div>
-          </Field>
-          <Field label="Comprobantes">
-            {expedienteTarget?.tiene_comprobantes_expediente ||
-            (expedienteTarget?.meta?.anexos || []).length > 0 ? (
-              <div className="data-table__cell-stack">
+          </div>
+
+          <div className="expediente-modal__row">
+            <div className="expediente-modal__meta">
+              <span className="expediente-modal__label">Comprobantes</span>
+              {(expedienteTarget?.meta?.anexos || []).length > 0 ? (
+                <Badge variant="accent">{expedienteTarget.meta.anexos.length}</Badge>
+              ) : expedienteTarget?.tiene_comprobantes_expediente ? (
+                <Badge variant="accent">PDF</Badge>
+              ) : null}
+            </div>
+            <div className="expediente-modal__actions">
+              {expedienteTarget?.tiene_comprobantes_expediente ||
+              (expedienteTarget?.meta?.anexos || []).length > 0 ? (
                 <Button
                   variant="primary"
                   size="sm"
@@ -499,17 +514,13 @@ export default function BandejaFirmas() {
                   disabled={loadingComprobantesPdf}
                   onClick={() => handleOpenComprobantesPdf(expedienteTarget)}
                 >
-                  Abrir comprobantes (PDF único)
+                  Abrir PDF
                 </Button>
-                <Alert variant="info" title="Agrupados">
-                  Todos los comprobantes PDF de los pagos de esta RC se unen en un solo
-                  archivo.
-                </Alert>
-              </div>
-            ) : (
-              <EmptyState title="Sin comprobantes asociados." />
-            )}
-          </Field>
+              ) : (
+                <span className="expediente-modal__empty">Sin comprobantes</span>
+              )}
+            </div>
+          </div>
         </div>
       </Modal>
 

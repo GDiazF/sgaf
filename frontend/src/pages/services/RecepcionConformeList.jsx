@@ -18,7 +18,6 @@ import {
   ConfirmModal,
   EmptyState,
   Icon,
-  Alert,
   useFormOverlay,
   formatApiFormError,
 } from '@slep/ui'
@@ -939,52 +938,67 @@ const RecepcionConformeList = ({ embedded = false }) => {
         open={!!expedienteRC}
         onClose={() => setExpedienteRC(null)}
         title="Expediente"
-        size="md"
+        size="sm"
         subheader={expedienteRC?.folio || 'RC sin folio'}
+        footer={
+          <Button variant="quiet" size="sm" onClick={() => setExpedienteRC(null)}>
+            Cerrar
+          </Button>
+        }
       >
-        {expedienteRC?.firma_paquete_modo === 'rc+anexos' ? (
-          <Alert variant="info" title="Paquete histórico">
-            Este documento se firmó como un único PDF (RC + anexos). Los comprobantes de
-            origen también aparecen abajo.
-          </Alert>
-        ) : (
-          <Alert variant="info" title="Documento firmado y anexos">
-            La firma digital aplica a la recepción conforme. Los comprobantes se conservan
-            como anexos del expediente (no van firmados dentro del mismo PDF).
-          </Alert>
-        )}
-
-        <div className="crud-form">
-          <Field label="Documento firmado">
-            <div className="data-table__actions">
-              {expedienteRC?.archivo_escaneado ? (
-                <a
-                  href={mediaUrl(expedienteRC.archivo_escaneado)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn--outline btn--sm"
-                >
-                  Abrir PDF firmado
-                </a>
-              ) : (
-                <span>Aún no hay PDF firmado.</span>
-              )}
-              {expedienteRC?.firma_codigo_validacion ? (
-                <Link
-                  className="btn btn--ghost btn--sm"
-                  to={`/validar/${expedienteRC.firma_codigo_validacion}`}
-                >
-                  Validar {expedienteRC.firma_codigo_validacion}
-                </Link>
+        <div className="expediente-modal">
+          <div className="expediente-modal__row">
+            <div className="expediente-modal__meta">
+              <span className="expediente-modal__label">Documento firmado</span>
+              {expedienteRC?.firma_paquete_modo === 'rc+anexos' ? (
+                <Badge variant="neutral">Paquete histórico</Badge>
+              ) : expedienteRC?.firma_codigo_validacion ? (
+                <Badge variant="success">{expedienteRC.firma_codigo_validacion}</Badge>
               ) : null}
             </div>
-          </Field>
+            <div className="expediente-modal__actions">
+              {expedienteRC?.archivo_escaneado ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  type="button"
+                  onClick={() =>
+                    window.open(
+                      mediaUrl(expedienteRC.archivo_escaneado),
+                      '_blank',
+                      'noopener,noreferrer',
+                    )
+                  }
+                >
+                  Abrir PDF
+                </Button>
+              ) : (
+                <span className="expediente-modal__empty">Sin PDF firmado</span>
+              )}
+              {expedienteRC?.firma_codigo_validacion ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  onClick={() =>
+                    window.open(`/validar/${expedienteRC.firma_codigo_validacion}`, '_blank')
+                  }
+                >
+                  Validar
+                </Button>
+              ) : null}
+            </div>
+          </div>
 
-          <Field
-            label={`Comprobantes (${expedienteRC?.expediente_comprobantes?.length || 0})`}
-          >
-            {expedienteRC?.expediente_comprobantes?.length > 0 ? (
-              <div className="data-table__cell-stack">
+          <div className="expediente-modal__row">
+            <div className="expediente-modal__meta">
+              <span className="expediente-modal__label">Comprobantes</span>
+              <Badge variant="accent">
+                {expedienteRC?.expediente_comprobantes?.length || 0}
+              </Badge>
+            </div>
+            <div className="expediente-modal__actions">
+              {(expedienteRC?.expediente_comprobantes?.length || 0) > 0 ? (
                 <Button
                   variant="primary"
                   size="sm"
@@ -993,17 +1007,13 @@ const RecepcionConformeList = ({ embedded = false }) => {
                   disabled={loadingComprobantesPdf}
                   onClick={() => handleOpenComprobantesPdf(expedienteRC)}
                 >
-                  Abrir comprobantes (PDF único)
+                  Abrir PDF
                 </Button>
-                <Alert variant="info" title="Agrupados">
-                  Todos los comprobantes PDF de los pagos de esta RC se unen en un solo
-                  archivo.
-                </Alert>
-              </div>
-            ) : (
-              <EmptyState title="Sin comprobantes asociados." />
-            )}
-          </Field>
+              ) : (
+                <span className="expediente-modal__empty">Sin comprobantes</span>
+              )}
+            </div>
+          </div>
         </div>
       </Modal>
 
