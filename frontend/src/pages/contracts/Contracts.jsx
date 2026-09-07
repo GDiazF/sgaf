@@ -72,9 +72,25 @@ const Contracts = () => {
   const [ordering, setOrdering] = useState('vigente_first')
   const [filterCategoria, setFilterCategoria] = useState('')
   const [filterOrientacion, setFilterOrientacion] = useState('')
+  const [exporting, setExporting] = useState(false)
 
   const debouncedSearch = useDebouncedValue(searchQuery)
   const isDraftsView = vista === 'borradores'
+
+  const buildListParams = (page = currentPage, size = pageSize, search = debouncedSearch) => ({
+    page,
+    page_size: size,
+    search,
+    vista,
+    ordering:
+      vista === 'borradores'
+        ? '-updated_at'
+        : ordering === 'vigente_first'
+          ? '-estado__nombre, -fecha_inicio'
+          : ordering,
+    ...(filterCategoria && { categoria: filterCategoria }),
+    ...(filterOrientacion && { orientacion: filterOrientacion }),
+  })
 
   const lookups = useMemo(
     () => ({
@@ -108,20 +124,7 @@ const Contracts = () => {
   const fetchData = async (page = 1, size = pageSize, search = debouncedSearch) => {
     setLoading(true)
     try {
-      const params = {
-        page,
-        page_size: size,
-        search,
-        vista,
-        ordering:
-          vista === 'borradores'
-            ? '-updated_at'
-            : ordering === 'vigente_first'
-              ? '-estado__nombre, -fecha_inicio'
-              : ordering,
-        ...(filterCategoria && { categoria: filterCategoria }),
-        ...(filterOrientacion && { orientacion: filterOrientacion }),
-      }
+      const params = buildListParams(page, size, search)
       const response = await api.get('contratos/contratos/', { params })
       const data = response.data.results || (Array.isArray(response.data) ? response.data : [])
       setContracts(data)
@@ -132,6 +135,37 @@ const Contracts = () => {
       notify({ variant: 'danger', text: 'No se pudieron cargar los contratos.' })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleExportExcel = async () => {
+    if (!can('contratos.view_contrato') || exporting) return
+    setExporting(true)
+    try {
+      const params = { ...buildListParams(1, pageSize, debouncedSearch) }
+      delete params.page
+      delete params.page_size
+      const response = await api.get('contratos/contratos/export_excel/', {
+        params,
+        responseType: 'blob',
+      })
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute(
+        'download',
+        `contratos_${vista}_${new Date().toISOString().split('T')[0]}.xlsx`,
+      )
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+      notify({ variant: 'success', text: 'Excel de contratos descargado.' })
+    } catch (error) {
+      console.error(error)
+      notify({ variant: 'danger', text: 'No se pudo descargar el Excel de contratos.' })
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -474,6 +508,21 @@ const Contracts = () => {
         <FiltersBar
           onSearch={() => setCurrentPage(1)}
           onClear={clearFilters}
+          actions={
+            can('contratos.view_contrato') ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                loading={exporting}
+                disabled={exporting}
+                onClick={handleExportExcel}
+              >
+                <Icon name="download" size="sm" />
+                {exporting ? 'Descargando…' : 'Descargar Excel'}
+              </Button>
+            ) : null
+          }
           advanced={
             isDraftsView ? null : (
               <>

@@ -1,6 +1,10 @@
 import datetime
+import io
 import logging
+
+import pandas as pd
 from django.db import transaction
+from django.http import HttpResponse
 from rest_framework import viewsets, filters, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -108,19 +112,24 @@ class ContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         'resumen_periodo': 'contratos.view_contrato',
         'crear_borrador': 'contratos.add_contrato',
         'publicar': 'contratos.change_contrato',
+        'export_excel': 'contratos.view_contrato',
     }
     queryset = Contrato.objects.select_related(
         'plantilla_recepcion_servicio',
         'proceso', 'estado', 'categoria', 'orientacion',
     ).prefetch_related(
-        'ampliaciones', 'documentos', 'historial', 'proveedores_asociados',
+        'ampliaciones',
+        'documentos',
+        'historial',
+        'proveedores_asociados',
+        'proveedores_asociados__proveedor',
     ).all()
     serializer_class = ContratoSerializer
     pagination_class = LargeResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['proceso', 'estado', 'categoria', 'orientacion', 'es_borrador']
     search_fields = ['codigo_mercado_publico', 'descripcion', 'detalle', 'nro_oc', 'cdp', 'proveedores_asociados__proveedor__nombre']
-    ordering_fields = ['fecha_inicio', 'monto_total', 'created_at', 'updated_at']
+    ordering_fields = ['fecha_inicio', 'monto_total', 'created_at', 'updated_at', 'estado__nombre']
 
     @staticmethod
     def _finalizado_q():
@@ -143,6 +152,61 @@ class ContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         if vista == 'activos':
             return qs.filter(es_borrador=False).exclude(self._finalizado_q())
         return qs
+
+    @action(detail=False, methods=['get'])
+    def export_excel(self, request):
+        """Exporta los contratos filtrados (misma vista/filtros del listado) a Excel."""
+        queryset = self.filter_queryset(self.get_queryset())
+
+        data = []
+        for c in queryset:
+            proveedores = ', '.join(
+                (p.proveedor.nombre if p.proveedor_id else '')
+                for p in c.proveedores_asociados.all()
+                if p.proveedor_id
+            ) or 'S/A'
+            data.append({
+                'Código MP': c.codigo_mercado_publico or '',
+                'Descripción': c.descripcion or '',
+                'Detalle': c.detalle or '',
+                'Borrador': 'Sí' if c.es_borrador else 'No',
+                'Estado': c.estado.nombre if c.estado_id else '',
+                'Categoría': c.categoria.nombre if c.categoria_id else '',
+                'Proceso': c.proceso.nombre if c.proceso_id else '',
+                'Orientación': c.orientacion.nombre if c.orientacion_id else '',
+                'Proveedores': proveedores,
+                'Fecha adjudicación': c.fecha_adjudicacion,
+                'Fecha inicio': c.fecha_inicio,
+                'Fecha término': c.fecha_termino,
+                'Plazo (meses)': c.plazo_meses,
+                'Nro OC': c.nro_oc or '',
+                'CDP': c.cdp or '',
+                'Tipo OC': c.get_tipo_oc_display() if c.tipo_oc else '',
+                'Plantilla cobro': c.get_plantilla_cobro_display() if c.plantilla_cobro else '',
+                'Aplica IVA': 'Sí' if c.aplica_iva else 'No',
+                'Monto adjudicado': c.monto_adjudicado,
+                'Monto ampliaciones': c.monto_ampliaciones,
+                'Monto total': c.monto_total,
+                'Monto ejecutado': c.monto_ejecutado,
+                'Monto restante': c.monto_restante,
+                'Creado': c.created_at.date() if c.created_at else None,
+                'Actualizado': c.updated_at.date() if c.updated_at else None,
+            })
+
+        df = pd.DataFrame(data)
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Contratos')
+
+        buffer.seek(0)
+        vista = (request.query_params.get('vista') or 'todos').strip() or 'todos'
+        filename = f'contratos_{vista}_{datetime.date.today().isoformat()}.xlsx'
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
     @action(detail=False, methods=['post'], url_path='crear-borrador')
     def crear_borrador(self, request):
