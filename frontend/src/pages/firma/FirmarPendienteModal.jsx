@@ -373,38 +373,6 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
         </Alert>
       ) : null}
 
-      {!loadingPdf && !loadError && pendiente?.origen === 'rc' && (pendiente?.meta?.anexos || []).length > 0 ? (
-        <Alert
-          variant="info"
-          title={`Comprobantes del expediente (${pendiente.meta.anexos.length})`}
-        >
-          Se firma solo la recepción conforme. Los comprobantes quedan como anexos del
-          expediente (no se incluyen en este PDF).
-          <ul className="rc-history-timeline">
-            {pendiente.meta.anexos.map((a) => (
-              <li key={a.pago_id || a.nombre} className="rc-history-timeline__card">
-                {a.url ? (
-                  <a
-                    href={
-                      a.url.startsWith('http')
-                        ? a.url
-                        : `${import.meta.env.VITE_API_URL || ''}${a.url}`
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {a.nombre || `Pago ${a.pago_id}`}
-                  </a>
-                ) : (
-                  <span>{a.nombre || `Pago ${a.pago_id}`}</span>
-                )}
-                {a.nro_documento ? ` · Doc. ${a.nro_documento}` : ''}
-              </li>
-            ))}
-          </ul>
-        </Alert>
-      ) : null}
-
       {!loadingPdf && !loadError && preview ? (
         <div className="firma-sign-layout">
           <div className="firma-sign-layout__viewer">
@@ -424,6 +392,37 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
           </div>
 
           <aside className="firma-sign-layout__aside">
+            {pendiente?.origen === 'rc' && (pendiente?.meta?.anexos || []).length > 0 ? (
+              <Alert
+                variant="info"
+                title={`Expediente: ${pendiente.meta.anexos.length} comprobante(s)`}
+              >
+                Se firma solo la RC. Los comprobantes no van en este PDF.
+                <ul className="firma-sign-anexos">
+                  {pendiente.meta.anexos.map((a) => (
+                    <li key={a.pago_id || a.nombre}>
+                      {a.url ? (
+                        <a
+                          href={
+                            a.url.startsWith('http')
+                              ? a.url
+                              : `${import.meta.env.VITE_API_URL || ''}${a.url}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {a.nombre || `Pago ${a.pago_id}`}
+                        </a>
+                      ) : (
+                        <span>{a.nombre || `Pago ${a.pago_id}`}</span>
+                      )}
+                      {a.nro_documento ? ` · ${a.nro_documento}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </Alert>
+            ) : null}
+
             {pageOptions.length > 1 ? (
               <Field label="Página">
                 <Select value={String(page)} onChange={handlePageChange} disabled={signing}>

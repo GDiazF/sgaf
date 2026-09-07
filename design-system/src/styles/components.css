@@ -12291,8 +12291,15 @@ body.has-modal-scroll-lock {
   height: min(90vh, 52rem);
 }
 
-.modal.modal--firma-sign .modal__body--viewer {
-  padding: 0;
+.modal.modal--firma-sign .modal__body--viewer > .alert {
+  margin: var(--space-4);
+  flex: 0 0 auto;
+}
+
+.modal.modal--firma-sign .modal__body--viewer > .firma-sign-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
 }
 
 .firma-sign-layout {
@@ -12333,6 +12340,19 @@ body.has-modal-scroll-lock {
   border-radius: var(--radius-sm);
   padding: var(--space-1);
   background: var(--surface-raised);
+}
+
+.firma-sign-anexos {
+  margin: var(--space-2) 0 0;
+  padding-left: 1.1rem;
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  max-height: 7rem;
+  overflow-y: auto;
+}
+
+.firma-sign-anexos a {
+  color: var(--accent);
 }
 
 .firma-sign-presets {

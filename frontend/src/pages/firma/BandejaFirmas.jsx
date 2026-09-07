@@ -384,12 +384,14 @@ export default function BandejaFirmas() {
       />
 
       <DocumentViewerModal
-        open={Boolean(revisarState?.pdfUrl)}
+        open={Boolean(revisarState)}
         onClose={closeRevisar}
         title="Revisar documento"
         subtitle={revisarState?.item?.titulo || revisarState?.item?.codigo_interno}
         documentType="PDF"
         fileUrl={revisarState?.pdfUrl}
+        loading={Boolean(revisarState?.loading)}
+        error={revisarState?.error || null}
       />
 
       <Modal

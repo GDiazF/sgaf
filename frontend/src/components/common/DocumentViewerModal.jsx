@@ -13,6 +13,8 @@ const DocumentViewerModal = ({
   subtitle,
   documentType = 'Documento',
   fileUrl,
+  loading = false,
+  error = null,
 }) => {
   const visible = open ?? isOpen
 
@@ -54,7 +56,11 @@ const DocumentViewerModal = ({
         </>
       }
     >
-      {fileUrl ? (
+      {loading ? (
+        <p className="doc-viewer__empty">Cargando documento…</p>
+      ) : error ? (
+        <p className="doc-viewer__empty">{error}</p>
+      ) : fileUrl ? (
         <iframe src={fileUrl} className="doc-viewer__frame" title={title || 'Vista previa'} />
       ) : (
         <p className="doc-viewer__empty">No hay archivo para mostrar.</p>
