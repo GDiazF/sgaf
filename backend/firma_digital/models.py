@@ -144,10 +144,12 @@ class FirmaPendiente(models.Model):
     ESTADO_PENDIENTE = 'pendiente'
     ESTADO_FIRMADO = 'firmado'
     ESTADO_RECHAZADO = 'rechazado'
+    ESTADO_ANULADO = 'anulado'
     ESTADO_CHOICES = [
         (ESTADO_PENDIENTE, 'Pendiente'),
         (ESTADO_FIRMADO, 'Firmado'),
         (ESTADO_RECHAZADO, 'Rechazado'),
+        (ESTADO_ANULADO, 'Anulado'),
     ]
 
     codigo_interno = models.CharField(max_length=40, unique=True, blank=True)
@@ -190,10 +192,12 @@ class FirmaPendiente(models.Model):
     )
 
     motivo_rechazo = models.TextField(blank=True, default='')
+    motivo_anulacion = models.TextField(blank=True, default='')
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
     firmado_en = models.DateTimeField(null=True, blank=True)
     rechazado_en = models.DateTimeField(null=True, blank=True)
+    anulado_en = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Firma pendiente'
@@ -260,6 +264,9 @@ class DocumentoFirmado(models.Model):
         verbose_name='Usuario del sistema',
     )
     firmado_en = models.DateTimeField('Firmado en', auto_now_add=True)
+    anulado = models.BooleanField('Anulado', default=False, db_index=True)
+    anulado_en = models.DateTimeField('Anulado en', null=True, blank=True)
+    motivo_anulacion = models.TextField('Motivo anulación', blank=True, default='')
 
     class Meta:
         verbose_name = 'Documento firmado'

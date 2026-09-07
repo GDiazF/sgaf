@@ -235,6 +235,22 @@ def enviar_rc_a_firmar(rc: RecepcionConforme, user, *, tipo: str = 'PAGO') -> Fi
     return pendiente
 
 
+def firma_digital_vigente_rc(rc: RecepcionConforme) -> bool:
+    """True si la última firma digital de la RC está firmada (bloquea edición)."""
+    latest = (
+        FirmaPendiente.objects.filter(origen='rc', referencia_id=rc.id)
+        .order_by('-creado_en')
+        .first()
+    )
+    return bool(latest and latest.estado == FirmaPendiente.ESTADO_FIRMADO)
+
+
+def rc_bloqueada_por_firma_digital(rc: RecepcionConforme | None) -> bool:
+    if not rc:
+        return False
+    return firma_digital_vigente_rc(rc)
+
+
 def firma_info_rc(rc: RecepcionConforme) -> dict:
     """Resumen de firma para listado de RC."""
     qs = FirmaPendiente.objects.filter(origen='rc', referencia_id=rc.id).order_by('-creado_en')
@@ -259,6 +275,7 @@ def firma_info_rc(rc: RecepcionConforme) -> dict:
         'firma_estado': 'sin_envio',
         'firma_estado_label': 'Sin envío',
         'firma_motivo_rechazo': '',
+        'firma_motivo_anulacion': '',
         'firma_pendiente_id': None,
         'firma_codigo_interno': None,
         'firma_codigo_validacion': None,
@@ -268,6 +285,8 @@ def firma_info_rc(rc: RecepcionConforme) -> dict:
             rc.firmante_id and rc.estado == 'EMITIDA' and not rc.archivo_escaneado
         ),
         'puede_reenviar_firma': False,
+        'bloqueo_edicion_firma': False,
+        'puede_anular_rc': True,
     }
     if not latest:
         return base_sin
@@ -279,6 +298,7 @@ def firma_info_rc(rc: RecepcionConforme) -> dict:
             'firma_estado': 'pendiente',
             'firma_estado_label': 'En bandeja',
             'firma_motivo_rechazo': '',
+            'firma_motivo_anulacion': '',
             'firma_pendiente_id': latest.id,
             'firma_codigo_interno': latest.codigo_interno,
             'firma_codigo_validacion': None,
@@ -286,12 +306,15 @@ def firma_info_rc(rc: RecepcionConforme) -> dict:
             'expediente_comprobantes': expediente,
             'puede_enviar_firma': False,
             'puede_reenviar_firma': False,
+            'bloqueo_edicion_firma': False,
+            'puede_anular_rc': True,
         }
     if latest.estado == FirmaPendiente.ESTADO_FIRMADO:
         return {
             'firma_estado': 'firmado',
             'firma_estado_label': 'Firmada',
             'firma_motivo_rechazo': '',
+            'firma_motivo_anulacion': '',
             'firma_pendiente_id': latest.id,
             'firma_codigo_interno': latest.codigo_interno,
             'firma_codigo_validacion': (
@@ -301,12 +324,15 @@ def firma_info_rc(rc: RecepcionConforme) -> dict:
             'expediente_comprobantes': expediente,
             'puede_enviar_firma': False,
             'puede_reenviar_firma': False,
+            'bloqueo_edicion_firma': True,
+            'puede_anular_rc': False,
         }
     if latest.estado == FirmaPendiente.ESTADO_RECHAZADO:
         return {
             'firma_estado': 'rechazado',
             'firma_estado_label': 'Firma rechazada',
             'firma_motivo_rechazo': latest.motivo_rechazo or '',
+            'firma_motivo_anulacion': '',
             'firma_pendiente_id': latest.id,
             'firma_codigo_interno': latest.codigo_interno,
             'firma_codigo_validacion': None,
@@ -314,5 +340,27 @@ def firma_info_rc(rc: RecepcionConforme) -> dict:
             'expediente_comprobantes': expediente,
             'puede_enviar_firma': False,
             'puede_reenviar_firma': bool(rc.firmante_id and rc.estado == 'EMITIDA'),
+            'bloqueo_edicion_firma': False,
+            'puede_anular_rc': True,
+        }
+    if latest.estado == FirmaPendiente.ESTADO_ANULADO:
+        return {
+            'firma_estado': 'anulado',
+            'firma_estado_label': 'Firma anulada',
+            'firma_motivo_rechazo': '',
+            'firma_motivo_anulacion': latest.motivo_anulacion or '',
+            'firma_pendiente_id': latest.id,
+            'firma_codigo_interno': latest.codigo_interno,
+            'firma_codigo_validacion': (
+                latest.documento_registro.codigo if latest.documento_registro_id else None
+            ),
+            'firma_paquete_modo': modo,
+            'expediente_comprobantes': expediente,
+            'puede_enviar_firma': bool(
+                rc.firmante_id and rc.estado == 'EMITIDA' and not rc.archivo_escaneado
+            ),
+            'puede_reenviar_firma': bool(rc.firmante_id and rc.estado == 'EMITIDA'),
+            'bloqueo_edicion_firma': False,
+            'puede_anular_rc': True,
         }
     return base_sin

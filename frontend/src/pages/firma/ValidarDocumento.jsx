@@ -231,7 +231,82 @@ export default function ValidarDocumento() {
         </Card>
       ) : null}
 
-      {result && result.valido === false ? (
+      {result && (result.estado === 'anulado' || result.anulado) ? (
+        <Card>
+          <CardHeader
+            title={result.codigo}
+            subtitle="Registro de firma en SGAF"
+            actions={<Badge variant="danger">Anulado</Badge>}
+          />
+          <div className="card__body">
+            <Alert variant="danger" title="Firma anulada">
+              Este código ya no es válido. La firma digital fue anulada por el firmante.
+            </Alert>
+            <p>
+              <strong>Firmado el:</strong> {formatFecha(result.firmado_en)}
+            </p>
+            <p>
+              <strong>Anulado el:</strong> {formatFecha(result.anulado_en)}
+            </p>
+            {result.motivo_anulacion ? (
+              <p>
+                <strong>Motivo:</strong> {result.motivo_anulacion}
+              </p>
+            ) : null}
+            <p>
+              <strong>Firmante:</strong> {result.firmante_nombre || '—'}
+              {result.firmante_cargo ? ` · ${result.firmante_cargo}` : ''}
+            </p>
+            {result.hash_corto ? (
+              <p>
+                <strong>Huella histórica (SHA-256):</strong>{' '}
+                <code>{result.hash_corto}…</code>
+              </p>
+            ) : null}
+
+            <Field
+              label="Verificar archivo (opcional)"
+              hint="Puede comparar el hash del PDF; el registro sigue anulado aunque coincida."
+              className="field--full"
+            >
+              <FileInput
+                variant="zone"
+                label="Seleccionar PDF"
+                accept=".pdf,application/pdf"
+                onChange={(e) => {
+                  setFile(e.target.files?.[0] || null)
+                  setHashCheck(null)
+                }}
+              />
+            </Field>
+            <Button
+              type="button"
+              variant="secondary"
+              loading={hashLoading}
+              disabled={hashLoading || !file}
+              onClick={verificarArchivo}
+            >
+              Comparar hash del PDF
+            </Button>
+
+            {hashCheck?.coincide === true ? (
+              <Alert variant="warning" title="Hash coincide (registro anulado)">
+                {hashCheck.mensaje}
+              </Alert>
+            ) : null}
+            {hashCheck?.coincide === false ? (
+              <Alert variant="warning" title="No coincide">
+                {hashCheck.mensaje}
+              </Alert>
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
+
+      {result &&
+      result.valido === false &&
+      !result.anulado &&
+      result.estado !== 'anulado' ? (
         <Alert variant="warning" title="No encontrado">
           El código {result.codigo} no está registrado como documento firmado en SGAF.
         </Alert>

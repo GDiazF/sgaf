@@ -15,12 +15,14 @@ import {
   Field,
   Textarea,
   Modal,
+  ConfirmModal,
 } from '@slep/ui'
 
 const TABS = [
   { id: 'pendiente', label: 'Pendientes' },
   { id: 'firmado', label: 'Firmados' },
   { id: 'rechazado', label: 'Rechazados' },
+  { id: 'anulado', label: 'Anulados' },
 ]
 
 const ORIGEN_LABEL = {
@@ -43,13 +45,22 @@ export default function BandejaFirmas() {
   const { notify } = useNotify()
   const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTab] = useState('pendiente')
-  const [counts, setCounts] = useState({ pendiente: 0, firmado: 0, rechazado: 0 })
+  const [counts, setCounts] = useState({
+    pendiente: 0,
+    firmado: 0,
+    rechazado: 0,
+    anulado: 0,
+  })
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [firmarTarget, setFirmarTarget] = useState(null)
   const [rejectTarget, setRejectTarget] = useState(null)
+  const [anularTarget, setAnularTarget] = useState(null)
+  const [anularConfirmOpen, setAnularConfirmOpen] = useState(false)
   const [motivo, setMotivo] = useState('')
+  const [motivoAnulacion, setMotivoAnulacion] = useState('')
   const [rejecting, setRejecting] = useState(false)
+  const [anulando, setAnulando] = useState(false)
   const [revisandoId, setRevisandoId] = useState(null)
   const [revisarState, setRevisarState] = useState(null)
   const [expedienteTarget, setExpedienteTarget] = useState(null)
@@ -225,6 +236,41 @@ export default function BandejaFirmas() {
     }
   }
 
+  const closeAnularFlow = () => {
+    if (anulando) return
+    setAnularTarget(null)
+    setAnularConfirmOpen(false)
+    setMotivoAnulacion('')
+  }
+
+  const handleAnularFirma = async () => {
+    if (!anularTarget) return
+    setAnulando(true)
+    try {
+      await api.post(`firma-digital/pendientes/${anularTarget.id}/anular/`, {
+        motivo: motivoAnulacion,
+      })
+      notify({
+        variant: 'success',
+        text: 'Firma anulada. El código SGAF quedó inválido y la RC volvió a Emitida.',
+      })
+      setAnularTarget(null)
+      setAnularConfirmOpen(false)
+      setMotivoAnulacion('')
+      window.dispatchEvent(new Event('refresh-notifications'))
+      fetchCounts()
+      setTab('anulado')
+    } catch (err) {
+      notify({
+        variant: 'danger',
+        text: err?.response?.data?.error || 'No se pudo anular la firma.',
+      })
+      setAnularConfirmOpen(false)
+    } finally {
+      setAnulando(false)
+    }
+  }
+
   const columns = useMemo(
     () => [
       {
@@ -251,7 +297,14 @@ export default function BandejaFirmas() {
       },
       {
         key: 'creado_en',
-        header: tab === 'firmado' ? 'Firmado' : tab === 'rechazado' ? 'Rechazado' : 'Solicitado',
+        header:
+          tab === 'firmado'
+            ? 'Firmado'
+            : tab === 'rechazado'
+              ? 'Rechazado'
+              : tab === 'anulado'
+                ? 'Anulado'
+                : 'Solicitado',
         className: 'col--tablet-hide',
         cardRole: 'field',
         priority: 2,
@@ -261,12 +314,19 @@ export default function BandejaFirmas() {
               ? item.firmado_en
               : tab === 'rechazado'
                 ? item.rechazado_en
-                : item.creado_en,
+                : tab === 'anulado'
+                  ? item.anulado_en
+                  : item.creado_en,
           ),
       },
       {
         key: 'extra',
-        header: tab === 'firmado' ? 'Validación' : tab === 'rechazado' ? 'Motivo' : 'Solicitado por',
+        header:
+          tab === 'firmado'
+            ? 'Validación'
+            : tab === 'rechazado' || tab === 'anulado'
+              ? 'Motivo'
+              : 'Solicitado por',
         className: 'col--tablet-hide',
         cardRole: 'field',
         priority: 2,
@@ -279,6 +339,7 @@ export default function BandejaFirmas() {
             )
           }
           if (tab === 'rechazado') return item.motivo_rechazo || '—'
+          if (tab === 'anulado') return item.motivo_anulacion || '—'
           return item.solicitado_por_nombre || '—'
         },
       },
@@ -330,17 +391,44 @@ export default function BandejaFirmas() {
                   Expediente
                 </Button>
               ) : null}
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => {
+                  setMotivoAnulacion('')
+                  setAnularConfirmOpen(false)
+                  setAnularTarget(item)
+                }}
+              >
+                Anular firma
+              </Button>
             </div>
-          ) : tab === 'rechazado' ? (
-            <Button
-              variant="outline"
-              size="sm"
-              loading={revisandoId === item.id}
-              disabled={revisandoId === item.id}
-              onClick={() => handleRevisar(item)}
-            >
-              Revisar
-            </Button>
+          ) : tab === 'rechazado' || tab === 'anulado' ? (
+            <div className="data-table__actions">
+              <Button
+                variant="outline"
+                size="sm"
+                loading={revisandoId === item.id}
+                disabled={revisandoId === item.id}
+                onClick={() => handleRevisar(item)}
+              >
+                Revisar
+              </Button>
+              {tab === 'anulado' && item.origen === 'rc' ? (
+                <Button variant="outline" size="sm" onClick={() => setExpedienteTarget(item)}>
+                  Expediente
+                </Button>
+              ) : null}
+              {tab === 'anulado' && item.codigo_validacion ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(`/validar/${item.codigo_validacion}`, '_blank')}
+                >
+                  Validar
+                </Button>
+              ) : null}
+            </div>
           ) : null,
       },
     ],
@@ -405,7 +493,9 @@ export default function BandejaFirmas() {
             ? 'Sin pendientes'
             : tab === 'firmado'
               ? 'Sin firmados'
-              : 'Sin rechazados'
+              : tab === 'anulado'
+                ? 'Sin anulados'
+                : 'Sin rechazados'
         }
         emptyDescription="No hay documentos en esta pestaña."
         page={1}
@@ -570,6 +660,54 @@ export default function BandejaFirmas() {
           />
         </Field>
       </Modal>
+
+      <Modal
+        open={Boolean(anularTarget) && !anularConfirmOpen}
+        onClose={closeAnularFlow}
+        size="md"
+        title="Anular firma digital"
+        subheader={anularTarget?.titulo}
+        footer={
+          <>
+            <Button variant="ghost" type="button" disabled={anulando} onClick={closeAnularFlow}>
+              Cancelar
+            </Button>
+            <Button
+              variant="danger"
+              type="button"
+              disabled={anulando || motivoAnulacion.trim().length < 5}
+              onClick={() => setAnularConfirmOpen(true)}
+            >
+              Continuar
+            </Button>
+          </>
+        }
+      >
+        <Field label="Motivo de anulación" required htmlFor="anular-motivo">
+          <Textarea
+            id="anular-motivo"
+            rows={4}
+            value={motivoAnulacion}
+            onChange={(e) => setMotivoAnulacion(e.target.value)}
+            placeholder="Indique por qué anula la firma (mínimo 5 caracteres)…"
+          />
+        </Field>
+      </Modal>
+
+      <ConfirmModal
+        open={Boolean(anularTarget) && anularConfirmOpen}
+        onClose={() => {
+          if (!anulando) setAnularConfirmOpen(false)
+        }}
+        danger
+        closeOnConfirm={false}
+        title="Confirmar anulación de firma"
+        description="Se invalidará el código SGAF y la RC volverá a Emitida. ¿Confirma?"
+        confirmLabel={anulando ? 'Anulando…' : 'Anular firma'}
+        cancelLabel="Volver"
+        confirmLoading={anulando}
+        onConfirm={handleAnularFirma}
+      />
     </div>
   )
 }

@@ -134,9 +134,13 @@ def registrar_documento(
 
 def documento_a_dict(doc: DocumentoFirmado) -> dict:
     pendiente = str(doc.hash_sha256 or '').startswith(HASH_RESERVA_PREFIX)
+    anulado = bool(getattr(doc, 'anulado', False))
+    valido = (not pendiente) and (not anulado)
+    estado = 'reserva' if pendiente else ('anulado' if anulado else 'valido')
     return {
         'codigo': doc.codigo,
-        'valido': not pendiente,
+        'valido': valido,
+        'estado': estado,
         'firmado_en': None if pendiente else (doc.firmado_en.isoformat() if doc.firmado_en else None),
         'firmante_nombre': doc.firmante_nombre,
         'firmante_run': doc.firmante_run,
@@ -146,4 +150,9 @@ def documento_a_dict(doc: DocumentoFirmado) -> dict:
         'nombre_archivo': doc.nombre_archivo,
         'hash_sha256': '' if pendiente else doc.hash_sha256,
         'hash_corto': '' if pendiente else (doc.hash_sha256[:12] if doc.hash_sha256 else ''),
+        'anulado': anulado,
+        'anulado_en': (
+            doc.anulado_en.isoformat() if anulado and getattr(doc, 'anulado_en', None) else None
+        ),
+        'motivo_anulacion': (doc.motivo_anulacion or '') if anulado else '',
     }

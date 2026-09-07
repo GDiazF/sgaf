@@ -151,11 +151,13 @@ class FirmaPendienteSerializer(serializers.ModelSerializer):
             'solicitado_por',
             'solicitado_por_nombre',
             'motivo_rechazo',
+            'motivo_anulacion',
             'codigo_validacion',
             'creado_en',
             'actualizado_en',
             'firmado_en',
             'rechazado_en',
+            'anulado_en',
         ]
         read_only_fields = fields
 

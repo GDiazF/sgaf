@@ -532,6 +532,18 @@ const RecepcionConformeList = ({ embedded = false }) => {
                   Firmada digital
                 </Badge>
               ) : null}
+              {item.firma_estado === 'anulado' ? (
+                <Badge
+                  variant="danger"
+                  title={
+                    item.firma_motivo_anulacion
+                      ? `Motivo: ${item.firma_motivo_anulacion}`
+                      : 'Firma digital anulada'
+                  }
+                >
+                  Firma anulada
+                </Badge>
+              ) : null}
               {item.firma_paquete_modo === 'rc+anexos' && item.firma_estado === 'firmado' ? (
                 <Badge variant="neutral" title="PDF firmado histórico incluye RC + anexos">
                   Paquete histórico
@@ -585,6 +597,7 @@ const RecepcionConformeList = ({ embedded = false }) => {
         render: (item) => {
           const processing = processingIds.includes(item.id)
           const isAnulada = item.estado === 'ANULADA'
+          const firmadaDigital = item.firma_estado === 'firmado' || item.bloqueo_edicion_firma
           return (
             <div className="data-table__actions" onClick={(e) => e.stopPropagation()}>
               {canView ? (
@@ -624,7 +637,9 @@ const RecepcionConformeList = ({ embedded = false }) => {
                           <Icon name="file" size="sm" />
                         </a>
                       ) : null}
-                      {can('servicios.change_recepcionconforme') && item.archivo_escaneado ? (
+                      {can('servicios.change_recepcionconforme') &&
+                      item.archivo_escaneado &&
+                      !firmadaDigital ? (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -636,7 +651,7 @@ const RecepcionConformeList = ({ embedded = false }) => {
                         </Button>
                       ) : null}
                     </>
-                  ) : can('servicios.change_recepcionconforme') ? (
+                  ) : can('servicios.change_recepcionconforme') && !firmadaDigital ? (
                     <label
                       className={`btn btn--ghost btn--sm${processing ? ' is-disabled' : ''}`}
                       title="Subir recepción firmada"
@@ -704,7 +719,9 @@ const RecepcionConformeList = ({ embedded = false }) => {
                       title={
                         item.firma_motivo_rechazo
                           ? `Reenviar a firmar — Motivo rechazo: ${item.firma_motivo_rechazo}`
-                          : 'Reenviar a firmar'
+                          : item.firma_motivo_anulacion
+                            ? `Reenviar a firmar — Motivo anulación: ${item.firma_motivo_anulacion}`
+                            : 'Reenviar a firmar'
                       }
                       disabled={processing}
                       onClick={() => setConfirmTarget({ type: 'reenviarFirma', item })}
@@ -713,7 +730,7 @@ const RecepcionConformeList = ({ embedded = false }) => {
                     </Button>
                   ) : null}
 
-                  {can('servicios.change_recepcionconforme') ? (
+                  {can('servicios.change_recepcionconforme') && !firmadaDigital ? (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -724,7 +741,9 @@ const RecepcionConformeList = ({ embedded = false }) => {
                     </Button>
                   ) : null}
 
-                  {can('servicios.delete_recepcionconforme') ? (
+                  {can('servicios.delete_recepcionconforme') &&
+                  item.puede_anular_rc !== false &&
+                  !firmadaDigital ? (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -827,6 +846,7 @@ const RecepcionConformeList = ({ embedded = false }) => {
         onSort={handleSort}
         mobileCardActions={(item) => {
           const isAnulada = item.estado === 'ANULADA'
+          const firmadaDigital = item.firma_estado === 'firmado' || item.bloqueo_edicion_firma
           if (isAnulada) {
             return canView
               ? {
@@ -836,6 +856,22 @@ const RecepcionConformeList = ({ embedded = false }) => {
                   },
                 }
               : {}
+          }
+          if (firmadaDigital) {
+            return {
+              primary: canView
+                ? {
+                    label: 'Expediente',
+                    onClick: () => setExpedienteRC(item),
+                  }
+                : undefined,
+              secondary: canView
+                ? {
+                    label: 'Historial',
+                    onClick: () => setHistoryRC(item),
+                  }
+                : undefined,
+            }
           }
           if (can('servicios.change_recepcionconforme') && item.puede_enviar_firma) {
             return {

@@ -16,6 +16,7 @@ from .client import (
 from .models import DocumentoFirmado, FirmaPendiente, SelloFirma
 from .preview import PdfPreviewError, render_page_preview
 from .queue import (
+    anular_firma_digital,
     firmar_pendiente,
     rechazar_firma,
     usuario_es_firmante_de,
@@ -461,16 +462,30 @@ class ValidarDocumentoHashView(APIView):
         file_hash = sha256_hex(uploaded.read())
         coincide = file_hash == doc.hash_sha256
         payload = documento_a_dict(doc)
+        if doc.anulado:
+            mensaje = (
+                'El registro de firma está anulado. '
+                + (
+                    'El archivo coincide con el hash histórico.'
+                    if coincide
+                    else 'El archivo no coincide con el hash registrado.'
+                )
+            )
+        else:
+            mensaje = (
+                'El archivo coincide con el registro de SGAF.'
+                if coincide
+                else 'El archivo no coincide con el hash registrado (posible alteración u otro archivo).'
+            )
         payload.update(
             {
                 'coincide': coincide,
-                'mensaje': (
-                    'El archivo coincide con el registro de SGAF.'
-                    if coincide
-                    else 'El archivo no coincide con el hash registrado (posible alteración u otro archivo).'
-                ),
+                'mensaje': mensaje,
             }
         )
+        # Anulado: siempre 200 con valido=false; si no anulado y no coincide → 409
+        if doc.anulado:
+            return Response(payload, status=status.HTTP_200_OK)
         return Response(payload, status=status.HTTP_200_OK if coincide else status.HTTP_409_CONFLICT)
 
 
@@ -500,6 +515,7 @@ class FirmaPendienteViewSet(viewsets.ReadOnlyModelViewSet):
             FirmaPendiente.ESTADO_PENDIENTE,
             FirmaPendiente.ESTADO_FIRMADO,
             FirmaPendiente.ESTADO_RECHAZADO,
+            FirmaPendiente.ESTADO_ANULADO,
         ):
             qs = qs.filter(estado=estado)
         return qs
@@ -514,13 +530,16 @@ class FirmaPendienteViewSet(viewsets.ReadOnlyModelViewSet):
             try:
                 func = user.funcionario_profile
             except Exception:
-                return Response({'pendiente': 0, 'firmado': 0, 'rechazado': 0})
+                return Response(
+                    {'pendiente': 0, 'firmado': 0, 'rechazado': 0, 'anulado': 0}
+                )
             base = base.filter(firmante=func)
         return Response(
             {
                 'pendiente': base.filter(estado=FirmaPendiente.ESTADO_PENDIENTE).count(),
                 'firmado': base.filter(estado=FirmaPendiente.ESTADO_FIRMADO).count(),
                 'rechazado': base.filter(estado=FirmaPendiente.ESTADO_RECHAZADO).count(),
+                'anulado': base.filter(estado=FirmaPendiente.ESTADO_ANULADO).count(),
             }
         )
 
@@ -528,7 +547,12 @@ class FirmaPendienteViewSet(viewsets.ReadOnlyModelViewSet):
     def documento(self, request, pk=None):
         """Sirve el PDF almacenado (paquete RC+anexos) o el firmado según estado."""
         pendiente = self.get_object()
-        campo = pendiente.archivo_firmado if pendiente.estado == FirmaPendiente.ESTADO_FIRMADO and pendiente.archivo_firmado else pendiente.archivo_origen
+        usar_firmado = (
+            pendiente.estado
+            in (FirmaPendiente.ESTADO_FIRMADO, FirmaPendiente.ESTADO_ANULADO)
+            and pendiente.archivo_firmado
+        )
+        campo = pendiente.archivo_firmado if usar_firmado else pendiente.archivo_origen
         if not campo:
             return Response(
                 {'error': 'Este ítem no tiene archivo PDF almacenado.'},
@@ -595,6 +619,19 @@ class FirmaPendienteViewSet(viewsets.ReadOnlyModelViewSet):
         pendiente = self.get_object()
         try:
             rechazar_firma(pendiente, request.user, request.data.get('motivo') or '')
+        except PermissionError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(FirmaPendienteSerializer(pendiente, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'])
+    def anular(self, request, pk=None):
+        pendiente = self.get_object()
+        try:
+            anular_firma_digital(
+                pendiente, request.user, request.data.get('motivo') or ''
+            )
         except PermissionError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
         except ValueError as exc:

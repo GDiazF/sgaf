@@ -46,6 +46,21 @@ Permiso «Puede usar firma digital (prueba)» — **independiente** de la bandej
 
 El firmante recibe notificación y firma en **Bandeja de firmas** con OTP de su certificado FirmaGob (RA).
 
+Tras la firma digital la RC queda **Completada** y **bloqueada** en pagos/recepciones: no se puede editar la RC, subir/borrar comprobantes, borrar pagos ni anular la RC por el botón de basura. La única vía de desbloqueo es que el **mismo firmante** (o un superusuario) anule la firma en la bandeja.
+
+---
+
+## Anular una firma (firmante)
+
+1. Ir a **Bandeja de firmas** → pestaña **Firmados**.
+2. Clic en **Anular firma**, indicar un **motivo** (≥ 5 caracteres) y confirmar de nuevo.
+3. Efectos:
+   - El ítem pasa a la pestaña **Anulados**.
+   - El código `SGAF-…` queda **inválido** en `/validar` (estado Anulado).
+   - La RC vuelve a **Emitida** (sin liberar los pagos) y se puede editar / reenviar a firmar.
+4. **Rechazar** (antes de firmar) es distinto: el documento queda en **Rechazados** y no invalida un `SGAF-…` ya emitido.
+5. **Anular la RC** (negocio, libera pagos) no es lo mismo que anular la firma; mientras la firma digital esté vigente, anular la RC está bloqueado.
+
 ---
 
 ## Producción vs pruebas (CERT)

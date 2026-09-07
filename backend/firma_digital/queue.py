@@ -115,6 +115,69 @@ def rechazar_firma(pendiente: FirmaPendiente, user, motivo: str) -> FirmaPendien
     return pendiente
 
 
+def anular_firma_digital(pendiente: FirmaPendiente, user, motivo: str) -> FirmaPendiente:
+    """Invalida una firma ya aplicada; la RC vuelve a EMITIDA (sin liberar pagos)."""
+    if pendiente.estado != FirmaPendiente.ESTADO_FIRMADO:
+        raise ValueError('Solo se pueden anular documentos ya firmados.')
+    if not usuario_es_firmante_de(pendiente, user):
+        raise PermissionError('No está autorizado a anular esta firma.')
+    motivo = (motivo or '').strip()
+    if len(motivo) < 5:
+        raise ValueError('Indique un motivo de anulación (mínimo 5 caracteres).')
+
+    now = timezone.now()
+    if pendiente.documento_registro_id:
+        doc = pendiente.documento_registro
+        doc.anulado = True
+        doc.anulado_en = now
+        doc.motivo_anulacion = motivo
+        doc.save(update_fields=['anulado', 'anulado_en', 'motivo_anulacion'])
+
+    pendiente.estado = FirmaPendiente.ESTADO_ANULADO
+    pendiente.motivo_anulacion = motivo
+    pendiente.anulado_en = now
+    pendiente.save(
+        update_fields=['estado', 'motivo_anulacion', 'anulado_en', 'actualizado_en']
+    )
+    _registrar_anulacion_origen(pendiente, user, motivo)
+    from .notify import marcar_notificaciones_firma
+
+    marcar_notificaciones_firma(pendiente)
+    return pendiente
+
+
+def _registrar_anulacion_origen(pendiente: FirmaPendiente, user, motivo: str) -> None:
+    if pendiente.origen != 'rc':
+        return
+    from servicios.models import HistorialRecepcionConforme, RecepcionConforme
+
+    try:
+        rc = RecepcionConforme.objects.get(pk=pendiente.referencia_id)
+    except RecepcionConforme.DoesNotExist:
+        return
+
+    if rc.archivo_escaneado:
+        rc.archivo_escaneado.delete(save=False)
+        rc.archivo_escaneado = ''
+    rc.estado = 'EMITIDA'
+    rc.save(update_fields=['archivo_escaneado', 'estado', 'updated_at'])
+
+    firmante_nombre = (
+        pendiente.firmante.nombre_funcionario if pendiente.firmante_id else None
+    )
+    usuario = firmante_nombre or getattr(user, 'username', None) or 'Sistema'
+    HistorialRecepcionConforme.objects.create(
+        recepcion_conforme=rc,
+        accion='ANULACION_FIRMA',
+        detalle=(
+            f'Firma digital anulada ({pendiente.codigo_interno}'
+            f'{f", código {pendiente.documento_registro.codigo}" if pendiente.documento_registro_id else ""}). '
+            f'Motivo: {motivo}'
+        ),
+        usuario=usuario,
+    )
+
+
 def _registrar_rechazo_origen(pendiente: FirmaPendiente, user, motivo: str) -> None:
     if pendiente.origen != 'rc':
         return

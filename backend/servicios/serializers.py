@@ -43,10 +43,16 @@ class RegistroPagoSerializer(serializers.ModelSerializer):
     servicio_unidad_medida = serializers.ReadOnlyField(source='servicio.unidad_medida', default='')
     recepcion_conforme_folio = serializers.ReadOnlyField(source='recepcion_conforme.folio', default=None)
     recepcion_conforme_estado = serializers.ReadOnlyField(source='recepcion_conforme.estado', default=None)
+    bloqueo_edicion_firma = serializers.SerializerMethodField()
 
     class Meta:
         model = RegistroPago
         fields = '__all__'
+
+    def get_bloqueo_edicion_firma(self, obj):
+        from .rc_firma import rc_bloqueada_por_firma_digital
+
+        return rc_bloqueada_por_firma_digital(obj.recepcion_conforme)
 
     def validate(self, data):
         nro_documento = data.get('nro_documento', self.instance.nro_documento if self.instance else None)
@@ -59,11 +65,34 @@ class RegistroPagoSerializer(serializers.ModelSerializer):
                 
             if qs.exists():
                 raise serializers.ValidationError({"nro_documento": f"La factura '{nro_documento}' ya fue ingresada previamente para el servicio seleccionado."})
+
+        from .rc_firma import rc_bloqueada_por_firma_digital
+
+        rc = None
+        if self.instance:
+            rc = self.instance.recepcion_conforme
+        if rc is None and data.get('recepcion_conforme') is not None:
+            rc = data.get('recepcion_conforme')
+        if rc_bloqueada_por_firma_digital(rc):
+            raise serializers.ValidationError(
+                'No se puede modificar este pago: la recepción conforme tiene firma digital vigente. '
+                'El firmante debe anular la firma en la bandeja /firma.'
+            )
                 
         return super().validate(data)
 
     def get_servicio_detalle(self, obj):
         return obj.servicio.proveedor.acronimo or obj.servicio.proveedor.nombre
+
+    def update(self, instance, validated_data):
+        from .rc_firma import rc_bloqueada_por_firma_digital
+
+        if rc_bloqueada_por_firma_digital(instance.recepcion_conforme):
+            raise serializers.ValidationError(
+                'No se puede modificar este pago: la recepción conforme tiene firma digital vigente. '
+                'El firmante debe anular la firma en la bandeja /firma.'
+            )
+        return super().update(instance, validated_data)
 
 class HistorialRecepcionConformeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -90,6 +119,9 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
     expediente_comprobantes = serializers.SerializerMethodField()
     puede_enviar_firma = serializers.SerializerMethodField()
     puede_reenviar_firma = serializers.SerializerMethodField()
+    bloqueo_edicion_firma = serializers.SerializerMethodField()
+    puede_anular_rc = serializers.SerializerMethodField()
+    firma_motivo_anulacion = serializers.SerializerMethodField()
 
     class Meta:
         model = RecepcionConforme
@@ -115,6 +147,9 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
     def get_firma_motivo_rechazo(self, obj):
         return self._firma_info(obj)['firma_motivo_rechazo']
 
+    def get_firma_motivo_anulacion(self, obj):
+        return self._firma_info(obj).get('firma_motivo_anulacion') or ''
+
     def get_firma_pendiente_id(self, obj):
         return self._firma_info(obj)['firma_pendiente_id']
 
@@ -135,6 +170,12 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
 
     def get_puede_reenviar_firma(self, obj):
         return self._firma_info(obj)['puede_reenviar_firma']
+
+    def get_bloqueo_edicion_firma(self, obj):
+        return bool(self._firma_info(obj).get('bloqueo_edicion_firma'))
+
+    def get_puede_anular_rc(self, obj):
+        return bool(self._firma_info(obj).get('puede_anular_rc', True))
 
     def validate(self, data):
         registros_ids = data.get('registros_ids', [])
@@ -178,6 +219,16 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         if instance.estado == 'ANULADA':
             raise serializers.ValidationError("No se puede editar una Recepción Conforme anulada.")
+
+        from .rc_firma import firma_digital_vigente_rc
+
+        if firma_digital_vigente_rc(instance):
+            # Permitir solo campos no estructurales si en el futuro se necesitan;
+            # por ahora bloquear cualquier update mientras la firma digital esté vigente.
+            raise serializers.ValidationError(
+                'No se puede editar esta recepción conforme: tiene firma digital vigente. '
+                'El firmante debe anular la firma en la bandeja /firma.'
+            )
 
         registros_ids = validated_data.pop('registros_ids', None)
         user = self.context['request'].user.username if 'request' in self.context else 'Sistema'

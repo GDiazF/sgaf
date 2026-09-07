@@ -90,6 +90,15 @@ Solo TI / permiso de prueba. Sube un PDF arbitrario, prueba atendida (OTP) o des
 
 Cualquiera puede consultar si un código `SGAF-…` existe en SGAF (metadatos + hash). **No** reemplaza la validación criptográfica de FirmaGob; es el registro institucional nuestro.
 
+Si el firmante **anula la firma** desde la bandeja, el mismo código responde con `valido: false` y estado **anulado** (motivo y fecha), sin desaparecer del registro.
+
+### 4.4 Bloqueo post-firma y anulación por firmante
+
+Tras firmar una RC (`FirmaPendiente` → `firmado`, RC `COMPLETADA`):
+
+- Pagos / recepciones: bloqueadas edición, comprobantes, borrado de pagos y anulación de negocio de la RC.
+- Desbloqueo: `POST …/pendientes/{id}/anular/` (solo firmante o superuser), con motivo; la RC vuelve a `EMITIDA` y el `DocumentoFirmado` queda marcado anulado. **No** libera pagos (a diferencia de anular la RC).
+
 ---
 
 ## 5. Flujo técnico (firma de un PDF)
@@ -166,14 +175,14 @@ Laboratorio: permiso aparte de prueba; no hace falta ser firmante operativo.
 | `services/firma-dep/` | Sidecar NestJS (JWT, sign-pdf, preview, audit) |
 | `backend/firma_digital/` | Modelos, bandeja, registry `SGAF-…`, cliente HTTP a firma-dep |
 | `backend/firma_digital/dep_client.py` | Django → firma-dep |
-| `backend/firma_digital/queue.py` | Encolar / firmar / rechazar |
+| `backend/firma_digital/queue.py` | Encolar / firmar / rechazar / anular firma |
 | `backend/servicios/rc_firma.py` | Armar PDF RC + meta de anexos + enviar a bandeja |
 | `frontend/src/pages/firma/` | Bandeja, modal firmar, prueba, validar |
 | `docker-compose.yml` | Servicio `firma-dep` + `backend` |
 
 Endpoints útiles:
 
-- Django: `firma-digital/pendientes/`, `…/firmar/`, `…/documento/`, `firma-digital/validar/…`
+- Django: `firma-digital/pendientes/`, `…/firmar/`, `…/rechazar/`, `…/anular/`, `…/documento/`, `firma-digital/validar/…`
 - firma-dep: `POST /api/v1/signatures/sign-pdf`, `GET /api/v1/health`
 
 ---

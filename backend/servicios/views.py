@@ -226,6 +226,22 @@ class RegistroPagoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
             .order_by('-fecha_pago')
         )
 
+    def destroy(self, request, *args, **kwargs):
+        from .rc_firma import rc_bloqueada_por_firma_digital
+
+        instance = self.get_object()
+        if rc_bloqueada_por_firma_digital(instance.recepcion_conforme):
+            return Response(
+                {
+                    'error': (
+                        'No se puede eliminar este pago: la recepción conforme tiene firma digital vigente. '
+                        'El firmante debe anular la firma en la bandeja /firma.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=False, methods=['get'])
     def export_excel(self, request):
         """Exporta los pagos filtrados a Excel."""
@@ -476,9 +492,30 @@ class RegistroPagoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         return parts
 
     def _assign_comprobante_to_pagos(self, pagos, uploaded_file, results, label):
+        from .rc_firma import rc_bloqueada_por_firma_digital
+
         pagos = list(pagos)
         if not pagos:
             results['errors'].append(f"{label}: No se encontraron registros de pago.")
+            return 0
+
+        bloqueados = [
+            p for p in pagos if rc_bloqueada_por_firma_digital(p.recepcion_conforme)
+        ]
+        if bloqueados:
+            folios = ', '.join(
+                sorted(
+                    {
+                        (p.recepcion_conforme.folio or str(p.recepcion_conforme_id))
+                        for p in bloqueados
+                        if p.recepcion_conforme_id
+                    }
+                )
+            )
+            results['errors'].append(
+                f"{label}: no se puede subir comprobante; RC con firma digital vigente"
+                + (f' ({folios}).' if folios else '.')
+            )
             return 0
 
         content = uploaded_file.read()
@@ -689,10 +726,23 @@ class RecepcionConformeViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def anular(self, request, pk=None):
         from .models import HistorialRecepcionConforme
+        from .rc_firma import firma_digital_vigente_rc
+
         rc = self.get_object()
         
         if rc.estado == 'ANULADA':
             return Response({'error': 'Esta RC ya se encuentra anulada.'}, status=400)
+
+        if firma_digital_vigente_rc(rc):
+            return Response(
+                {
+                    'error': (
+                        'No se puede anular esta RC: tiene firma digital vigente. '
+                        'El firmante debe anular la firma en la bandeja /firma.'
+                    )
+                },
+                status=400,
+            )
             
         # 1. Liberate payments
         count_released = rc.registros.count()

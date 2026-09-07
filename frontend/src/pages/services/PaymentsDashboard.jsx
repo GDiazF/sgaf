@@ -515,7 +515,14 @@ const PaymentsDashboard = () => {
       await fetchData(currentPage, pageSize, debouncedSearch, ordering, statusFilter)
         } catch (error) {
       console.error(error)
-      notify({ variant: 'danger', text: 'Error al subir el comprobante.' })
+      const data = error.response?.data
+      const detail =
+        (typeof data === 'string' && data) ||
+        data?.error ||
+        data?.detail ||
+        (Array.isArray(data?.non_field_errors) && data.non_field_errors[0]) ||
+        'Error al subir el comprobante.'
+      notify({ variant: 'danger', text: detail })
         } finally {
       setProcessingIds((prev) => prev.filter((id) => id !== payment.id))
         }
@@ -690,6 +697,7 @@ const PaymentsDashboard = () => {
         className: 'col--actions',
         render: (item) => {
           const locked = item.recepcion_conforme && !isPrivileged
+          const firmaLock = !!item.bloqueo_edicion_firma
           const processing = processingIds.includes(item.id)
           return (
             <div className="data-table__actions" onClick={(e) => e.stopPropagation()}>
@@ -706,7 +714,7 @@ const PaymentsDashboard = () => {
                     <Icon name="file" size="sm" />
                   </a>
                   ) : null}
-                  {can('servicios.change_registropago') ? (
+                  {can('servicios.change_registropago') && !firmaLock ? (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -719,7 +727,7 @@ const PaymentsDashboard = () => {
                     </Button>
                   ) : null}
                 </>
-              ) : can('servicios.change_registropago') ? (
+              ) : can('servicios.change_registropago') && !firmaLock ? (
                 <label
                   className={`btn btn--ghost btn--sm${processing ? ' is-disabled' : ''}`}
                   title="Subir comprobante"
@@ -761,8 +769,12 @@ const PaymentsDashboard = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  title="Editar"
-                  disabled={locked}
+                  title={
+                    firmaLock
+                      ? 'Bloqueado: firma digital vigente en la RC'
+                      : 'Editar'
+                  }
+                  disabled={locked || firmaLock}
                   onClick={() => handleEdit(item)}
                 >
                   <Icon name="edit" size="sm" />
@@ -772,8 +784,12 @@ const PaymentsDashboard = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  title="Eliminar"
-                  disabled={locked}
+                  title={
+                    firmaLock
+                      ? 'Bloqueado: firma digital vigente en la RC'
+                      : 'Eliminar'
+                  }
+                  disabled={locked || firmaLock}
                   onClick={() => setConfirmTarget({ type: 'delete', item })}
                 >
                   <Icon name="trash" size="sm" />
@@ -1015,21 +1031,34 @@ const PaymentsDashboard = () => {
         }}
         sortKey={activeSortKey}
         onSort={handleSort}
-        mobileCardActions={(item) => ({
-          primary: can('servicios.change_registropago')
-            ? {
-                label: 'Editar',
-                onClick: () => handleEdit(item),
-              }
-            : undefined,
-          secondary:
-            can('servicios.delete_registropago') && !item.recepcion_conforme
+        mobileCardActions={(item) => {
+          const firmaLock = !!item.bloqueo_edicion_firma
+          if (firmaLock) {
+            return {
+              primary: item.comprobante
+                ? {
+                    label: 'Ver comprobante',
+                    onClick: () => window.open(mediaUrl(item.comprobante), '_blank'),
+                  }
+                : undefined,
+            }
+          }
+          return {
+            primary: can('servicios.change_registropago')
               ? {
-                  label: 'Eliminar',
-                  onClick: () => setConfirmTarget({ type: 'delete', item }),
+                  label: 'Editar',
+                  onClick: () => handleEdit(item),
                 }
               : undefined,
-        })}
+            secondary:
+              can('servicios.delete_registropago') && !item.recepcion_conforme
+                ? {
+                    label: 'Eliminar',
+                    onClick: () => setConfirmTarget({ type: 'delete', item }),
+                  }
+                : undefined,
+          }
+        }}
         toolbar={
           <div className="table-toolbar__left">
             <span className="table-toolbar__title">Listado</span>
