@@ -10,6 +10,8 @@ import {
   Input,
   Select,
   Alert,
+  useFormOverlay,
+  formatApiFormError,
 } from '@slep/ui'
 
 import { ZOOM_DEFAULT } from '../../utils/firmaPreviewZoom'
@@ -21,17 +23,6 @@ const PRESETS = [
   { id: 'bl', label: 'Inf. izq.' },
   { id: 'br', label: 'Inf. der.' },
 ]
-
-function downloadBlob(data, filename) {
-  const url = window.URL.createObjectURL(new Blob([data], { type: 'application/pdf' }))
-  const link = document.createElement('a')
-  link.href = url
-  link.setAttribute('download', filename)
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  window.URL.revokeObjectURL(url)
-}
 
 async function readErrorMessage(error) {
   const data = error?.response?.data
@@ -47,7 +38,7 @@ async function readErrorMessage(error) {
       return 'Error al firmar.'
     }
   }
-  return 'Error al firmar.'
+  return formatApiFormError(error, 'Error al firmar.')
 }
 
 function clamp(n, min, max) {
@@ -68,6 +59,8 @@ function getSignerDefaults(user) {
 export default function FirmarPendienteModal({ open, pendiente, onClose, onFirmado }) {
   const { user } = useAuth()
   const { notify } = useNotify()
+  const signOverlay = useFormOverlay()
+  const successCodigoRef = useRef(null)
   const [config, setConfig] = useState(null)
   const [pdfFile, setPdfFile] = useState(null)
   const [loadingPdf, setLoadingPdf] = useState(false)
@@ -79,7 +72,6 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
   const [otp, setOtp] = useState('')
   const [signerName, setSignerName] = useState('')
   const [signerRole, setSignerRole] = useState('')
-  const [signing, setSigning] = useState(false)
   const dragRef = useRef(null)
   const stageRef = useRef(null)
   const viewportRef = useRef(null)
@@ -149,6 +141,8 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
     if (!open || !pendiente) return
     let cancelled = false
     ;(async () => {
+      signOverlay.reset()
+      successCodigoRef.current = null
       setOtp('')
       setPreview(null)
       setPdfFile(null)
@@ -183,6 +177,7 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset overlay al abrir; no re-disparar por signOverlay
   }, [open, pendiente, loadPreview, notify])
 
   const applyPreset = (id) => {
@@ -259,6 +254,7 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
 
   const handleSign = async () => {
     if (!pendiente || !pdfFile || !preview) return
+    if (signOverlay.busy) return
     if (!signerName.trim()) {
       notify({
         variant: 'warning',
@@ -276,7 +272,6 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
     const coords = boxToPdfCoords()
     if (!coords) return
 
-    setSigning(true)
     const formData = new FormData()
     formData.append('file', pdfFile)
     formData.append('otp', otp.trim())
@@ -286,33 +281,76 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
     formData.append('urx', String(coords.urx))
     formData.append('ury', String(coords.ury))
 
+    successCodigoRef.current = null
     try {
-      const response = await api.post(
-        `firma-digital/pendientes/${pendiente.id}/firmar/`,
-        formData,
+      const result = await signOverlay.run(
+        async () => {
+          const response = await api.post(
+            `firma-digital/pendientes/${pendiente.id}/firmar/`,
+            formData,
+            {
+              responseType: 'blob',
+              headers: { 'Content-Type': 'multipart/form-data' },
+            },
+          )
+          const ct = response.data?.type || ''
+          if (ct.includes('json')) {
+            const text = await response.data.text()
+            let msg = 'No se pudo firmar el documento.'
+            try {
+              msg = JSON.parse(text).error || msg
+            } catch {
+              /* ignore */
+            }
+            throw new Error(msg)
+          }
+          const codigo =
+            response.headers?.['x-sgaf-documento-codigo'] ||
+            response.headers?.['X-SGAF-Documento-Codigo'] ||
+            null
+          successCodigoRef.current = codigo
+          return { codigo }
+        },
         {
-          responseType: 'blob',
-          headers: { 'Content-Type': 'multipart/form-data' },
+          successTitle: 'Documento firmado',
+          successDescription: 'El documento fue generado con éxito.',
+          formatError: (err) => {
+            const data = err?.response?.data
+            if (typeof data === 'string') return data
+            if (data && typeof data === 'object' && !(data instanceof Blob) && data.error) {
+              return String(data.error)
+            }
+            return err?.message || formatApiFormError(err, 'Error al firmar.')
+          },
         },
       )
-      const codigo =
-        response.headers?.['x-sgaf-documento-codigo'] ||
-        response.headers?.['X-SGAF-Documento-Codigo']
-      downloadBlob(response.data, `${pendiente.codigo_interno}_firmado.pdf`)
-      notify({
-        variant: 'success',
-        text: codigo
-          ? `Documento firmado. Código: ${codigo}`
-          : 'Documento firmado correctamente.',
-      })
-      onFirmado?.({ codigo })
-      onClose?.()
+      const codigo = result?.codigo || successCodigoRef.current
+      if (codigo) {
+        signOverlay.setDescription(
+          `El documento fue generado con éxito. Código de validación: ${codigo}`,
+        )
+      }
     } catch (err) {
-      notify({ variant: 'danger', text: await readErrorMessage(err) })
-    } finally {
-      setSigning(false)
+      if (err?.response?.data instanceof Blob) {
+        const msg = await readErrorMessage(err)
+        signOverlay.setDescription(msg)
+      }
     }
   }
+
+  const handleOverlayDismiss = () => {
+    if (signOverlay.status === 'success') {
+      const codigo = successCodigoRef.current
+      signOverlay.reset()
+      onFirmado?.({ codigo })
+      onClose?.()
+      return
+    }
+    signOverlay.dismiss()
+  }
+
+  const signing = signOverlay.busy
+  const overlayBlocksClose = signOverlay.active
 
   const pageOptions = preview
     ? Array.from({ length: preview.page_count }, (_, i) => ({
@@ -334,18 +372,23 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
     <Modal
       open={open}
       onClose={() => {
-        if (!signing) onClose?.()
+        if (!overlayBlocksClose) onClose?.()
       }}
       className="modal--shell modal--viewer modal--firma-sign"
       bodyClassName="modal__body--viewer"
       title="Ubicar sello y firmar"
       subheader={pendiente?.titulo || pendiente?.codigo_interno || 'Documento'}
-      overlayStatus={signing ? 'loading' : null}
-      overlayTitle="Firmando documento…"
-      overlayDescription="Enviando a FirmaGob. Esto puede tardar unos segundos."
+      {...signOverlay.modalProps}
+      onOverlayDismiss={handleOverlayDismiss}
       footer={
         <>
-          <Button variant="quiet" size="sm" type="button" onClick={onClose} disabled={signing}>
+          <Button
+            variant="quiet"
+            size="sm"
+            type="button"
+            onClick={onClose}
+            disabled={overlayBlocksClose}
+          >
             Cancelar
           </Button>
           <Button
@@ -353,7 +396,7 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
             size="sm"
             type="button"
             loading={signing}
-            disabled={signing || loadingPdf || !preview || !signerName.trim()}
+            disabled={overlayBlocksClose || loadingPdf || !preview || !signerName.trim()}
             onClick={handleSign}
           >
             Firmar con sello
@@ -385,7 +428,7 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
               onStampPointerDown={onStampPointerDown}
               onStampPointerMove={onStampPointerMove}
               onStampPointerUp={onStampPointerUp}
-              disabled={signing}
+              disabled={overlayBlocksClose}
               viewportRef={viewportRef}
               stageRef={stageRef}
             />
@@ -425,7 +468,7 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
 
             {pageOptions.length > 1 ? (
               <Field label="Página">
-                <Select value={String(page)} onChange={handlePageChange} disabled={signing}>
+                <Select value={String(page)} onChange={handlePageChange} disabled={overlayBlocksClose}>
                   {pageOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
@@ -443,7 +486,7 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
                     type="button"
                     variant="outline"
                     size="sm"
-                    disabled={signing}
+                    disabled={overlayBlocksClose}
                     onClick={() => applyPreset(p.id)}
                   >
                     {p.label}
@@ -453,11 +496,11 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
             </Field>
 
             <Field label="Firmante" required>
-              <Input value={signerName} readOnly disabled={signing} placeholder="Sin nombre" />
+              <Input value={signerName} readOnly disabled={overlayBlocksClose} placeholder="Sin nombre" />
             </Field>
 
             <Field label="Cargo">
-              <Input value={signerRole} readOnly disabled={signing} placeholder="Sin cargo" />
+              <Input value={signerRole} readOnly disabled={overlayBlocksClose} placeholder="Sin cargo" />
             </Field>
 
             {config?.sello_resuelto?.imagen_url ? (
@@ -480,7 +523,7 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
                 autoComplete="one-time-code"
                 maxLength={6}
                 placeholder="000000"
-                disabled={signing}
+                disabled={overlayBlocksClose}
               />
             </Field>
           </aside>

@@ -610,6 +610,33 @@ class RecepcionConformeViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=['get'])
+    def comprobantes_pdf(self, request, pk=None):
+        """PDF único con todos los comprobantes de los pagos de la RC."""
+        rc = self.get_object()
+        try:
+            from .rc_firma import construir_pdf_comprobantes_rc
+
+            pdf_bytes = construir_pdf_comprobantes_rc(rc)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            import logging
+
+            logging.getLogger(__name__).exception(
+                'Error generando PDF de comprobantes RC %s', rc.pk
+            )
+            return Response(
+                {'error': f'No se pudo agrupar los comprobantes: {exc}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        folio = (rc.folio or f'rc-{rc.pk}').replace('/', '-')
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = (
+            f'inline; filename="RC_{folio}_comprobantes.pdf"'
+        )
+        return response
+
     @action(detail=False, methods=['post'])
     def create_historical(self, request):
         from django.db import transaction

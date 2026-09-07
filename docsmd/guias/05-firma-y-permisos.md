@@ -42,7 +42,7 @@ Permiso «Puede usar firma digital (prueba)» — **independiente** de la bandej
 
 1. Ir a **Pagos → pestaña Recepciones**.
 2. RC en estado **Emitida**, con **firmante** asignado.
-3. Clic en **Enviar a firmar** (genera PDF RC + anexos y lo pone en la bandeja del firmante).
+3. Clic en **Enviar a firmar** (genera el PDF **solo de la RC** y lo pone en la bandeja del firmante; los comprobantes quedan como anexos del expediente).
 
 El firmante recibe notificación y firma en **Bandeja de firmas** con OTP de su certificado FirmaGob (RA).
 

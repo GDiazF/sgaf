@@ -118,6 +118,55 @@ def construir_paquete_rc(rc: RecepcionConforme, user, tipo: str = 'PAGO') -> tup
     return rc_pdf, meta
 
 
+def _merge_pdfs(parts: list[bytes]) -> bytes:
+    """Une varios PDF en uno solo (páginas en orden)."""
+    import io
+
+    import pypdfium2 as pdfium
+
+    dest = pdfium.PdfDocument.new()
+    try:
+        for data in parts:
+            if not data or not data.startswith(b'%PDF'):
+                continue
+            src = pdfium.PdfDocument(data)
+            try:
+                dest.import_pages(src)
+            finally:
+                src.close()
+        out = io.BytesIO()
+        dest.save(out)
+        return out.getvalue()
+    finally:
+        dest.close()
+
+
+def construir_pdf_comprobantes_rc(rc: RecepcionConforme) -> bytes:
+    """
+    Un solo PDF con todos los comprobantes PDF de los pagos de la RC.
+    No incluye el PDF de la recepción conforme.
+    """
+    pagos = list(rc.registros.all())
+    parts: list[bytes] = []
+    for pago in pagos:
+        if not pago.comprobante:
+            continue
+        try:
+            pago.comprobante.open('rb')
+            data = pago.comprobante.read()
+            pago.comprobante.close()
+        except Exception:
+            logger.exception('No se pudo leer comprobante del pago %s', pago.pk)
+            continue
+        if data.startswith(b'%PDF'):
+            parts.append(data)
+    if not parts:
+        raise ValueError('La RC no tiene comprobantes PDF para agrupar.')
+    if len(parts) == 1:
+        return parts[0]
+    return _merge_pdfs(parts)
+
+
 def expediente_comprobantes_rc(rc: RecepcionConforme) -> list[dict]:
     """Comprobantes agrupados a nivel RC (origen: pagos asociados)."""
     out = []

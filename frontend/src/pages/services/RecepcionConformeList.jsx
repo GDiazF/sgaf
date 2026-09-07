@@ -81,6 +81,7 @@ const RecepcionConformeList = ({ embedded = false }) => {
 
   const [historyRC, setHistoryRC] = useState(null)
   const [expedienteRC, setExpedienteRC] = useState(null)
+  const [loadingComprobantesPdf, setLoadingComprobantesPdf] = useState(false)
   const [processingIds, setProcessingIds] = useState([])
   const [confirmTarget, setConfirmTarget] = useState(null)
   const [confirming, setConfirming] = useState(false)
@@ -213,6 +214,47 @@ const RecepcionConformeList = ({ embedded = false }) => {
         message = data.hint || data.error
       }
       notify({ variant: 'danger', text: message })
+    }
+  }
+
+  const handleOpenComprobantesPdf = async (rc) => {
+    if (!rc?.id || loadingComprobantesPdf) return
+    setLoadingComprobantesPdf(true)
+    try {
+      const response = await api.get(`recepciones-conformes/${rc.id}/comprobantes_pdf/`, {
+        responseType: 'blob',
+      })
+      const blob = response.data
+      if (blob?.type?.includes('json')) {
+        const text = await blob.text()
+        let msg = 'No se pudo generar el PDF de comprobantes.'
+        try {
+          msg = JSON.parse(text).error || msg
+        } catch {
+          /* ignore */
+        }
+        notify({ variant: 'danger', text: msg })
+        return
+      }
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))
+      window.open(url, '_blank', 'noopener,noreferrer')
+      setTimeout(() => window.URL.revokeObjectURL(url), 60_000)
+    } catch (error) {
+      let message = 'No se pudo abrir el PDF de comprobantes.'
+      const data = error?.response?.data
+      if (data instanceof Blob) {
+        try {
+          const payload = JSON.parse(await data.text())
+          message = payload.error || message
+        } catch {
+          /* ignore */
+        }
+      } else if (data?.error) {
+        message = data.error
+      }
+      notify({ variant: 'danger', text: message })
+    } finally {
+      setLoadingComprobantesPdf(false)
     }
   }
 
@@ -942,25 +984,22 @@ const RecepcionConformeList = ({ embedded = false }) => {
             label={`Comprobantes (${expedienteRC?.expediente_comprobantes?.length || 0})`}
           >
             {expedienteRC?.expediente_comprobantes?.length > 0 ? (
-              <ul className="rc-history-timeline">
-                {expedienteRC.expediente_comprobantes.map((c) => (
-                  <li key={c.pago_id || c.nombre} className="rc-history-timeline__card">
-                    {c.url ? (
-                      <a href={mediaUrl(c.url)} target="_blank" rel="noopener noreferrer">
-                        {c.nombre || `Pago ${c.pago_id}`}
-                      </a>
-                    ) : (
-                      <span>{c.nombre || `Pago ${c.pago_id}`}</span>
-                    )}
-                    <div className="rc-history-timeline__meta">
-                      {c.nro_documento ? <span>Doc. {c.nro_documento}</span> : null}
-                      {c.size_bytes ? (
-                        <span>{(c.size_bytes / (1024 * 1024)).toFixed(2)} MB</span>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <div className="data-table__cell-stack">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  type="button"
+                  loading={loadingComprobantesPdf}
+                  disabled={loadingComprobantesPdf}
+                  onClick={() => handleOpenComprobantesPdf(expedienteRC)}
+                >
+                  Abrir comprobantes (PDF único)
+                </Button>
+                <Alert variant="info" title="Agrupados">
+                  Todos los comprobantes PDF de los pagos de esta RC se unen en un solo
+                  archivo.
+                </Alert>
+              </div>
             ) : (
               <EmptyState title="Sin comprobantes asociados." />
             )}
