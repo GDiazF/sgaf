@@ -277,6 +277,64 @@ class DocumentoFirmado(models.Model):
         return self.codigo
 
 
+class AccesoDocumentoFirma(models.Model):
+    """Registro de quién abrió/descargó un PDF firmado o del expediente."""
+
+    TIPO_DOCUMENTO = 'documento'
+    TIPO_COMPROBANTES = 'comprobantes'
+    TIPO_ARCHIVO_ESCANEADO = 'archivo_escaneado'
+    TIPO_CHOICES = [
+        (TIPO_DOCUMENTO, 'Documento PDF'),
+        (TIPO_COMPROBANTES, 'Comprobantes'),
+        (TIPO_ARCHIVO_ESCANEADO, 'Archivo escaneado / firmado RC'),
+    ]
+
+    ESTADO_SIN_PENDIENTE = 'sin_pendiente'
+
+    pendiente = models.ForeignKey(
+        FirmaPendiente,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='accesos',
+    )
+    documento_registro = models.ForeignKey(
+        DocumentoFirmado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='accesos',
+    )
+    origen = models.CharField(max_length=64, blank=True, default='')
+    referencia_id = models.PositiveIntegerField(null=True, blank=True, db_index=True)
+    tipo = models.CharField(max_length=32, choices=TIPO_CHOICES, db_index=True)
+    estado_firma = models.CharField(max_length=20, blank=True, default='')
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='accesos_documento_firma',
+    )
+    usuario_nombre = models.CharField(max_length=150, blank=True, default='')
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default='')
+    detalle = models.TextField(blank=True, default='')
+    creado_en = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Acceso a documento firmado'
+        verbose_name_plural = 'Accesos a documentos firmados'
+        ordering = ['-creado_en']
+        indexes = [
+            models.Index(fields=['origen', 'referencia_id', 'creado_en']),
+            models.Index(fields=['pendiente', 'creado_en']),
+        ]
+
+    def __str__(self):
+        return f'{self.tipo} · {self.estado_firma} · {self.creado_en}'
+
+
 def sello_fondo_upload_to(_instance, filename):
     _, ext = os.path.splitext(filename)
     ext = (ext or '.png').lower()

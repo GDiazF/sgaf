@@ -565,6 +565,14 @@ class FirmaPendienteViewSet(viewsets.ReadOnlyModelViewSet):
                 {'error': 'No se pudo abrir el archivo PDF.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+        from .access_log import AccesoDocumentoFirma, registrar_acceso_documento
+
+        registrar_acceso_documento(
+            request=request,
+            tipo=AccesoDocumentoFirma.TIPO_DOCUMENTO,
+            pendiente=pendiente,
+            via='bandeja',
+        )
         filename = (campo.name or 'documento.pdf').split('/')[-1]
         response = FileResponse(campo, content_type='application/pdf')
         response['Content-Disposition'] = f'inline; filename="{filename}"'
@@ -607,12 +615,50 @@ class FirmaPendienteViewSet(viewsets.ReadOnlyModelViewSet):
                 {'error': f'No se pudo agrupar los comprobantes: {exc}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+        from .access_log import AccesoDocumentoFirma, registrar_acceso_documento
+
+        registrar_acceso_documento(
+            request=request,
+            tipo=AccesoDocumentoFirma.TIPO_COMPROBANTES,
+            pendiente=pendiente,
+            via='bandeja',
+        )
         folio = (pendiente.meta or {}).get('folio') or pendiente.codigo_interno or pendiente.pk
         response = HttpResponse(pdf_bytes, content_type='application/pdf')
         response['Content-Disposition'] = (
             f'inline; filename="RC_{folio}_comprobantes.pdf"'
         )
         return response
+
+    @action(detail=True, methods=['get'])
+    def accesos(self, request, pk=None):
+        """Lista accesos/descargas registrados de este pendiente (firmante o superuser)."""
+        pendiente = self.get_object()
+        if not usuario_es_firmante_de(pendiente, request.user):
+            return Response(
+                {'error': 'No está autorizado a ver estos accesos.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        from .models import AccesoDocumentoFirma
+
+        qs = (
+            AccesoDocumentoFirma.objects.filter(pendiente=pendiente)
+            .select_related('usuario')
+            .order_by('-creado_en')[:200]
+        )
+        data = [
+            {
+                'id': a.id,
+                'tipo': a.tipo,
+                'estado_firma': a.estado_firma,
+                'usuario_nombre': a.usuario_nombre,
+                'ip': a.ip,
+                'detalle': a.detalle,
+                'creado_en': a.creado_en.isoformat() if a.creado_en else None,
+            }
+            for a in qs
+        ]
+        return Response({'count': len(data), 'results': data})
 
     @action(detail=True, methods=['post'])
     def rechazar(self, request, pk=None):

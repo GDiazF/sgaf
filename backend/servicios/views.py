@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db import transaction
 from django.core.files.base import ContentFile
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 import pandas as pd
 import io
 import datetime
@@ -667,11 +667,61 @@ class RecepcionConformeViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
                 {'error': f'No se pudo agrupar los comprobantes: {exc}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+        from firma_digital.access_log import (
+            AccesoDocumentoFirma,
+            registrar_acceso_documento,
+            resolver_pendiente_rc,
+        )
+
+        registrar_acceso_documento(
+            request=request,
+            tipo=AccesoDocumentoFirma.TIPO_COMPROBANTES,
+            pendiente=resolver_pendiente_rc(rc.id),
+            origen='rc',
+            referencia_id=rc.id,
+            via='recepciones',
+        )
         folio = (rc.folio or f'rc-{rc.pk}').replace('/', '-')
         response = HttpResponse(pdf_bytes, content_type='application/pdf')
         response['Content-Disposition'] = (
             f'inline; filename="RC_{folio}_comprobantes.pdf"'
         )
+        return response
+
+    @action(detail=True, methods=['get'])
+    def archivo_firmado(self, request, pk=None):
+        """Sirve archivo_escaneado (PDF firmado/escaneado) con auditoría de acceso."""
+        from firma_digital.access_log import (
+            AccesoDocumentoFirma,
+            registrar_acceso_documento,
+            resolver_pendiente_rc,
+        )
+
+        rc = self.get_object()
+        campo = rc.archivo_escaneado
+        if not campo:
+            return Response(
+                {'error': 'Esta RC no tiene archivo firmado/escaneado.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        try:
+            campo.open('rb')
+        except Exception:
+            return Response(
+                {'error': 'No se pudo abrir el archivo PDF.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        registrar_acceso_documento(
+            request=request,
+            tipo=AccesoDocumentoFirma.TIPO_ARCHIVO_ESCANEADO,
+            pendiente=resolver_pendiente_rc(rc.id),
+            origen='rc',
+            referencia_id=rc.id,
+            via='recepciones',
+        )
+        filename = (campo.name or f'RC_{rc.folio or rc.pk}_firmado.pdf').split('/')[-1]
+        response = FileResponse(campo, content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
         return response
 
     @action(detail=False, methods=['post'])

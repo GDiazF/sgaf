@@ -36,12 +36,6 @@ const formatDateTime = (dateString) => {
 const formatCurrency = (amount) =>
   new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(amount || 0)
 
-const mediaUrl = (path) => {
-  if (!path) return '#'
-  if (path.startsWith('http')) return path
-  return `${import.meta.env.VITE_API_URL || ''}${path}`
-}
-
 const ESTADO_BADGE = {
   EMITIDA: { variant: 'warning', label: 'Pendiente' },
   COMPLETADA: { variant: 'success', label: 'Completada' },
@@ -81,6 +75,7 @@ const RecepcionConformeList = ({ embedded = false }) => {
   const [historyRC, setHistoryRC] = useState(null)
   const [expedienteRC, setExpedienteRC] = useState(null)
   const [loadingComprobantesPdf, setLoadingComprobantesPdf] = useState(false)
+  const [loadingArchivoFirmado, setLoadingArchivoFirmado] = useState(false)
   const [processingIds, setProcessingIds] = useState([])
   const [confirmTarget, setConfirmTarget] = useState(null)
   const [confirming, setConfirming] = useState(false)
@@ -254,6 +249,47 @@ const RecepcionConformeList = ({ embedded = false }) => {
       notify({ variant: 'danger', text: message })
     } finally {
       setLoadingComprobantesPdf(false)
+    }
+  }
+
+  const handleOpenArchivoFirmado = async (rc) => {
+    if (!rc?.id || loadingArchivoFirmado) return
+    setLoadingArchivoFirmado(true)
+    try {
+      const response = await api.get(`recepciones-conformes/${rc.id}/archivo_firmado/`, {
+        responseType: 'blob',
+      })
+      const blob = response.data
+      if (blob?.type?.includes('json')) {
+        const text = await blob.text()
+        let msg = 'No se pudo abrir el PDF firmado.'
+        try {
+          msg = JSON.parse(text).error || msg
+        } catch {
+          /* ignore */
+        }
+        notify({ variant: 'danger', text: msg })
+        return
+      }
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))
+      window.open(url, '_blank', 'noopener,noreferrer')
+      setTimeout(() => window.URL.revokeObjectURL(url), 60_000)
+    } catch (error) {
+      let message = 'No se pudo abrir el PDF firmado.'
+      const data = error?.response?.data
+      if (data instanceof Blob) {
+        try {
+          const payload = JSON.parse(await data.text())
+          message = payload.error || message
+        } catch {
+          /* ignore */
+        }
+      } else if (data?.error) {
+        message = data.error
+      }
+      notify({ variant: 'danger', text: message })
+    } finally {
+      setLoadingArchivoFirmado(false)
     }
   }
 
@@ -627,15 +663,16 @@ const RecepcionConformeList = ({ embedded = false }) => {
                         </Button>
                       ) : null}
                       {canView && item.archivo_escaneado ? (
-                        <a
-                          href={mediaUrl(item.archivo_escaneado)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn btn--ghost btn--sm"
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           title="Ver documento firmado"
+                          loading={loadingArchivoFirmado}
+                          disabled={loadingArchivoFirmado}
+                          onClick={() => handleOpenArchivoFirmado(item)}
                         >
                           <Icon name="file" size="sm" />
-                        </a>
+                        </Button>
                       ) : null}
                       {can('servicios.change_recepcionconforme') &&
                       item.archivo_escaneado &&
@@ -942,17 +979,37 @@ const RecepcionConformeList = ({ embedded = false }) => {
                       ? 'create'
                       : ev?.accion === 'MODIFICACION_PAGOS' ||
                           ev?.accion === 'RECHAZO_FIRMA' ||
-                          ev?.accion === 'ANULACION'
+                          ev?.accion === 'ANULACION' ||
+                          ev?.accion === 'ANULACION_FIRMA'
                         ? 'danger'
-                        : 'info'
+                        : ev?.accion === 'DESCARGA_PDF_FIRMADO' ||
+                            ev?.accion === 'DESCARGA_COMPROBANTES'
+                          ? 'info'
+                          : 'info'
                   }`}
                 >
                   <Icon name="activity" size="sm" />
                 </div>
                 <div className="rc-history-timeline__card">
                   <div className="rc-history-timeline__meta">
-                    <Badge variant="neutral">
-                      {(ev?.accion || '').replace(/_/g, ' ') || 'Evento'}
+                    <Badge
+                      variant={
+                        ev?.accion === 'DESCARGA_PDF_FIRMADO' ||
+                        ev?.accion === 'DESCARGA_COMPROBANTES'
+                          ? 'accent'
+                          : 'neutral'
+                      }
+                    >
+                      {(
+                        {
+                          DESCARGA_PDF_FIRMADO: 'Descarga PDF firmado',
+                          DESCARGA_COMPROBANTES: 'Descarga comprobantes',
+                          ANULACION_FIRMA: 'Anulación firma',
+                          FIRMADO_DIGITAL: 'Firmado digital',
+                          RECHAZO_FIRMA: 'Rechazo firma',
+                          ENVIO_FIRMA: 'Envío a firmar',
+                        }[ev?.accion] || (ev?.accion || '').replace(/_/g, ' ')
+                      ) || 'Evento'}
                     </Badge>
                     <time>{formatDateTime(ev?.fecha)}</time>
                   </div>
@@ -998,13 +1055,9 @@ const RecepcionConformeList = ({ embedded = false }) => {
                   variant="primary"
                   size="sm"
                   type="button"
-                  onClick={() =>
-                    window.open(
-                      mediaUrl(expedienteRC.archivo_escaneado),
-                      '_blank',
-                      'noopener,noreferrer',
-                    )
-                  }
+                  loading={loadingArchivoFirmado}
+                  disabled={loadingArchivoFirmado}
+                  onClick={() => handleOpenArchivoFirmado(expedienteRC)}
                 >
                   Abrir PDF
                 </Button>

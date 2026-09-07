@@ -5,7 +5,7 @@ from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 import base64
 
-from .models import ConfiguracionSelloFirma, DocumentoFirmado, FirmaPendiente, SelloFirma
+from .models import AccesoDocumentoFirma, ConfiguracionSelloFirma, DocumentoFirmado, FirmaPendiente, SelloFirma
 
 
 def _thumb(file_field):
@@ -310,9 +310,10 @@ class DocumentoFirmadoAdmin(admin.ModelAdmin):
         'firmante_nombre',
         'origen',
         'firmado_en',
+        'anulado',
         'nombre_archivo',
     )
-    list_filter = ('origen', 'purpose')
+    list_filter = ('origen', 'purpose', 'anulado')
     search_fields = ('codigo', 'firmante_nombre', 'firmante_run', 'hash_sha256')
     readonly_fields = (
         'codigo',
@@ -325,7 +326,53 @@ class DocumentoFirmadoAdmin(admin.ModelAdmin):
         'firmante_cargo',
         'firmado_por',
         'firmado_en',
+        'anulado',
+        'anulado_en',
+        'motivo_anulacion',
     )
+
+
+@admin.register(AccesoDocumentoFirma)
+class AccesoDocumentoFirmaAdmin(admin.ModelAdmin):
+    list_display = (
+        'creado_en',
+        'tipo',
+        'estado_firma',
+        'usuario_nombre',
+        'pendiente',
+        'origen',
+        'referencia_id',
+        'ip',
+    )
+    list_filter = ('tipo', 'estado_firma', 'origen')
+    search_fields = (
+        'usuario_nombre',
+        'detalle',
+        'pendiente__codigo_interno',
+        'documento_registro__codigo',
+        'ip',
+    )
+    readonly_fields = (
+        'pendiente',
+        'documento_registro',
+        'origen',
+        'referencia_id',
+        'tipo',
+        'estado_firma',
+        'usuario',
+        'usuario_nombre',
+        'ip',
+        'user_agent',
+        'detalle',
+        'creado_en',
+    )
+    ordering = ('-creado_en',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(FirmaPendiente)

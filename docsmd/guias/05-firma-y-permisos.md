@@ -61,6 +61,8 @@ Tras la firma digital la RC queda **Completada** y **bloqueada** en pagos/recepc
 4. **Rechazar** (antes de firmar) es distinto: el documento queda en **Rechazados** y no invalida un `SGAF-…` ya emitido.
 5. **Anular la RC** (negocio, libera pagos) no es lo mismo que anular la firma; mientras la firma digital esté vigente, anular la RC está bloqueado.
 
+La anulación es **institucional en SGAF** (no revoca la firma criptográfica en FirmaGob). Las aperturas/descargas del PDF firmado y de los comprobantes del expediente quedan auditadas: aparecen en la **trazabilidad de la RC** (`DESCARGA_PDF_FIRMADO` / `DESCARGA_COMPROBANTES`, con el estado de la firma en ese momento) y en el registro técnico `AccesoDocumentoFirma` (Admin Django o `GET …/pendientes/{id}/accesos/`). Así se puede ver quién consultó el documento **antes o después** de anular.
+
 ---
 
 ## Producción vs pruebas (CERT)

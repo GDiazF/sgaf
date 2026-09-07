@@ -25,6 +25,7 @@ EXCLUDED_LABELS = {
     'otp_totp.TOTPDevice',
     'contratos.HistorialContrato',
     'servicios.HistorialRecepcionConforme',
+    'firma_digital.AccesoDocumentoFirma',
     'ejecutivos.HistorialGestion',
     'tickets.TicketHistory',
     'tickets.TicketUserActivity',
