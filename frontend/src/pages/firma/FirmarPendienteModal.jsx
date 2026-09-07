@@ -373,6 +373,38 @@ export default function FirmarPendienteModal({ open, pendiente, onClose, onFirma
         </Alert>
       ) : null}
 
+      {!loadingPdf && !loadError && pendiente?.origen === 'rc' && (pendiente?.meta?.anexos || []).length > 0 ? (
+        <Alert
+          variant="info"
+          title={`Comprobantes del expediente (${pendiente.meta.anexos.length})`}
+        >
+          Se firma solo la recepción conforme. Los comprobantes quedan como anexos del
+          expediente (no se incluyen en este PDF).
+          <ul className="rc-history-timeline">
+            {pendiente.meta.anexos.map((a) => (
+              <li key={a.pago_id || a.nombre} className="rc-history-timeline__card">
+                {a.url ? (
+                  <a
+                    href={
+                      a.url.startsWith('http')
+                        ? a.url
+                        : `${import.meta.env.VITE_API_URL || ''}${a.url}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {a.nombre || `Pago ${a.pago_id}`}
+                  </a>
+                ) : (
+                  <span>{a.nombre || `Pago ${a.pago_id}`}</span>
+                )}
+                {a.nro_documento ? ` · Doc. ${a.nro_documento}` : ''}
+              </li>
+            ))}
+          </ul>
+        </Alert>
+      ) : null}
+
       {!loadingPdf && !loadError && preview ? (
         <div className="firma-sign-layout">
           <div className="firma-sign-layout__viewer">

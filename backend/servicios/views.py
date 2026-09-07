@@ -579,7 +579,7 @@ class RecepcionConformeViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def enviar_a_firmar(self, request, pk=None):
-        """Envía o reenvía la RC a la bandeja de firmas (RC + anexos PDF)."""
+        """Envía o reenvía la RC a la bandeja de firmas (solo PDF de la RC; anexos en expediente)."""
         rc = self.get_object()
         tipo = (request.data.get('tipo') or 'PAGO').upper()
         try:
@@ -592,15 +592,20 @@ class RecepcionConformeViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
             import logging
             logging.getLogger(__name__).exception('Error enviando RC %s a firmar', rc.pk)
             return Response(
-                {'error': f'No se pudo armar el paquete de firma: {exc}'},
+                {'error': f'No se pudo armar el documento de firma: {exc}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+        anexos = (pendiente.meta or {}).get('anexos') or []
         return Response(
             {
-                'message': 'Documento enviado a la bandeja de firmas.',
+                'message': (
+                    'Recepción conforme enviada a la bandeja de firmas. '
+                    'Se firma solo la RC; los comprobantes quedan como anexos del expediente.'
+                ),
                 'codigo_interno': pendiente.codigo_interno,
                 'pendiente_id': pendiente.id,
-                'anexos': (pendiente.meta or {}).get('anexos') or [],
+                'anexos': anexos,
+                'paginas_paquete': (pendiente.meta or {}).get('paginas_paquete') or 'rc',
             },
             status=status.HTTP_200_OK,
         )

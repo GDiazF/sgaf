@@ -64,7 +64,21 @@ def _raise_from_dep(payload: Any, http_status: int | None) -> None:
             msg = ' '.join(str(m) for m in raw_msg)
         else:
             msg = str(raw_msg or 'Error en firma-dep.')
-        detail = payload.get('detail') or payload.get('rawResponse')
+        detail = (
+            payload.get('detail')
+            or payload.get('firmaGobRaw')
+            or payload.get('rawResponse')
+        )
+        # Preferir detalle textual de FirmaGob cuando el mensaje es genérico de axios.
+        if detail and (
+            'status code' in msg.lower() or msg.lower().startswith('request failed')
+        ):
+            if isinstance(detail, dict):
+                nested = detail.get('message') or detail.get('error') or detail.get('msg')
+                if nested:
+                    msg = str(nested)
+            elif isinstance(detail, str) and detail.strip():
+                msg = detail.strip()[:500]
         raise FirmaGobError(str(msg), status_code=http_status, payload=detail or payload)
     raise FirmaGobError(
         f'Error en firma-dep (HTTP {http_status}).',

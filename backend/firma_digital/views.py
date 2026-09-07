@@ -20,7 +20,14 @@ from .queue import (
     rechazar_firma,
     usuario_es_firmante_de,
 )
-from .registry import documento_a_dict, normalizar_codigo, registrar_documento, sha256_hex
+from .registry import (
+    documento_a_dict,
+    liberar_reserva,
+    normalizar_codigo,
+    registrar_documento,
+    reservar_documento,
+    sha256_hex,
+)
 from .resolve import resolver_sello, rut_to_firmagob_run
 from .serializers import FirmaPendienteSerializer, SelloFirmaSerializer
 from .stamp import (
@@ -301,32 +308,62 @@ class FirmaGobProbarView(APIView):
 
         try:
             if mode == MODE_DESATENDIDA:
-                signed = sign_pdf_desatendida(
-                    pdf['bytes'],
-                    rut=rut,
-                    file_name=pdf['file'].name or 'documento.pdf',
-                    entity=entity,
-                    validation_url=validation_url_for(),
-                    visible_seal=with_stamp,
-                    seal_page=seal_page,
-                    seal_top_margin_cm=round(seal_top, 2),
-                    seal_left_margin_cm=round(seal_left, 2),
+                reserva = reservar_documento(
+                    nombre_archivo=pdf['file'].name or 'documento.pdf',
+                    origen='prueba',
+                    purpose='Desatendido',
+                    firmante_nombre=signer_name,
+                    firmante_run=rut_to_firmagob_run(rut),
+                    firmante_cargo=role,
+                    user=request.user,
                 )
+                try:
+                    signed = sign_pdf_desatendida(
+                        pdf['bytes'],
+                        rut=rut,
+                        file_name=pdf['file'].name or 'documento.pdf',
+                        entity=entity,
+                        validation_url=validation_url_for(reserva.codigo),
+                        document_id=reserva.codigo,
+                        visible_seal=with_stamp,
+                        seal_page=seal_page,
+                        seal_top_margin_cm=round(seal_top, 2),
+                        seal_left_margin_cm=round(seal_left, 2),
+                    )
+                except Exception:
+                    liberar_reserva(reserva)
+                    raise
                 purpose = 'Desatendido'
+                codigo_validacion = reserva.codigo
             else:
-                signed = sign_pdf_atendida(
-                    pdf['bytes'],
-                    rut=rut,
-                    otp=otp,
-                    file_name=pdf['file'].name or 'documento.pdf',
-                    entity=entity,
-                    validation_url=validation_url_for(),
-                    visible_seal=with_stamp,
-                    seal_page=seal_page,
-                    seal_top_margin_cm=round(seal_top, 2),
-                    seal_left_margin_cm=round(seal_left, 2),
+                reserva = reservar_documento(
+                    nombre_archivo=pdf['file'].name or 'documento.pdf',
+                    origen='prueba',
+                    purpose=PURPOSE_ATENDIDO,
+                    firmante_nombre=signer_name,
+                    firmante_run=rut_to_firmagob_run(rut),
+                    firmante_cargo=role,
+                    user=request.user,
                 )
+                try:
+                    signed = sign_pdf_atendida(
+                        pdf['bytes'],
+                        rut=rut,
+                        otp=otp,
+                        file_name=pdf['file'].name or 'documento.pdf',
+                        entity=entity,
+                        validation_url=validation_url_for(reserva.codigo),
+                        document_id=reserva.codigo,
+                        visible_seal=with_stamp,
+                        seal_page=seal_page,
+                        seal_top_margin_cm=round(seal_top, 2),
+                        seal_left_margin_cm=round(seal_left, 2),
+                    )
+                except Exception:
+                    liberar_reserva(reserva)
+                    raise
                 purpose = PURPOSE_ATENDIDO
+                codigo_validacion = reserva.codigo
         except FirmaGobError as exc:
             http_status = firmagob_http_status(exc)
             body = {'error': exc.message}
@@ -349,6 +386,7 @@ class FirmaGobProbarView(APIView):
             firmante_run=rut_to_firmagob_run(rut),
             firmante_cargo=role,
             user=request.user,
+            codigo=codigo_validacion,
         )
 
         response = HttpResponse(signed, content_type='application/pdf')

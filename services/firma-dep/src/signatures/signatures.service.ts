@@ -989,15 +989,33 @@ export class SignaturesService {
         axiosError.message ||
         'Error desconocido al llamar a FirmaGob.';
 
+      const rawSnippet =
+        typeof responseData === 'string'
+          ? responseData.slice(0, 800)
+          : (() => {
+              try {
+                return JSON.stringify(responseData)?.slice(0, 800) ?? '';
+              } catch {
+                return '[unserializable]';
+              }
+            })();
+
       this.logger.error(
-        `FirmaGob respondio con error. status=${status} message=${apiMessage}`,
+        `FirmaGob respondio con error. status=${status} message=${apiMessage} body=${rawSnippet}`,
       );
 
-      // Preferir el mensaje real de FirmaGob cuando aporta detalle (certificado, OTP, etc.).
-      const userMessage =
+      // Preferir el mensaje real de FirmaGob cuando aporta detalle (certificado, OTP, tamaño, etc.).
+      let userMessage =
         typeof apiMessage === 'string' && apiMessage.trim().length > 0
           ? apiMessage.trim()
           : this.resolveFirmaGobErrorMessage(status);
+
+      const bodyLower = `${apiMessage || ''} ${rawSnippet || ''}`.toLowerCase();
+      if (status === 400 && (bodyLower.includes('5 mb') || bodyLower.includes('tamaño'))) {
+        userMessage =
+          'FirmaGob rechazó la solicitud: el documento supera el límite de 5 MB de la API. '
+          + 'Firme solo la recepción conforme; los comprobantes van como anexos del expediente.';
+      }
 
       return verboseError
         ? { ok: false, message: userMessage, statusCode: status, error: apiMessage, firmaGobRaw: responseData ?? null }

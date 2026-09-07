@@ -9,8 +9,11 @@ from django.utils import timezone
 
 from .client import PURPOSE_ATENDIDO, normalize_otp
 from .models import DocumentoFirmado, FirmaPendiente
-from .registry import registrar_documento
+from .registry import liberar_reserva, registrar_documento, reservar_documento
 from .resolve import rut_to_firmagob_run
+
+# FirmaGob limita la solicitud ~5 MB (PDF en base64 + layout). Margen seguro ~3.5 MB binarios.
+FIRMAGOB_MAX_PDF_BYTES = int(3.5 * 1024 * 1024)
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractBaseUser
@@ -137,7 +140,6 @@ def _registrar_rechazo_origen(pendiente: FirmaPendiente, user, motivo: str) -> N
     )
 
 
-@transaction.atomic
 def firmar_pendiente(
     pendiente: FirmaPendiente,
     user,
@@ -173,6 +175,12 @@ def firmar_pendiente(
         raise ValueError('Falta el PDF a firmar.')
     if urx <= llx or ury <= lly:
         raise ValueError('Coordenadas de sello inválidas.')
+    if len(pdf_bytes) > FIRMAGOB_MAX_PDF_BYTES:
+        raise ValueError(
+            'El PDF supera el tamaño máximo que acepta FirmaGob '
+            f'(~{FIRMAGOB_MAX_PDF_BYTES / (1024 * 1024):.1f} MB). '
+            'Firme solo la recepción conforme; los comprobantes quedan como anexos del expediente.'
+        )
 
     funcionario = pendiente.firmante
     rut = (funcionario.rut if funcionario else '') or ''
@@ -185,31 +193,8 @@ def firmar_pendiente(
     role = (funcionario.cargo or '').strip() if funcionario else ''
     entity = getattr(settings, 'FIRMAGOB_ENTITY', '') or None
 
-    # Márgenes reales desde coordenadas PDF (altura de la página del PDF, no A4 fijo).
-    seal_page = seal_page_from_pdf_page(page)
-    _w, page_h = get_pdf_page_size_pt(pdf_bytes, seal_page)
-    seal_top_cm, seal_left_cm = pdf_box_to_seal_margins_cm(
-        llx=llx,
-        ury=ury,
-        page_height_pt=page_h,
-    )
-
-    signed = sign_pdf_atendida(
-        pdf_bytes,
-        rut=rut,
-        otp=otp_code,
-        file_name=f'{pendiente.codigo_interno or "documento"}.pdf',
-        entity=entity,
-        validation_url=validation_url_for(pendiente.codigo_interno),
-        document_id=pendiente.codigo_interno or None,
-        visible_seal=True,
-        seal_page=seal_page,
-        seal_top_margin_cm=seal_top_cm,
-        seal_left_margin_cm=seal_left_cm,
-    )
-
-    registro = registrar_documento(
-        pdf_bytes=signed,
+    # Reservar SGAF-… antes de FirmaGob (footer/QR). Si falla la firma, liberar.
+    reserva = reservar_documento(
         nombre_archivo=f'{pendiente.codigo_interno}_firmado.pdf',
         origen=pendiente.origen,
         purpose=PURPOSE_ATENDIDO,
@@ -218,18 +203,59 @@ def firmar_pendiente(
         firmante_cargo=role,
         user=user,
     )
+    codigo_validacion = reserva.codigo
 
-    pendiente.archivo_firmado.save(
-        f'{pendiente.codigo_interno}_firmado.pdf',
-        ContentFile(signed),
-        save=False,
+    seal_page = seal_page_from_pdf_page(page)
+    _w, page_h = get_pdf_page_size_pt(pdf_bytes, seal_page)
+    seal_top_cm, seal_left_cm = pdf_box_to_seal_margins_cm(
+        llx=llx,
+        ury=ury,
+        page_height_pt=page_h,
     )
-    pendiente.estado = FirmaPendiente.ESTADO_FIRMADO
-    pendiente.documento_registro = registro
-    pendiente.firmado_en = timezone.now()
-    pendiente.save()
 
-    _aplicar_efecto_origen(pendiente, signed)
+    try:
+        signed = sign_pdf_atendida(
+            pdf_bytes,
+            rut=rut,
+            otp=otp_code,
+            file_name=f'{pendiente.codigo_interno or "documento"}.pdf',
+            entity=entity,
+            validation_url=validation_url_for(codigo_validacion),
+            document_id=codigo_validacion,
+            visible_seal=True,
+            seal_page=seal_page,
+            seal_top_margin_cm=seal_top_cm,
+            seal_left_margin_cm=seal_left_cm,
+        )
+    except Exception:
+        liberar_reserva(reserva)
+        raise
+
+    with transaction.atomic():
+        registro = registrar_documento(
+            pdf_bytes=signed,
+            nombre_archivo=f'{pendiente.codigo_interno}_firmado.pdf',
+            origen=pendiente.origen,
+            purpose=PURPOSE_ATENDIDO,
+            firmante_nombre=signer_name,
+            firmante_run=rut_to_firmagob_run(rut),
+            firmante_cargo=role,
+            user=user,
+            codigo=codigo_validacion,
+        )
+
+        pendiente.archivo_firmado.save(
+            f'{pendiente.codigo_interno}_firmado.pdf',
+            ContentFile(signed),
+            save=False,
+        )
+        pendiente.estado = FirmaPendiente.ESTADO_FIRMADO
+        pendiente.documento_registro = registro
+        pendiente.firmado_en = timezone.now()
+        pendiente.save()
+
+        _aplicar_efecto_origen(pendiente, signed)
+
     from .notify import marcar_notificaciones_firma
 
     marcar_notificaciones_firma(pendiente)
@@ -254,6 +280,9 @@ def _aplicar_efecto_origen(pendiente: FirmaPendiente, signed: bytes) -> None:
         HistorialRecepcionConforme.objects.create(
             recepcion_conforme=rc,
             accion='FIRMADO_DIGITAL',
-            detalle=f'Firmado digitalmente ({pendiente.codigo_interno}).',
+            detalle=(
+                f'Firmado digitalmente ({pendiente.codigo_interno}'
+                f'{f", validación {pendiente.documento_registro.codigo}" if pendiente.documento_registro_id else ""}).'
+            ),
             usuario=pendiente.firmante.nombre_funcionario if pendiente.firmante else 'Sistema',
         )

@@ -18,6 +18,7 @@ import {
   ConfirmModal,
   EmptyState,
   Icon,
+  Alert,
   useFormOverlay,
   formatApiFormError,
 } from '@slep/ui'
@@ -79,6 +80,7 @@ const RecepcionConformeList = ({ embedded = false }) => {
   const editOverlay = useFormOverlay()
 
   const [historyRC, setHistoryRC] = useState(null)
+  const [expedienteRC, setExpedienteRC] = useState(null)
   const [processingIds, setProcessingIds] = useState([])
   const [confirmTarget, setConfirmTarget] = useState(null)
   const [confirming, setConfirming] = useState(false)
@@ -227,9 +229,9 @@ const RecepcionConformeList = ({ embedded = false }) => {
         variant: 'success',
         text:
           data?.message ||
-          `Enviado a firmar (${data?.codigo_interno || 'OK'})${
-            anexos ? ` · ${anexos} anexo(s)` : ''
-          }.`,
+          `Enviado a firmar (${data?.codigo_interno || 'OK'}): solo la RC` +
+            (anexos ? ` · ${anexos} comprobante(s) en el expediente` : '') +
+            '.',
       })
     } catch (error) {
       notify({
@@ -422,8 +424,8 @@ const RecepcionConformeList = ({ embedded = false }) => {
       return {
         title: 'Reenviar a firmar',
         description: motivo
-          ? `¿Reenviar la RC ${folio} a la bandeja de firmas? Motivo del rechazo anterior: ${motivo}`
-          : `¿Reenviar la RC ${folio} a la bandeja de firmas (RC + anexos)?`,
+          ? `¿Reenviar la RC ${folio} a la bandeja? Se firma solo la RC; los comprobantes quedan en el expediente. Motivo del rechazo anterior: ${motivo}`
+          : `¿Reenviar la RC ${folio} a la bandeja? Se firma solo la RC; los comprobantes quedan como anexos del expediente.`,
         confirmLabel: 'Reenviar',
         danger: false,
       }
@@ -489,6 +491,16 @@ const RecepcionConformeList = ({ embedded = false }) => {
                   Firmada digital
                 </Badge>
               ) : null}
+              {item.firma_paquete_modo === 'rc+anexos' && item.firma_estado === 'firmado' ? (
+                <Badge variant="neutral" title="PDF firmado histórico incluye RC + anexos">
+                  Paquete histórico
+                </Badge>
+              ) : null}
+              {item.firma_paquete_modo === 'rc' && item.firma_estado === 'firmado' ? (
+                <Badge variant="neutral" title="Firmada solo la RC; comprobantes en el expediente">
+                  RC + anexos aparte
+                </Badge>
+              ) : null}
             </div>
           )
         },
@@ -547,24 +559,35 @@ const RecepcionConformeList = ({ embedded = false }) => {
 
               {!isAnulada ? (
                 <>
-                  {item.archivo_escaneado ? (
+                  {item.archivo_escaneado ||
+                  (item.expediente_comprobantes && item.expediente_comprobantes.length > 0) ? (
                     <>
                       {canView ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Expediente (documento firmado + comprobantes)"
+                          onClick={() => setExpedienteRC(item)}
+                        >
+                          <Icon name="attach" size="sm" />
+                        </Button>
+                      ) : null}
+                      {canView && item.archivo_escaneado ? (
                         <a
                           href={mediaUrl(item.archivo_escaneado)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn btn--ghost btn--sm"
-                          title="Ver recepción escaneada"
+                          title="Ver documento firmado"
                         >
                           <Icon name="file" size="sm" />
                         </a>
                       ) : null}
-                      {can('servicios.change_recepcionconforme') ? (
+                      {can('servicios.change_recepcionconforme') && item.archivo_escaneado ? (
                         <Button
                           variant="ghost"
                           size="sm"
-                          title="Eliminar archivo"
+                          title="Eliminar archivo firmado"
                           disabled={processing}
                           onClick={() => setConfirmTarget({ type: 'deleteFile', item })}
                         >
@@ -625,7 +648,7 @@ const RecepcionConformeList = ({ embedded = false }) => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      title="Enviar a firmar (RC + anexos)"
+                      title="Enviar a firmar (solo RC; comprobantes en expediente)"
                       disabled={processing}
                       onClick={() => handleEnviarAFirmar(item)}
                     >
@@ -867,6 +890,81 @@ const RecepcionConformeList = ({ embedded = false }) => {
           ) : (
             <EmptyState title="Sin registros históricos." />
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!expedienteRC}
+        onClose={() => setExpedienteRC(null)}
+        title="Expediente"
+        size="md"
+        subheader={expedienteRC?.folio || 'RC sin folio'}
+      >
+        {expedienteRC?.firma_paquete_modo === 'rc+anexos' ? (
+          <Alert variant="info" title="Paquete histórico">
+            Este documento se firmó como un único PDF (RC + anexos). Los comprobantes de
+            origen también aparecen abajo.
+          </Alert>
+        ) : (
+          <Alert variant="info" title="Documento firmado y anexos">
+            La firma digital aplica a la recepción conforme. Los comprobantes se conservan
+            como anexos del expediente (no van firmados dentro del mismo PDF).
+          </Alert>
+        )}
+
+        <div className="crud-form">
+          <Field label="Documento firmado">
+            <div className="data-table__actions">
+              {expedienteRC?.archivo_escaneado ? (
+                <a
+                  href={mediaUrl(expedienteRC.archivo_escaneado)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn--outline btn--sm"
+                >
+                  Abrir PDF firmado
+                </a>
+              ) : (
+                <span>Aún no hay PDF firmado.</span>
+              )}
+              {expedienteRC?.firma_codigo_validacion ? (
+                <Link
+                  className="btn btn--ghost btn--sm"
+                  to={`/validar/${expedienteRC.firma_codigo_validacion}`}
+                >
+                  Validar {expedienteRC.firma_codigo_validacion}
+                </Link>
+              ) : null}
+            </div>
+          </Field>
+
+          <Field
+            label={`Comprobantes (${expedienteRC?.expediente_comprobantes?.length || 0})`}
+          >
+            {expedienteRC?.expediente_comprobantes?.length > 0 ? (
+              <ul className="rc-history-timeline">
+                {expedienteRC.expediente_comprobantes.map((c) => (
+                  <li key={c.pago_id || c.nombre} className="rc-history-timeline__card">
+                    {c.url ? (
+                      <a href={mediaUrl(c.url)} target="_blank" rel="noopener noreferrer">
+                        {c.nombre || `Pago ${c.pago_id}`}
+                      </a>
+                    ) : (
+                      <span>{c.nombre || `Pago ${c.pago_id}`}</span>
+                    )}
+                    <div className="rc-history-timeline__meta">
+                      {c.nro_documento ? <span>Doc. {c.nro_documento}</span> : null}
+                      {c.size_bytes ? (
+                        <span>{(c.size_bytes / (1024 * 1024)).toFixed(2)} MB</span>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState title="Sin comprobantes asociados." />
+            )}
+          </Field>
         </div>
       </Modal>
 

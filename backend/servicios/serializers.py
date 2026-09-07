@@ -86,6 +86,8 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
     firma_pendiente_id = serializers.SerializerMethodField()
     firma_codigo_interno = serializers.SerializerMethodField()
     firma_codigo_validacion = serializers.SerializerMethodField()
+    firma_paquete_modo = serializers.SerializerMethodField()
+    expediente_comprobantes = serializers.SerializerMethodField()
     puede_enviar_firma = serializers.SerializerMethodField()
     puede_reenviar_firma = serializers.SerializerMethodField()
 
@@ -121,6 +123,12 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
 
     def get_firma_codigo_validacion(self, obj):
         return self._firma_info(obj)['firma_codigo_validacion']
+
+    def get_firma_paquete_modo(self, obj):
+        return self._firma_info(obj).get('firma_paquete_modo')
+
+    def get_expediente_comprobantes(self, obj):
+        return self._firma_info(obj).get('expediente_comprobantes') or []
 
     def get_puede_enviar_firma(self, obj):
         return self._firma_info(obj)['puede_enviar_firma']

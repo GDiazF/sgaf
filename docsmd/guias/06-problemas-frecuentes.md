@@ -74,6 +74,22 @@ Revise [05 — Firma y permisos](./05-firma-y-permisos.md) (permiso + funcionari
 
 - RC debe estar **Emitida** con **firmante** asignado.
 - Backend actualizado: `git pull` + `docker compose restart backend`.
+- Se firma **solo el PDF de la RC**. Los comprobantes quedan en el **expediente** (ícono de adjuntos en el listado).
+- Si un pendiente antiguo tiene un PDF enorme (RC+anexos), **reenvíe a firmar** para regenerar solo la RC.
+
+### FirmaGob responde 400 / «Error» genérico
+
+Causa frecuente: el PDF supera el límite de **~5 MB** de la API FirmaGob (tras base64). Con el flujo actual (solo RC) no debería ocurrir.
+
+```bash
+docker compose logs firma-dep --tail=100 | grep -i Firmagob
+```
+
+### El link del pie del PDF no valida (código FP-… vs SGAF-…)
+
+- **Usar siempre** el código `SGAF-AAAA-NNNN` (bandeja → Validación).
+- `FP-…` es el código interno de la bandeja, no el del validador público.
+- Firmas nuevas incrustan `SGAF-…` en el pie/QR. PDFs antiguos con `FP-…` en el pie no se reescriben.
 
 ### Firma falla o «no autorizado»
 
