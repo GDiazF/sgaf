@@ -129,6 +129,7 @@ class FirmaPendienteSerializer(serializers.ModelSerializer):
     )
     estado_label = serializers.SerializerMethodField()
     tiene_archivo_origen = serializers.SerializerMethodField()
+    tiene_comprobantes_expediente = serializers.SerializerMethodField()
 
     class Meta:
         model = FirmaPendiente
@@ -142,6 +143,7 @@ class FirmaPendienteSerializer(serializers.ModelSerializer):
             'estado',
             'estado_label',
             'tiene_archivo_origen',
+            'tiene_comprobantes_expediente',
             'firmante',
             'firmante_nombre',
             'grupo_firmante',
@@ -166,6 +168,23 @@ class FirmaPendienteSerializer(serializers.ModelSerializer):
 
     def get_tiene_archivo_origen(self, obj):
         return bool(obj.archivo_origen)
+
+    def get_tiene_comprobantes_expediente(self, obj):
+        if obj.origen != 'rc':
+            return False
+        anexos = (obj.meta or {}).get('anexos') or []
+        if any(not a.get('omitido') for a in anexos):
+            return True
+        # Históricos sin meta.anexos: consultar pagos con comprobante.
+        try:
+            from servicios.models import RecepcionConforme
+
+            rc = RecepcionConforme.objects.filter(pk=obj.referencia_id).first()
+            if not rc:
+                return False
+            return rc.registros.exclude(comprobante='').exclude(comprobante=None).exists()
+        except Exception:
+            return False
 
     def get_estado_label(self, obj):
         return obj.get_estado_display()

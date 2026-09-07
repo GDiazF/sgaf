@@ -15,6 +15,7 @@ import {
   Field,
   Textarea,
   Modal,
+  Alert,
 } from '@slep/ui'
 
 const TABS = [
@@ -52,6 +53,8 @@ export default function BandejaFirmas() {
   const [rejecting, setRejecting] = useState(false)
   const [revisandoId, setRevisandoId] = useState(null)
   const [revisarState, setRevisarState] = useState(null)
+  const [expedienteTarget, setExpedienteTarget] = useState(null)
+  const [loadingComprobantesPdf, setLoadingComprobantesPdf] = useState(false)
 
   const fetchCounts = useCallback(async () => {
     try {
@@ -159,6 +162,47 @@ export default function BandejaFirmas() {
     }
   }
 
+  const handleOpenComprobantesPdf = async (item) => {
+    if (!item?.id || loadingComprobantesPdf) return
+    setLoadingComprobantesPdf(true)
+    try {
+      const response = await api.get(`firma-digital/pendientes/${item.id}/comprobantes_pdf/`, {
+        responseType: 'blob',
+      })
+      const blob = response.data
+      if (blob?.type?.includes('json')) {
+        const text = await blob.text()
+        let msg = 'No se pudo generar el PDF de comprobantes.'
+        try {
+          msg = JSON.parse(text).error || msg
+        } catch {
+          /* ignore */
+        }
+        notify({ variant: 'danger', text: msg })
+        return
+      }
+      const pdfUrl = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))
+      window.open(pdfUrl, '_blank', 'noopener,noreferrer')
+      setTimeout(() => window.URL.revokeObjectURL(pdfUrl), 60_000)
+    } catch (err) {
+      let message = 'No se pudo abrir el PDF de comprobantes.'
+      const data = err?.response?.data
+      if (data instanceof Blob) {
+        try {
+          const payload = JSON.parse(await data.text())
+          message = payload.error || message
+        } catch {
+          /* ignore */
+        }
+      } else if (data?.error) {
+        message = data.error
+      }
+      notify({ variant: 'danger', text: message })
+    } finally {
+      setLoadingComprobantesPdf(false)
+    }
+  }
+
   const handleReject = async () => {
     if (!rejectTarget) return
     setRejecting(true)
@@ -262,7 +306,7 @@ export default function BandejaFirmas() {
                 Rechazar
               </Button>
             </div>
-          ) : tab === 'firmado' && item.codigo_validacion ? (
+          ) : tab === 'firmado' ? (
             <div className="data-table__actions">
               <Button
                 variant="outline"
@@ -273,13 +317,20 @@ export default function BandejaFirmas() {
               >
                 Revisar
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(`/validar/${item.codigo_validacion}`, '_blank')}
-              >
-                Validar
-              </Button>
+              {item.codigo_validacion ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(`/validar/${item.codigo_validacion}`, '_blank')}
+                >
+                  Validar
+                </Button>
+              ) : null}
+              {item.origen === 'rc' ? (
+                <Button variant="outline" size="sm" onClick={() => setExpedienteTarget(item)}>
+                  Expediente
+                </Button>
+              ) : null}
             </div>
           ) : tab === 'rechazado' ? (
             <Button
@@ -393,6 +444,74 @@ export default function BandejaFirmas() {
         loading={Boolean(revisarState?.loading)}
         error={revisarState?.error || null}
       />
+
+      <Modal
+        open={Boolean(expedienteTarget)}
+        onClose={() => setExpedienteTarget(null)}
+        title="Expediente"
+        size="md"
+        subheader={
+          expedienteTarget?.titulo || expedienteTarget?.codigo_interno || 'Documento firmado'
+        }
+      >
+        <Alert variant="info" title="Documento firmado y anexos">
+          La firma digital aplica a la recepción conforme. Los comprobantes se agrupan en un
+          PDF de soporte del expediente.
+        </Alert>
+        <div className="crud-form">
+          <Field label="Documento firmado">
+            <div className="data-table__actions">
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => {
+                  const item = expedienteTarget
+                  setExpedienteTarget(null)
+                  if (item) handleRevisar(item)
+                }}
+              >
+                Abrir PDF firmado
+              </Button>
+              {expedienteTarget?.codigo_validacion ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  onClick={() =>
+                    window.open(`/validar/${expedienteTarget.codigo_validacion}`, '_blank')
+                  }
+                >
+                  Validar {expedienteTarget.codigo_validacion}
+                </Button>
+              ) : null}
+            </div>
+          </Field>
+          <Field label="Comprobantes">
+            {expedienteTarget?.tiene_comprobantes_expediente ||
+            (expedienteTarget?.meta?.anexos || []).length > 0 ? (
+              <div className="data-table__cell-stack">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  type="button"
+                  loading={loadingComprobantesPdf}
+                  disabled={loadingComprobantesPdf}
+                  onClick={() => handleOpenComprobantesPdf(expedienteTarget)}
+                >
+                  Abrir comprobantes (PDF único)
+                </Button>
+                <Alert variant="info" title="Agrupados">
+                  Todos los comprobantes PDF de los pagos de esta RC se unen en un solo
+                  archivo.
+                </Alert>
+              </div>
+            ) : (
+              <EmptyState title="Sin comprobantes asociados." />
+            )}
+          </Field>
+        </div>
+      </Modal>
 
       <Modal
         open={Boolean(rejectTarget)}

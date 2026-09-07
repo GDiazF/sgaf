@@ -546,6 +546,50 @@ class FirmaPendienteViewSet(viewsets.ReadOnlyModelViewSet):
         response['Content-Disposition'] = f'inline; filename="{filename}"'
         return response
 
+    @action(detail=True, methods=['get'])
+    def comprobantes_pdf(self, request, pk=None):
+        """PDF único con los comprobantes de la RC asociada (expediente)."""
+        pendiente = self.get_object()
+        if pendiente.origen != 'rc':
+            return Response(
+                {'error': 'Este documento no tiene expediente de comprobantes.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not usuario_es_firmante_de(pendiente, request.user):
+            return Response(
+                {'error': 'No está autorizado a ver este expediente.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            from servicios.models import RecepcionConforme
+            from servicios.rc_firma import construir_pdf_comprobantes_rc
+
+            rc = RecepcionConforme.objects.get(pk=pendiente.referencia_id)
+            pdf_bytes = construir_pdf_comprobantes_rc(rc)
+        except RecepcionConforme.DoesNotExist:
+            return Response(
+                {'error': 'No se encontró la recepción conforme asociada.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            import logging
+
+            logging.getLogger(__name__).exception(
+                'Error generando comprobantes del pendiente %s', pendiente.pk
+            )
+            return Response(
+                {'error': f'No se pudo agrupar los comprobantes: {exc}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        folio = (pendiente.meta or {}).get('folio') or pendiente.codigo_interno or pendiente.pk
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = (
+            f'inline; filename="RC_{folio}_comprobantes.pdf"'
+        )
+        return response
+
     @action(detail=True, methods=['post'])
     def rechazar(self, request, pk=None):
         pendiente = self.get_object()
