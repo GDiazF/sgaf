@@ -328,8 +328,11 @@ def context_from_recepcion_conforme(rc, user=None, tipo=None):
     ctx = build_blank_context(usuario_nombre=usuario)
     proveedor = rc.proveedor
     firmante = rc.firmante
+    from django.db.models import F
+
     registros = list(
-        rc.registros.select_related('establecimiento', 'servicio').all()
+        rc.registros.select_related('establecimiento', 'servicio')
+        .order_by(F('orden_en_rc').asc(nulls_last=True), 'id')
     )
     establecimientos = []
     for pago in registros:

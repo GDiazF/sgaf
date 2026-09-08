@@ -614,6 +614,24 @@ class RecepcionConformeViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
     ordering_fields = ['fecha_emision', 'folio', 'proveedor__nombre', 'id']
     search_fields = ['folio', 'proveedor__nombre']
 
+    def get_queryset(self):
+        from django.db.models import F, Prefetch
+
+        return (
+            super()
+            .get_queryset()
+            .select_related('proveedor', 'proveedor__tipo_proveedor', 'grupo_firmante', 'firmante')
+            .prefetch_related(
+                Prefetch(
+                    'registros',
+                    queryset=RegistroPago.objects.select_related(
+                        'establecimiento', 'servicio', 'servicio__proveedor'
+                    ).order_by(F('orden_en_rc').asc(nulls_last=True), 'id'),
+                ),
+                'historial',
+            )
+        )
+
     @action(detail=True, methods=['post'])
     def enviar_a_firmar(self, request, pk=None):
         """Envía o reenvía la RC a la bandeja de firmas (solo PDF de la RC; anexos en expediente)."""
@@ -744,8 +762,10 @@ class RecepcionConformeViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
                     observaciones='Recepción conforme histórica cargada por el sistema.'
                 )
                 
-                # 2. Update payments
-                RegistroPago.objects.filter(id__in=registros_ids).update(recepcion_conforme=rc)
+                # 2. Update payments (preserva orden de selección)
+                from .rc_firma import sync_registros_rc
+
+                sync_registros_rc(rc, registros_ids)
                 
                 # 3. Log history
                 user = request.user.username if request.user else 'Sistema'
@@ -796,7 +816,7 @@ class RecepcionConformeViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
             
         # 1. Liberate payments
         count_released = rc.registros.count()
-        rc.registros.update(recepcion_conforme=None)
+        rc.registros.update(recepcion_conforme=None, orden_en_rc=None)
 
         # 1b. Quitar de bandeja de firmas + notificación al firmante
         from firma_digital.notify import cancelar_firmas_origen

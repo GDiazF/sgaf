@@ -150,6 +150,13 @@ class RegistroPago(models.Model):
     monto_total = models.IntegerField()
     consumo = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Consumo del periodo")
     recepcion_conforme = models.ForeignKey(RecepcionConforme, on_delete=models.SET_NULL, null=True, blank=True, related_name='registros')
+    orden_en_rc = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name='Orden en RC',
+        help_text='Posición del pago dentro de la recepción conforme (orden de selección).',
+    )
     fecha_registro = models.DateTimeField(auto_now_add=True)
     comprobante = models.FileField(
         upload_to='pagos/comprobantes/%Y/%m/', 

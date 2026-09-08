@@ -211,8 +211,9 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
         )
         
         if registros_ids:
-            registros = RegistroPago.objects.filter(id__in=registros_ids)
-            registros.update(recepcion_conforme=rc)
+            from .rc_firma import sync_registros_rc
+
+            sync_registros_rc(rc, registros_ids)
 
         return rc
 
@@ -220,7 +221,7 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
         if instance.estado == 'ANULADA':
             raise serializers.ValidationError("No se puede editar una Recepción Conforme anulada.")
 
-        from .rc_firma import firma_digital_vigente_rc
+        from .rc_firma import firma_digital_vigente_rc, sync_registros_rc
 
         if firma_digital_vigente_rc(instance):
             # Permitir solo campos no estructurales si en el futuro se necesitan;
@@ -261,13 +262,19 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
              removed_ids = current_ids - new_ids
              added_ids = new_ids - current_ids
              
-             # 1. Unassign removed
+             # 1. Validate new before sync
+             if added_ids:
+                 new_registros = RegistroPago.objects.filter(id__in=added_ids)
+                 for reg in new_registros:
+                     if reg.recepcion_conforme and reg.recepcion_conforme != instance:
+                         raise serializers.ValidationError(f"El pago {reg.nro_documento} ya pertenece a otra RC.")
+                     if reg.servicio.proveedor_id != instance.proveedor_id:
+                         raise serializers.ValidationError(f"El pago {reg.nro_documento} no pertenece al proveedor de esta RC.")
+
              if removed_ids:
                  removed_qs = instance.registros.filter(id__in=removed_ids)
                  count_removed = removed_qs.count()
                  removed_docs = ", ".join([str(r.nro_documento) for r in removed_qs])
-                 
-                 removed_qs.update(recepcion_conforme=None)
                  HistorialRecepcionConforme.objects.create(
                     recepcion_conforme=instance,
                     accion='MODIFICACION_PAGOS',
@@ -275,25 +282,21 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
                     usuario=user
                  )
              
-             # 2. Assign new
              if added_ids:
-                 new_registros = RegistroPago.objects.filter(id__in=added_ids)
-                 
-                 added_docs = []
-                 for reg in new_registros:
-                     if reg.recepcion_conforme and reg.recepcion_conforme != instance:
-                         raise serializers.ValidationError(f"El pago {reg.nro_documento} ya pertenece a otra RC.")
-                     if reg.servicio.proveedor_id != instance.proveedor_id:
-                         raise serializers.ValidationError(f"El pago {reg.nro_documento} no pertenece al proveedor de esta RC.")
-                     added_docs.append(str(reg.nro_documento))
-                
-                 new_registros.update(recepcion_conforme=instance)
+                 added_docs = list(
+                     RegistroPago.objects.filter(id__in=added_ids).values_list(
+                         'nro_documento', flat=True
+                     )
+                 )
                  HistorialRecepcionConforme.objects.create(
                     recepcion_conforme=instance,
                     accion='MODIFICACION_PAGOS',
-                    detalle=f"Se agregaron {len(added_ids)} pagos al documento: {', '.join(added_docs)}",
+                    detalle=f"Se agregaron {len(added_ids)} pagos al documento: {', '.join(str(d) for d in added_docs)}",
                     usuario=user
                  )
+
+             # Sync asociación + orden de selección completo
+             sync_registros_rc(instance, registros_ids)
              
         return rc
 

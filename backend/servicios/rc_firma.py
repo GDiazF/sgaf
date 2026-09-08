@@ -11,6 +11,32 @@ from .models import HistorialRecepcionConforme, RecepcionConforme, RegistroPago
 logger = logging.getLogger(__name__)
 
 
+def pagos_de_rc(rc: RecepcionConforme, *, select_related: bool = True):
+    """Pagos de la RC en el orden de selección (`orden_en_rc`)."""
+    from django.db.models import F
+
+    qs = rc.registros.all()
+    if select_related:
+        qs = qs.select_related('establecimiento', 'servicio', 'servicio__proveedor')
+    return list(qs.order_by(F('orden_en_rc').asc(nulls_last=True), 'id'))
+
+
+def sync_registros_rc(rc: RecepcionConforme, registros_ids: list[int]) -> None:
+    """Asocia los pagos a la RC y guarda el orden de `registros_ids`."""
+    ids = [int(pk) for pk in registros_ids]
+    current_ids = set(rc.registros.values_list('id', flat=True))
+    new_set = set(ids)
+    removed = current_ids - new_set
+    if removed:
+        RegistroPago.objects.filter(id__in=removed).update(
+            recepcion_conforme=None, orden_en_rc=None
+        )
+    for i, pk in enumerate(ids):
+        RegistroPago.objects.filter(pk=pk).update(
+            recepcion_conforme=rc, orden_en_rc=i
+        )
+
+
 def _pdf_rc_desde_recepcion(rc, user, tipo: str = 'PAGO') -> bytes:
     """PDF de la RC completa (propósito RLB 1 o más pagos), no el unitario de un pago."""
     from servicios.pdf import build_recepcion_conforme_pdf
@@ -86,9 +112,7 @@ def construir_paquete_rc(rc: RecepcionConforme, user, tipo: str = 'PAGO') -> tup
     PDF a firmar: solo la recepción conforme.
     Los comprobantes se listan en meta.anexos como soporte del expediente (no se fusionan).
     """
-    pagos = list(
-        rc.registros.select_related('establecimiento', 'servicio', 'servicio__proveedor').all()
-    )
+    pagos = pagos_de_rc(rc)
     if not pagos:
         raise ValueError('La recepción conforme no tiene pagos asociados.')
 
@@ -146,7 +170,7 @@ def construir_pdf_comprobantes_rc(rc: RecepcionConforme) -> bytes:
     Un solo PDF con todos los comprobantes PDF de los pagos de la RC.
     No incluye el PDF de la recepción conforme.
     """
-    pagos = list(rc.registros.all())
+    pagos = pagos_de_rc(rc, select_related=False)
     parts: list[bytes] = []
     for pago in pagos:
         if not pago.comprobante:
@@ -170,7 +194,7 @@ def construir_pdf_comprobantes_rc(rc: RecepcionConforme) -> bytes:
 def expediente_comprobantes_rc(rc: RecepcionConforme) -> list[dict]:
     """Comprobantes agrupados a nivel RC (origen: pagos asociados)."""
     out = []
-    pagos = rc.registros.all()
+    pagos = pagos_de_rc(rc, select_related=False)
     for pago in pagos:
         if not pago.comprobante:
             continue
