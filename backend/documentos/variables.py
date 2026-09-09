@@ -165,6 +165,22 @@ VARIABLE_GROUPS = [
                 'hint': 'Suma de montos totales menos el IVA total (19% incluido).',
             },
             {'key': 'rc_estado_pago', 'label': 'Estado de la RC', 'type': 'text'},
+            {
+                'key': 'rc_cdp_nombre',
+                'label': 'CDP · Nombre',
+                'type': 'text',
+                'hint': 'Nombre del CDP elegido al crear la recepción (incluye el N° de CDP).',
+            },
+            {
+                'key': 'rc_cdp_anio',
+                'label': 'CDP · Año',
+                'type': 'text',
+            },
+            {
+                'key': 'rc_cdp_descripcion',
+                'label': 'CDP · Descripción',
+                'type': 'text',
+            },
             {'key': 'establecimientos_nombres', 'label': 'Establecimientos (lista)', 'type': 'text'},
             {
                 'key': 'pago_nro_cliente',
@@ -456,6 +472,9 @@ SAMPLE_CONTEXT = {
     'rc_total_junji': '$1.178.000',
     'rc_iva_total': '$190.001',
     'rc_total_neto': '$999.999',
+    'rc_cdp_nombre': 'CDP Agua 2026-045',
+    'rc_cdp_anio': '2026',
+    'rc_cdp_descripcion': 'Disponibilidad presupuestaria servicios básicos',
     'rc_listado_html': '<p>Listado de ejemplo</p>',
     'pago_nro_cliente': '1001',
     'pago_rbd': '12345-6',

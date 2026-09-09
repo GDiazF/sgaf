@@ -50,6 +50,25 @@ def _proveedor_acronimo(proveedor):
     return (getattr(proveedor, 'acronimo', None) or '') or ''
 
 
+def _rc_cdp_context(rc_or_cdp):
+    """Nombre / año / descripción del CDP de repositorio ligado a la RC."""
+    cdp = rc_or_cdp
+    if cdp is not None and hasattr(cdp, 'cdp'):
+        cdp = getattr(cdp, 'cdp', None)
+    if not cdp:
+        return {
+            'rc_cdp_nombre': '',
+            'rc_cdp_anio': '',
+            'rc_cdp_descripcion': '',
+        }
+    anio = getattr(cdp, 'anio', None)
+    return {
+        'rc_cdp_nombre': (getattr(cdp, 'nombre', None) or '') or '',
+        'rc_cdp_anio': str(anio) if anio not in (None, '') else '',
+        'rc_cdp_descripcion': (getattr(cdp, 'descripcion', None) or '') or '',
+    }
+
+
 def _neto_iva_desde_bruto(monto_bruto):
     """
     Desglosa neto e IVA (19%) asumiendo que el monto ya incluye IVA.
@@ -385,6 +404,7 @@ def context_from_recepcion_conforme(rc, user=None, tipo=None):
         'rc_iva_total': _fmt_clp(total_iva),
         'rc_listado_html': listado_html,
         'rc_estado_pago': rc.estado or '',
+        **_rc_cdp_context(rc),
         'observaciones': rc.observaciones or '',
         'firmante_nombre': (firmante.nombre_funcionario if firmante else '') or '',
         'firmante_rut': (firmante.rut if firmante else '') or '',
@@ -459,6 +479,7 @@ def context_from_registro_pago(pago, user=None, tipo=None):
         'rc_iva_total': _fmt_clp(total_iva),
         'rc_listado_html': listado_html,
         'rc_estado_pago': (rc.estado if rc else '') or '',
+        **_rc_cdp_context(rc),
         'observaciones': (rc.observaciones if rc else '') or '',
         'firmante_nombre': (firmante.nombre_funcionario if firmante else '') or '',
         'firmante_rut': (firmante.rut if firmante else '') or '',
