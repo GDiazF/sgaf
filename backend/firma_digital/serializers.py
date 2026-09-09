@@ -130,6 +130,7 @@ class FirmaPendienteSerializer(serializers.ModelSerializer):
     estado_label = serializers.SerializerMethodField()
     tiene_archivo_origen = serializers.SerializerMethodField()
     tiene_comprobantes_expediente = serializers.SerializerMethodField()
+    expediente_cdps = serializers.SerializerMethodField()
 
     class Meta:
         model = FirmaPendiente
@@ -144,6 +145,7 @@ class FirmaPendienteSerializer(serializers.ModelSerializer):
             'estado_label',
             'tiene_archivo_origen',
             'tiene_comprobantes_expediente',
+            'expediente_cdps',
             'firmante',
             'firmante_nombre',
             'grupo_firmante',
@@ -187,6 +189,28 @@ class FirmaPendienteSerializer(serializers.ModelSerializer):
             return rc.registros.exclude(comprobante='').exclude(comprobante=None).exists()
         except Exception:
             return False
+
+    def get_expediente_cdps(self, obj):
+        """Snapshot en meta.cdps; fallback a RC viva si no hay snapshot."""
+        meta_cdps = (obj.meta or {}).get('cdps')
+        if isinstance(meta_cdps, list):
+            return meta_cdps
+        if obj.origen != 'rc':
+            return []
+        try:
+            from servicios.models import RecepcionConforme
+            from servicios.rc_firma import expediente_cdps_rc
+
+            rc = (
+                RecepcionConforme.objects.select_related('cdp')
+                .filter(pk=obj.referencia_id)
+                .first()
+            )
+            if not rc:
+                return []
+            return expediente_cdps_rc(rc)
+        except Exception:
+            return []
 
     def get_estado_label(self, obj):
         return obj.get_estado_display()

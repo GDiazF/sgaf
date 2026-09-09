@@ -108,6 +108,10 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
     tipo_proveedor_nombre = serializers.ReadOnlyField(source='proveedor.tipo_proveedor.nombre')
     grupo_firmante_nombre = serializers.ReadOnlyField(source='grupo_firmante.nombre')
     firmante_nombre = serializers.ReadOnlyField(source='firmante.nombre_funcionario')
+    cdp_nombre = serializers.ReadOnlyField(source='cdp.nombre')
+    cdp_anio = serializers.ReadOnlyField(source='cdp.anio')
+    cdp_descripcion = serializers.ReadOnlyField(source='cdp.descripcion')
+    cdp_archivo_url = serializers.SerializerMethodField()
     historial = HistorialRecepcionConformeSerializer(many=True, read_only=True)
     firma_estado = serializers.SerializerMethodField()
     firma_estado_label = serializers.SerializerMethodField()
@@ -117,6 +121,7 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
     firma_codigo_validacion = serializers.SerializerMethodField()
     firma_paquete_modo = serializers.SerializerMethodField()
     expediente_comprobantes = serializers.SerializerMethodField()
+    expediente_cdps = serializers.SerializerMethodField()
     puede_enviar_firma = serializers.SerializerMethodField()
     puede_reenviar_firma = serializers.SerializerMethodField()
     bloqueo_edicion_firma = serializers.SerializerMethodField()
@@ -127,6 +132,17 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
         model = RecepcionConforme
         fields = '__all__'
         read_only_fields = ('fecha_emision', 'folio')
+        extra_kwargs = {
+            'cdp': {'required': False, 'allow_null': True},
+        }
+
+    def get_cdp_archivo_url(self, obj):
+        if not obj.cdp_id or not obj.cdp or not obj.cdp.archivo:
+            return None
+        try:
+            return obj.cdp.archivo.url
+        except Exception:
+            return None
 
     def _firma_info(self, obj):
         cache = getattr(self, '_firma_info_cache', None)
@@ -164,6 +180,9 @@ class RecepcionConformeSerializer(serializers.ModelSerializer):
 
     def get_expediente_comprobantes(self, obj):
         return self._firma_info(obj).get('expediente_comprobantes') or []
+
+    def get_expediente_cdps(self, obj):
+        return self._firma_info(obj).get('expediente_cdps') or []
 
     def get_puede_enviar_firma(self, obj):
         return self._firma_info(obj)['puede_enviar_firma']

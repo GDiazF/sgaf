@@ -99,7 +99,7 @@ const PaymentsDashboard = () => {
 
   const [editingId, setEditingId] = useState(null)
   const [formData, setFormData] = useState(emptyForm)
-  const [rcForm, setRCForm] = useState({ grupo_firmante: '', firmante: '' })
+  const [rcForm, setRCForm] = useState({ grupo_firmante: '', firmante: '', cdp: '' })
   const [selectedIds, setSelectedIds] = useState(new Set())
 
   const [confirmTarget, setConfirmTarget] = useState(null)
@@ -376,7 +376,7 @@ const PaymentsDashboard = () => {
 
   const handleGenerateRC = () => {
     if (!validateSameProvider()) return
-    setRCForm({ grupo_firmante: '', firmante: '' })
+    setRCForm({ grupo_firmante: '', firmante: '', cdp: '' })
     setShowRCModal(true)
   }
 
@@ -390,6 +390,7 @@ const PaymentsDashboard = () => {
       registros_ids: Array.from(selectedIds),
       grupo_firmante: form.grupo_firmante,
       firmante: form.firmante,
+      cdp: form.cdp || null,
     })
   }
 

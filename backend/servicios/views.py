@@ -620,7 +620,7 @@ class RecepcionConformeViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         return (
             super()
             .get_queryset()
-            .select_related('proveedor', 'proveedor__tipo_proveedor', 'grupo_firmante', 'firmante')
+            .select_related('proveedor', 'proveedor__tipo_proveedor', 'grupo_firmante', 'firmante', 'cdp')
             .prefetch_related(
                 Prefetch(
                     'registros',

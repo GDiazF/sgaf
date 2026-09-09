@@ -36,6 +36,12 @@ const formatDateTime = (dateString) => {
 const formatCurrency = (amount) =>
   new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(amount || 0)
 
+const mediaUrl = (path) => {
+  if (!path) return '#'
+  if (path.startsWith('http')) return path
+  return `${import.meta.env.VITE_API_URL || ''}${path}`
+}
+
 const ESTADO_BADGE = {
   EMITIDA: { variant: 'warning', label: 'Pendiente' },
   COMPLETADA: { variant: 'success', label: 'Completada' },
@@ -590,6 +596,11 @@ const RecepcionConformeList = ({ embedded = false }) => {
                   RC + anexos aparte
                 </Badge>
               ) : null}
+              {item.cdp_nombre ? (
+                <Badge variant="accent" title={item.cdp_descripcion || item.cdp_nombre}>
+                  CDP: {item.cdp_nombre}
+                </Badge>
+              ) : null}
             </div>
           )
         },
@@ -1100,6 +1111,38 @@ const RecepcionConformeList = ({ embedded = false }) => {
                 </Button>
               ) : (
                 <span className="expediente-modal__empty">Sin comprobantes</span>
+              )}
+            </div>
+          </div>
+
+          <div className="expediente-modal__row">
+            <div className="expediente-modal__meta">
+              <span className="expediente-modal__label">CDP</span>
+              {(expedienteRC?.expediente_cdps?.length || 0) > 0 ? (
+                <Badge variant="accent">{expedienteRC.expediente_cdps.length}</Badge>
+              ) : null}
+            </div>
+            <div className="expediente-modal__actions">
+              {(expedienteRC?.expediente_cdps?.length || 0) > 0 ? (
+                expedienteRC.expediente_cdps.map((cdp) =>
+                  cdp.archivo_url ? (
+                    <Button
+                      key={cdp.id}
+                      variant="primary"
+                      size="sm"
+                      type="button"
+                      onClick={() => window.open(mediaUrl(cdp.archivo_url), '_blank', 'noopener')}
+                    >
+                      {cdp.nombre || 'Abrir PDF'}
+                    </Button>
+                  ) : (
+                    <span key={cdp.id} className="expediente-modal__empty">
+                      {cdp.nombre || 'CDP sin archivo'}
+                    </span>
+                  ),
+                )
+              ) : (
+                <span className="expediente-modal__empty">Sin CDP</span>
               )}
             </div>
           </div>

@@ -136,6 +136,7 @@ def construir_paquete_rc(rc: RecepcionConforme, user, tipo: str = 'PAGO') -> tup
         'tipo_pdf': tipo,
         'proveedor': str(rc.proveedor) if rc.proveedor_id else '',
         'anexos': anexos_meta,
+        'cdps': expediente_cdps_rc(rc),
         'paginas_paquete': 'rc',
         'anexos_en_pdf_firmado': False,
     }
@@ -221,6 +222,45 @@ def expediente_comprobantes_rc(rc: RecepcionConforme) -> list[dict]:
     return out
 
 
+def _cdp_a_dict(cdp) -> dict | None:
+    if not cdp:
+        return None
+    url = ''
+    try:
+        if cdp.archivo:
+            url = cdp.archivo.url
+    except Exception:
+        pass
+    return {
+        'id': cdp.id,
+        'nombre': cdp.nombre or '',
+        'anio': cdp.anio,
+        'descripcion': (cdp.descripcion or '').strip(),
+        'archivo_url': url,
+    }
+
+
+def expediente_cdps_rc(rc: RecepcionConforme) -> list[dict]:
+    """
+    CDPs del expediente, únicos por id.
+    Fuente actual: RC.cdp. Listo para agregar otras fuentes (servicio/pago) sin duplicar.
+    """
+    seen: set[int] = set()
+    out: list[dict] = []
+
+    def _add(cdp):
+        item = _cdp_a_dict(cdp)
+        if not item or item['id'] in seen:
+            return
+        seen.add(item['id'])
+        out.append(item)
+
+    if getattr(rc, 'cdp_id', None):
+        _add(rc.cdp)
+
+    return out
+
+
 def enviar_rc_a_firmar(rc: RecepcionConforme, user, *, tipo: str = 'PAGO') -> FirmaPendiente:
     """Encola o reenvía la RC a la bandeja (PDF de la RC; anexos solo en meta/expediente)."""
     if rc.estado == 'ANULADA':
@@ -280,6 +320,7 @@ def firma_info_rc(rc: RecepcionConforme) -> dict:
     qs = FirmaPendiente.objects.filter(origen='rc', referencia_id=rc.id).order_by('-creado_en')
     latest = qs.first()
     expediente = expediente_comprobantes_rc(rc)
+    cdps = expediente_cdps_rc(rc)
 
     def _paquete_modo(pendiente: FirmaPendiente | None) -> str | None:
         if not pendiente:
@@ -305,6 +346,7 @@ def firma_info_rc(rc: RecepcionConforme) -> dict:
         'firma_codigo_validacion': None,
         'firma_paquete_modo': None,
         'expediente_comprobantes': expediente,
+        'expediente_cdps': cdps,
         'puede_enviar_firma': bool(
             rc.firmante_id and rc.estado == 'EMITIDA' and not rc.archivo_escaneado
         ),
@@ -328,6 +370,7 @@ def firma_info_rc(rc: RecepcionConforme) -> dict:
             'firma_codigo_validacion': None,
             'firma_paquete_modo': modo,
             'expediente_comprobantes': expediente,
+            'expediente_cdps': cdps,
             'puede_enviar_firma': False,
             'puede_reenviar_firma': False,
             'bloqueo_edicion_firma': False,
@@ -346,6 +389,7 @@ def firma_info_rc(rc: RecepcionConforme) -> dict:
             ),
             'firma_paquete_modo': modo,
             'expediente_comprobantes': expediente,
+            'expediente_cdps': cdps,
             'puede_enviar_firma': False,
             'puede_reenviar_firma': False,
             'bloqueo_edicion_firma': True,
@@ -362,6 +406,7 @@ def firma_info_rc(rc: RecepcionConforme) -> dict:
             'firma_codigo_validacion': None,
             'firma_paquete_modo': modo,
             'expediente_comprobantes': expediente,
+            'expediente_cdps': cdps,
             'puede_enviar_firma': False,
             'puede_reenviar_firma': bool(rc.firmante_id and rc.estado == 'EMITIDA'),
             'bloqueo_edicion_firma': False,
@@ -380,6 +425,7 @@ def firma_info_rc(rc: RecepcionConforme) -> dict:
             ),
             'firma_paquete_modo': modo,
             'expediente_comprobantes': expediente,
+            'expediente_cdps': cdps,
             'puede_enviar_firma': bool(
                 rc.firmante_id and rc.estado == 'EMITIDA' and not rc.archivo_escaneado
             ),

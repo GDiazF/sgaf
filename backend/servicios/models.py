@@ -107,6 +107,16 @@ class RecepcionConforme(models.Model):
         verbose_name="Firmante"
     )
 
+    cdp = models.ForeignKey(
+        'CDP',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='recepciones_conformes',
+        verbose_name='CDP',
+        help_text='Certificado de disponibilidad presupuestaria del repositorio (opcional).',
+    )
+
     def save(self, *args, **kwargs):
         if not self.folio:
             year = datetime.date.today().year
