@@ -141,6 +141,13 @@ class RegistroServicioDoc(models.Model):
         permissions = [
             ('configure_tiporegistroservicio', 'Puede configurar tipos y campos de documentación'),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tipo', 'folio'],
+                condition=~models.Q(folio=''),
+                name='uniq_registro_doc_tipo_folio_no_vacio',
+            ),
+        ]
 
     def __str__(self):
         return f'{self.tipo.codigo} #{self.pk} {self.folio or ""}'.strip()

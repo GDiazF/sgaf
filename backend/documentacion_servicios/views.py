@@ -128,11 +128,16 @@ class RegistroServicioDocViewSet(viewsets.ModelViewSet):
     ordering = ['-fecha_servicio', '-creado_en']
 
     def get_permissions(self):
-        if self.action in ('list', 'retrieve', 'meta', 'descargar_zip'):
+        if self.action in (
+            'list',
+            'retrieve',
+            'meta',
+            'descargar_zip',
+        ):
             return [permissions.IsAuthenticated(), CanViewRegistrosDoc()]
-        if self.action == 'create':
+        if self.action in ('create', 'plantilla_masiva', 'bulk_preview', 'bulk_commit'):
             return [permissions.IsAuthenticated(), CanAddRegistroDoc()]
-        if self.action in ('update', 'partial_update', 'enviar_correo'):
+        if self.action in ('update', 'partial_update', 'enviar_correo', 'marcar_enviado'):
             return [permissions.IsAuthenticated(), CanChangeRegistroDoc()]
         if self.action == 'destroy':
             return [permissions.IsAuthenticated(), CanDeleteRegistroDoc()]
@@ -167,6 +172,102 @@ class RegistroServicioDocViewSet(viewsets.ModelViewSet):
         """Tipos activos con campos para armar UI."""
         tipos = TipoRegistroServicio.objects.filter(activo=True).prefetch_related('campos')
         return Response(TipoRegistroServicioSerializer(tipos, many=True).data)
+
+    @action(detail=False, methods=['get'], url_path='plantilla-masiva')
+    def plantilla_masiva(self, request):
+        from documentacion_servicios.bulk import build_plantilla_response
+
+        tipo_id = request.query_params.get('tipo')
+        if not tipo_id:
+            return Response({'detail': 'Indique tipo.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            tipo = TipoRegistroServicio.objects.get(pk=tipo_id, activo=True)
+        except TipoRegistroServicio.DoesNotExist:
+            return Response({'detail': 'Tipo no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        if not tipo.usa_folio:
+            return Response(
+                {'detail': 'Este tipo no usa folio; no admite carga masiva.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return build_plantilla_response(tipo)
+
+    @action(detail=False, methods=['post'], url_path='bulk-preview')
+    def bulk_preview(self, request):
+        """Valida Excel sin guardar. Devuelve filas OK + errores (parcial)."""
+        from documentacion_servicios.bulk import preview_excel
+
+        tipo_id = request.data.get('tipo')
+        file = request.FILES.get('file')
+        if not tipo_id or not file:
+            return Response(
+                {'detail': 'Envíe tipo y archivo Excel.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            tipo = TipoRegistroServicio.objects.prefetch_related('campos').get(
+                pk=tipo_id, activo=True
+            )
+        except TipoRegistroServicio.DoesNotExist:
+            return Response({'detail': 'Tipo no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        if not tipo.usa_folio:
+            return Response(
+                {'detail': 'Este tipo no usa folio; no admite carga masiva.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        result = preview_excel(tipo, file)
+        return Response(result)
+
+    @action(detail=False, methods=['post'], url_path='bulk-commit')
+    def bulk_commit(self, request):
+        """Crea registros con filas validadas + PDFs nombrados por folio (éxito parcial)."""
+        import json
+
+        from documentacion_servicios.bulk import commit_bulk
+
+        tipo_id = request.data.get('tipo')
+        rows_raw = request.data.get('rows')
+        files = request.FILES.getlist('files') or request.FILES.getlist('files[]')
+        if not tipo_id:
+            return Response({'detail': 'Indique tipo.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            tipo = TipoRegistroServicio.objects.get(pk=tipo_id, activo=True)
+        except TipoRegistroServicio.DoesNotExist:
+            return Response({'detail': 'Tipo no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if isinstance(rows_raw, str):
+            try:
+                rows = json.loads(rows_raw)
+            except json.JSONDecodeError:
+                return Response(
+                    {'detail': 'rows JSON inválido.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        elif isinstance(rows_raw, list):
+            rows = rows_raw
+        else:
+            return Response(
+                {'detail': 'Envíe rows (JSON) y archivos PDF.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not rows:
+            return Response(
+                {'detail': 'No hay filas para importar.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not files:
+            return Response(
+                {'detail': 'Suba al menos un PDF.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        result = commit_bulk(tipo, rows, list(files), user=request.user)
+        status_code = (
+            status.HTTP_201_CREATED
+            if result.get('created')
+            else status.HTTP_400_BAD_REQUEST
+        )
+        return Response(result, status=status_code)
 
     @action(detail=False, methods=['post'], url_path='descargar-zip')
     def descargar_zip(self, request):
@@ -354,5 +455,24 @@ class RegistroServicioDocViewSet(viewsets.ModelViewSet):
             'status': 'ok',
             'destinatario': dest_label,
             'destinatarios': enviados,
+            'correo_enviado_en': reg.correo_enviado_en,
+        })
+
+    @action(detail=True, methods=['post'], url_path='marcar-enviado')
+    def marcar_enviado(self, request, pk=None):
+        """Marca el registro como ya enviado (sin mandar correo). Útil para históricos."""
+        from django.utils import timezone
+
+        reg = self.get_object()
+        if reg.correo_enviado_en:
+            return Response({
+                'status': 'ok',
+                'correo_enviado_en': reg.correo_enviado_en,
+                'detail': 'Ya estaba marcado como enviado.',
+            })
+        reg.correo_enviado_en = timezone.now()
+        reg.save(update_fields=['correo_enviado_en'])
+        return Response({
+            'status': 'ok',
             'correo_enviado_en': reg.correo_enviado_en,
         })

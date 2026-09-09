@@ -70,6 +70,7 @@ export {
 } from './components/ui/CrudForm.jsx'
 export { FormOverlay } from './components/ui/FormOverlay.jsx'
 export { useFormOverlay, formatApiFormError } from './hooks/useFormOverlay.js'
+export { useDelayedFlag, useTableSkeleton } from './hooks/useDelayedFlag.js'
 export { LoginCard } from './components/ui/LoginCard.jsx'
 export {
   Card,

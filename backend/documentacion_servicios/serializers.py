@@ -187,7 +187,7 @@ class RegistroServicioDocSerializer(serializers.ModelSerializer):
 
         # Normalizar columnas core desde flat
         if 'folio' in flat:
-            attrs['folio'] = flat.get('folio') or ''
+            attrs['folio'] = (flat.get('folio') or '').strip()
         if 'proveedor' in flat:
             pk = coerce_pk(flat.get('proveedor'))
             if pk is not None:
@@ -207,6 +207,19 @@ class RegistroServicioDocSerializer(serializers.ModelSerializer):
         if 'fecha_servicio' in flat:
             attrs['fecha_servicio'] = flat.get('fecha_servicio') or None
 
+        folio = attrs.get('folio')
+        if folio is None and self.instance:
+            folio = self.instance.folio
+        folio = (folio or '').strip()
+        if folio and tipo.usa_folio:
+            qs = RegistroServicioDoc.objects.filter(tipo=tipo, folio=folio)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    {'folio': 'Ya existe un registro de este tipo con ese folio.'}
+                )
+
         # Valores JSON: no incluir FKs ya resueltas como objetos
         flat_for_valores = {
             k: (v.pk if hasattr(v, 'pk') else v) for k, v in flat.items()
@@ -225,7 +238,25 @@ class RegistroServicioDocSerializer(serializers.ModelSerializer):
 
         return attrs
 
+    def _rename_archivo_to_folio(self, validated_data, instance=None):
+        """Marca el archivo para renombrar; la asignación real va en create/update."""
+        archivo = validated_data.get('archivo')
+        if not archivo:
+            return None
+        tipo = validated_data.get('tipo') or (instance.tipo if instance else None)
+        if not tipo or not tipo.usa_folio:
+            return None
+        folio = validated_data.get('folio')
+        if folio is None and instance:
+            folio = instance.folio
+        folio = (folio or '').strip()
+        if not folio:
+            return None
+        # Sacar el FileField del validated_data: lo asignamos nosotros con nombre forzado
+        return validated_data.pop('archivo'), folio
+
     def create(self, validated_data):
+        from documentacion_servicios.files import assign_archivo_con_folio
         from establecimientos.models import Establecimiento
         from servicios.models import Proveedor
 
@@ -240,7 +271,13 @@ class RegistroServicioDocSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and request.user and request.user.is_authenticated:
             validated_data['creado_por'] = request.user
+
+        rename = self._rename_archivo_to_folio(validated_data)
         instance = super().create(validated_data)
+        if rename:
+            uploaded, folio = rename
+            assign_archivo_con_folio(instance, uploaded, folio)
+            instance.save(update_fields=['archivo'])
         try:
             from documentacion_servicios.notify import notificar_registro_creado
 
@@ -250,6 +287,7 @@ class RegistroServicioDocSerializer(serializers.ModelSerializer):
         return instance
 
     def update(self, instance, validated_data):
+        from documentacion_servicios.files import assign_archivo_con_folio
         from establecimientos.models import Establecimiento
         from servicios.models import Proveedor
 
@@ -265,4 +303,10 @@ class RegistroServicioDocSerializer(serializers.ModelSerializer):
                 if establecimiento_id
                 else None
             )
-        return super().update(instance, validated_data)
+        rename = self._rename_archivo_to_folio(validated_data, instance=instance)
+        instance = super().update(instance, validated_data)
+        if rename:
+            uploaded, folio = rename
+            assign_archivo_con_folio(instance, uploaded, folio)
+            instance.save(update_fields=['archivo'])
+        return instance

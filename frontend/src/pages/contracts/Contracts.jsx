@@ -123,6 +123,7 @@ const Contracts = () => {
 
   const fetchData = async (page = 1, size = pageSize, search = debouncedSearch) => {
     setLoading(true)
+    setContracts([])
     try {
       const params = buildListParams(page, size, search)
       const response = await api.get('contratos/contratos/', { params })

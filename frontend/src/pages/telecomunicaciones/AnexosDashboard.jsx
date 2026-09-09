@@ -394,7 +394,7 @@ const AnexosDashboard = () => {
       <DataTable
         columns={columns}
         rows={pageRows}
-        loading={loading && !data}
+        loading={loading}
         totalCount={flatRows.length}
         emptyTitle="Sin resultados"
         emptyDescription="No hay anexos asignados con los filtros actuales."

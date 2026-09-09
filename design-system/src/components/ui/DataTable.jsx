@@ -4,6 +4,7 @@ import { EmptyState } from './EmptyState.jsx'
 import { Select } from './Field.jsx'
 import { Icon } from '../../icons/Icon.jsx'
 import { cn } from '../../lib/cn.js'
+import { useTableSkeleton } from '../../hooks/useDelayedFlag.js'
 
 const SortIcon = () => (
   <svg className="sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
@@ -149,6 +150,9 @@ function plainText(node) {
  *
  * fillViewport (default true): el listado usa el alto restante del shell y scrollea
  * el cuerpo (toolbar/footer fijos). Pasar false solo en demos / embeds no-CRUD.
+ *
+ * loadingDelayMs (default 180): con filas ya visibles, el skeleton espera este
+ * umbral. Sin filas (primera carga), el skeleton es inmediato.
  */
 export function DataTable({
   columns = [],
@@ -176,6 +180,7 @@ export function DataTable({
   className,
   skeletonCols,
   skeletonRows = 6,
+  loadingDelayMs = 180,
   mobileCardActions,
   recordListLabel = 'Listado en tarjetas',
   selectable = false,
@@ -183,6 +188,7 @@ export function DataTable({
   onSelectionChange,
 }) {
   const [expanded, setExpanded] = useState(() => ({}))
+  const showSkeleton = useTableSkeleton(loading, rows.length, loadingDelayMs)
 
   const total = totalCount ?? rows.length
   const pageCount = Math.max(1, Math.ceil(total / pageSize) || 1)
@@ -261,7 +267,7 @@ export function DataTable({
     >
       {toolbar ? <div className="table-toolbar">{toolbar}</div> : null}
 
-      {loading ? (
+      {showSkeleton ? (
         <div className="table-loading" data-table-loading>
           <TableSkeleton cols={skeletonCols ?? (columns.length || 5)} rows={skeletonRows} />
           <p className="sr-only" role="status">
@@ -270,13 +276,13 @@ export function DataTable({
         </div>
       ) : null}
 
-      {!loading && rows.length === 0 ? (
+      {!showSkeleton && !loading && rows.length === 0 ? (
         <div className="table-empty" data-table-empty>
           <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
         </div>
       ) : null}
 
-      {!loading && rows.length > 0 ? (
+      {!showSkeleton && rows.length > 0 ? (
         <>
           <div className="table-wrap">
             <table

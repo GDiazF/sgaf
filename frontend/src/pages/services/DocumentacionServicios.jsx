@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useNotify } from '../../hooks/useNotify'
 import { usePermission } from '../../hooks/usePermission'
 import DocumentViewerModal from '../../components/common/DocumentViewerModal'
+import DocBulkUploadModal from '../../components/services/DocBulkUploadModal'
 import {
   PageHeader,
   FiltersBar,
@@ -104,7 +105,16 @@ function emailsEnvioEstablecimiento(row) {
 
 function buildColumns(
   campos,
-  { onEdit, onDelete, onViewFile, onDownload, onSendEmail, canChange, canDelete },
+  {
+    onEdit,
+    onDelete,
+    onViewFile,
+    onDownload,
+    onSendEmail,
+    onMarkSent,
+    canChange,
+    canDelete,
+  },
 ) {
   const active = (campos || []).filter((c) => c.activo).sort((a, b) => a.orden - b.orden)
   const cols = active
@@ -217,6 +227,16 @@ function buildColumns(
               {yaEnviado ? ' Reenviar' : ''}
             </Button>
           ) : null}
+          {canChange && !yaEnviado ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              title="Marcar como enviado (sin mandar correo)"
+              onClick={() => onMarkSent?.(row)}
+            >
+              <Icon name="check" size="sm" />
+            </Button>
+          ) : null}
           {canChange ? (
             <Button size="sm" variant="secondary" onClick={() => onEdit(row)}>
               Editar
@@ -260,6 +280,10 @@ export default function DocumentacionServicios() {
   const [pageSize, setPageSize] = useState(50)
   const [selectedKeys, setSelectedKeys] = useState([])
   const [zipBusy, setZipBusy] = useState(false)
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkPreview, setBulkPreview] = useState(null)
+  const [bulkCommitResult, setBulkCommitResult] = useState(null)
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -268,6 +292,8 @@ export default function DocumentacionServicios() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [emailTarget, setEmailTarget] = useState(null)
   const [sendingEmail, setSendingEmail] = useState(false)
+  const [markSentTarget, setMarkSentTarget] = useState(null)
+  const [markingSent, setMarkingSent] = useState(false)
   const [viewer, setViewer] = useState(null)
 
   const [configOpen, setConfigOpen] = useState(false)
@@ -447,6 +473,94 @@ export default function DocumentacionServicios() {
       notify({ variant: 'danger', text: msg })
     } finally {
       setZipBusy(false)
+    }
+  }
+
+  const resetBulk = () => {
+    setBulkPreview(null)
+    setBulkCommitResult(null)
+  }
+
+  const handleBulkDownloadTemplate = async () => {
+    if (!activeTipoId) return
+    try {
+      const res = await api.get('doc-servicios/registros/plantilla-masiva/', {
+        params: { tipo: activeTipoId },
+        responseType: 'blob',
+      })
+      const code = (activeTipo?.codigo || 'tipo').toLowerCase()
+      triggerBlobDownload(res.data, `plantilla_${code}.xlsx`)
+    } catch (err) {
+      notify({
+        variant: 'danger',
+        text: formatApiFormError(err) || 'No se pudo descargar la plantilla',
+      })
+    }
+  }
+
+  const handleBulkPreviewExcel = async (fileOrEvent) => {
+    const file = fileOrEvent?.target?.files?.[0] || fileOrEvent
+    if (!file || !activeTipoId) return
+    setBulkBusy(true)
+    setBulkCommitResult(null)
+    try {
+      const fd = new FormData()
+      fd.append('tipo', String(activeTipoId))
+      fd.append('file', file)
+      const res = await api.post('doc-servicios/registros/bulk-preview/', fd)
+      setBulkPreview(res.data)
+      if (!(res.data?.ok || []).length && (res.data?.errors || []).length) {
+        notify({ variant: 'warning', text: 'Ninguna fila válida en el Excel' })
+      }
+    } catch (err) {
+      setBulkPreview(null)
+      notify({
+        variant: 'danger',
+        text: formatApiFormError(err) || 'Error al validar el Excel',
+      })
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const handleBulkCommitPdfs = async (fileOrEvent) => {
+    const list =
+      fileOrEvent?.target?.files != null
+        ? Array.from(fileOrEvent.target.files)
+        : Array.isArray(fileOrEvent)
+          ? fileOrEvent
+          : fileOrEvent
+            ? [fileOrEvent]
+            : []
+    if (!list.length || !activeTipoId || !(bulkPreview?.ok || []).length) return
+    setBulkBusy(true)
+    try {
+      const fd = new FormData()
+      fd.append('tipo', String(activeTipoId))
+      fd.append('rows', JSON.stringify(bulkPreview.ok))
+      list.forEach((f) => fd.append('files', f))
+      const res = await api.post('doc-servicios/registros/bulk-commit/', fd)
+      setBulkCommitResult(res.data)
+      const n = res.data?.created?.length || 0
+      if (n) {
+        notify({ variant: 'success', text: `${n} registro(s) creados` })
+        await loadRegistros()
+      }
+    } catch (err) {
+      const data = err?.response?.data
+      if (data && (data.created || data.errors)) {
+        setBulkCommitResult(data)
+        if ((data.created || []).length) {
+          await loadRegistros()
+        }
+      } else {
+        notify({
+          variant: 'danger',
+          text: formatApiFormError(err) || 'Error en la importación',
+        })
+      }
+    } finally {
+      setBulkBusy(false)
     }
   }
 
@@ -647,11 +761,37 @@ export default function DocumentacionServicios() {
         onViewFile: openViewer,
         onDownload: downloadOne,
         onSendEmail: setEmailTarget,
+        onMarkSent: setMarkSentTarget,
         canChange,
         canDelete,
       }),
     [activeTipo, canChange, canDelete],
   )
+
+  const confirmMarkSent = async () => {
+    if (!markSentTarget) return
+    setMarkingSent(true)
+    try {
+      const res = await api.post(
+        `doc-servicios/registros/${markSentTarget.id}/marcar-enviado/`,
+      )
+      const enviadoEn = res.data.correo_enviado_en || new Date().toISOString()
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === markSentTarget.id ? { ...r, correo_enviado_en: enviadoEn } : r,
+        ),
+      )
+      notify({ variant: 'success', text: 'Marcado como enviado' })
+      setMarkSentTarget(null)
+    } catch (err) {
+      notify({
+        variant: 'danger',
+        text: formatApiFormError(err) || 'No se pudo marcar como enviado',
+      })
+    } finally {
+      setMarkingSent(false)
+    }
+  }
 
   const confirmSendEmail = async () => {
     if (!emailTarget) return
@@ -834,6 +974,23 @@ export default function DocumentacionServicios() {
                 onClick={downloadZip}
               >
                 <Icon name="download" size="sm" /> Descargar ZIP ({selectedKeys.length})
+              </Button>
+            ) : null}
+            {canAdd ? (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  resetBulk()
+                  setBulkOpen(true)
+                }}
+                disabled={!activeTipo?.usa_folio}
+                title={
+                  activeTipo?.usa_folio
+                    ? 'Carga masiva Excel + PDFs'
+                    : 'Este tipo no usa folio'
+                }
+              >
+                <Icon name="upload" size="sm" /> Carga masiva
               </Button>
             ) : null}
             {showConfig ? (
@@ -1242,6 +1399,25 @@ export default function DocumentacionServicios() {
         onConfirm={confirmSendEmail}
       />
 
+      <ConfirmModal
+        open={!!markSentTarget}
+        onClose={() => {
+          if (!markingSent) setMarkSentTarget(null)
+        }}
+        title="Marcar como enviado"
+        description={
+          markSentTarget
+            ? `Se marcará el folio «${markSentTarget.folio || markSentTarget.id}» como ya enviado (sin mandar correo). Útil para documentos enviados fuera del sistema.`
+            : ''
+        }
+        confirmLabel={markingSent ? 'Guardando…' : 'Marcar enviado'}
+        cancelLabel="Cancelar"
+        danger={false}
+        closeOnConfirm={false}
+        confirmLoading={markingSent}
+        onConfirm={confirmMarkSent}
+      />
+
       <DocumentViewerModal
         open={!!viewer}
         onClose={() => setViewer(null)}
@@ -1249,6 +1425,20 @@ export default function DocumentacionServicios() {
         title={viewer?.title}
         subtitle={viewer?.subtitle}
         documentType={activeTipo?.nombre || 'Documento'}
+      />
+
+      <DocBulkUploadModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        tipoNombre={activeTipo?.nombre || ''}
+        usaFolio={Boolean(activeTipo?.usa_folio)}
+        uploading={bulkBusy}
+        preview={bulkPreview}
+        commitResult={bulkCommitResult}
+        onDownloadTemplate={handleBulkDownloadTemplate}
+        onPreviewExcel={handleBulkPreviewExcel}
+        onCommitPdfs={handleBulkCommitPdfs}
+        onReset={resetBulk}
       />
     </div>
   )

@@ -3104,6 +3104,24 @@
 }
 
 .data-table-shell--fill > .table-loading,
+.data-table-shell--fill > .table-loading--pending {
+  flex: 1 1 auto;
+  min-height: 12rem;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  border: 1px solid var(--border);
+  border-top: none;
+  background: var(--surface);
+}
+
+.data-table-shell--fill > .table-loading--pending {
+  background: transparent;
+  border-color: transparent;
+}
+
 .data-table-shell--fill > .table-empty {
   flex: 1 1 auto;
   min-height: 12rem;
@@ -3117,6 +3135,7 @@
 }
 
 .data-table-shell--fill > .table-toolbar + .table-loading,
+.data-table-shell--fill > .table-toolbar + .table-loading--pending,
 .data-table-shell--fill > .table-toolbar + .table-empty {
   border-radius: 0;
 }
@@ -3857,6 +3876,12 @@
   min-height: 12rem;
   padding: var(--space-4);
   background: var(--surface);
+}
+.table-loading--pending {
+  /* Reserva espacio antes del umbral del skeleton (sin flash visual) */
+  padding: 0;
+  border: none;
+  background: transparent;
 }
 .table-loading[hidden] {
   display: none !important;
@@ -5172,7 +5197,12 @@ img.avatar {
 
 /* Skeleton */
 .skeleton {
-  background: linear-gradient(90deg, var(--bg) 25%, oklch(94% 0.006 250) 50%, var(--bg) 75%);
+  background: linear-gradient(
+    90deg,
+    var(--surface-raised, var(--bg)) 25%,
+    var(--border) 50%,
+    var(--surface-raised, var(--bg)) 75%
+  );
   background-size: 200% 100%;
   animation: skeleton-pulse 1.4s ease infinite;
   border-radius: var(--radius-sm);
@@ -5209,7 +5239,16 @@ img.avatar {
   display: flex;
   flex-direction: column;
   gap: 0;
+  width: 100%;
+  max-width: 100%;
   padding: var(--space-1) 0;
+  box-sizing: border-box;
+}
+
+.table-loading .skeleton-table {
+  width: 100%;
+  max-width: 100%;
+  flex: 1 1 auto;
 }
 
 .skeleton-table--bars .skeleton--title {

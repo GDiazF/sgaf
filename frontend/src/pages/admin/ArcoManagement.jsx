@@ -343,7 +343,7 @@ const ArcoManagement = () => {
       <DataTable
         columns={columns}
         rows={pageRows}
-        loading={loading && requests.length === 0}
+        loading={loading}
         totalCount={requests.length}
         emptyTitle="Sin solicitudes"
         emptyDescription="No se encontraron solicitudes que coincidan con los filtros."
