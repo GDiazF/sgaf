@@ -365,6 +365,11 @@ export default function BandejaFirmas() {
               >
                 Revisar
               </Button>
+              {item.origen === 'rc' ? (
+                <Button variant="outline" size="sm" onClick={() => setExpedienteTarget(item)}>
+                  Expediente
+                </Button>
+              ) : null}
               <Button variant="primary" size="sm" onClick={() => setFirmarTarget(item)}>
                 Firmar
               </Button>
@@ -420,7 +425,7 @@ export default function BandejaFirmas() {
               >
                 Revisar
               </Button>
-              {tab === 'anulado' && item.origen === 'rc' ? (
+              {item.origen === 'rc' ? (
                 <Button variant="outline" size="sm" onClick={() => setExpedienteTarget(item)}>
                   Expediente
                 </Button>

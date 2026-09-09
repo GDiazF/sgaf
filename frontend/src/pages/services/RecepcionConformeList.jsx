@@ -660,46 +660,50 @@ const RecepcionConformeList = ({ embedded = false }) => {
 
               {!isAnulada ? (
                 <>
-                  {item.archivo_escaneado ||
-                  (item.expediente_comprobantes && item.expediente_comprobantes.length > 0) ? (
-                    <>
-                      {canView ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          title="Expediente (documento firmado + comprobantes)"
-                          onClick={() => setExpedienteRC(item)}
-                        >
-                          <Icon name="attach" size="sm" />
-                        </Button>
-                      ) : null}
-                      {canView && item.archivo_escaneado ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          title="Ver documento firmado"
-                          loading={loadingArchivoFirmado}
-                          disabled={loadingArchivoFirmado}
-                          onClick={() => handleOpenArchivoFirmado(item)}
-                        >
-                          <Icon name="file" size="sm" />
-                        </Button>
-                      ) : null}
-                      {can('servicios.change_recepcionconforme') &&
-                      item.archivo_escaneado &&
-                      !firmadaDigital ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          title="Eliminar archivo firmado"
-                          disabled={processing}
-                          onClick={() => setConfirmTarget({ type: 'deleteFile', item })}
-                        >
-                          <Icon name="close" size="sm" />
-                        </Button>
-                      ) : null}
-                    </>
-                  ) : can('servicios.change_recepcionconforme') && !firmadaDigital ? (
+                  {canView &&
+                  (item.archivo_escaneado ||
+                    (item.expediente_comprobantes && item.expediente_comprobantes.length > 0) ||
+                    (item.expediente_cdps && item.expediente_cdps.length > 0)) ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Expediente (documento firmado, comprobantes y/o CDP)"
+                      onClick={() => setExpedienteRC(item)}
+                    >
+                      <Icon name="attach" size="sm" />
+                    </Button>
+                  ) : null}
+
+                  {canView && item.archivo_escaneado ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Ver documento firmado"
+                      loading={loadingArchivoFirmado}
+                      disabled={loadingArchivoFirmado}
+                      onClick={() => handleOpenArchivoFirmado(item)}
+                    >
+                      <Icon name="file" size="sm" />
+                    </Button>
+                  ) : null}
+
+                  {can('servicios.change_recepcionconforme') &&
+                  item.archivo_escaneado &&
+                  !firmadaDigital ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Eliminar archivo firmado"
+                      disabled={processing}
+                      onClick={() => setConfirmTarget({ type: 'deleteFile', item })}
+                    >
+                      <Icon name="close" size="sm" />
+                    </Button>
+                  ) : null}
+
+                  {!item.archivo_escaneado &&
+                  can('servicios.change_recepcionconforme') &&
+                  !firmadaDigital ? (
                     <label
                       className={`btn btn--ghost btn--sm${processing ? ' is-disabled' : ''}`}
                       title="Subir recepción firmada"
@@ -895,6 +899,11 @@ const RecepcionConformeList = ({ embedded = false }) => {
         mobileCardActions={(item) => {
           const isAnulada = item.estado === 'ANULADA'
           const firmadaDigital = item.firma_estado === 'firmado' || item.bloqueo_edicion_firma
+          const hasExpediente = Boolean(
+            item.archivo_escaneado ||
+              (item.expediente_comprobantes && item.expediente_comprobantes.length > 0) ||
+              (item.expediente_cdps && item.expediente_cdps.length > 0),
+          )
           if (isAnulada) {
             return canView
               ? {
@@ -905,7 +914,7 @@ const RecepcionConformeList = ({ embedded = false }) => {
                 }
               : {}
           }
-          if (firmadaDigital) {
+          if (firmadaDigital || (hasExpediente && canView && !item.puede_enviar_firma && !item.puede_reenviar_firma)) {
             return {
               primary: canView
                 ? {
@@ -927,10 +936,15 @@ const RecepcionConformeList = ({ embedded = false }) => {
                 label: 'Enviar a firmar',
                 onClick: () => handleEnviarAFirmar(item),
               },
-              secondary: {
-                label: 'Editar',
-                onClick: () => handleEdit(item),
-              },
+              secondary: hasExpediente && canView
+                ? {
+                    label: 'Expediente',
+                    onClick: () => setExpedienteRC(item),
+                  }
+                : {
+                    label: 'Editar',
+                    onClick: () => handleEdit(item),
+                  },
             }
           }
           if (can('servicios.change_recepcionconforme') && item.puede_reenviar_firma) {
@@ -939,10 +953,15 @@ const RecepcionConformeList = ({ embedded = false }) => {
                 label: 'Reenviar a firmar',
                 onClick: () => setConfirmTarget({ type: 'reenviarFirma', item }),
               },
-              secondary: {
-                label: 'Historial',
-                onClick: () => setHistoryRC(item),
-              },
+              secondary: hasExpediente && canView
+                ? {
+                    label: 'Expediente',
+                    onClick: () => setExpedienteRC(item),
+                  }
+                : {
+                    label: 'Historial',
+                    onClick: () => setHistoryRC(item),
+                  },
             }
           }
           return {
