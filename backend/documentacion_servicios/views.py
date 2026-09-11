@@ -413,36 +413,16 @@ class RegistroServicioDocViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        enviados = []
-        fallidos = []
-        for email in destinatarios:
-            ok = enviar_correo_maestro(
-                'DOC_SERVICIOS_ENVIO_ESTABLECIMIENTO',
-                [email],
-                contexto,
-                archivo_adjunto=adjunto,
-                imagenes_inline=imagenes_inline,
-            )
-            if ok:
-                enviados.append(email)
-            else:
-                fallidos.append(email)
-
-        if not enviados:
+        ok = enviar_correo_maestro(
+            'DOC_SERVICIOS_ENVIO_ESTABLECIMIENTO',
+            destinatarios,
+            contexto,
+            archivo_adjunto=adjunto,
+            imagenes_inline=imagenes_inline,
+        )
+        if not ok:
             return Response(
                 {'detail': 'No se pudo enviar el correo. Revise SMTP y la plantilla.'},
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
-        if fallidos:
-            return Response(
-                {
-                    'detail': (
-                        f'Se envió a {", ".join(enviados)}, pero falló para: '
-                        f'{", ".join(fallidos)}. Revise los correos del establecimiento.'
-                    ),
-                    'destinatarios': enviados,
-                    'fallidos': fallidos,
-                },
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
@@ -450,11 +430,11 @@ class RegistroServicioDocViewSet(viewsets.ModelViewSet):
 
         reg.correo_enviado_en = timezone.now()
         reg.save(update_fields=['correo_enviado_en'])
-        dest_label = ', '.join(enviados)
+        dest_label = ', '.join(destinatarios)
         return Response({
             'status': 'ok',
             'destinatario': dest_label,
-            'destinatarios': enviados,
+            'destinatarios': destinatarios,
             'correo_enviado_en': reg.correo_enviado_en,
         })
 

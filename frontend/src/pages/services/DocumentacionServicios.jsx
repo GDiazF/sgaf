@@ -116,54 +116,43 @@ function buildColumns(
     canDelete,
   },
 ) {
-  const active = (campos || []).filter((c) => c.activo).sort((a, b) => a.orden - b.orden)
-  const cols = active
-    .filter((c) => c.tipo_dato !== 'file')
-    .slice(0, 6)
-    .map((c) => ({
-      key: c.clave,
-      header: c.etiqueta,
-      sortable: Boolean(SORTABLE_CORE[c.clave]),
-      className: c.orden === 0 ? 'col--primary' : undefined,
-      cardRole: c.orden === 0 ? 'title' : undefined,
-      render: (row) => {
-        const flat = flattenRegistro(row)
-        if (c.clave === 'proveedor') return row.proveedor_nombre || '—'
-        if (c.clave === 'establecimiento') return row.establecimiento_nombre || '—'
-        if (c.clave === 'fecha_servicio' || c.tipo_dato === 'date') {
-          return formatDateCL(flat[c.clave] ?? flat.fecha_servicio)
-        }
-        if (c.clave === 'folio') return flat.folio || '—'
-        const v = flat[c.clave]
-        if (v === true) return 'Sí'
-        if (v === false) return 'No'
-        return v ?? '—'
-      },
-    }))
+  // Listado compacto: no mostrar textos largos ni archivo (acciones cubren el PDF).
+  const hideInTable = new Set(['archivo', 'observaciones'])
+  const preferredOrder = ['folio', 'establecimiento', 'proveedor', 'fecha_servicio']
+  const active = (campos || [])
+    .filter((c) => c.activo && c.tipo_dato !== 'file' && !hideInTable.has(c.clave))
+    .sort((a, b) => a.orden - b.orden)
 
-  cols.push({
-    key: 'destinatarios',
-    header: 'Destinatarios',
-    className: 'col--tablet-hide',
+  const byClave = Object.fromEntries(active.map((c) => [c.clave, c]))
+  const ordered = []
+  for (const key of preferredOrder) {
+    if (byClave[key]) ordered.push(byClave[key])
+  }
+  for (const c of active) {
+    if (!preferredOrder.includes(c.clave)) ordered.push(c)
+  }
+
+  const cols = ordered.slice(0, 4).map((c, idx) => ({
+    key: c.clave,
+    header: c.etiqueta,
+    sortable: Boolean(SORTABLE_CORE[c.clave]),
+    className: idx === 0 ? 'col--primary' : undefined,
+    cardRole: idx === 0 ? 'title' : undefined,
+    tabletHide: idx >= 2,
     render: (row) => {
-      const emails = emailsEnvioEstablecimiento(row)
-      if (!emails.length) {
-        return (
-          <span
-            className="field__hint"
-            title="Registre correo institucional y/o del director/a en Establecimientos"
-          >
-            Sin correo
-          </span>
-        )
+      const flat = flattenRegistro(row)
+      if (c.clave === 'proveedor') return row.proveedor_nombre || '—'
+      if (c.clave === 'establecimiento') return row.establecimiento_nombre || '—'
+      if (c.clave === 'fecha_servicio' || c.tipo_dato === 'date') {
+        return formatDateCL(flat[c.clave] ?? flat.fecha_servicio)
       }
-      return (
-        <span className="doc-servicios-dest" title={emails.join('\n')}>
-          {emails.join(', ')}
-        </span>
-      )
+      if (c.clave === 'folio') return flat.folio || '—'
+      const v = flat[c.clave]
+      if (v === true) return 'Sí'
+      if (v === false) return 'No'
+      return v ?? '—'
     },
-  })
+  }))
 
   cols.push({
     key: 'correo',
