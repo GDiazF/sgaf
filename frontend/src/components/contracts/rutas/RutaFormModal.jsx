@@ -76,9 +76,10 @@ export default function RutaFormModal({
 
   const handleClose = () => {
     if (overlay.busy) return
+    const wasSaved = overlay.status === 'success'
     overlay.reset()
     setSearchTermEst('')
-    onClose()
+    onClose(wasSaved ? { saved: true } : undefined)
   }
 
   const handleOverlayDismiss = () => {
@@ -362,6 +363,36 @@ export default function RutaFormModal({
 
           {esLinea ? (
             <>
+              <Field
+                label="Día inicio del periodo"
+                htmlFor={`${formId}-dia-inicio`}
+                hint="Opcional. Por defecto 1. Útil si el mes de cobro no va del 1 al 30/31."
+              >
+                <Input
+                  id={`${formId}-dia-inicio`}
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={formData.dia_inicio_periodo}
+                  onChange={(e) =>
+                    setFormData({ ...formData, dia_inicio_periodo: e.target.value })
+                  }
+                />
+              </Field>
+              <Field
+                label="Día fin del periodo"
+                htmlFor={`${formId}-dia-fin`}
+                hint="Opcional. Por defecto último día del mes (31 se ajusta solo)."
+              >
+                <Input
+                  id={`${formId}-dia-fin`}
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={formData.dia_fin_periodo}
+                  onChange={(e) => setFormData({ ...formData, dia_fin_periodo: e.target.value })}
+                />
+              </Field>
               <div className="field">
                 <Switch
                   label="Incluir fines de semana"

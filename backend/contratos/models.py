@@ -221,8 +221,11 @@ class Contrato(models.Model):
     def ensure_gestion_operativa(self):
         if self.es_borrador:
             return None
-        existing = self.servicios_operativos.first()
+        existing = self.servicios_operativos.filter(activa=True).first()
         if existing:
+            if not existing.plantilla_cobro and self.plantilla_cobro:
+                existing.plantilla_cobro = self.plantilla_cobro
+                existing.save(update_fields=['plantilla_cobro'])
             return existing
         if not self.plantilla_cobro:
             return None
@@ -249,7 +252,17 @@ class Contrato(models.Model):
             tipo_servicio=tipo,
             nombre=self.codigo_mercado_publico,
             modalidad_cobro=modalidad,
+            activa=True,
+            plantilla_cobro=self.plantilla_cobro,
         )
+
+    def archivar_gestion_activa(self, plantilla_origen=None):
+        """Archiva la gestión activa (si hay). No crea una nueva."""
+        active = self.servicios_operativos.filter(activa=True).first()
+        if not active:
+            return None
+        active.archivar(plantilla_origen=plantilla_origen or active.plantilla_cobro or self.plantilla_cobro)
+        return active
 
     def __str__(self):
         codigo = self.codigo_mercado_publico or f'Borrador #{self.pk}'
@@ -376,6 +389,34 @@ class AmpliacionContrato(models.Model):
                 'fecha_termino': 'El nuevo término debe ser posterior al término previo del contrato.',
             })
 
+
+class AmpliacionMontoProveedor(models.Model):
+    """Monto de ampliación asignado a un proveedor del contrato."""
+
+    ampliacion = models.ForeignKey(
+        AmpliacionContrato,
+        on_delete=models.CASCADE,
+        related_name='montos_proveedor',
+        verbose_name='Ampliación',
+    )
+    proveedor = models.ForeignKey(
+        'servicios.Proveedor',
+        on_delete=models.PROTECT,
+        related_name='montos_ampliacion',
+        verbose_name='Proveedor',
+    )
+    monto = models.IntegerField(default=0, verbose_name='Monto')
+
+    class Meta:
+        verbose_name = 'Monto de ampliación por proveedor'
+        verbose_name_plural = 'Montos de ampliación por proveedor'
+        unique_together = ('ampliacion', 'proveedor')
+        ordering = ['proveedor__nombre', 'id']
+
+    def __str__(self):
+        return f"{self.proveedor} · ${self.monto}"
+
+
 class ContratoProveedor(models.Model):
     contrato = models.ForeignKey(Contrato, on_delete=models.CASCADE, related_name='proveedores_asociados')
     proveedor = models.ForeignKey('servicios.Proveedor', on_delete=models.PROTECT, related_name='contratos_asociados')
@@ -389,6 +430,21 @@ class ContratoProveedor(models.Model):
         unique_together = ('contrato', 'proveedor')
 
     @property
+    def monto_ampliado(self):
+        from django.db.models import Sum
+
+        total = AmpliacionMontoProveedor.objects.filter(
+            ampliacion__contrato_id=self.contrato_id,
+            proveedor_id=self.proveedor_id,
+        ).aggregate(s=Sum('monto'))['s']
+        return int(total or 0)
+
+    @property
+    def monto_techo(self):
+        """Adjudicado + ampliaciones asignadas a este proveedor."""
+        return int(self.monto_adjudicado or 0) + self.monto_ampliado
+
+    @property
     def monto_ejecutado(self):
         # Calculates what has been spent of this specific provider's budget for this contract
         from django.db.models import Sum
@@ -399,7 +455,7 @@ class ContratoProveedor(models.Model):
 
     @property
     def monto_restante(self):
-        return self.monto_adjudicado - self.monto_ejecutado
+        return self.monto_techo - self.monto_ejecutado
 
     def __str__(self):
         return f"{self.proveedor.nombre} - {self.contrato.codigo_mercado_publico}"
@@ -455,6 +511,38 @@ class ServicioContrato(models.Model):
         blank=True,
         help_text='Obligatorio si la modalidad es monto mensual único.',
     )
+    activa = models.BooleanField(
+        default=True,
+        db_index=True,
+        verbose_name='Gestión activa',
+        help_text='False = archivada (historial tras cambio de plantilla de cobro).',
+    )
+    archivada_en = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Archivada el',
+    )
+    plantilla_cobro = models.CharField(
+        max_length=20,
+        choices=Contrato.PLANTILLA_COBRO_CHOICES,
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name='Plantilla de cobro (origen)',
+        help_text='Plantilla con la que operó esta gestión (útil en historial).',
+    )
+
+    def archivar(self, plantilla_origen=None):
+        """Pasa la gestión a historial (solo lectura)."""
+        from django.utils import timezone
+
+        if not self.activa:
+            return
+        if plantilla_origen and not self.plantilla_cobro:
+            self.plantilla_cobro = plantilla_origen
+        self.activa = False
+        self.archivada_en = timezone.now()
+        self.save(update_fields=['activa', 'archivada_en', 'plantilla_cobro'])
 
     def __str__(self):
         return f"{self.nombre} ({self.contrato.codigo_mercado_publico})"
@@ -510,7 +598,12 @@ class ServicioContrato(models.Model):
         verbose_name = "Servicio de Contrato"
         verbose_name_plural = "Servicios de Contrato"
         constraints = [
-            models.UniqueConstraint(fields=['contrato'], name='unique_gestion_por_contrato'),
+            # Varias gestiones archivadas OK; solo una activa por contrato.
+            models.UniqueConstraint(
+                fields=['contrato'],
+                condition=models.Q(activa=True),
+                name='unique_gestion_activa_por_contrato',
+            ),
         ]
         ordering = ['nombre', 'id']
 
@@ -576,20 +669,29 @@ class RutaTransporte(models.Model):
     def rango_periodo(self, mes, anio):
         import calendar
         import datetime
-        if self.servicio_id and self.servicio.es_linea_por_establecimiento:
-            last = calendar.monthrange(anio, mes)[1]
-            return datetime.date(anio, mes, 1), datetime.date(anio, mes, last)
-        if self.dia_inicio_periodo <= self.dia_fin_periodo:
+
+        def _clamp(dia, year, month):
+            last = calendar.monthrange(year, month)[1]
+            d = int(dia or 1)
+            return max(1, min(d, last))
+
+        dia_ini = _clamp(self.dia_inicio_periodo, anio, mes)
+        dia_fin = _clamp(self.dia_fin_periodo, anio, mes)
+
+        if dia_ini <= dia_fin:
             return (
-                datetime.date(anio, mes, self.dia_inicio_periodo),
-                datetime.date(anio, mes, self.dia_fin_periodo),
+                datetime.date(anio, mes, dia_ini),
+                datetime.date(anio, mes, dia_fin),
             )
-        fecha_fin = datetime.date(anio, mes, self.dia_fin_periodo)
+        # Cruza mes (ej. 21 → 20): fin en mes de referencia, inicio en el anterior.
+        fecha_fin = datetime.date(anio, mes, dia_fin)
         if mes == 1:
             prev_mes, prev_anio = 12, anio - 1
         else:
             prev_mes, prev_anio = mes - 1, anio
-        fecha_inicio = datetime.date(prev_anio, prev_mes, self.dia_inicio_periodo)
+        fecha_inicio = datetime.date(
+            prev_anio, prev_mes, _clamp(self.dia_inicio_periodo, prev_anio, prev_mes)
+        )
         return fecha_inicio, fecha_fin
 
     def recalcular_periodos_abiertos(self):

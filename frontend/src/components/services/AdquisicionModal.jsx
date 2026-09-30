@@ -329,10 +329,9 @@ const AdquisicionModal = ({
 
         <p className="contracts-section-title">4. Finanzas</p>
         <div className="form-grid">
-          <Field label="Concepto / glosa" required htmlFor="adq-desc" className="field--full">
+          <Field label="Concepto / glosa" htmlFor="adq-desc" className="field--full" hint="Opcional.">
             <Textarea
               id="adq-desc"
-              required
               rows={2}
               value={formData.descripcion || ''}
               onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}

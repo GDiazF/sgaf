@@ -18,6 +18,7 @@ from documentos.context_builders import _fmt_m3
 from .models import (
     ProcesoCompra, EstadoContrato, CategoriaContrato, Contrato, 
     OrientacionLicitacion, DocumentoContrato, HistorialContrato, AmpliacionContrato,
+    AmpliacionMontoProveedor,
     TipoServicioOperativo, ServicioContrato, RutaTransporte, PeriodoCobro, AusenciaRuta,
     VolumenDiaPeriodo, FeriadoNacional, GrupoPresetRutas
 )
@@ -37,6 +38,21 @@ from servicios.serializers import FacturaAdquisicionSerializer
 from servicios.pdf import build_rc_adq_pdf
 
 logger = logging.getLogger(__name__)
+
+
+def _gestion_archivada_response(servicio):
+    """Respuesta 400 si la gestión operativa está en historial."""
+    if servicio is not None and not getattr(servicio, 'activa', True):
+        return Response(
+            {
+                'detail': (
+                    'Esta gestión está archivada (historial). '
+                    'No se pueden crear ni modificar rutas, periodos ni asistencias.'
+                ),
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return None
 
 _DEFAULT_PERMS = [permissions.IsAuthenticated, SgafModelPermissions]
 
@@ -70,7 +86,9 @@ class DocumentoContratoViewSet(viewsets.ModelViewSet):
 class AmpliacionContratoViewSet(viewsets.ModelViewSet):
     """Registro de ampliaciones de vigencia. Alta, consulta y edición (sin borrar)."""
 
-    queryset = AmpliacionContrato.objects.select_related('contrato').all()
+    queryset = AmpliacionContrato.objects.select_related('contrato').prefetch_related(
+        'montos_proveedor', 'montos_proveedor__proveedor',
+    ).all()
     serializer_class = AmpliacionContratoSerializer
     filterset_fields = ['contrato']
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
@@ -119,10 +137,15 @@ class ContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         'proceso', 'estado', 'categoria', 'orientacion',
     ).prefetch_related(
         'ampliaciones',
+        'ampliaciones__montos_proveedor',
+        'ampliaciones__montos_proveedor__proveedor',
         'documentos',
         'historial',
         'proveedores_asociados',
         'proveedores_asociados__proveedor',
+        'proveedores_asociados__establecimientos',
+        'recepciones',
+        'recepciones__establecimientos',
     ).all()
     serializer_class = ContratoSerializer
     pagination_class = LargeResultsSetPagination
@@ -286,6 +309,7 @@ class ContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         total = 0
         establecimientos_ids = []
         con_periodo = 0
+        pares_fechas = []  # (date, date) para cortes / etiquetas
         for ruta in rutas:
             periodo = next(
                 (
@@ -310,6 +334,9 @@ class ContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
             monto = periodo.monto_total or 0
             total += monto
             establecimientos_ids.extend(ests)
+            fi, ff = periodo.fecha_inicio, periodo.fecha_fin
+            if fi and ff:
+                pares_fechas.append((fi, ff))
             lineas.append({
                 'ruta_id': ruta.id,
                 'nombre': ruta.nombre,
@@ -319,7 +346,20 @@ class ContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
                 'tiene_periodo': True,
                 'periodo_id': periodo.id,
                 'estado': periodo.estado,
+                'fecha_inicio': fi.isoformat() if fi else None,
+                'fecha_fin': ff.isoformat() if ff else None,
             })
+
+        from documentos.context_builders import _fmt_periodo_desde_cortes, _fmt_periodo_rango
+
+        unicos = sorted(set(pares_fechas))
+        periodo_label = _fmt_periodo_desde_cortes(pares_fechas, mes_ref=mes, anio_ref=anio)
+        cortes_labels = [
+            _fmt_periodo_rango(a, b, mes_ref=mes, anio_ref=anio) for a, b in unicos
+        ]
+
+        f_ini = min((a for a, _ in pares_fechas), default=None)
+        f_fin = max((b for _, b in pares_fechas), default=None)
 
         return Response({
             'tiene_gestion': True,
@@ -331,6 +371,11 @@ class ContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
             'establecimientos_ids': list(dict.fromkeys(establecimientos_ids)),
             'faltantes': len(lineas) - con_periodo,
             'lineas_con_periodo': con_periodo,
+            'periodo_fecha_inicio': f_ini.isoformat() if f_ini else None,
+            'periodo_fecha_fin': f_fin.isoformat() if f_fin else None,
+            'periodo_label': periodo_label,
+            'periodo_cortes_distintos': len(unicos) > 1,
+            'periodo_cortes_labels': cortes_labels,
         })
 
 
@@ -401,30 +446,94 @@ class ServicioContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
     sgaf_action_permissions = {
         'generar_acta_conformidad': 'contratos.view_serviciocontrato',
     }
-    queryset = ServicioContrato.objects.select_related('contrato', 'tipo_servicio').all().order_by('nombre', 'id')
+    queryset = ServicioContrato.objects.select_related('contrato', 'tipo_servicio').all().order_by(
+        '-activa', '-id'
+    )
     serializer_class = ServicioContratoSerializer
-    filterset_fields = ['contrato', 'tipo_servicio']
+    filterset_fields = ['contrato', 'tipo_servicio', 'activa']
+
+    def update(self, request, *args, **kwargs):
+        blocked = _gestion_archivada_response(self.get_object())
+        if blocked:
+            return blocked
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        blocked = _gestion_archivada_response(self.get_object())
+        if blocked:
+            return blocked
+        return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=['post'])
     def generar_acta_conformidad(self, request, pk=None):
         import io
         import os
         import datetime
+        import logging
+        from xml.sax.saxutils import escape as xml_escape
         from django.http import FileResponse
-        from django.conf import settings
         from reportlab.lib import colors
-        from reportlab.lib.pagesizes import letter
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import inch, mm
-        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        from reportlab.lib.enums import TA_CENTER
         from reportlab.lib.colors import HexColor
         from reportlab.lib.utils import ImageReader
 
+        def safe_para(text, style, *, bold_prefix=None):
+            body = xml_escape(str(text or '')).replace('\n', '<br/>')
+            if bold_prefix:
+                return Paragraph(f"<b>{xml_escape(str(bold_prefix))}</b> {body}", style)
+            return Paragraph(body, style)
+
         servicio = self.get_object()
-        ruta_ids = request.data.get('ruta_ids', [])
-        periodo_ids = request.data.get('periodo_ids', [])
-        est_ids = request.data.get('est_ids', [])
+        if getattr(servicio, 'es_linea_por_establecimiento', False):
+            return Response(
+                {
+                    'detail': (
+                        'El acta de visto bueno de recorridos aplica solo a gestiones '
+                        'diarias de transporte. Use la recepción de servicio.'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ruta_ids = request.data.get('ruta_ids', []) or []
+        periodo_ids = request.data.get('periodo_ids', []) or []
+        est_ids = request.data.get('est_ids', []) or []
+        if not ruta_ids or not periodo_ids:
+            return Response(
+                {'detail': 'Seleccione al menos una ruta y un periodo.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            return self._build_acta_conformidad_pdf(
+                servicio, ruta_ids, periodo_ids, est_ids,
+                io=io, os=os, datetime=datetime, xml_escape=xml_escape,
+                FileResponse=FileResponse, colors=colors,
+                SimpleDocTemplate=SimpleDocTemplate, Table=Table,
+                TableStyle=TableStyle, Paragraph=Paragraph, Spacer=Spacer,
+                Image=Image, getSampleStyleSheet=getSampleStyleSheet,
+                ParagraphStyle=ParagraphStyle, inch=inch, mm=mm,
+                TA_CENTER=TA_CENTER, HexColor=HexColor, ImageReader=ImageReader,
+                safe_para=safe_para,
+            )
+        except Exception as exc:
+            logging.getLogger(__name__).exception('Error generando acta de conformidad')
+            return Response(
+                {'detail': f'No se pudo generar el acta: {exc}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def _build_acta_conformidad_pdf(
+        self, servicio, ruta_ids, periodo_ids, est_ids, *,
+        io, os, datetime, xml_escape, FileResponse, colors,
+        SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image,
+        getSampleStyleSheet, ParagraphStyle, inch, mm, TA_CENTER, HexColor,
+        ImageReader, safe_para,
+    ):
+        from core.utils.report_utils import get_report_assets
 
         buffer = io.BytesIO()
         FOLIO = (216*mm, 330*mm) # VERTICAL (OFICIO)
@@ -486,9 +595,9 @@ class ServicioContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
             periodo_str = "N/A"
 
         info_data = [
-            [Paragraph(f"<b>Establecimiento:</b>", styles['ActaNormal']), Paragraph(est_nombres.upper(), styles['ActaNormal'])],
-            [Paragraph(f"<b>Director(a):</b>", styles['ActaNormal']), Paragraph(director_val.upper(), styles['ActaNormal'])],
-            [Paragraph(f"<b>Periodo:</b>", styles['ActaNormal']), Paragraph(periodo_str, styles['ActaNormal'])]
+            [Paragraph("<b>Establecimiento:</b>", styles['ActaNormal']), safe_para(str(est_nombres).upper(), styles['ActaNormal'])],
+            [Paragraph("<b>Director(a):</b>", styles['ActaNormal']), safe_para(str(director_val).upper(), styles['ActaNormal'])],
+            [Paragraph("<b>Periodo:</b>", styles['ActaNormal']), safe_para(periodo_str, styles['ActaNormal'])]
         ]
         info_table = Table(info_data, colWidths=[1.5*inch, TOTAL_W - 1.5*inch])
         info_table.setStyle(TableStyle([
@@ -556,7 +665,7 @@ class ServicioContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
                         else: grid_style.append(('BACKGROUND', (len(row)-1, r_idx + 2), (len(row)-1, r_idx + 2), rojo_alerta))
                 row.append(str(row_total)); data_grid.append(row)
             
-            day_w = (TOTAL_W - 1.4*inch) / len(all_days)
+            day_w = (TOTAL_W - 1.4*inch) / max(len(all_days), 1)
             col_widths = [0.9*inch] + [day_w]*len(all_days) + [0.5*inch]
             main_table = Table(data_grid, colWidths=col_widths)
             grid_style.append(('BACKGROUND', (-1, 1), (-1, -1), verde_total))
@@ -568,7 +677,12 @@ class ServicioContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         # 3. OBSERVACIONES
         elements.append(Spacer(1, 5)) # Reducido
         elements.append(Table([[Paragraph("<b>Observaciones:</b>", styles['ActaNormal'])]], colWidths=[TOTAL_W], style=[('LEFTPADDING', (0,0), (0,0), 0)]))
-        obs_box_data = [[Paragraph(f"<b>{r.nombre.upper()}:</b> {r.itinerario or 'SIN DETALLE'}", styles['ActaSmall'])] for r in rutas_objs]
+        obs_box_data = [
+            [safe_para(r.itinerario or 'SIN DETALLE', styles['ActaSmall'], bold_prefix=f"{r.nombre.upper()}:")]
+            for r in rutas_objs
+        ]
+        if not obs_box_data:
+            obs_box_data = [[Paragraph("Sin rutas seleccionadas.", styles['ActaSmall'])]]
         obs_table = Table(obs_box_data, colWidths=[TOTAL_W])
         obs_table.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.black), ('BOX', (0,0), (-1,-1), 1.5, colors.black)]))
         elements.append(obs_table)
@@ -583,7 +697,7 @@ class ServicioContratoViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
             rutas_del_colegio = rutas_objs.filter(establecimientos=est).values_list('nombre', flat=True)
             rutas_str = ", ".join(rutas_del_colegio)
             
-            f_content = [[Spacer(1, 45)], [Paragraph(f"<b>{est.nombre.upper()}</b>", styles['SigText'])], [Paragraph(rutas_str, styles['SigText'])]]
+            f_content = [[Spacer(1, 45)], [safe_para(est.nombre.upper(), styles['SigText'])], [safe_para(rutas_str, styles['SigText'])]]
             # Altura equilibrada: 45 + 15 + 15 = 75pt
             f_sub_table = Table(f_content, colWidths=[(TOTAL_W - 10)/2], rowHeights=[45, 15, 15])
             f_sub_table.setStyle(TableStyle([
@@ -622,10 +736,31 @@ class RutaTransporteViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
     }
     queryset = RutaTransporte.objects.select_related('servicio', 'proveedor').prefetch_related(
         'establecimientos', 'periodos', 'periodos__ausencias', 'periodos__volumenes_dia',
-    ).all()
+    ).all().order_by('nombre', 'id')
     serializer_class = RutaTransporteSerializer
     pagination_class = None # Ver todas las rutas sin paginación
     filterset_fields = ['servicio', 'proveedor']
+
+    def create(self, request, *args, **kwargs):
+        servicio_id = request.data.get('servicio')
+        if servicio_id:
+            servicio = ServicioContrato.objects.filter(pk=servicio_id).first()
+            blocked = _gestion_archivada_response(servicio)
+            if blocked:
+                return blocked
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        blocked = _gestion_archivada_response(self.get_object().servicio)
+        if blocked:
+            return blocked
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        blocked = _gestion_archivada_response(self.get_object().servicio)
+        if blocked:
+            return blocked
+        return super().destroy(request, *args, **kwargs)
 
     @action(detail=False, methods=['post'], url_path='bulk-crear-lineas')
     def bulk_crear_lineas(self, request):
@@ -642,6 +777,9 @@ class RutaTransporteViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
             servicio = ServicioContrato.objects.get(pk=servicio_id)
         except ServicioContrato.DoesNotExist:
             return Response({'servicio': 'Gestión no encontrada.'}, status=status.HTTP_400_BAD_REQUEST)
+        blocked = _gestion_archivada_response(servicio)
+        if blocked:
+            return blocked
         precio_m3 = request.data.get('precio_m3')
         if servicio.es_volumetrico:
             if not precio_m3:
@@ -664,6 +802,18 @@ class RutaTransporteViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         errores = []
         incluir_fines = request.data.get('incluir_fines_semana', True)
         excluir_fer = request.data.get('excluir_feriados', False)
+        dia_inicio = request.data.get('dia_inicio_periodo', 1)
+        dia_fin = request.data.get('dia_fin_periodo', 31)
+        try:
+            dia_inicio = int(dia_inicio if dia_inicio not in (None, '') else 1)
+            dia_fin = int(dia_fin if dia_fin not in (None, '') else 31)
+        except (TypeError, ValueError):
+            return Response(
+                {'detail': 'Día inicio/fin deben ser números enteros.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        dia_inicio = max(1, min(dia_inicio, 31))
+        dia_fin = max(1, min(dia_fin, 31))
         if isinstance(incluir_fines, str):
             incluir_fines = incluir_fines.lower() in ('true', '1', 'yes')
         if isinstance(excluir_fer, str):
@@ -678,8 +828,8 @@ class RutaTransporteViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
                     'valor_mensual': valor_mensual if servicio.es_mensual else None,
                     'precio_m3': precio_m3 if servicio.es_volumetrico else None,
                     'valor_diario': 0,
-                    'dia_inicio_periodo': 1,
-                    'dia_fin_periodo': 31,
+                    'dia_inicio_periodo': dia_inicio,
+                    'dia_fin_periodo': dia_fin,
                     'incluir_fines_semana': bool(incluir_fines),
                     'excluir_feriados': bool(excluir_fer),
                 }
@@ -699,6 +849,9 @@ class RutaTransporteViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='generar-periodo')
     def generar_periodo(self, request, pk=None):
         ruta = self.get_object()
+        blocked = _gestion_archivada_response(ruta.servicio)
+        if blocked:
+            return blocked
         mes = int(request.data.get('mes'))
         anio = int(request.data.get('anio'))
         fecha_inicio, fecha_fin = ruta.rango_periodo(mes, anio)
@@ -721,7 +874,11 @@ class RutaTransporteViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         
         for rid in ruta_ids:
             try:
-                ruta = RutaTransporte.objects.get(id=rid)
+                ruta = RutaTransporte.objects.select_related('servicio').get(id=rid)
+                blocked = _gestion_archivada_response(ruta.servicio)
+                if blocked:
+                    skipped_count += 1
+                    continue
                 fecha_inicio, fecha_fin = ruta.rango_periodo(mes, anio)
                 
                 # Evitar duplicados
@@ -759,9 +916,17 @@ class RutaTransporteViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         
         if not update_data:
             return Response({"detail": "No hay campos válidos para actualizar."}, status=status.HTTP_400_BAD_REQUEST)
-            
-        updated_count = RutaTransporte.objects.filter(id__in=ruta_ids).update(**update_data)
-        
+
+        updated_count = 0
+        with transaction.atomic():
+            for ruta in RutaTransporte.objects.select_related('servicio').filter(id__in=ruta_ids):
+                if ruta.servicio_id and not ruta.servicio.activa:
+                    continue
+                for k, v in update_data.items():
+                    setattr(ruta, k, v)
+                ruta.save()
+                updated_count += 1
+
         return Response({
             "status": "success",
             "updated_count": updated_count
@@ -867,6 +1032,35 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     ordering_fields = ['fecha_inicio']
     ordering = ['-fecha_inicio']
+
+    def _servicio_of(self, periodo=None):
+        obj = periodo or self.get_object()
+        ruta = getattr(obj, 'ruta', None)
+        return getattr(ruta, 'servicio', None) if ruta else None
+
+    def create(self, request, *args, **kwargs):
+        ruta_id = request.data.get('ruta')
+        if ruta_id:
+            ruta = RutaTransporte.objects.select_related('servicio').filter(pk=ruta_id).first()
+            blocked = _gestion_archivada_response(getattr(ruta, 'servicio', None) if ruta else None)
+            if blocked:
+                return blocked
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        blocked = _gestion_archivada_response(self._servicio_of())
+        if blocked:
+            return blocked
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        blocked = _gestion_archivada_response(self._servicio_of())
+        if blocked:
+            return blocked
+        return super().destroy(request, *args, **kwargs)
+
+    def _block_si_archivada(self, periodo=None):
+        return _gestion_archivada_response(self._servicio_of(periodo))
 
     @action(detail=True, methods=['get'])
     def calendario(self, request, pk=None):
@@ -991,6 +1185,9 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         nro_factura, fecha_servicio; y si es mixto también montos.
         """
         periodo = self.get_object()
+        blocked = self._block_si_archivada(periodo)
+        if blocked:
+            return blocked
         servicio = periodo.ruta.servicio if periodo.ruta.servicio_id else None
         if not servicio or not servicio.permite_recepcion_servicio:
             return Response(
@@ -1069,6 +1266,9 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='toggle-dia')
     def toggle_dia(self, request, pk=None):
+        blocked = self._block_si_archivada()
+        if blocked:
+            return blocked
         fecha_str = request.data.get('fecha')
         if not fecha_str:
             return Response({"fecha": "Requerido."}, status=status.HTTP_400_BAD_REQUEST)
@@ -1102,6 +1302,9 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='volumen-dia')
     def volumen_dia(self, request, pk=None):
         """Registra o elimina m³ de un día (modalidad volumétrica)."""
+        blocked = self._block_si_archivada()
+        if blocked:
+            return blocked
         fecha_str = request.data.get('fecha')
         raw_vol = request.data.get('volumen_m3')
         if not fecha_str:
@@ -1208,6 +1411,14 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
                     id__in=periodo_ids,
                 ).select_related('ruta', 'ruta__servicio').prefetch_related('volumenes_dia')
                 for periodo in periodos:
+                    blocked = self._block_si_archivada(periodo)
+                    if blocked:
+                        results.append({
+                            'id': periodo.id,
+                            'status': 'error',
+                            'detail': 'Gestión archivada (historial)',
+                        })
+                        continue
                     servicio = periodo.ruta.servicio if periodo.ruta.servicio_id else None
                     if not servicio or not servicio.es_volumetrico:
                         results.append({'id': periodo.id, 'status': 'error', 'detail': 'No volumétrico'})
@@ -1258,9 +1469,19 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
         results = []
         try:
             with transaction.atomic():
-                periodos = PeriodoCobro.objects.select_for_update().filter(id__in=periodo_ids)
+                periodos = PeriodoCobro.objects.select_for_update().filter(
+                    id__in=periodo_ids,
+                ).select_related('ruta', 'ruta__servicio')
                 
                 for periodo in periodos:
+                    blocked = self._block_si_archivada(periodo)
+                    if blocked:
+                        results.append({
+                            "id": periodo.id,
+                            "status": "error",
+                            "detail": "Gestión archivada (historial)",
+                        })
+                        continue
                     if periodo.estado == 'CERRADO':
                         results.append({"id": periodo.id, "status": "error", "detail": "Periodo cerrado"})
                         continue
@@ -1301,8 +1522,13 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
     def cerrar(self, request, pk=None):
         try:
             with transaction.atomic():
-                periodo = PeriodoCobro.objects.select_for_update().get(pk=pk)
-                
+                periodo = PeriodoCobro.objects.select_for_update().select_related(
+                    'ruta', 'ruta__servicio',
+                ).get(pk=pk)
+                blocked = self._block_si_archivada(periodo)
+                if blocked:
+                    return blocked
+
                 if periodo.estado == 'CERRADO':
                     return Response({"detail": "El periodo ya está cerrado."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1327,10 +1553,41 @@ class PeriodoCobroViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
             return Response({"detail": "Error interno al cerrar el periodo."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class AusenciaRutaViewSet(viewsets.ModelViewSet):
-    queryset = AusenciaRuta.objects.all()
+    queryset = AusenciaRuta.objects.select_related(
+        'periodo', 'periodo__ruta', 'periodo__ruta__servicio',
+    ).all()
     serializer_class = AusenciaRutaSerializer
     filterset_fields = ['periodo', 'fecha']
     permission_classes = _DEFAULT_PERMS
+
+    def _servicio_of(self, ausencia=None):
+        obj = ausencia or self.get_object()
+        periodo = getattr(obj, 'periodo', None)
+        ruta = getattr(periodo, 'ruta', None) if periodo else None
+        return getattr(ruta, 'servicio', None) if ruta else None
+
+    def create(self, request, *args, **kwargs):
+        periodo_id = request.data.get('periodo')
+        if periodo_id:
+            periodo = PeriodoCobro.objects.select_related('ruta__servicio').filter(pk=periodo_id).first()
+            blocked = _gestion_archivada_response(
+                getattr(getattr(periodo, 'ruta', None), 'servicio', None) if periodo else None
+            )
+            if blocked:
+                return blocked
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        blocked = _gestion_archivada_response(self._servicio_of())
+        if blocked:
+            return blocked
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        blocked = _gestion_archivada_response(self._servicio_of())
+        if blocked:
+            return blocked
+        return super().destroy(request, *args, **kwargs)
 
 class FeriadoNacionalViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
     sgaf_action_permissions = {

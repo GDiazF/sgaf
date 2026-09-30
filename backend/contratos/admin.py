@@ -2,7 +2,7 @@ from django.contrib import admin
 from .models import (
     ProcesoCompra, EstadoContrato, CategoriaContrato, Contrato, OrientacionLicitacion,
     TipoServicioOperativo, ServicioContrato, RutaTransporte, FeriadoNacional, PeriodoCobro,
-    AmpliacionContrato,
+    AmpliacionContrato, AmpliacionMontoProveedor,
 )
 
 @admin.register(TipoServicioOperativo)
@@ -72,6 +72,11 @@ class ContratoAdmin(admin.ModelAdmin):
     )
 
 
+class AmpliacionMontoProveedorInline(admin.TabularInline):
+    model = AmpliacionMontoProveedor
+    extra = 0
+
+
 @admin.register(AmpliacionContrato)
 class AmpliacionContratoAdmin(admin.ModelAdmin):
     list_display = (
@@ -81,3 +86,11 @@ class AmpliacionContratoAdmin(admin.ModelAdmin):
     list_filter = ('created_at',)
     search_fields = ('contrato__codigo_mercado_publico', 'nro_resolucion', 'motivo')
     readonly_fields = ('fecha_termino_anterior', 'created_at', 'usuario')
+    inlines = [AmpliacionMontoProveedorInline]
+
+
+@admin.register(AmpliacionMontoProveedor)
+class AmpliacionMontoProveedorAdmin(admin.ModelAdmin):
+    list_display = ('ampliacion', 'proveedor', 'monto')
+    list_filter = ('ampliacion__contrato',)
+    search_fields = ('proveedor__nombre', 'ampliacion__contrato__codigo_mercado_publico')

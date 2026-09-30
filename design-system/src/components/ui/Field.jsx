@@ -1,10 +1,12 @@
 import { forwardRef, useId, useState } from 'react'
 import { cn } from '../../lib/cn.js'
 import { Icon } from '../../icons/Icon.jsx'
+import { DateInput } from './DateInput.jsx'
 
 export function Field({
   label,
   hint,
+  tip,
   error,
   required,
   success,
@@ -22,22 +24,49 @@ export function Field({
       )}
     >
       {label ? (
-        <label
-          className={cn('field__label', required && 'field__label--required')}
-          htmlFor={htmlFor}
-        >
-          {label}
-        </label>
+        <div className="field__label-row">
+          <label
+            className={cn('field__label', required && 'field__label--required')}
+            htmlFor={htmlFor}
+          >
+            {label}
+          </label>
+          {tip ? <InfoTip>{tip}</InfoTip> : null}
+        </div>
       ) : null}
       {children}
       {error ? <p className="field__error">{error}</p> : null}
-      {!error && hint ? <p className="field__hint">{hint}</p> : null}
+      {!error && hint && !tip ? <p className="field__hint">{hint}</p> : null}
     </div>
   )
 }
 
-export const Input = forwardRef(function Input({ className, ...rest }, ref) {
-  return <input ref={ref} className={cn('input', 'no-global', className)} {...rest} />
+/** Ayuda contextual junto al label: icono (i), texto al hover/focus. */
+export function InfoTip({ children, label = 'Más información', className }) {
+  const tipId = useId()
+  if (!children) return null
+  return (
+    <span className={cn('info-tip', className)}>
+      <button
+        type="button"
+        className="info-tip__btn"
+        aria-label={label}
+        aria-describedby={tipId}
+      >
+        <Icon name="info" size={14} aria-hidden />
+      </button>
+      <span id={tipId} role="tooltip" className="info-tip__bubble">
+        {children}
+      </span>
+    </span>
+  )
+}
+
+export const Input = forwardRef(function Input({ className, type, ...rest }, ref) {
+  if (type === 'date') {
+    return <DateInput ref={ref} className={className} {...rest} />
+  }
+  return <input ref={ref} type={type} className={cn('input', 'no-global', className)} {...rest} />
 })
 
 export const Select = forwardRef(function Select(

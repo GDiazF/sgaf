@@ -78,8 +78,39 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
 
   const applicableRutas = useMemo(() => {
     if (!selectedPeriodName) return []
-    return rutas.filter((r) => periodoForRuta(r, selectedPeriodName))
+    return [...rutas]
+      .filter((r) => periodoForRuta(r, selectedPeriodName))
+      .sort((a, b) => {
+        const byName = (a.nombre || '').localeCompare(b.nombre || '', 'es', {
+          sensitivity: 'base',
+        })
+        if (byName !== 0) return byName
+        return (a.proveedor_nombre || '').localeCompare(b.proveedor_nombre || '', 'es', {
+          sensitivity: 'base',
+        })
+      })
   }, [selectedPeriodName, rutas])
+
+  const [rutaSort, setRutaSort] = useState({ key: 'nombre', direction: 'asc' })
+
+  const sortedApplicableRutas = useMemo(() => {
+    const items = [...applicableRutas]
+    const dir = rutaSort.direction === 'asc' ? 1 : -1
+    items.sort((a, b) => {
+      const aVal = (rutaSort.key === 'proveedor' ? a.proveedor_nombre : a.nombre) || ''
+      const bVal = (rutaSort.key === 'proveedor' ? b.proveedor_nombre : b.nombre) || ''
+      return aVal.localeCompare(bVal, 'es', { sensitivity: 'base' }) * dir
+    })
+    return items
+  }, [applicableRutas, rutaSort])
+
+  const toggleRutaSort = (key) => {
+    setRutaSort((prev) =>
+      prev.key === key
+        ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' },
+    )
+  }
 
   const diasGrid = useMemo(() => {
     if (!selectedPeriodName || applicableRutas.length === 0) return []
@@ -214,9 +245,37 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
             <thead>
               <tr>
                 <th className="rutas-detail-matrix__sticky">
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>
-                    {rowLabel} ({applicableRutas.length})
-                  </span>
+                  <button
+                    type="button"
+                    className="rutas-detail-matrix__sort"
+                    onClick={() => toggleRutaSort('nombre')}
+                    title="Ordenar por nombre"
+                  >
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>
+                      {rowLabel} ({sortedApplicableRutas.length})
+                      {rutaSort.key === 'nombre'
+                        ? rutaSort.direction === 'asc'
+                          ? ' ↑'
+                          : ' ↓'
+                        : ''}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="rutas-detail-matrix__sort"
+                    onClick={() => toggleRutaSort('proveedor')}
+                    title="Ordenar por proveedor"
+                    style={{ display: 'block', marginTop: 2 }}
+                  >
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--primary)' }}>
+                      Proveedor
+                      {rutaSort.key === 'proveedor'
+                        ? rutaSort.direction === 'asc'
+                          ? ' ↑'
+                          : ' ↓'
+                        : ''}
+                    </span>
+                  </button>
                 </th>
                 {diasGrid.map((fecha) => {
                   const fStr = format(fecha, 'yyyy-MM-dd')
@@ -252,7 +311,7 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
               </tr>
             </thead>
             <tbody>
-              {applicableRutas.map((ruta) => {
+              {sortedApplicableRutas.map((ruta) => {
                 const p = periodoForRuta(ruta, selectedPeriodName)
                 return (
                   <tr key={ruta.id}>

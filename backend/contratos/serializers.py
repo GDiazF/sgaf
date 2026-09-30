@@ -3,6 +3,7 @@ from django.db import transaction
 from .models import (
     ProcesoCompra, EstadoContrato, CategoriaContrato, Contrato, OrientacionLicitacion,
     DocumentoContrato, HistorialContrato, ContratoProveedor, AmpliacionContrato,
+    AmpliacionMontoProveedor,
 )
 from core.serializers import MediaRelativeFileField
 from establecimientos.serializers import EstablecimientoSerializer
@@ -39,16 +40,25 @@ class HistorialContratoSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class AmpliacionMontoProveedorSerializer(serializers.ModelSerializer):
+    proveedor_nombre = serializers.ReadOnlyField(source='proveedor.nombre')
+
+    class Meta:
+        model = AmpliacionMontoProveedor
+        fields = ['id', 'proveedor', 'proveedor_nombre', 'monto']
+
+
 class AmpliacionContratoSerializer(serializers.ModelSerializer):
     documento = MediaRelativeFileField(required=False, allow_null=True)
     eliminar_documento = serializers.BooleanField(required=False, write_only=True, default=False)
+    montos_proveedor = AmpliacionMontoProveedorSerializer(many=True, read_only=True)
 
     class Meta:
         model = AmpliacionContrato
         fields = [
             'id', 'contrato', 'fecha_termino_anterior', 'fecha_inicio', 'fecha_termino',
             'nro_resolucion', 'motivo', 'monto', 'porcentaje', 'documento', 'eliminar_documento',
-            'created_at', 'usuario',
+            'montos_proveedor', 'created_at', 'usuario',
         ]
         read_only_fields = ['fecha_termino_anterior', 'created_at', 'usuario']
 
@@ -56,6 +66,83 @@ class AmpliacionContratoSerializer(serializers.ModelSerializer):
         if monto is None:
             return ''
         return f' Monto: ${int(monto):,}.'.replace(',', '.')
+
+    def _parse_montos_proveedor(self, raw):
+        """Acepta lista, o JSON string (multipart FormData)."""
+        if raw is None or raw is serializers.empty:
+            return None
+        if isinstance(raw, str):
+            import json
+            raw = raw.strip()
+            if not raw:
+                return []
+            try:
+                raw = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise serializers.ValidationError({
+                    'montos_proveedor': 'Formato inválido (se espera JSON).',
+                }) from exc
+        if not isinstance(raw, list):
+            raise serializers.ValidationError({
+                'montos_proveedor': 'Debe ser una lista de {proveedor, monto}.',
+            })
+        parsed = []
+        for item in raw:
+            if not isinstance(item, dict):
+                raise serializers.ValidationError({
+                    'montos_proveedor': 'Cada ítem debe ser un objeto {proveedor, monto}.',
+                })
+            prov = item.get('proveedor')
+            monto = item.get('monto')
+            if prov in (None, ''):
+                continue
+            if monto in (None, ''):
+                continue
+            try:
+                monto_int = int(monto)
+            except (TypeError, ValueError) as exc:
+                raise serializers.ValidationError({
+                    'montos_proveedor': 'Los montos deben ser enteros.',
+                }) from exc
+            if monto_int < 0:
+                raise serializers.ValidationError({
+                    'montos_proveedor': 'Los montos no pueden ser negativos.',
+                })
+            if monto_int == 0:
+                continue
+            parsed.append({'proveedor': int(prov), 'monto': monto_int})
+        return parsed
+
+    def _sync_montos_proveedor(self, ampliacion, montos):
+        if montos is None:
+            return
+        contrato = ampliacion.contrato
+        valid_ids = set(
+            contrato.proveedores_asociados.values_list('proveedor_id', flat=True)
+        )
+        seen = set()
+        for row in montos:
+            pid = row['proveedor']
+            if pid not in valid_ids:
+                raise serializers.ValidationError({
+                    'montos_proveedor': f'Proveedor {pid} no está asociado al contrato.',
+                })
+            if pid in seen:
+                raise serializers.ValidationError({
+                    'montos_proveedor': 'Hay proveedores duplicados en los montos.',
+                })
+            seen.add(pid)
+            AmpliacionMontoProveedor.objects.update_or_create(
+                ampliacion=ampliacion,
+                proveedor_id=pid,
+                defaults={'monto': row['monto']},
+            )
+        AmpliacionMontoProveedor.objects.filter(ampliacion=ampliacion).exclude(
+            proveedor_id__in=seen
+        ).delete()
+        total = sum(r['monto'] for r in montos)
+        ampliacion.monto = total if montos else None
+        ampliacion.save(update_fields=['monto'])
 
     @staticmethod
     def _doc_nombre(ampliacion):
@@ -145,6 +232,16 @@ class AmpliacionContratoSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'monto': 'El monto no puede ser negativo.'})
         return attrs
 
+    def _montos_from_request(self):
+        raw = getattr(self, 'initial_data', None)
+        if raw is None:
+            return None
+        if hasattr(raw, 'get'):
+            if 'montos_proveedor' not in raw:
+                return None
+            return self._parse_montos_proveedor(raw.get('montos_proveedor'))
+        return None
+
     def _sync_contrato_termino(self, contrato):
         from django.db.models import Max
 
@@ -157,6 +254,7 @@ class AmpliacionContratoSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         request = self.context.get('request')
         validated_data.pop('eliminar_documento', None)
+        montos_parsed = self._montos_from_request()
 
         contrato = validated_data.get('contrato') or self.context.get('contrato')
         if contrato is None:
@@ -183,6 +281,9 @@ class AmpliacionContratoSerializer(serializers.ModelSerializer):
             ampliacion.documento = documento
         ampliacion.full_clean()
         ampliacion.save()
+
+        if montos_parsed is not None:
+            self._sync_montos_proveedor(ampliacion, montos_parsed)
 
         self._sync_contrato_termino(contrato)
 
@@ -212,6 +313,8 @@ class AmpliacionContratoSerializer(serializers.ModelSerializer):
             user = request.user.get_full_name() or request.user.username
 
         validated_data.pop('contrato', None)  # no se reasigna
+        montos_parsed = self._montos_from_request()
+        validated_data.pop('_montos_proveedor_parsed', None)
 
         if validated_data.get('monto') in ('', None) and 'monto' in validated_data:
             validated_data['monto'] = None
@@ -247,6 +350,8 @@ class AmpliacionContratoSerializer(serializers.ModelSerializer):
         instance.full_clean()
         instance.save()
 
+        if montos_parsed is not None:
+            self._sync_montos_proveedor(instance, montos_parsed)
         contrato = instance.contrato
         self._sync_contrato_termino(contrato)
 
@@ -277,11 +382,17 @@ class ContratoProveedorSerializer(serializers.ModelSerializer):
     proveedor_nombre = serializers.ReadOnlyField(source='proveedor.nombre')
     monto_ejecutado = serializers.ReadOnlyField()
     monto_restante = serializers.ReadOnlyField()
+    monto_ampliado = serializers.ReadOnlyField()
+    monto_techo = serializers.ReadOnlyField()
     establecimientos_detalle = EstablecimientoSerializer(source='establecimientos', many=True, read_only=True)
 
     class Meta:
         model = ContratoProveedor
-        fields = ['id', 'proveedor', 'proveedor_nombre', 'monto_adjudicado', 'monto_consumido_previo', 'monto_ejecutado', 'monto_restante', 'establecimientos', 'establecimientos_detalle']
+        fields = [
+            'id', 'proveedor', 'proveedor_nombre', 'monto_adjudicado', 'monto_consumido_previo',
+            'monto_ampliado', 'monto_techo', 'monto_ejecutado', 'monto_restante',
+            'establecimientos', 'establecimientos_detalle',
+        ]
 
 class ContratoSerializer(serializers.ModelSerializer):
     proceso_nombre = serializers.ReadOnlyField(source='proceso.nombre')
@@ -406,19 +517,56 @@ class ContratoSerializer(serializers.ModelSerializer):
         return contrato
 
     def update(self, instance, validated_data):
+        from django.db import transaction
+
         proveedores_data = validated_data.pop('proveedores_asociados', None)
         publicar = self.context.get('publicar', False)
         if publicar:
             validated_data['es_borrador'] = False
 
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
+        old_plantilla = instance.plantilla_cobro or None
+        plantilla_en_payload = 'plantilla_cobro' in validated_data
+        new_plantilla = (
+            (validated_data.get('plantilla_cobro') or None)
+            if plantilla_en_payload
+            else old_plantilla
+        )
+        plantilla_cambio = plantilla_en_payload and new_plantilla != old_plantilla and bool(new_plantilla)
 
-        self._save_proveedores(instance, proveedores_data)
+        request = self.context.get('request')
+        raw = getattr(request, 'data', {}) if request else {}
+        confirmar = False
+        if hasattr(raw, 'get'):
+            confirmar = str(raw.get('confirmar_cambio_plantilla', '')).lower() in (
+                '1', 'true', 'yes', 'si', 'sí',
+            )
 
-        if not instance.es_borrador:
-            instance.ensure_gestion_operativa()
+        active = instance.servicios_operativos.filter(activa=True).first()
+        if plantilla_cambio and active and not confirmar:
+            raise serializers.ValidationError({
+                'plantilla_cobro': (
+                    'Al cambiar la plantilla de cobro, la gestión operativa actual '
+                    'pasará a historial (solo lectura) y se abrirá una gestión nueva. '
+                    'Confirme el cambio.'
+                ),
+                'requiere_confirmacion_cambio_plantilla': True,
+                'gestion_activa_id': active.id,
+            })
+
+        with transaction.atomic():
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            instance.save()
+
+            self._save_proveedores(instance, proveedores_data)
+
+            if not instance.es_borrador:
+                if plantilla_cambio and active:
+                    # Refrescar por si el objeto quedó desfasado
+                    active.refresh_from_db()
+                    if active.activa:
+                        active.archivar(plantilla_origen=old_plantilla)
+                instance.ensure_gestion_operativa()
         return instance
 
 # =====================================================================
@@ -455,13 +603,14 @@ class ServicioContratoSerializer(serializers.ModelSerializer):
     def validate(self, data):
         contrato = data.get('contrato') or getattr(self.instance, 'contrato', None)
         tipo = data.get('tipo_servicio') or getattr(self.instance, 'tipo_servicio', None)
-        if contrato:
-            qs = ServicioContrato.objects.filter(contrato=contrato)
+        activa = data.get('activa', getattr(self.instance, 'activa', True) if self.instance else True)
+        if contrato and activa:
+            qs = ServicioContrato.objects.filter(contrato=contrato, activa=True)
             if self.instance:
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise serializers.ValidationError(
-                    {'contrato': 'Este contrato ya tiene una gestión operativa.'}
+                    {'contrato': 'Este contrato ya tiene una gestión operativa activa.'}
                 )
         es_transporte = False
         if tipo:
@@ -489,6 +638,8 @@ class ServicioContratoSerializer(serializers.ModelSerializer):
                         {'monto_mensual': 'Indique el monto mensual que aplica a todos los colegios.'}
                     )
             # MENSUAL_FIJO_VARIABLE: monto_mensual opcional (sugiere fijo por defecto)
+        if plantilla and not data.get('plantilla_cobro') and not getattr(self.instance, 'plantilla_cobro', None):
+            data['plantilla_cobro'] = plantilla
         return data
 
 class PeriodoCobroSerializer(serializers.ModelSerializer):
@@ -522,8 +673,28 @@ class RutaTransporteSerializer(serializers.ModelSerializer):
         model = RutaTransporte
         fields = '__all__'
 
+    _INT_NULL_FIELDS = (
+        'valor_diario', 'valor_mensual', 'precio_m3',
+        'dia_inicio_periodo', 'dia_fin_periodo',
+    )
+
+    def to_internal_value(self, data):
+        # Evita "introduzca número entero válido" cuando el front manda "".
+        if hasattr(data, 'copy'):
+            data = data.copy()
+        else:
+            data = dict(data)
+        for field in self._INT_NULL_FIELDS:
+            if field in data and data[field] == '':
+                data[field] = None
+        return super().to_internal_value(data)
+
     def validate(self, data):
         servicio = data.get('servicio') or getattr(self.instance, 'servicio', None)
+        if servicio and not getattr(servicio, 'activa', True):
+            raise serializers.ValidationError(
+                {'servicio': 'No se puede modificar una gestión archivada (historial).'}
+            )
         proveedor = data.get('proveedor') or getattr(self.instance, 'proveedor', None)
         establecimientos = data.get('establecimientos')
         if establecimientos is None and self.instance:
@@ -570,6 +741,7 @@ class RutaTransporteSerializer(serializers.ModelSerializer):
                 )
             if not servicio.es_mensual_mixto:
                 data['valor_diario'] = data.get('valor_diario') or 0
+            data['precio_m3'] = None
             if proveedor:
                 qs = RutaTransporte.objects.filter(
                     servicio=servicio,
@@ -582,6 +754,10 @@ class RutaTransporteSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(
                         {'establecimientos': 'Este establecimiento ya está en la gestión para este proveedor.'}
                     )
+        elif servicio and not servicio.es_linea_por_establecimiento:
+            # Transporte diario: no aplica mensual ni m³
+            data['valor_mensual'] = None
+            data['precio_m3'] = None
         return data
 
 class AusenciaRutaSerializer(serializers.ModelSerializer):

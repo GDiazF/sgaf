@@ -281,14 +281,44 @@ export default function BulkRouteSettingsModal({ open, onClose, rutas, variant =
               </div>
 
               {variant === 'establecimiento' ? (
-                <Field label="Monto mensual" htmlFor="bulk-valor-mensual">
-                  <CurrencyInput
-                    id="bulk-valor-mensual"
-                    placeholder="No cambiar"
-                    value={fields.valor_mensual}
-                    onChange={(val) => setFields({ ...fields, valor_mensual: val })}
-                  />
-                </Field>
+                <div className="form-grid">
+                  <Field label="Monto mensual" htmlFor="bulk-valor-mensual" className="field--full">
+                    <CurrencyInput
+                      id="bulk-valor-mensual"
+                      placeholder="No cambiar"
+                      value={fields.valor_mensual}
+                      onChange={(val) => setFields({ ...fields, valor_mensual: val })}
+                    />
+                  </Field>
+                  <Field
+                    label="Día inicio"
+                    htmlFor="bulk-dia-inicio"
+                    hint="Opcional. Si el cobro no va del 1 al 30/31."
+                  >
+                    <Input
+                      id="bulk-dia-inicio"
+                      type="number"
+                      min={1}
+                      max={31}
+                      placeholder="No cambiar"
+                      value={fields.dia_inicio_periodo}
+                      onChange={(e) =>
+                        setFields({ ...fields, dia_inicio_periodo: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="Día fin" htmlFor="bulk-dia-fin">
+                    <Input
+                      id="bulk-dia-fin"
+                      type="number"
+                      min={1}
+                      max={31}
+                      placeholder="No cambiar"
+                      value={fields.dia_fin_periodo}
+                      onChange={(e) => setFields({ ...fields, dia_fin_periodo: e.target.value })}
+                    />
+                  </Field>
+                </div>
               ) : (
                 <div className="form-grid">
                   <Field label="Día inicio" htmlFor="bulk-dia-inicio">

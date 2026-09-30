@@ -15,6 +15,7 @@ export { Icon, iconNames, iconLabels, resolveIconName } from './icons/Icon.jsx'
 export { Button, IconButton, ButtonSplit, ACTION_TO_VARIANT } from './components/ui/Button.jsx'
 export {
   Field,
+  InfoTip,
   Input,
   Select,
   Textarea,
@@ -28,6 +29,12 @@ export {
   formatCLPDisplay,
   parseCLPInput,
 } from './components/ui/CurrencyInput.jsx'
+export {
+  DateInput,
+  formatDateCL,
+  parseDateCL,
+  maskDateCL,
+} from './components/ui/DateInput.jsx'
 export {
   KmInput,
   formatKmDisplay,

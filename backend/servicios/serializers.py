@@ -344,7 +344,21 @@ class FacturaAdquisicionSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at', 'folio', 'modalidad']
         extra_kwargs = {
             'cdp': {'required': False, 'allow_blank': True},
+            'descripcion': {'required': False, 'allow_blank': True},
         }
+
+    def create(self, validated_data):
+        establecimientos = validated_data.pop('establecimientos', [])
+        instance = super().create(validated_data)
+        instance.establecimientos.set(establecimientos)
+        return instance
+
+    def update(self, instance, validated_data):
+        establecimientos = validated_data.pop('establecimientos', None)
+        instance = super().update(instance, validated_data)
+        if establecimientos is not None:
+            instance.establecimientos.set(establecimientos)
+        return instance
 
 
 class CompraAgilSerializer(FacturaAdquisicionSerializer):
@@ -354,6 +368,7 @@ class CompraAgilSerializer(FacturaAdquisicionSerializer):
         extra_kwargs = {
             'nro_oc': {'required': True, 'allow_blank': False},
             'cdp': {'required': False, 'allow_blank': True},
+            'descripcion': {'required': False, 'allow_blank': True},
         }
 
     def validate_nro_oc(self, value):

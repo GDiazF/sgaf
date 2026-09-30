@@ -29,7 +29,9 @@ VARIABLE_GROUPS = [
                 'key': 'contrato_detalle',
                 'label': 'Detalle (texto corto)',
                 'type': 'text',
-                'hint': 'Texto amigable opcional para documentos (ej. recepción). Si está vacío, no se rellena.',
+                'hint': (
+                    'Campo «Detalle» del contrato. Si está vacío, usa la descripción completa.'
+                ),
             },
             {'key': 'contrato_monto', 'label': 'Monto del contrato / OC', 'type': 'text'},
             {'key': 'contrato_fecha_inicio', 'label': 'Fecha inicio contrato', 'type': 'text'},
@@ -114,8 +116,24 @@ VARIABLE_GROUPS = [
             {'key': 'rc_folio', 'label': 'Folio RC', 'type': 'text'},
             {'key': 'rc_tipo', 'label': 'Tipo de recepción (ROC/RCF/RCA)', 'type': 'text'},
             {'key': 'rc_nro_factura', 'label': 'Número de factura', 'type': 'text'},
-            {'key': 'rc_periodo', 'label': 'Periodo', 'type': 'text'},
-            {'key': 'rc_glosa', 'label': 'Glosa / descripción', 'type': 'text'},
+            {
+                'key': 'rc_periodo',
+                'label': 'Periodo',
+                'type': 'text',
+                'hint': (
+                    'Etiqueta elegida al emitir la RC: mes («Agosto 2026») o rango '
+                    '(«01/08/2026 AL 31/08/2026» / «21/08/2026 AL 20/09/2026»).'
+                ),
+            },
+            {
+                'key': 'rc_glosa',
+                'label': 'Glosa / descripción',
+                'type': 'text',
+                'hint': (
+                    'Concepto + listado de establecimientos. No incluye el periodo '
+                    '(usa el chip «Periodo RC» / rc_periodo para eso).'
+                ),
+            },
             {'key': 'rc_tipo_entrega', 'label': 'Tipo de entrega (total/parcial)', 'type': 'text'},
             {'key': 'rc_fecha_recepcion', 'label': 'Fecha de recepción', 'type': 'text'},
             {'key': 'rc_fecha_plazo', 'label': 'Fecha plazo', 'type': 'text'},
@@ -275,7 +293,9 @@ VARIABLE_GROUPS = [
                 'key': 'contrato_detalle',
                 'label': 'Contrato · Detalle (texto corto)',
                 'type': 'text',
-                'hint': 'Texto amigable para la recepción (opcional). Preferir esta en el cuerpo del documento.',
+                'hint': (
+                    'Campo «Detalle» del contrato. Si está vacío, usa la descripción completa.'
+                ),
             },
             {
                 'key': 'contrato_nro_oc',
@@ -454,7 +474,7 @@ SAMPLE_CONTEXT = {
     'rc_folio': 'ROC-000123',
     'rc_tipo': 'ROC',
     'rc_nro_factura': 'F-12345',
-    'rc_periodo': 'Marzo 2026',
+    'rc_periodo': '01/08/2026 AL 31/08/2026',
     'rc_glosa': 'Recepción conforme de servicios del periodo',
     'rc_tipo_entrega': 'Total',
     'rc_fecha_recepcion': '15-03-2026',

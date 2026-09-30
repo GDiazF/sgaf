@@ -47,17 +47,71 @@ const MONTH_NAMES = [
   'Diciembre',
 ]
 
+/** Misma lógica que RutaTransporte.rango_periodo en backend. */
+function estimatePeriodoRange(ruta, mes, anio) {
+  const m = Number(mes)
+  const y = Number(anio)
+  if (!ruta || !m || !y) return null
+
+  const daysIn = (year, month) => new Date(year, month, 0).getDate()
+  const clamp = (dia, year, month) => {
+    const last = daysIn(year, month)
+    const d = Math.max(1, Math.min(Number(dia) || 1, last))
+    return d
+  }
+  const pad = (n) => String(n).padStart(2, '0')
+  const fmt = (d, month, year) => `${pad(d)}/${pad(month)}/${year}`
+
+  const diaIniCfg = ruta.dia_inicio_periodo ?? 1
+  const diaFinCfg = ruta.dia_fin_periodo ?? 31
+  const diaIni = clamp(diaIniCfg, y, m)
+  const diaFin = clamp(diaFinCfg, y, m)
+
+  if (diaIni <= diaFin) {
+    return {
+      inicio: fmt(diaIni, m, y),
+      termino: fmt(diaFin, m, y),
+      cruzaMes: false,
+      diaIni: diaIniCfg,
+      diaFin: diaFinCfg,
+    }
+  }
+  // 21 → 20: fin en mes de referencia, inicio en el anterior
+  let prevMes = m - 1
+  let prevAnio = y
+  if (prevMes < 1) {
+    prevMes = 12
+    prevAnio = y - 1
+  }
+  return {
+    inicio: fmt(clamp(diaIniCfg, prevAnio, prevMes), prevMes, prevAnio),
+    termino: fmt(diaFin, m, y),
+    cruzaMes: true,
+    diaIni: diaIniCfg,
+    diaFin: diaFinCfg,
+  }
+}
+
 const ServicioDetailPage = ({
   servicioId: servicioIdProp,
   embedded = false,
   contract: contractProp = null,
+  readOnly = false,
 } = {}) => {
   const params = useParams()
   const id = servicioIdProp || params.id
   const { can } = usePermission()
+  const [servicio, setServicio] = useState(null)
+  const isReadOnly = Boolean(readOnly) || servicio?.activa === false
   const canViewRuta = can('contratos.view_rutatransporte')
   const canViewServicioOp = can('contratos.view_serviciocontrato')
-  const [servicio, setServicio] = useState(null)
+  const canAddRuta = !isReadOnly && can('contratos.add_rutatransporte')
+  const canChangeRuta = !isReadOnly && can('contratos.change_rutatransporte')
+  const canDeleteRuta = !isReadOnly && can('contratos.delete_rutatransporte')
+  const canChangeAusencia = !isReadOnly && can('contratos.change_ausenciaruta')
+  const canAddPeriodo = !isReadOnly && can('contratos.add_periodocobro')
+  const canChangePeriodo = !isReadOnly && can('contratos.change_periodocobro')
+  const canChangeServicio = !isReadOnly && can('contratos.change_serviciocontrato')
   const [contrato, setContrato] = useState(null)
   const [rutas, setRutas] = useState([])
   const [loading, setLoading] = useState(true)
@@ -313,17 +367,38 @@ const ServicioDetailPage = ({
         { responseType: 'blob' },
       )
 
-      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const contentType = response.headers?.['content-type'] || ''
+      if (contentType.includes('application/json')) {
+        const text = await response.data.text()
+        const parsed = JSON.parse(text)
+        throw new Error(parsed.detail || 'Error al generar el acta.')
+      }
+
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
       const link = document.createElement('a')
       link.href = url
       link.setAttribute('download', `Acta_Conformidad_${id}.pdf`)
       document.body.appendChild(link)
       link.click()
       link.remove()
+      window.URL.revokeObjectURL(url)
       closeActaModal()
     } catch (err) {
       console.error('Error generating Acta:', err)
-      notify({ variant: 'danger', text: 'Error al generar el acta de conformidad.' })
+      let message = 'Error al generar el acta de conformidad.'
+      const data = err?.response?.data
+      if (data instanceof Blob) {
+        try {
+          const text = await data.text()
+          const parsed = JSON.parse(text)
+          if (parsed?.detail) message = parsed.detail
+        } catch {
+          /* ignore */
+        }
+      } else if (err?.message) {
+        message = err.message
+      }
+      notify({ variant: 'danger', text: message })
     } finally {
       setGeneratingActa(false)
     }
@@ -522,9 +597,12 @@ const ServicioDetailPage = ({
         proveedor: data.proveedor,
         establecimientos: data.establecimientos || [],
         precio_m3: data.precio_m3,
+        dia_inicio_periodo: data.dia_inicio_periodo || 1,
+        dia_fin_periodo: data.dia_fin_periodo || 31,
         incluir_fines_semana: data.incluir_fines_semana ?? true,
         excluir_feriados: data.excluir_feriados ?? false,
       })
+      await fetchData()
       return
     }
     if (esMensual) {
@@ -533,23 +611,30 @@ const ServicioDetailPage = ({
         proveedor: data.proveedor,
         establecimientos: data.establecimientos || [],
         valor_mensual: data.valor_mensual,
+        dia_inicio_periodo: data.dia_inicio_periodo || 1,
+        dia_fin_periodo: data.dia_fin_periodo || 31,
         incluir_fines_semana: data.incluir_fines_semana ?? true,
         excluir_feriados: data.excluir_feriados ?? false,
       })
+      await fetchData()
       return
     }
-    await api.post('contratos/rutas/', {
+    const payload = {
       ...data,
       servicio: id,
       valor_diario: data.valor_diario || 0,
-    })
+      valor_mensual: data.valor_mensual === '' ? null : data.valor_mensual,
+      precio_m3: data.precio_m3 === '' ? null : data.precio_m3,
+    }
+    await api.post('contratos/rutas/', payload)
+    await fetchData()
   }
 
-  const handleRutaModalClose = (result) => {
+  const handleRutaModalClose = async (result) => {
     setIsRutaModalOpen(false)
     if (result?.saved) {
       setRutaFormData({ ...EMPTY_FORM })
-      fetchData()
+      await fetchData()
     }
   }
 
@@ -559,7 +644,7 @@ const ServicioDetailPage = ({
     try {
       await api.delete(`contratos/rutas/${deleteTarget.id}/`)
       setDeleteTarget(null)
-      fetchData()
+      await fetchData()
       notify({
         variant: 'success',
         text: esLineaEst ? 'Establecimiento eliminado.' : 'Ruta eliminada.',
@@ -572,15 +657,21 @@ const ServicioDetailPage = ({
   }
 
   const handleUpdateRuta = async (data) => {
-    const payload = { ...data, valor_diario: data.valor_diario || 0 }
+    const payload = {
+      ...data,
+      valor_diario: data.valor_diario || 0,
+      valor_mensual: data.valor_mensual === '' ? null : data.valor_mensual,
+      precio_m3: data.precio_m3 === '' ? null : data.precio_m3,
+    }
     await api.put(`contratos/rutas/${data.id}/`, payload)
+    await fetchData()
   }
 
-  const handleEditRutaModalClose = (result) => {
+  const handleEditRutaModalClose = async (result) => {
     setIsEditModalOpen(false)
     if (result?.saved) {
       setEditRutaData(null)
-      fetchData()
+      await fetchData()
     }
   }
 
@@ -858,7 +949,7 @@ const ServicioDetailPage = ({
           >
             <Icon name="info" size="sm" />
           </Button>
-          {permiteRecepcionServicio && canViewRuta ? (
+          {permiteRecepcionServicio && !isReadOnly && canViewRuta ? (
             <Button
               variant="ghost"
               size="sm"
@@ -870,12 +961,12 @@ const ServicioDetailPage = ({
               <Icon name="file" size="sm" />
             </Button>
           ) : null}
-          {can('contratos.change_rutatransporte') ? (
+          {canChangeRuta ? (
             <Button variant="ghost" size="sm" onClick={() => openEditRutaModal(ruta)}>
               <Icon name="edit" size="sm" />
             </Button>
           ) : null}
-          {can('contratos.delete_rutatransporte') ? (
+          {canDeleteRuta ? (
             <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(ruta)}>
               <Icon name="trash" size="sm" />
             </Button>
@@ -895,7 +986,7 @@ const ServicioDetailPage = ({
 
   const toolbarActions = (
     <>
-      {esMensual && !esVolumetric && can('contratos.change_serviciocontrato') ? (
+      {esMensual && !esVolumetric && canChangeServicio ? (
         <Button
           variant="secondary"
           size="sm"
@@ -905,7 +996,7 @@ const ServicioDetailPage = ({
           <Icon name="procedimientos" size="sm" /> Modalidad · {modalidadLabel}
         </Button>
       ) : null}
-      {usaAsistenciaYFeriados && can('contratos.change_rutatransporte') ? (
+      {usaAsistenciaYFeriados && canChangeRuta ? (
         <Button
           variant="secondary"
           size="sm"
@@ -935,7 +1026,7 @@ const ServicioDetailPage = ({
           <Icon name="file" size="sm" /> Consolidado
         </Button>
       ) : null}
-      {can('contratos.add_rutatransporte') ? (
+      {canAddRuta ? (
         <Button variant="primary" size="sm" onClick={openCreateLinea}>
           <Icon name="plus" size="sm" />{' '}
           {esLineaEst ? 'Agregar establecimientos' : 'Nueva ruta'}
@@ -982,6 +1073,12 @@ const ServicioDetailPage = ({
       data-od-id={embedded ? 'rutas-detail-embed' : 'rutas-detail-page'}
       data-fill-viewport={embedded ? undefined : true}
     >
+      {isReadOnly ? (
+        <Alert variant="warning" title="Gestión histórica (solo lectura)">
+          Esta gestión fue archivada al cambiar la plantilla de cobro. Puede consultar rutas y
+          periodos, pero no modificarlos.
+        </Alert>
+      ) : null}
       {embedded ? null : (
         <PageHeader
           icon="rutas"
@@ -1067,7 +1164,7 @@ const ServicioDetailPage = ({
               : 'No hay rutas con los filtros actuales.'
         }
         emptyAction={
-          can('contratos.add_rutatransporte') ? (
+          canAddRuta ? (
             <Button
               variant="primary"
               size="sm"
@@ -1096,7 +1193,7 @@ const ServicioDetailPage = ({
               {esLineaEst ? 'Establecimientos' : 'Rutas operativas'}
             </span>
             <Badge variant="neutral">{sortedRutas.length}</Badge>
-            {selectedRutasTable.length > 0 && can('contratos.add_periodocobro') ? (
+            {selectedRutasTable.length > 0 && canAddPeriodo ? (
               <Button
                 variant="primary"
                 size="sm"
@@ -1106,7 +1203,7 @@ const ServicioDetailPage = ({
                 {selectedRutasTable.length})
               </Button>
             ) : null}
-            {usaAsistenciaYFeriados && can('contratos.change_ausenciaruta') ? (
+            {usaAsistenciaYFeriados && canChangeAusencia ? (
               <Button
                 variant="secondary"
                 size="sm"
@@ -1115,7 +1212,7 @@ const ServicioDetailPage = ({
                 <Icon name="reservas" size="sm" /> Planilla asistencia
               </Button>
             ) : null}
-            {esVolumetric && can('contratos.change_periodocobro') ? (
+            {esVolumetric && canChangePeriodo ? (
               <Button
                 variant="secondary"
                 size="sm"
@@ -1124,7 +1221,7 @@ const ServicioDetailPage = ({
                 <Icon name="reservas" size="sm" /> Planilla m³
               </Button>
             ) : null}
-            {usaAsistenciaYFeriados && can('contratos.change_rutatransporte') ? (
+            {usaAsistenciaYFeriados && canChangeRuta ? (
               <Button
                 variant="secondary"
                 size="sm"
@@ -1133,7 +1230,7 @@ const ServicioDetailPage = ({
                 <Icon name="procedimientos" size="sm" /> Config. masiva
               </Button>
             ) : null}
-            {!esLineaEst && canViewServicioOp ? (
+            {!esLineaEst && !isReadOnly && canViewServicioOp ? (
               <Button variant="secondary" size="sm" onClick={() => setIsActaModalOpen(true)}>
                 <Icon name="file" size="sm" /> Acta
               </Button>
@@ -1145,7 +1242,7 @@ const ServicioDetailPage = ({
             label: 'Gestionar',
             onClick: () => openRoutePanel(ruta, 'management'),
           },
-          secondary: can('contratos.change_rutatransporte')
+          secondary: canChangeRuta
             ? { label: 'Editar', onClick: () => openEditRutaModal(ruta) }
             : undefined,
         })}
@@ -1333,6 +1430,13 @@ const ServicioDetailPage = ({
                     </strong>
                   </div>
                   <div className="rutas-detail-drawer-stat">
+                    <p>Corte de periodo</p>
+                    <strong>
+                      Día {selectedRoute?.dia_inicio_periodo ?? 1} →{' '}
+                      {selectedRoute?.dia_fin_periodo ?? 31}
+                    </strong>
+                  </div>
+                  <div className="rutas-detail-drawer-stat">
                     <p>Calendario</p>
                     <strong>
                       {selectedRoute?.incluir_fines_semana
@@ -1353,6 +1457,13 @@ const ServicioDetailPage = ({
                       {new Intl.NumberFormat('es-CL').format(
                         selectedRoute?.valor_mensual || 0,
                       )}
+                    </strong>
+                  </div>
+                  <div className="rutas-detail-drawer-stat">
+                    <p>Corte de periodo</p>
+                    <strong>
+                      Día {selectedRoute?.dia_inicio_periodo ?? 1} →{' '}
+                      {selectedRoute?.dia_fin_periodo ?? 31}
                     </strong>
                   </div>
                   <div className="rutas-detail-drawer-stat">
@@ -1400,7 +1511,7 @@ const ServicioDetailPage = ({
                   <h4 className="rutas-detail-section-title" style={{ margin: 0 }}>
                     Historial de periodos
                   </h4>
-                  {can('contratos.add_periodocobro') ? (
+                  {!isReadOnly && canAddPeriodo ? (
                     <Button
                       variant="primary"
                       size="sm"
@@ -1495,6 +1606,7 @@ const ServicioDetailPage = ({
       <PeriodoCalendarioModal
         open={!!activePeriodId}
         periodoId={activePeriodId}
+        readOnly={isReadOnly}
         onClose={() => {
           setActivePeriodId(null)
           fetchData()
@@ -1724,6 +1836,7 @@ const ServicioDetailPage = ({
         open={isPeriodoModalOpen}
         onClose={closePeriodoModal}
         title="Generar periodo"
+        size="sm"
         {...periodoOverlay.modalProps}
         onOverlayDismiss={handlePeriodoOverlayDismiss}
         footer={
@@ -1749,7 +1862,7 @@ const ServicioDetailPage = ({
       >
         <form id="generar-periodo-form" className="crud-form" onSubmit={handleGeneratePeriod}>
           <div className="form-grid">
-            <Field label="Mes del periodo" htmlFor="periodo-mes">
+            <Field label="Mes" htmlFor="periodo-mes">
               <Select
                 id="periodo-mes"
                 value={periodoData.mes}
@@ -1775,36 +1888,31 @@ const ServicioDetailPage = ({
               />
             </Field>
           </div>
-          {selectedRoute ? (
-            <div className="rutas-detail-period-preview" style={{ marginTop: 'var(--space-4)' }}>
-              <p className="rutas-detail-period-preview__label">
-                <Icon name="reservas" size="sm" /> Rango de fechas estimado
-              </p>
-              <div className="rutas-detail-period-preview__range">
-                <div>
-                  <p>
-                    {esLineaEst
-                      ? `1/${periodoData.mes}/${periodoData.anio}`
-                      : `${selectedRoute.dia_inicio_periodo}/${
-                          periodoData.mes === 1 ? 12 : periodoData.mes - 1
-                        }/${
-                          periodoData.mes === 1 ? periodoData.anio - 1 : periodoData.anio
-                        }`}
-                  </p>
-                  <span>Inicio</span>
-                </div>
-                <Icon name="chevron" size="sm" />
-                <div>
-                  <p>
-                    {esLineaEst
-                      ? `${new Date(periodoData.anio, periodoData.mes, 0).getDate()}/${periodoData.mes}/${periodoData.anio}`
-                      : `${selectedRoute.dia_fin_periodo}/${periodoData.mes}/${periodoData.anio}`}
-                  </p>
-                  <span>Término</span>
-                </div>
-              </div>
-            </div>
-          ) : null}
+          {selectedRoute
+            ? (() => {
+                const rango = estimatePeriodoRange(
+                  selectedRoute,
+                  periodoData.mes,
+                  periodoData.anio,
+                )
+                if (!rango) return null
+                return (
+                  <div className="rutas-detail-period-preview">
+                    <p className="rutas-detail-period-preview__dates">
+                      <strong>{rango.inicio}</strong>
+                      <span className="rutas-detail-period-preview__arrow" aria-hidden>
+                        →
+                      </span>
+                      <strong>{rango.termino}</strong>
+                    </p>
+                    <p className="rutas-detail-period-preview__hint">
+                      Corte día {rango.diaIni} → {rango.diaFin}
+                      {rango.cruzaMes ? ' · cruza de mes' : ''}
+                    </p>
+                  </div>
+                )
+              })()
+            : null}
         </form>
       </Modal>
 
@@ -1812,7 +1920,8 @@ const ServicioDetailPage = ({
         open={isBulkModalOpen}
         onClose={closeBulkPeriodoModal}
         title="Apertura masiva"
-        subheader={`${selectedRutasTable.length} ${esLineaEst ? 'establecimientos seleccionados' : 'rutas seleccionadas'}`}
+        size="sm"
+        subheader={`${selectedRutasTable.length} ${esLineaEst ? 'establecimiento' : 'ruta'}${selectedRutasTable.length === 1 ? '' : 's'}`}
         {...bulkPeriodoOverlay.modalProps}
         onOverlayDismiss={handleBulkPeriodoOverlayDismiss}
         footer={
@@ -1831,14 +1940,14 @@ const ServicioDetailPage = ({
               loading={bulkPeriodoOverlay.busy}
               disabled={bulkPeriodoOverlay.busy || bulkPeriodoOverlay.active}
             >
-              Generar periodos masivos
+              Generar periodos
             </Button>
           </>
         }
       >
         <form id="bulk-periodo-form" className="crud-form" onSubmit={handleBulkCreatePeriod}>
           <div className="form-grid">
-            <Field label="Mes del periodo" htmlFor="bulk-mes">
+            <Field label="Mes" htmlFor="bulk-mes">
               <Select
                 id="bulk-mes"
                 value={bulkPeriodoData.mes}
@@ -1846,9 +1955,9 @@ const ServicioDetailPage = ({
                   setBulkPeriodoData({ ...bulkPeriodoData, mes: e.target.value })
                 }
               >
-                {[...Array(12)].map((_, i) => (
-                  <option key={i + 1} value={i + 1}>
-                    {new Date(0, i).toLocaleString('es-CL', { month: 'long' })}
+                {MONTH_NAMES.map((m, i) => (
+                  <option key={m} value={i + 1}>
+                    {m}
                   </option>
                 ))}
               </Select>
@@ -1864,10 +1973,47 @@ const ServicioDetailPage = ({
               />
             </Field>
           </div>
-          <Alert variant="warning" title="Nota" style={{ marginTop: 'var(--space-4)' }}>
-            Se generarán automáticamente los calendarios operativos para todas las rutas
-            seleccionadas. Los periodos que ya existan serán ignorados.
-          </Alert>
+          {(() => {
+            const selected = rutas.filter((r) => selectedRutasTable.includes(r.id))
+            const groups = new Map()
+            selected.forEach((r) => {
+              const key = `${r.dia_inicio_periodo ?? 1}-${r.dia_fin_periodo ?? 31}`
+              const rango = estimatePeriodoRange(r, bulkPeriodoData.mes, bulkPeriodoData.anio)
+              if (!groups.has(key)) {
+                groups.set(key, {
+                  corte: `${r.dia_inicio_periodo ?? 1} → ${r.dia_fin_periodo ?? 31}`,
+                  rango,
+                  count: 0,
+                })
+              }
+              groups.get(key).count += 1
+            })
+            if (groups.size === 0) return null
+            const mesLabel = MONTH_NAMES[(Number(bulkPeriodoData.mes) || 1) - 1]
+            return (
+              <div className="rutas-detail-period-preview">
+                <p className="rutas-detail-period-preview__label">
+                  Periodos para {mesLabel} {bulkPeriodoData.anio}
+                </p>
+                <ul className="rutas-detail-period-preview__list">
+                  {[...groups.values()].map((g) => (
+                    <li key={g.corte}>
+                      <strong>
+                        {g.rango?.inicio || '—'} → {g.rango?.termino || '—'}
+                      </strong>
+                      <span>
+                        {g.count} {esLineaEst ? 'establecimiento' : 'ruta'}
+                        {g.count === 1 ? '' : 's'} · corte {g.corte}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="rutas-detail-period-preview__hint">
+                  Cada línea usa su propio corte. Los periodos que ya existan se omiten.
+                </p>
+              </div>
+            )
+          })()}
         </form>
       </Modal>
 

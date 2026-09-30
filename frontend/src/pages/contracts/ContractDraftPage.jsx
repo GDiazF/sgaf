@@ -241,16 +241,18 @@ const ContractDraftPage = () => {
           onDismiss={overlay.dismiss}
         >
           <Card className="contract-draft-card">
-            <ContractForm
-              formId="contract-draft-form"
-              formData={formData}
-              setFormData={setFormData}
-              lookups={lookups}
-              isDraft
-              compactLayout
-              editingId={contract.id}
-              onSubmit={(e) => e.preventDefault()}
-            />
+            <div className="card__body">
+              <ContractForm
+                formId="contract-draft-form"
+                formData={formData}
+                setFormData={setFormData}
+                lookups={lookups}
+                isDraft
+                compactLayout
+                editingId={contract.id}
+                onSubmit={(e) => e.preventDefault()}
+              />
+            </div>
           </Card>
         </FormOverlay>
       </div>

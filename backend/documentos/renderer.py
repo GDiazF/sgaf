@@ -80,7 +80,8 @@ def _substitute_text(html, context):
         # HTML confiable armado en el servidor (p. ej. listados de pagos)
         if name.endswith('_html'):
             return str(value)
-        return escape(str(value), quote=False)
+        # Escapar y preservar saltos de línea (glosas multilínea, etc.)
+        return escape(str(value), quote=False).replace('\n', '<br>\n')
 
     return VAR_RE.sub(repl, html or '')
 
@@ -408,7 +409,18 @@ def _apply_sgaf_var_spans(root, context):
             el.clear()
             el.append(BeautifulSoup(str(value), 'html.parser'))
         else:
-            el.string = str(value)
+            text = str(value)
+            if '\n' in text:
+                from bs4 import NavigableString
+                el.clear()
+                parts = escape(text, quote=False).split('\n')
+                for i, part in enumerate(parts):
+                    if i:
+                        el.append(BeautifulSoup('<br/>', 'html.parser').br)
+                    if part:
+                        el.append(NavigableString(part))
+            else:
+                el.string = text
         classes = [c for c in (el.get('class') or []) if c != 'sgaf-var']
         if classes:
             el['class'] = classes

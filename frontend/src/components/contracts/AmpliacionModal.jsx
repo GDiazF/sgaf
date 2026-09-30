@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   Modal,
   Button,
@@ -10,9 +10,27 @@ import {
   CurrencyInput,
   Badge,
   Icon,
+  InfoTip,
+  Select,
   useFormOverlay,
   formatApiFormError,
 } from '@slep/ui'
+
+const buildInitialRows = (contract, editing) => {
+  const fromEditing = editing?.montos_proveedor || []
+  if (fromEditing.length) {
+    return fromEditing.map((m) => ({
+      proveedor: String(m.proveedor),
+      monto: m.monto ?? '',
+    }))
+  }
+  // Legado: un solo monto global y un solo proveedor del contrato
+  const proveedores = contract?.proveedores_asociados || []
+  if (editing?.monto && proveedores.length === 1) {
+    return [{ proveedor: String(proveedores[0].proveedor), monto: editing.monto }]
+  }
+  return []
+}
 
 const emptyForm = (contract, editing) => ({
   fecha_inicio: editing?.fecha_inicio || contract?.fecha_termino || '',
@@ -21,6 +39,7 @@ const emptyForm = (contract, editing) => ({
   motivo: editing?.motivo || '',
   monto: editing?.monto ?? '',
   porcentaje: editing?.porcentaje ?? '',
+  montos_rows: buildInitialRows(contract, editing),
   documento: null,
   eliminar_documento: false,
 })
@@ -40,6 +59,7 @@ const AmpliacionModal = ({ open, onClose, onSave, contract, editing = null }) =>
   const isEdit = Boolean(editing?.id)
   const terminoVigente = contract?.fecha_termino || ''
   const [form, setForm] = useState(emptyForm(contract, editing))
+  const proveedores = contract?.proveedores_asociados || []
 
   useEffect(() => {
     if (!open) return
@@ -48,18 +68,86 @@ const AmpliacionModal = ({ open, onClose, onSave, contract, editing = null }) =>
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset solo al abrir
   }, [open, contract?.id, contract?.fecha_termino, editing])
 
+  const usedProveedorIds = useMemo(
+    () => new Set((form.montos_rows || []).map((r) => String(r.proveedor)).filter(Boolean)),
+    [form.montos_rows],
+  )
+
+  const disponiblesParaAgregar = useMemo(
+    () => proveedores.filter((pa) => !usedProveedorIds.has(String(pa.proveedor))),
+    [proveedores, usedProveedorIds],
+  )
+
+  const totalMontos = useMemo(
+    () => (form.montos_rows || []).reduce((sum, r) => sum + (Number(r.monto) || 0), 0),
+    [form.montos_rows],
+  )
+
   const existingDocUrl =
     !form.eliminar_documento && editing?.documento && !(form.documento instanceof File)
       ? editing.documento
       : null
   const existingDocName = existingDocUrl ? fileNameFromUrl(existingDocUrl) : null
 
+  const vigenciaTip = isEdit
+    ? `Término previo al registrar: ${
+        editing?.fecha_termino_anterior
+          ? new Date(editing.fecha_termino_anterior).toLocaleDateString('es-CL')
+          : '—'
+      }. Al cambiar fechas se recalcula la vigencia del contrato.`
+    : terminoVigente
+      ? `Término vigente actual: ${new Date(terminoVigente).toLocaleDateString('es-CL')}. Al guardar, el contrato pasa a la nueva fecha de término.`
+      : 'Sin fecha de término vigente.'
+
+  const handleAddRow = () => {
+    const next = disponiblesParaAgregar[0]
+    if (!next) return
+    setForm((prev) => ({
+      ...prev,
+      montos_rows: [...(prev.montos_rows || []), { proveedor: String(next.proveedor), monto: '' }],
+    }))
+  }
+
+  const handleRemoveRow = (index) => {
+    setForm((prev) => ({
+      ...prev,
+      montos_rows: (prev.montos_rows || []).filter((_, i) => i !== index),
+    }))
+  }
+
+  const handleRowChange = (index, field, value) => {
+    setForm((prev) => {
+      const next = [...(prev.montos_rows || [])]
+      next[index] = { ...next[index], [field]: value }
+      return { ...prev, montos_rows: next }
+    })
+  }
+
+  const optionsForRow = (row) => {
+    const current = String(row.proveedor || '')
+    return proveedores.filter(
+      (pa) =>
+        String(pa.proveedor) === current || !usedProveedorIds.has(String(pa.proveedor)),
+    )
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
       await overlay.run(
         async () => {
-          await onSave(form, editing)
+          await onSave(
+            {
+              ...form,
+              montos_proveedor: (form.montos_rows || [])
+                .filter((r) => r.proveedor && r.monto !== '' && r.monto != null)
+                .map((r) => ({
+                  proveedor: r.proveedor,
+                  monto: r.monto,
+                })),
+            },
+            editing,
+          )
         },
         {
           successDescription: isEdit
@@ -92,9 +180,14 @@ const AmpliacionModal = ({ open, onClose, onSave, contract, editing = null }) =>
     <Modal
       open={open}
       onClose={handleClose}
-      size="md"
+      size="lg"
       title={isEdit ? 'Editar ampliación' : 'Ampliación de contrato'}
-      subheader={`Contrato ${contract?.codigo_mercado_publico || ''}`}
+      subheader={
+        <span className="field__label-row">
+          Contrato {contract?.codigo_mercado_publico || contract?.id || '—'}
+          <InfoTip label="Vigencia">{vigenciaTip}</InfoTip>
+        </span>
+      }
       {...overlay.modalProps}
       onOverlayDismiss={handleOverlayDismiss}
       footer={
@@ -115,23 +208,12 @@ const AmpliacionModal = ({ open, onClose, onSave, contract, editing = null }) =>
       }
     >
       <form id="ampliacion-form" className="crud-form" onSubmit={handleSubmit}>
-        <FormStatus
-          variant="info"
-          title={isEdit ? 'Editar ampliación' : 'Vigencia del contrato'}
-          description={
-            isEdit
-              ? `Término previo al registrar: ${editing?.fecha_termino_anterior ? new Date(editing.fecha_termino_anterior).toLocaleDateString('es-CL') : '—'}. Al cambiar fechas se recalcula la vigencia del contrato.`
-              : terminoVigente
-                ? `Término vigente actual: ${new Date(terminoVigente).toLocaleDateString('es-CL')}. Al guardar, el contrato pasará a la nueva fecha de término.`
-                : 'Sin fecha de término vigente.'
-          }
-        />
-        <div className="form-grid">
+        <div className="form-grid form-grid--align-end">
           <Field
             label="Inicio de la ampliación"
             required
             htmlFor="amp-inicio"
-            hint="Por defecto es el término vigente; puedes cambiarlo si la ampliación no es continua."
+            tip="Por defecto es el término vigente; cámbialo solo si la ampliación no es continua."
           >
             <Input
               id="amp-inicio"
@@ -158,21 +240,90 @@ const AmpliacionModal = ({ open, onClose, onSave, contract, editing = null }) =>
               onChange={(e) => setForm({ ...form, nro_resolucion: e.target.value })}
             />
           </Field>
-          <Field
-            label="Monto de la ampliación"
-            htmlFor="amp-monto"
-            hint="Opcional. Monto adicional asociado a esta ampliación."
-          >
-            <CurrencyInput
-              id="amp-monto"
-              value={form.monto ?? ''}
-              onChange={(val) => setForm({ ...form, monto: val })}
-            />
-          </Field>
+
+          <div className="field field--full">
+            <div className="contracts-section-head">
+              <p className="contracts-section-title field__label-row">
+                Monto por proveedor
+                <InfoTip label="Montos por proveedor">
+                  {proveedores.length
+                    ? 'Opcional. Añade solo los proveedores del contrato a los que corresponde monto de ampliación. El total se calcula solo.'
+                    : 'Este contrato no tiene proveedores asociados.'}
+                </InfoTip>
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleAddRow}
+                disabled={!disponiblesParaAgregar.length}
+              >
+                <Icon name="plus" size="sm" /> Añadir
+              </Button>
+            </div>
+            {(form.montos_rows || []).length === 0 ? (
+              <p className="contracts-empty-hint">
+                Sin montos por proveedor. Use «Añadir» si corresponde.
+              </p>
+            ) : (
+              <div className="contracts-providers-list">
+                {(form.montos_rows || []).map((row, index) => {
+                  const opts = optionsForRow(row)
+                  return (
+                    <div key={`${row.proveedor}-${index}`} className="contracts-provider-card">
+                      <div className="contracts-provider-card__head">
+                        <span>Proveedor {index + 1}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveRow(index)}
+                          aria-label="Quitar proveedor"
+                        >
+                          <Icon name="trash" size="sm" />
+                        </Button>
+                      </div>
+                      <div className="form-grid">
+                        <Field label="Proveedor" htmlFor={`amp-prov-${index}`} className="field--full">
+                          <Select
+                            id={`amp-prov-${index}`}
+                            required
+                            value={row.proveedor || ''}
+                            onChange={(e) => handleRowChange(index, 'proveedor', e.target.value)}
+                          >
+                            <option value="">Seleccione…</option>
+                            {opts.map((pa) => (
+                              <option key={pa.proveedor} value={String(pa.proveedor)}>
+                                {pa.proveedor_nombre || `Proveedor #${pa.proveedor}`}
+                              </option>
+                            ))}
+                          </Select>
+                        </Field>
+                        <Field label="Monto ampliación ($)" htmlFor={`amp-monto-${index}`}>
+                          <CurrencyInput
+                            id={`amp-monto-${index}`}
+                            value={row.monto ?? ''}
+                            onChange={(val) => handleRowChange(index, 'monto', val)}
+                          />
+                        </Field>
+                      </div>
+                    </div>
+                  )
+                })}
+                {totalMontos > 0 ? (
+                  <p className="contracts-empty-hint">
+                    Total ampliación:{' '}
+                    <strong>${Number(totalMontos).toLocaleString('es-CL')}</strong>
+                  </p>
+                ) : null}
+              </div>
+            )}
+          </div>
+
           <Field
             label="% de ampliación"
             htmlFor="amp-pct"
-            hint="Informativo (ej. 30). No se usa para calcular montos."
+            tip="Informativo (ej. 30). No se usa para calcular montos."
           >
             <Input
               id="amp-pct"
@@ -197,7 +348,7 @@ const AmpliacionModal = ({ open, onClose, onSave, contract, editing = null }) =>
             label="Documento de ampliación"
             htmlFor="amp-doc"
             className="field--full"
-            hint={
+            tip={
               existingDocName
                 ? 'Puedes reemplazarlo subiendo otro archivo, o eliminarlo.'
                 : form.eliminar_documento

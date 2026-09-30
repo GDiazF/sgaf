@@ -262,8 +262,23 @@ class FacturaAdquisicion(models.Model):
     
     # El periodo al que corresponde la factura (primero de mes para registrar mes/año)
     periodo = models.DateField(blank=True, null=True, verbose_name="Periodo")
+    periodo_etiqueta = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+        verbose_name='Etiqueta de periodo',
+        help_text=(
+            'Texto elegido al emitir la RC para glosa/PDF: '
+            '«Agosto 2026» o «21/08/2026 AL 20/09/2026».'
+        ),
+    )
 
-    descripcion = models.TextField(verbose_name="Descripción de producto o servicio")
+    descripcion = models.TextField(
+        blank=True,
+        default='',
+        verbose_name="Descripción de producto o servicio",
+        help_text='Concepto / glosa de la RC. Opcional: la plantilla puede armar el texto con otras variables.',
+    )
     
     # Fecha de recepcion conforme (dd/mm/yyyy predeterminada hoy)
     fecha_recepcion = models.DateField(default=datetime.date.today, verbose_name="Fecha de recepción conforme")

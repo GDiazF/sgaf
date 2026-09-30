@@ -20,6 +20,8 @@ import FacturasAdquisicionDashboard from './pages/services/FacturasAdquisicionDa
 import DocumentacionServicios from './pages/services/DocumentacionServicios';
 import Contracts from './pages/contracts/Contracts';
 import ContractDetail from './pages/contracts/ContractDetail';
+import ContractNewPage from './pages/contracts/ContractNewPage';
+import ContractDraftPage from './pages/contracts/ContractDraftPage';
 import PeriodoDetallePage from './pages/contracts/PeriodoDetallePage';
 import ServiciosDashboard from './pages/contracts/ServiciosDashboard';
 import { ServicioDetailRedirect } from './pages/contracts/ServicioDetailPage';
@@ -176,6 +178,8 @@ function App() {
                 {/* Contratos y Compras */}
                 <Route element={<ProtectedRoute permission="contratos.view_contrato" />}>
                   <Route path="contracts" element={<Contracts />} />
+                  <Route path="contracts/new" element={<ContractNewPage />} />
+                  <Route path="contracts/:id/edit" element={<ContractDraftPage />} />
                   <Route path="contracts/:id" element={<ContractDetail />} />
                 </Route>
                 <Route element={<ProtectedRoute permission="servicios.view_proveedor" />}>

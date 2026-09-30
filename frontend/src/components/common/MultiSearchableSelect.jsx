@@ -98,11 +98,12 @@ const MultiSearchableSelect = ({
 
   const handleToggleOption = (optionValue) => {
     if (disabled) return
-    const option = options.find((o) => o.value === optionValue)
+    const option = options.find((o) => String(o.value) === String(optionValue))
     if (option?.disabled) return
 
-    const newValue = value.includes(optionValue)
-      ? value.filter((v) => v !== optionValue)
+    const exists = value.some((v) => String(v) === String(optionValue))
+    const newValue = exists
+      ? value.filter((v) => String(v) !== String(optionValue))
       : [...value, optionValue]
     onChange(newValue)
   }
@@ -150,7 +151,7 @@ const MultiSearchableSelect = ({
             <div className="combo__options" onWheel={(e) => e.stopPropagation()}>
               {filteredOptions.length > 0 ? (
                 filteredOptions.map((opt) => {
-                  const isSelected = value.includes(opt.value)
+                  const isSelected = value.some((v) => String(v) === String(opt.value))
                   return (
                     <button
                       key={opt.value}

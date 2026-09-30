@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { format, eachDayOfInterval, parseISO, isWeekend } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Modal, Button, ConfirmModal, Icon, Field, CurrencyInput, Input, Switch } from '@slep/ui'
+import { Modal, Button, ConfirmModal, Icon, Field, CurrencyInput, Input, Switch, Badge } from '@slep/ui'
 import { usePermission } from '../../../hooks/usePermission'
 import { useNotify } from '../../../hooks/useNotify'
 import api from '../../../api'
@@ -17,7 +17,10 @@ function DiaCelda({ fecha, isTrabajado, isFeriado, isFinDeSemana, onClick, disab
     <button
       type="button"
       disabled={disabled}
-      onClick={() => onClick(fecha)}
+      onClick={() => {
+        if (disabled) return
+        onClick(fecha)
+      }}
       className={cls}
     >
       <span className="rutas-detail-day__dow">
@@ -40,7 +43,10 @@ function DiaCeldaVolumen({ fecha, volumen, isFeriado, isFinDeSemana, onClick, di
     <button
       type="button"
       disabled={disabled}
-      onClick={() => onClick(fecha)}
+      onClick={() => {
+        if (disabled) return
+        onClick(fecha)
+      }}
       className={cls}
       title={tieneVolumen ? `${formatM3Display(volumen)} m³` : 'Registrar m³ del servicio'}
     >
@@ -55,7 +61,12 @@ function DiaCeldaVolumen({ fecha, volumen, isFeriado, isFinDeSemana, onClick, di
   )
 }
 
-export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
+export default function PeriodoCalendarioModal({
+  open,
+  periodoId,
+  onClose,
+  readOnly = false,
+}) {
   const { can } = usePermission()
   const [loading, setLoading] = useState(true)
   const [loadingTotal, setLoadingTotal] = useState(false)
@@ -80,8 +91,9 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
   const esMixto = Boolean(calendario?.es_mensual_mixto)
   const esLineaEst = esMensual || esVolumetrico
   const usaAsistencia = Boolean(calendario?.usa_asistencia) && !esMixto
-  const isClosed = calendario?.estado === 'CERRADO'
-  const canEditPeriodo = can('contratos.change_periodocobro')
+  const isClosed = calendario?.estado === 'CERRADO' || Boolean(readOnly)
+  const canEditPeriodo = !readOnly && can('contratos.change_periodocobro')
+  const canToggleAusencia = !readOnly && can('contratos.change_ausenciaruta')
 
   const fetchCalendario = useCallback(async () => {
     try {
@@ -144,8 +156,8 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
   }, [open, periodoId, fetchCalendario, fetchTotal])
 
   const handleToggleDia = async (fechaDate) => {
-    if (!can('contratos.change_ausenciaruta')) return
-    if (calendario?.estado === 'CERRADO') return
+    if (!canToggleAusencia) return
+    if (calendario?.estado === 'CERRADO' || readOnly) return
     const fechaStr = format(fechaDate, 'yyyy-MM-dd')
     const isCurrentlyAusente = calendario.ausencias.includes(fechaStr)
 
@@ -166,7 +178,8 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
   }
 
   const handleCerrarPeriodo = async () => {
-    if (!can('contratos.change_ausenciaruta') && !canEditPeriodo) return
+    if (readOnly) return
+    if (!canToggleAusencia && !canEditPeriodo) return
     setConfirmClose(false)
     setIsClosing(true)
     try {
@@ -188,7 +201,7 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
   }
 
   const handleSaveVolumenDia = async (clear = false) => {
-    if (!diaVolumenEdit) return
+    if (!diaVolumenEdit || readOnly || !canEditPeriodo) return
     setSavingVolumenDia(true)
     try {
       await api.post(`contratos/periodos/${periodoId}/volumen-dia/`, {
@@ -288,7 +301,9 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
           </Button>
         }
         footer={
-          calendario?.estado === 'CERRADO' ? (
+          readOnly ? (
+            <Badge variant="warning">Solo lectura (historial)</Badge>
+          ) : calendario?.estado === 'CERRADO' ? (
             <BadgeClosed />
           ) : (
             <Button
@@ -298,7 +313,7 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
               disabled={
                 isClosing ||
                 !calendario ||
-                !(can('contratos.change_ausenciaruta') || canEditPeriodo)
+                !(canToggleAusencia || canEditPeriodo)
               }
             >
               <Icon name="shield" size="sm" /> Guardar y congelar periodo
@@ -340,7 +355,8 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
                         const isFeriado = feriados.includes(fStr)
                         const isAus = (calendario.ausencias || []).includes(fStr)
                         const isDisabled =
-                          calendario.estado === 'CERRADO' ||
+                          isClosed ||
+                          !canToggleAusencia ||
                           (!calendario.regla.incluir_fines_semana && isFinSem) ||
                           (calendario.regla.excluir_feriados && isFeriado)
 
@@ -415,7 +431,7 @@ export default function PeriodoCalendarioModal({ open, periodoId, onClose }) {
                         const isFinSem = isWeekend(dia)
                         const isFeriado = feriados.includes(fStr)
                         const isDisabled =
-                          calendario.estado === 'CERRADO' ||
+                          isClosed ||
                           (!calendario.regla.incluir_fines_semana && isFinSem) ||
                           (calendario.regla.excluir_feriados && isFeriado)
 

@@ -5,6 +5,7 @@ import {
   Button,
   Field,
   Input,
+  DateInput,
   Select,
   Icon,
   Switch,
@@ -262,27 +263,24 @@ const ContractForm = ({
         </div>
         <div className="form-grid form-grid--3">
           <Field label="Fecha adjudicación" required={publishRequired} htmlFor="c-fa">
-            <Input
+            <DateInput
               id="c-fa"
-              type="date"
               required={publishRequired}
               value={formData.fecha_adjudicacion || ''}
               onChange={(e) => patchForm({ fecha_adjudicacion: e.target.value })}
             />
           </Field>
           <Field label="Fecha inicio" required={publishRequired} htmlFor="c-fi">
-            <Input
+            <DateInput
               id="c-fi"
-              type="date"
               required={publishRequired}
               value={formData.fecha_inicio || ''}
               onChange={(e) => patchForm({ fecha_inicio: e.target.value })}
             />
           </Field>
           <Field label="Fecha término" required={publishRequired} htmlFor="c-ft">
-            <Input
+            <DateInput
               id="c-ft"
-              type="date"
               required={publishRequired}
               value={formData.fecha_termino || ''}
               onChange={(e) => patchForm({ fecha_termino: e.target.value })}

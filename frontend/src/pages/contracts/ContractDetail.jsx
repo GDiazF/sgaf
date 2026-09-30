@@ -5,9 +5,7 @@ import ContractModal from '../../components/contracts/ContractModal'
 import ContractReceptionModal from '../../components/contracts/ContractReceptionModal'
 import AmpliacionModal from '../../components/contracts/AmpliacionModal'
 import ContratoPlantillaRecepcionModal from '../../components/contracts/ContratoPlantillaRecepcionModal'
-import ContratoAmpliacionesTab, {
-  ampliacionLabel,
-} from '../../components/contracts/ContratoAmpliacionesTab'
+import ContratoAmpliacionesPanel from '../../components/contracts/ContratoAmpliacionesTab'
 import ContratoServiciosTab from './ContratoServiciosTab'
 import DocumentViewerModal from '../../components/common/DocumentViewerModal'
 import { usePermission } from '../../hooks/usePermission'
@@ -23,7 +21,6 @@ import {
   Button,
   Field,
   Input,
-  Select,
   FileInput,
   Modal,
   ConfirmModal,
@@ -116,42 +113,78 @@ const estadoVariant = (nombre) => {
 
 function ProviderAdjudicacionDetail({ row, catalog, establishments }) {
   const previo = Number(row.monto_consumido_previo) || 0
+  const ampliado = Number(row.monto_ampliado) || 0
+  const adjudicado = Number(row.monto_adjudicado) || 0
+  const ejecutado = Number(row.monto_ejecutado) || 0
+  const saldo = Number(row.monto_restante) || 0
+  const techo = adjudicado + ampliado
   const nombres = establishments.map((e) => e.nombre || e).filter(Boolean)
+  const contacto = (catalog?.contacto || '').trim()
+  const pctLibre = techo > 0 ? Math.round((saldo / techo) * 100) : null
 
   return (
-    <dl className="contracts-meta">
-      <div className="contracts-meta__item">
-        <dt>RUT</dt>
-        <dd>{catalog?.rut || '—'}</dd>
+    <div className="contracts-sheet">
+      <div className="contracts-sheet__stats">
+        <div className="contracts-sheet__stat">
+          <span className="contracts-sheet__stat-label">Techo</span>
+          <span className="contracts-sheet__stat-value">{formatCurrency(techo)}</span>
+          <span className="contracts-sheet__stat-hint">
+            {ampliado > 0
+              ? `${formatCurrency(adjudicado)} + ${formatCurrency(ampliado)} amp.`
+              : 'Adjudicado'}
+          </span>
+        </div>
+        <div className="contracts-sheet__stat">
+          <span className="contracts-sheet__stat-label">Ejecutado</span>
+          <span className="contracts-sheet__stat-value">{formatCurrency(ejecutado)}</span>
+          <span className="contracts-sheet__stat-hint">
+            {previo > 0 ? `Prev. ${formatCurrency(previo)}` : 'Recepciones'}
+          </span>
+        </div>
+        <div className="contracts-sheet__stat contracts-sheet__stat--accent">
+          <span className="contracts-sheet__stat-label">Saldo</span>
+          <span className="contracts-sheet__stat-value">{formatCurrency(saldo)}</span>
+          <span className="contracts-sheet__stat-hint">
+            {pctLibre != null ? `${pctLibre}% disponible` : '—'}
+          </span>
+        </div>
       </div>
-      <div className="contracts-meta__item">
-        <dt>Tipo</dt>
-        <dd>{catalog?.tipo_proveedor_nombre || '—'}</dd>
-      </div>
-      <div className="contracts-meta__item">
-        <dt>Contacto</dt>
-        <dd>{catalog?.contacto || '—'}</dd>
-      </div>
-      <div className="contracts-meta__item">
-        <dt>Adjudicado</dt>
-        <dd>{formatCurrency(row.monto_adjudicado)}</dd>
-      </div>
-      <div className="contracts-meta__item">
-        <dt>Ejecutado</dt>
-        <dd>
-          {formatCurrency(row.monto_ejecutado)}
-          {previo > 0 ? ` (previo ${formatCurrency(previo)})` : ''}
-        </dd>
-      </div>
-      <div className="contracts-meta__item">
-        <dt>Saldo</dt>
-        <dd>{formatCurrency(row.monto_restante)}</dd>
-      </div>
-      <div className="contracts-meta__item contracts-meta__item--full">
-        <dt>Establecimientos</dt>
-        <dd>{nombres.length ? nombres.join(', ') : 'Sin asignaciones'}</dd>
-      </div>
-    </dl>
+
+      <dl className="contracts-sheet__facts">
+        <div className="contracts-sheet__fact">
+          <dt>RUT</dt>
+          <dd className="contracts-sheet__mono">{catalog?.rut || '—'}</dd>
+        </div>
+        <div className="contracts-sheet__fact">
+          <dt>Tipo</dt>
+          <dd>{catalog?.tipo_proveedor_nombre || '—'}</dd>
+        </div>
+        {contacto ? (
+          <div className="contracts-sheet__fact contracts-sheet__fact--stack">
+            <dt>Contacto</dt>
+            <dd>{contacto}</dd>
+          </div>
+        ) : null}
+      </dl>
+
+      <section className="contracts-sheet__section">
+        <h3 className="contracts-sheet__section-title">
+          Establecimientos
+          {nombres.length ? (
+            <Badge variant="neutral">{nombres.length}</Badge>
+          ) : null}
+        </h3>
+        {nombres.length ? (
+          <ul className="contracts-sheet__list">
+            {nombres.map((nombre) => (
+              <li key={nombre}>{nombre}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="contracts-sheet__empty">Sin establecimientos asignados</p>
+        )}
+      </section>
+    </div>
   )
 }
 
@@ -165,25 +198,14 @@ const ContractDetail = () => {
   const [loading, setLoading] = useState(true)
   const [receptions, setReceptions] = useState([])
   const [history, setHistory] = useState([])
-  const [selectedAmpliacionId, setSelectedAmpliacionId] = useState(null)
   const tabParam = searchParams.get('tab')
-  const ampliacionesForTabs = contract?.ampliaciones || []
-  const tabs = useMemo(() => {
-    const list = [...TABS_BASE]
-    if (ampliacionesForTabs.length > 0) {
-      const ampTab = {
-        id: 'ampliaciones',
-        label:
-          ampliacionesForTabs.length === 1
-            ? 'Ampliación de contrato'
-            : `Ampliaciones (${ampliacionesForTabs.length})`,
-      }
-      // Justo después de General
-      list.splice(1, 0, ampTab)
-    }
-    return list
-  }, [ampliacionesForTabs.length])
-  const activeTab = tabs.some((t) => t.id === tabParam) ? tabParam : 'info'
+  // Compat: ?tab=ampliaciones ya no existe → General
+  const activeTab =
+    tabParam === 'ampliaciones'
+      ? 'info'
+      : TABS_BASE.some((t) => t.id === tabParam)
+        ? tabParam
+        : 'info'
   const setActiveTab = (tabId) => {
     const next = new URLSearchParams(searchParams)
     if (tabId === 'info') next.delete('tab')
@@ -192,25 +214,18 @@ const ContractDetail = () => {
   }
 
   useEffect(() => {
-    if (activeTab === 'ampliaciones' && ampliacionesForTabs.length === 0) {
-      setActiveTab('info')
+    if (tabParam === 'ampliaciones') {
+      const next = new URLSearchParams(searchParams)
+      next.delete('tab')
+      setSearchParams(next, { replace: true })
+      requestAnimationFrame(() => {
+        document.getElementById('contract-ampliaciones')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+      })
     }
-  }, [activeTab, ampliacionesForTabs.length])
-
-  useEffect(() => {
-    const list = contract?.ampliaciones || []
-    if (!list.length) {
-      setSelectedAmpliacionId(null)
-      return
-    }
-    if (!list.some((a) => String(a.id) === String(selectedAmpliacionId))) {
-      const latest = [...list].sort(
-        (a, b) =>
-          new Date(b.fecha_termino || 0).getTime() - new Date(a.fecha_termino || 0).getTime(),
-      )[0]
-      setSelectedAmpliacionId(latest?.id ?? null)
-    }
-  }, [contract?.ampliaciones, selectedAmpliacionId])
+  }, [tabParam, searchParams, setSearchParams])
 
   const { notify } = useNotify()
 
@@ -327,11 +342,12 @@ const ContractDetail = () => {
     return contractToFormData(contract)
   }, [contract])
 
-  const handleEditSave = async (dataToSubmit) => {
-    await api.put(
-      `contratos/contratos/${contract.id}/`,
-      prepareContractPayload(dataToSubmit),
-    )
+  const handleEditSave = async (dataToSubmit, { confirmarCambioPlantilla = false } = {}) => {
+    const payload = prepareContractPayload(dataToSubmit)
+    if (confirmarCambioPlantilla) {
+      payload.confirmar_cambio_plantilla = true
+    }
+    await api.put(`contratos/contratos/${contract.id}/`, payload)
   }
 
   const handleEditClose = (result) => {
@@ -355,6 +371,8 @@ const ContractDetail = () => {
     } else if (editing?.id) {
       data.append('porcentaje', '')
     }
+    // Siempre enviar desglose (aunque vacío) para poder limpiar montos al editar
+    data.append('montos_proveedor', JSON.stringify(form.montos_proveedor || []))
     if (form.documento instanceof File) {
       data.append('documento', form.documento)
     } else if (editing?.id && form.eliminar_documento) {
@@ -382,8 +400,24 @@ const ContractDetail = () => {
     setEditingAmpliacion(null)
     if (result?.saved) {
       fetchContract()
-      setActiveTab('ampliaciones')
+      setActiveTab('info')
+      requestAnimationFrame(() => {
+        document.getElementById('contract-ampliaciones')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+      })
     }
+  }
+
+  const scrollToAmpliaciones = () => {
+    setActiveTab('info')
+    requestAnimationFrame(() => {
+      document.getElementById('contract-ampliaciones')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
   }
 
   const handlePlantillaRecepcionClose = (result) => {
@@ -450,24 +484,69 @@ const ContractDetail = () => {
     }
   }
 
+  const upsertReceptionLocal = (saved) => {
+    if (!saved?.id) return
+    setReceptions((prev) => {
+      const idx = prev.findIndex((r) => Number(r.id) === Number(saved.id))
+      if (idx === -1) return [saved, ...prev]
+      const next = [...prev]
+      next[idx] = { ...next[idx], ...saved }
+      return next
+    })
+    setContract((prev) => {
+      if (!prev) return prev
+      const list = prev.recepciones || []
+      const idx = list.findIndex((r) => Number(r.id) === Number(saved.id))
+      const recepciones =
+        idx === -1
+          ? [saved, ...list]
+          : list.map((r, i) => (i === idx ? { ...r, ...saved } : r))
+      return { ...prev, recepciones }
+    })
+  }
+
   const handleCreateReception = async (formData, isSplit = false) => {
+    const estIds = (formData.establecimientos || [])
+      .map((e) => Number(e?.id ?? e))
+      .filter((id) => Number.isFinite(id) && id > 0)
+
+    const payload = {
+      contrato: contract.id,
+      cdp: formData.cdp || '',
+      nro_factura: formData.nro_factura || '',
+      nro_oc: formData.nro_oc || '',
+      fecha_recepcion: formData.fecha_recepcion || null,
+      periodo: formData.periodo || null,
+      periodo_etiqueta: formData.periodo_etiqueta || '',
+      descripcion: formData.descripcion ?? '',
+      proveedor: formData.proveedor,
+      tipo_entrega: formData.tipo_entrega,
+      total_neto: formData.total_neto,
+      iva: formData.iva,
+      total_pagar: formData.total_pagar,
+      grupo_firmante: formData.grupo_firmante || null,
+      firmante: formData.firmante || null,
+      establecimientos: estIds,
+    }
+
     if (editingRC) {
-      await api.put(`contratos/recepciones-contrato/${editingRC.id}/`, {
-        ...formData,
-        contrato: contract.id,
-      })
-    } else if (isSplit && formData.establecimientos?.length > 1) {
+      const { data } = await api.put(
+        `contratos/recepciones-contrato/${editingRC.id}/`,
+        payload,
+      )
+      upsertReceptionLocal(data)
+    } else if (isSplit && estIds.length > 1) {
       let currentFolio = formData.folio || ''
-      for (const estId of formData.establecimientos) {
+      for (const estId of estIds) {
         const estName =
           lookups.establishments.find((e) => e.id === estId)?.nombre || ''
-        await api.post('contratos/recepciones-contrato/', {
-          ...formData,
+        const { data } = await api.post('contratos/recepciones-contrato/', {
+          ...payload,
           establecimientos: [estId],
-          contrato: contract.id,
           folio: currentFolio,
-          descripcion: formData.descripcion + (estName ? `\n- ${estName}` : ''),
+          descripcion: `${formData.descripcion || ''}${estName ? `\n- ${estName}` : ''}`.trim(),
         })
+        upsertReceptionLocal(data)
         if (currentFolio) {
           currentFolio = currentFolio.replace(/(\d+)(?!.*\d)/, (match) => {
             const num = parseInt(match, 10) + 1
@@ -476,17 +555,18 @@ const ContractDetail = () => {
         }
       }
     } else {
-      await api.post('contratos/recepciones-contrato/', {
-        ...formData,
-        contrato: contract.id,
+      const { data } = await api.post('contratos/recepciones-contrato/', {
+        ...payload,
+        folio: formData.folio || '',
       })
+      upsertReceptionLocal(data)
     }
   }
 
-  const handleReceptionClose = (result) => {
+  const handleReceptionClose = async (result) => {
     setReceptionModalOpen(false)
     setEditingRC(null)
-    if (result?.saved) fetchContract()
+    if (result?.saved) await fetchContract()
   }
 
   const confirmDeleteRc = async () => {
@@ -695,11 +775,6 @@ const ContractDetail = () => {
     }
     if (tab.id === 'receptions') return `${tab.label} (${receptions.length})`
     if (tab.id === 'docs') return `${tab.label} (${contract.documentos?.length || 0})`
-    if (tab.id === 'ampliaciones') {
-      return ampliaciones.length === 1
-        ? tab.label
-        : `Ampliaciones (${ampliaciones.length})`
-    }
     if (tab.id === 'history') return `${tab.label} (${history.length})`
     return tab.label
   }
@@ -773,9 +848,10 @@ const ContractDetail = () => {
       cardRole: 'field',
       priority: 2,
       render: (p) => {
+        const techo = Number(p.monto_techo ?? p.monto_adjudicado) || 0
         const pct =
-          p.monto_adjudicado > 0
-            ? Math.min(100, Math.round((p.monto_ejecutado / p.monto_adjudicado) * 100))
+          techo > 0
+            ? Math.min(100, Math.round((p.monto_ejecutado / techo) * 100))
             : 0
         return (
           <div>
@@ -879,7 +955,9 @@ const ContractDetail = () => {
               variant="ghost"
               size="sm"
               onClick={() => {
-                setEditingRC(rc)
+                const fresh =
+                  receptions.find((r) => Number(r.id) === Number(rc.id)) || rc
+                setEditingRC(fresh)
                 setReceptionModalOpen(true)
               }}
             >
@@ -1032,13 +1110,9 @@ const ContractDetail = () => {
         }
       />
 
-      <div
-        className={`tabs contracts-tabs${
-          ampliaciones.length > 1 ? ' contracts-tabs--amp-pick' : ''
-        }`}
-      >
+      <div className="tabs contracts-tabs">
         <ul className="tabs__list" role="tablist" aria-label="Secciones del contrato">
-          {tabs.map((tab) => (
+          {TABS_BASE.map((tab) => (
             <li key={tab.id}>
               <button
                 type="button"
@@ -1054,30 +1128,6 @@ const ContractDetail = () => {
             </li>
           ))}
         </ul>
-        {activeTab === 'ampliaciones' && ampliaciones.length > 1 ? (
-          <div className="contracts-amp-picker">
-            <Select
-              id="amp-pick"
-              aria-label="Seleccionar ampliación"
-              value={selectedAmpliacionId ?? ''}
-              onChange={(e) =>
-                setSelectedAmpliacionId(Number(e.target.value) || e.target.value)
-              }
-            >
-              {[...ampliaciones]
-                .sort(
-                  (a, b) =>
-                    new Date(b.fecha_termino || 0).getTime() -
-                    new Date(a.fecha_termino || 0).getTime(),
-                )
-                .map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {ampliacionLabel(a)}
-                  </option>
-                ))}
-            </Select>
-          </div>
-        ) : null}
       </div>
 
       <div
@@ -1242,6 +1292,7 @@ const ContractDetail = () => {
                 </div>
               </ChartCard>
             </div>
+
             <div className="contracts-kpi-grid">
               <ChartCard
                 title="Control presupuestario"
@@ -1331,7 +1382,7 @@ const ContractDetail = () => {
                         <button
                           type="button"
                           className="contracts-provider-link"
-                          onClick={() => setActiveTab('ampliaciones')}
+                          onClick={scrollToAmpliaciones}
                         >
                           {ampliaciones.length} ampliación
                           {ampliaciones.length === 1 ? '' : 'es'}
@@ -1376,6 +1427,16 @@ const ContractDetail = () => {
                 </div>
               </ChartCard>
             </div>
+
+            <ContratoAmpliacionesPanel
+              ampliaciones={ampliaciones}
+              canEdit={canRegisterAmpliacion}
+              onEdit={openAmpliacionModal}
+              onCreate={() => openAmpliacionModal(null)}
+              onPreviewDoc={setPreviewDoc}
+              formatCurrency={formatCurrency}
+              formatDate={formatDate}
+            />
           </div>
         ) : null}
 
@@ -1473,7 +1534,10 @@ const ContractDetail = () => {
                   ? {
                       label: 'Editar',
                       onClick: () => {
-                        setEditingRC(rc)
+                        const fresh =
+                          receptions.find((r) => Number(r.id) === Number(rc.id)) ||
+                          rc
+                        setEditingRC(fresh)
                         setReceptionModalOpen(true)
                       },
                     }
@@ -1503,20 +1567,6 @@ const ContractDetail = () => {
               }
             />
           </div>
-        ) : null}
-
-        {activeTab === 'ampliaciones' && ampliaciones.length > 0 ? (
-          <ContratoAmpliacionesTab
-            ampliaciones={ampliaciones}
-            selectedId={selectedAmpliacionId}
-            onSelectedIdChange={setSelectedAmpliacionId}
-            canEdit={canRegisterAmpliacion}
-            onEdit={openAmpliacionModal}
-            onPreviewDoc={setPreviewDoc}
-            formatCurrency={formatCurrency}
-            formatDate={formatDate}
-            calcSegmentProgress={calcSegmentProgress}
-          />
         ) : null}
 
         {activeTab === 'docs' ? (
@@ -1625,6 +1675,7 @@ const ContractDetail = () => {
         onClose={handleReceptionClose}
         onSave={handleCreateReception}
         contract={contract}
+        receptions={receptions}
         lookups={lookups}
         editingRC={editingRC}
       />
@@ -1714,6 +1765,8 @@ const ContractDetail = () => {
       <Modal
         open={!!selectedProvider}
         onClose={() => setSelectedProvider(null)}
+        size="sm"
+        className="contracts-sheet-modal"
         title={selectedProvider?.proveedor_nombre || 'Proveedor'}
         subheader="Adjudicación en este contrato"
         footer={

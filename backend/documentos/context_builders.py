@@ -113,9 +113,13 @@ def _est_ciudad(est):
 
 
 def _contrato_detalle(contrato):
+    """Detalle corto del contrato; si está vacío, cae a la descripción completa."""
     if not contrato:
         return ''
-    return (getattr(contrato, 'detalle', None) or '').strip()
+    detalle = (getattr(contrato, 'detalle', None) or '').strip()
+    if detalle:
+        return detalle
+    return (getattr(contrato, 'descripcion', None) or '').strip()
 
 
 def _fmt_periodo(periodo):
@@ -123,6 +127,106 @@ def _fmt_periodo(periodo):
         return ''
     mes = MESES.get(periodo.month, '').capitalize()
     return f'{mes} {periodo.year}'.strip()
+
+
+def _fmt_periodo_rango(fecha_inicio, fecha_fin, *, mes_ref=None, anio_ref=None):
+    """
+    Etiqueta de periodo para RC/glosa.
+    - Mes calendario completo (1 → último día): «Agosto 2026»
+    - Rango custom (ej. 21→20): «21/07/2026 AL 20/08/2026»
+    """
+    import calendar
+
+    if fecha_inicio and fecha_fin:
+        last = calendar.monthrange(fecha_inicio.year, fecha_inicio.month)[1]
+        is_full_month = (
+            fecha_inicio.day == 1
+            and fecha_fin.day == last
+            and fecha_inicio.month == fecha_fin.month
+            and fecha_inicio.year == fecha_fin.year
+        )
+        if is_full_month:
+            mes = MESES.get(fecha_inicio.month, '').capitalize()
+            return f'{mes} {fecha_inicio.year}'.strip()
+        return (
+            f'{fecha_inicio.strftime("%d/%m/%Y")} AL '
+            f'{fecha_fin.strftime("%d/%m/%Y")}'
+        )
+    if mes_ref and anio_ref:
+        mes = MESES.get(int(mes_ref), '').capitalize()
+        return f'{mes} {anio_ref}'.strip()
+    return ''
+
+
+def _fmt_periodo_desde_cortes(fechas_pares, *, mes_ref=None, anio_ref=None):
+    """
+    fechas_pares: iterable de (fecha_inicio, fecha_fin).
+    - Un solo corte (aunque muchas líneas): esa etiqueta.
+    - Varios cortes distintos (ej. 1→31 y 21→20): mes de referencia
+      («Septiembre 2026»), sin inventar un min/max engañoso.
+    """
+    pares = []
+    for ini, fin in fechas_pares or []:
+        if ini and fin:
+            pares.append((ini, fin))
+    unicos = sorted(set(pares))
+    if not unicos:
+        return _fmt_periodo_rango(None, None, mes_ref=mes_ref, anio_ref=anio_ref)
+    if len(unicos) == 1:
+        return _fmt_periodo_rango(
+            unicos[0][0], unicos[0][1], mes_ref=mes_ref, anio_ref=anio_ref
+        )
+    # Cortes distintos: la RC general usa el mes de referencia.
+    return _fmt_periodo_rango(None, None, mes_ref=mes_ref, anio_ref=anio_ref)
+
+
+def _periodo_fechas_from_factura(factura):
+    """Pares (inicio, fin) de PeriodoCobro del contrato (mes/año + proveedor [+ ests])."""
+    periodo = getattr(factura, 'periodo', None)
+    contrato = getattr(factura, 'contrato', None)
+    if not periodo or not contrato:
+        return []
+    try:
+        from contratos.models import PeriodoCobro
+    except Exception:
+        return []
+
+    qs = PeriodoCobro.objects.filter(
+        ruta__servicio__contrato_id=contrato.pk,
+        mes_referencia=periodo.month,
+        anio_referencia=periodo.year,
+    )
+    proveedor_id = getattr(factura, 'proveedor_id', None)
+    if proveedor_id:
+        qs = qs.filter(ruta__proveedor_id=proveedor_id)
+
+    # Si la RC trae establecimientos, limitar a líneas que los cubren
+    est_ids = []
+    try:
+        est_ids = list(factura.establecimientos.values_list('id', flat=True))
+    except Exception:
+        est_ids = []
+    if not est_ids and getattr(factura, 'establecimiento_id', None):
+        est_ids = [factura.establecimiento_id]
+    if est_ids:
+        qs = qs.filter(ruta__establecimientos__in=est_ids).distinct()
+
+    return list(qs.values_list('fecha_inicio', 'fecha_fin'))
+
+
+def _fmt_periodo_rc(factura):
+    """Periodo de la RC: etiqueta guardada al emitir, o cálculo automático."""
+    guardada = (getattr(factura, 'periodo_etiqueta', None) or '').strip()
+    if guardada:
+        return guardada
+    pares = _periodo_fechas_from_factura(factura)
+    periodo = getattr(factura, 'periodo', None)
+    label = _fmt_periodo_desde_cortes(
+        pares,
+        mes_ref=periodo.month if periodo else None,
+        anio_ref=periodo.year if periodo else None,
+    )
+    return label or _fmt_periodo(periodo)
 
 
 def _rc_tipo(factura):
@@ -159,6 +263,127 @@ def _firmante_unidad(firmante):
     return 'DIRECCIÓN'
 
 
+def _extract_concepto_base(descripcion, periodo_etiqueta=''):
+    """Quita periodo y bullets/labels auto de establecimientos de una glosa persistida."""
+    import re
+
+    auto_labels = (
+        'TOTALIDAD DE JARDINES INFANTILES VTF',
+        'TOTALIDAD DE ESTABLECIMIENTOS (ESCUELAS/LICEOS)',
+        'TOTALIDAD DE ESTABLECIMIENTOS',
+        'OFICINA CENTRAL ADM.',
+    )
+
+    def _is_auto(line):
+        t = re.sub(r'^\s*-\s*', '', str(line or '')).strip().upper()
+        return t in auto_labels
+
+    text = str(descripcion or '')
+    kept = []
+    for line in text.splitlines():
+        if re.match(r'^\s*-\s+\S', line) or _is_auto(line):
+            break
+        kept.append(line)
+    text = '\n'.join(kept).rstrip()
+    if periodo_etiqueta:
+        suffix = f' - {periodo_etiqueta}'
+        if text.endswith(suffix):
+            text = text[: -len(suffix)].rstrip()
+    text = re.sub(
+        r'\s+-\s+\d{2}/\d{2}/\d{4}\s+AL\s+\d{2}/\d{2}/\d{4}\s*$',
+        '',
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r'\s+-\s+(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|'
+        r'SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)(\s+DE)?\s+\d{4}\s*$',
+        '',
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = text.rstrip()
+    chunks = [c.strip() for c in re.split(r'\s*;\s*|\s+-\s+', text) if c.strip()]
+    if chunks and all(_is_auto(c) for c in chunks):
+        return ''
+    for label in auto_labels:
+        suffix = f' - {label}'
+        if text.upper().endswith(suffix.upper()):
+            text = text[: -len(suffix)].rstrip()
+    return text.rstrip()
+
+
+def _smart_glosa_establecimientos(establecimientos):
+    """Sufijo de glosa por establecimientos (misma idea que el frontend)."""
+    items = [e for e in (establecimientos or []) if e]
+    if not items:
+        return ''
+    names = [(e.nombre or '').strip() for e in items if (e.nombre or '').strip()]
+    if not names:
+        return ''
+    if len(names) > 5:
+        jardines = [e for e in items if _es_jardin(e)]
+        if len(jardines) == len(items):
+            return '\n- TOTALIDAD DE JARDINES INFANTILES VTF'
+        oficinas = [
+            e
+            for e in items
+            if (
+                (getattr(getattr(e, 'tipo', None), 'area_gestion', None) or '').upper()
+                == 'OFICINA'
+            )
+        ]
+        if len(oficinas) == len(items):
+            return '\n- OFICINA CENTRAL ADM.'
+        if not jardines:
+            return '\n- TOTALIDAD DE ESTABLECIMIENTOS (ESCUELAS/LICEOS)'
+        return '\n- TOTALIDAD DE ESTABLECIMIENTOS'
+    return '\n- ' + '\n- '.join(names)
+
+
+def _compose_rc_glosa(concepto, establecimientos):
+    """
+    Arma rc_glosa: concepto + establecimientos.
+    Sin concepto, los establecimientos van sin guión inicial para no generar
+    « - - TOTALIDAD…» cuando la plantilla ya une con « - ».
+    """
+    concepto = (concepto or '').strip()
+    suffix = _smart_glosa_establecimientos(establecimientos)
+    if not suffix:
+        return concepto
+    if not concepto:
+        lines = []
+        for line in suffix.splitlines():
+            line = line.strip()
+            if line.startswith('-'):
+                line = line[1:].strip()
+            if line:
+                lines.append(line)
+        return '; '.join(lines)
+    return f'{concepto}{suffix}'.rstrip()
+
+
+def _rc_glosa_from_factura(factura, establecimientos=None):
+    """
+    Glosa para PDF: concepto + establecimientos del M2M.
+    El periodo NO va aquí: sale por la variable rc_periodo (periodo_etiqueta).
+    """
+    ests = establecimientos
+    if ests is None:
+        ests = list(factura.establecimientos.all())
+        if not ests and getattr(factura, 'establecimiento_id', None):
+            ests = [factura.establecimiento]
+    etiqueta = (getattr(factura, 'periodo_etiqueta', None) or '').strip()
+    if not etiqueta:
+        etiqueta = _fmt_periodo_rc(factura)
+    # Extrae concepto limpio (quita periodo viejo si quedó en descripcion)
+    concepto = _extract_concepto_base(factura.descripcion or '', etiqueta)
+    if not concepto:
+        raw = (factura.descripcion or '').strip()
+        concepto = raw.splitlines()[0].strip() if raw else ''
+        concepto = _extract_concepto_base(concepto, etiqueta)
+    return _compose_rc_glosa(concepto, ests)
+
 def context_from_factura_adq(factura, user=None):
     """
     Contexto real para plantillas de propósito recepcion_adq.
@@ -172,10 +397,11 @@ def context_from_factura_adq(factura, user=None):
     contrato = factura.contrato
     firmante = factura.firmante
 
-    establecimientos = list(factura.establecimientos.all())
+    establecimientos = list(factura.establecimientos.select_related('tipo').all())
     if not establecimientos and factura.establecimiento_id:
         establecimientos = [factura.establecimiento]
     est_principal = establecimientos[0] if establecimientos else None
+    rc_glosa = _rc_glosa_from_factura(factura, establecimientos)
 
     nro_oc = factura.nro_oc or ''
     if not nro_oc and contrato:
@@ -208,8 +434,10 @@ def context_from_factura_adq(factura, user=None):
         'rc_folio': factura.folio or '',
         'rc_tipo': _rc_tipo(factura),
         'rc_nro_factura': factura.nro_factura or '',
-        'rc_periodo': _fmt_periodo(factura.periodo),
-        'rc_glosa': factura.descripcion or '',
+        'rc_periodo': _fmt_periodo_rc(factura),
+        # Glosa armada al emitir: concepto + periodo + establecimientos actuales (M2M)
+        'rc_glosa': rc_glosa,
+        'glosa': rc_glosa,
         'rc_tipo_entrega': str(factura.tipo_entrega) if factura.tipo_entrega_id else '',
         'rc_fecha_recepcion': _fmt_date(factura.fecha_recepcion),
         'rc_fecha_plazo': '',

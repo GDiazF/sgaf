@@ -223,8 +223,11 @@ const Contracts = () => {
     setShowForm(true)
   }
 
-  const handleSave = async (dataToSubmit) => {
+  const handleSave = async (dataToSubmit, { confirmarCambioPlantilla = false } = {}) => {
     const finalData = prepareContractPayload(dataToSubmit)
+    if (confirmarCambioPlantilla) {
+      finalData.confirmar_cambio_plantilla = true
+    }
     await api.put(`contratos/contratos/${editingId}/`, finalData)
   }
 

@@ -11,6 +11,7 @@ export function FormsPage() {
   const [on, setOn] = useState(true)
   const [monto, setMonto] = useState('1250000')
   const [km, setKm] = useState('15480')
+  const [fecha, setFecha] = useState('2026-03-15')
   const [periodos, setPeriodos] = useState(['Enero 2026'])
 
   return (
@@ -53,8 +54,17 @@ export function FormsPage() {
             >
               <KmInput value={km} onChange={setKm} />
             </Field>
-            <Field label="Input date">
-              <Input className="no-global" type="date" />
+            <Field
+              label="Fecha"
+              hint="DateInput · siempre dd/mm/aaaa (valor ISO hacia el API)"
+              htmlFor="form-fecha"
+            >
+              <Input
+                id="form-fecha"
+                type="date"
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+              />
             </Field>
             <Field label="Input datetime">
               <Input className="no-global" type="datetime-local" />
