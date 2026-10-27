@@ -132,6 +132,24 @@ export const DateInput = forwardRef(function DateInput(
     emitChange(onChange, name, inputId, iso)
   }
 
+  const openPicker = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (disabled) return
+    const el = nativeRef.current
+    if (!el) return
+    try {
+      if (typeof el.showPicker === 'function') {
+        el.showPicker()
+        return
+      }
+    } catch {
+      /* Chrome lanza si el input no se considera visible; fallback abajo */
+    }
+    el.focus()
+    el.click()
+  }
+
   return (
     <div
       className={cn(
@@ -162,26 +180,29 @@ export const DateInput = forwardRef(function DateInput(
         }}
         onBlur={handleBlur}
       />
-      <label
+      <button
+        type="button"
         className="date-input__picker"
-        htmlFor={nativeId}
         title="Abrir calendario"
         aria-label="Abrir calendario"
+        disabled={disabled}
+        onClick={openPicker}
       >
-        <Icon name="reservas" size={16} />
-        <input
-          ref={nativeRef}
-          id={nativeId}
-          type="date"
-          className="date-input__native"
-          value={value || ''}
-          onChange={handleNativeChange}
-          disabled={disabled}
-          min={min}
-          max={max}
-          tabIndex={-1}
-        />
-      </label>
+        <Icon name="reservas" size={16} aria-hidden />
+      </button>
+      <input
+        ref={nativeRef}
+        id={nativeId}
+        type="date"
+        className="date-input__native"
+        value={value || ''}
+        onChange={handleNativeChange}
+        disabled={disabled}
+        min={min}
+        max={max}
+        tabIndex={-1}
+        aria-hidden
+      />
     </div>
   )
 })

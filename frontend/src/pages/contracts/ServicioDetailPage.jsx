@@ -996,7 +996,7 @@ const ServicioDetailPage = ({
           <Icon name="procedimientos" size="sm" /> Modalidad · {modalidadLabel}
         </Button>
       ) : null}
-      {usaAsistenciaYFeriados && canChangeRuta ? (
+      {!isReadOnly && canChangeRuta ? (
         <Button
           variant="secondary"
           size="sm"

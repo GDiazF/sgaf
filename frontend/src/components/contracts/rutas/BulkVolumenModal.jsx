@@ -328,7 +328,7 @@ export default function BulkVolumenModal({ open, onClose, rutas, onUpdate, rowLa
                                 type="button"
                                 onClick={() => openCellEdit(ruta, fecha)}
                                 disabled={!p || isClosed || !canEdit}
-                                className={`rutas-detail-matrix__cell${hasVol ? ' is-vol' : ''}`}
+                                className={`rutas-detail-matrix__cell${hasVol ? ' is-vol' : ' is-empty'}`}
                                 title={hasVol ? `${formatM3Display(vol)} m³` : 'Registrar m³'}
                               >
                                 {hasVol ? formatM3Display(vol) : '·'}

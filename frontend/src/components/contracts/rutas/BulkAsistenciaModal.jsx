@@ -17,11 +17,18 @@ function dateInPeriodo(periodo, fStr) {
   return fStr >= start && fStr <= end
 }
 
+function proveedorKey(ruta) {
+  return ruta.proveedor != null && ruta.proveedor !== '' ? String(ruta.proveedor) : 'sin'
+}
+
 export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, rowLabel = 'Rutas' }) {
   const { can } = usePermission()
   const [selectedPeriodName, setSelectedPeriodName] = useState('')
+  const [proveedorFilter, setProveedorFilter] = useState('')
+  const [selectedRutaId, setSelectedRutaId] = useState(null)
   const [feriados, setFeriados] = useState([])
   const [togglingId, setTogglingId] = useState(null)
+  const [rutaSort, setRutaSort] = useState({ key: 'nombre', direction: 'asc' })
   const { notify } = useNotify()
 
   const availablePeriodNames = useMemo(() => {
@@ -56,6 +63,8 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
   useEffect(() => {
     if (!open) {
       setSelectedPeriodName('')
+      setProveedorFilter('')
+      setSelectedRutaId(null)
       return undefined
     }
     const fetchFeriados = async () => {
@@ -78,23 +87,29 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
 
   const applicableRutas = useMemo(() => {
     if (!selectedPeriodName) return []
-    return [...rutas]
-      .filter((r) => periodoForRuta(r, selectedPeriodName))
-      .sort((a, b) => {
-        const byName = (a.nombre || '').localeCompare(b.nombre || '', 'es', {
-          sensitivity: 'base',
-        })
-        if (byName !== 0) return byName
-        return (a.proveedor_nombre || '').localeCompare(b.proveedor_nombre || '', 'es', {
-          sensitivity: 'base',
-        })
-      })
+    return rutas.filter((r) => periodoForRuta(r, selectedPeriodName))
   }, [selectedPeriodName, rutas])
 
-  const [rutaSort, setRutaSort] = useState({ key: 'nombre', direction: 'asc' })
+  const proveedorOptions = useMemo(() => {
+    const map = new Map()
+    applicableRutas.forEach((r) => {
+      const key = proveedorKey(r)
+      if (!map.has(key)) {
+        map.set(key, r.proveedor_nombre || 'Sin proveedor')
+      }
+    })
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }))
+  }, [applicableRutas])
+
+  const filteredRutas = useMemo(() => {
+    if (!proveedorFilter) return applicableRutas
+    return applicableRutas.filter((r) => proveedorKey(r) === proveedorFilter)
+  }, [applicableRutas, proveedorFilter])
 
   const sortedApplicableRutas = useMemo(() => {
-    const items = [...applicableRutas]
+    const items = [...filteredRutas]
     const dir = rutaSort.direction === 'asc' ? 1 : -1
     items.sort((a, b) => {
       const aVal = (rutaSort.key === 'proveedor' ? a.proveedor_nombre : a.nombre) || ''
@@ -102,7 +117,14 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
       return aVal.localeCompare(bVal, 'es', { sensitivity: 'base' }) * dir
     })
     return items
-  }, [applicableRutas, rutaSort])
+  }, [filteredRutas, rutaSort])
+
+  useEffect(() => {
+    if (selectedRutaId == null) return
+    if (!sortedApplicableRutas.some((r) => r.id === selectedRutaId)) {
+      setSelectedRutaId(null)
+    }
+  }, [sortedApplicableRutas, selectedRutaId])
 
   const toggleRutaSort = (key) => {
     setRutaSort((prev) =>
@@ -113,10 +135,10 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
   }
 
   const diasGrid = useMemo(() => {
-    if (!selectedPeriodName || applicableRutas.length === 0) return []
+    if (!selectedPeriodName || sortedApplicableRutas.length === 0) return []
     let minStart = null
     let maxEnd = null
-    applicableRutas.forEach((ruta) => {
+    sortedApplicableRutas.forEach((ruta) => {
       const p = periodoForRuta(ruta, selectedPeriodName)
       if (!p) return
       const start = parseISO(String(p.fecha_inicio).slice(0, 10))
@@ -126,7 +148,7 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
     })
     if (!minStart || !maxEnd) return []
     return eachDayOfInterval({ start: minStart, end: maxEnd })
-  }, [selectedPeriodName, applicableRutas])
+  }, [selectedPeriodName, sortedApplicableRutas])
 
   const handleToggleCell = async (periodoId, fechaStr) => {
     if (!periodoId) return
@@ -147,7 +169,7 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
     const isFer = feriados.includes(fStr)
 
     const validPeriodoIds = []
-    applicableRutas.forEach((r) => {
+    sortedApplicableRutas.forEach((r) => {
       const p = periodoForRuta(r, selectedPeriodName)
       if (p && dateInPeriodo(p, fStr)) {
         const incFinSem = p.regla?.incluir_fines_semana ?? r.incluir_fines_semana ?? false
@@ -161,7 +183,7 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
 
     setTogglingId(`col-${fStr}`)
     try {
-      const firstRuta = applicableRutas.find((r) =>
+      const firstRuta = sortedApplicableRutas.find((r) =>
         r.periodos.some((per) => per.nombre_estandarizado === selectedPeriodName),
       )
       const firstP = firstRuta?.periodos.find(
@@ -183,6 +205,10 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
     }
   }
 
+  const handleSelectRow = (rutaId) => {
+    setSelectedRutaId((prev) => (prev === rutaId ? null : rutaId))
+  }
+
   return (
     <Modal
       open={open}
@@ -190,13 +216,17 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
       title="Planilla de asistencia"
       subheader={`Marca inasistencias en todos los ${rowLabel.toLowerCase()} del periodo · clic en el día = toda la columna`}
       className="rutas-detail-modal--sheet"
-      headerActions={
-        <div style={{ minWidth: 200 }}>
+      afterHeader={
+        <div className="rutas-detail-matrix-toolbar">
           <Field label="Periodo" htmlFor="bulk-asist-periodo">
             <Select
               id="bulk-asist-periodo"
               value={selectedPeriodName}
-              onChange={(e) => setSelectedPeriodName(e.target.value)}
+              onChange={(e) => {
+                setSelectedPeriodName(e.target.value)
+                setProveedorFilter('')
+                setSelectedRutaId(null)
+              }}
             >
               <option value="">— Elige un periodo —</option>
               {availablePeriodNames.map((name) => (
@@ -206,10 +236,28 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
               ))}
             </Select>
           </Field>
+          <Field label="Proveedor" htmlFor="bulk-asist-proveedor">
+            <Select
+              id="bulk-asist-proveedor"
+              value={proveedorFilter}
+              onChange={(e) => {
+                setProveedorFilter(e.target.value)
+                setSelectedRutaId(null)
+              }}
+              disabled={!selectedPeriodName || proveedorOptions.length === 0}
+            >
+              <option value="">Todos los proveedores</option>
+              {proveedorOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
         </div>
       }
       footer={
-        <div className="rutas-detail-matrix-legend" style={{ borderTop: 0, padding: 0, width: '100%' }}>
+        <div className="rutas-detail-matrix-legend rutas-detail-matrix-legend--footer">
           <div className="rutas-detail-matrix-legend__item">
             <span className="rutas-detail-matrix-legend__swatch rutas-detail-matrix-legend__swatch--ok" />
             Realizado
@@ -226,17 +274,28 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
             <span className="rutas-detail-matrix-legend__swatch rutas-detail-matrix-legend__swatch--fer" />
             Bloqueo feriado
           </div>
-          <div className="rutas-detail-matrix-legend__item" style={{ marginLeft: 'auto' }}>
-            <Icon name="info" size="sm" /> Haz clic en una celda para alternar
+          <div className="rutas-detail-matrix-legend__item rutas-detail-matrix-legend__item--hint">
+            <Icon name="info" size="sm" /> Clic en el nombre de la fila para fijarla · hover resalta
           </div>
         </div>
       }
     >
       {!selectedPeriodName ? (
-        <div style={{ padding: 'var(--space-8)' }}>
+        <div className="rutas-detail-matrix-empty">
           <EmptyState
             title="Selecciona un periodo"
             description="Para cargar la planilla de asistencia."
+          />
+        </div>
+      ) : sortedApplicableRutas.length === 0 ? (
+        <div className="rutas-detail-matrix-empty">
+          <EmptyState
+            title={proveedorFilter ? 'Sin líneas de ese proveedor' : `Sin ${rowLabel.toLowerCase()}`}
+            description={
+              proveedorFilter
+                ? 'Prueba con «Todos los proveedores» o elige otro periodo.'
+                : 'No hay periodos con ese nombre en las líneas cargadas.'
+            }
           />
         </div>
       ) : (
@@ -251,7 +310,7 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
                     onClick={() => toggleRutaSort('nombre')}
                     title="Ordenar por nombre"
                   >
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>
+                    <span className="rutas-detail-matrix__sort-label">
                       {rowLabel} ({sortedApplicableRutas.length})
                       {rutaSort.key === 'nombre'
                         ? rutaSort.direction === 'asc'
@@ -265,9 +324,8 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
                     className="rutas-detail-matrix__sort"
                     onClick={() => toggleRutaSort('proveedor')}
                     title="Ordenar por proveedor"
-                    style={{ display: 'block', marginTop: 2 }}
                   >
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--primary)' }}>
+                    <span className="rutas-detail-matrix__sort-label rutas-detail-matrix__sort-label--accent">
                       Proveedor
                       {rutaSort.key === 'proveedor'
                         ? rutaSort.direction === 'asc'
@@ -286,10 +344,10 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
                   return (
                     <th
                       key={fecha.toString()}
+                      className={isSem ? 'is-weekend' : undefined}
                       onClick={() =>
                         can('contratos.change_ausenciaruta') && handleToggleColumn(fecha)
                       }
-                      style={isSem ? { background: 'var(--bg)' } : undefined}
                     >
                       <div className="rutas-detail-matrix__dayhead">
                         {isTogglingCol ? (
@@ -299,7 +357,7 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
                             <span>
                               {format(fecha, 'EEE', { locale: es }).substring(0, 2)}
                             </span>
-                            <span style={isFer ? { color: 'var(--warning, #f59e0b)' } : undefined}>
+                            <span className={isFer ? 'is-feriado' : undefined}>
                               {format(fecha, 'd')}
                             </span>
                           </>
@@ -313,41 +371,34 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
             <tbody>
               {sortedApplicableRutas.map((ruta) => {
                 const p = periodoForRuta(ruta, selectedPeriodName)
+                const isSelected = selectedRutaId === ruta.id
                 return (
-                  <tr key={ruta.id}>
+                  <tr
+                    key={ruta.id}
+                    className={isSelected ? 'is-selected' : undefined}
+                  >
                     <td className="rutas-detail-matrix__sticky">
-                      <strong
-                        style={{
-                          display: 'block',
-                          fontSize: 'var(--text-xs)',
-                          color: 'var(--fg)',
-                        }}
+                      <button
+                        type="button"
+                        className="rutas-detail-matrix__row-select"
+                        onClick={() => handleSelectRow(ruta.id)}
+                        title={
+                          isSelected
+                            ? 'Quitar selección de fila'
+                            : 'Seleccionar fila para seguir el horario'
+                        }
+                        aria-pressed={isSelected}
                       >
-                        {ruta.nombre}
-                      </strong>
-                      <span
-                        style={{
-                          display: 'block',
-                          fontSize: 'var(--text-xs)',
-                          color: 'var(--primary)',
-                          marginTop: 2,
-                        }}
-                      >
-                        {ruta.proveedor_nombre}
-                      </span>
-                      {ruta.itinerario ? (
-                        <span
-                          style={{
-                            display: 'block',
-                            fontSize: 'var(--text-xs)',
-                            color: 'var(--warning-text, #b45309)',
-                            marginTop: 2,
-                          }}
-                          title={ruta.itinerario}
-                        >
-                          {ruta.itinerario}
+                        <strong className="rutas-detail-matrix__row-name">{ruta.nombre}</strong>
+                        <span className="rutas-detail-matrix__row-prov">
+                          {ruta.proveedor_nombre || 'Sin proveedor'}
                         </span>
-                      ) : null}
+                        {ruta.itinerario ? (
+                          <span className="rutas-detail-matrix__row-itin" title={ruta.itinerario}>
+                            {ruta.itinerario}
+                          </span>
+                        ) : null}
+                      </button>
                     </td>
                     {diasGrid.map((fecha) => {
                       const fStr = format(fecha, 'yyyy-MM-dd')
@@ -385,7 +436,10 @@ export default function BulkAsistenciaModal({ open, onClose, rutas, onUpdate, ro
                               type="button"
                               onClick={() => handleToggleCell(p?.id, fStr)}
                               disabled={
-                                isToggling || !p || p.estado === 'CERRADO' || !can('contratos.change_ausenciaruta')
+                                isToggling ||
+                                !p ||
+                                p.estado === 'CERRADO' ||
+                                !can('contratos.change_ausenciaruta')
                               }
                               className={`rutas-detail-matrix__cell${isAus ? ' is-aus' : ''}`}
                               title={isAus ? 'Marcar como TRABAJADO' : 'Marcar como AUSENTE'}

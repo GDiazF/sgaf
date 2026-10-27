@@ -595,6 +595,7 @@
 
 /* Fecha chilena dd/mm/yyyy (+ calendario nativo) */
 .date-input {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -642,7 +643,6 @@
   opacity: var(--opacity-muted);
 }
 .date-input__picker {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -650,27 +650,38 @@
   width: 2rem;
   height: 2rem;
   margin: 0;
+  padding: 0;
+  border: 0;
   border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--muted);
   cursor: pointer;
+  line-height: 0;
 }
-.date-input__picker:hover {
+.date-input__picker:hover,
+.date-input__picker:focus-visible {
   color: var(--fg);
   background: var(--surface-inset);
+  outline: none;
 }
 .date-input.is-disabled .date-input__picker {
   cursor: not-allowed;
   pointer-events: none;
 }
+/* Visible para showPicker() (Chrome exige que no esté display:none),
+   pero sin interceptar el clic: lo abre el botón. */
 .date-input__native {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  border: 0;
+  right: var(--space-2);
+  top: 50%;
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
   padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
 }
 
 /* Input de cantidad entera (miles + sufijo opcional, p. ej. km) */
@@ -9430,14 +9441,18 @@ body.has-modal-scroll-lock {
 }
 .rutas-feriados__sync {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: var(--space-3);
-  flex-wrap: wrap;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--primary-subtle, var(--bg));
+}
+.rutas-feriados__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 .rutas-feriados__sync-title {
   margin: 0;
@@ -9698,6 +9713,14 @@ body.has-modal-scroll-lock {
   background: var(--warning-subtle, #fffbeb);
   border-color: var(--warning, #f59e0b);
 }
+.rutas-detail-calendar__dot--vol {
+  background: var(--success-subtle, #ecfdf5);
+  border-color: var(--success, #10b981);
+}
+.rutas-detail-calendar__dot--empty {
+  background: var(--surface);
+  border-color: var(--border);
+}
 .rutas-detail-calendar__grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -9760,6 +9783,21 @@ body.has-modal-scroll-lock {
 .rutas-detail-day--weekend {
   background: var(--bg);
   color: var(--muted);
+}
+.rutas-detail-day--vol {
+  background: var(--success-subtle, #ecfdf5);
+  border-color: color-mix(in srgb, var(--success, #10b981) 35%, var(--border));
+  color: var(--success-text, #047857);
+}
+.rutas-detail-day--empty {
+  background: var(--surface);
+  color: var(--fg);
+}
+.rutas-detail-day__vol {
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .rutas-detail-pay-summary {
@@ -10127,6 +10165,25 @@ body.has-modal-scroll-lock {
   overflow: auto;
   background: var(--bg);
 }
+.rutas-detail-matrix-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.rutas-detail-matrix-toolbar .field {
+  min-width: 12rem;
+  max-width: 18rem;
+  flex: 1 1 12rem;
+  margin: 0;
+}
+.rutas-detail-matrix-empty {
+  padding: var(--space-8);
+}
 .rutas-detail-matrix {
   border-collapse: separate;
   border-spacing: 0;
@@ -10151,7 +10208,7 @@ body.has-modal-scroll-lock {
 /* Especificidad > .rutas-detail-matrix td { padding: 0 } */
 .rutas-detail-matrix th.rutas-detail-matrix__sticky,
 .rutas-detail-matrix td.rutas-detail-matrix__sticky {
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3);
 }
 .rutas-detail-matrix thead .rutas-detail-matrix__sticky {
   z-index: 4;
@@ -10167,6 +10224,78 @@ body.has-modal-scroll-lock {
 }
 .rutas-detail-matrix thead th:hover {
   background: var(--primary-subtle, var(--bg));
+}
+.rutas-detail-matrix thead th.is-weekend {
+  background: var(--bg);
+}
+.rutas-detail-matrix__sort {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.rutas-detail-matrix__sort + .rutas-detail-matrix__sort {
+  margin-top: 2px;
+}
+.rutas-detail-matrix__sort-label {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.rutas-detail-matrix__sort-label--accent {
+  color: var(--primary);
+}
+.rutas-detail-matrix__row-select {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.rutas-detail-matrix__row-name {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--fg);
+  font-weight: var(--font-semibold, 600);
+}
+.rutas-detail-matrix__row-prov {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--primary);
+}
+.rutas-detail-matrix__row-itin {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--warning-text, #b45309);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rutas-detail-matrix tbody tr:hover > td.rutas-detail-matrix__sticky,
+.rutas-detail-matrix tbody tr.is-selected > td.rutas-detail-matrix__sticky {
+  background: var(--primary-subtle, var(--bg));
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+.rutas-detail-matrix tbody tr:hover .rutas-detail-matrix__cell:not(:disabled),
+.rutas-detail-matrix tbody tr.is-selected .rutas-detail-matrix__cell:not(:disabled) {
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--primary) 45%, transparent);
+}
+.rutas-detail-matrix tbody tr:hover .rutas-detail-matrix__blocked,
+.rutas-detail-matrix tbody tr.is-selected .rutas-detail-matrix__blocked {
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--primary) 30%, transparent);
+}
+.rutas-detail-matrix tbody tr.is-selected > td {
+  border-bottom-color: color-mix(in oklch, var(--primary) 40%, var(--border));
 }
 .rutas-detail-matrix__dayhead {
   display: flex;
@@ -10184,6 +10313,9 @@ body.has-modal-scroll-lock {
   font-size: var(--text-xs);
   font-weight: 700;
 }
+.rutas-detail-matrix__dayhead .is-feriado {
+  color: var(--warning, #f59e0b);
+}
 .rutas-detail-matrix__cell {
   width: 100%;
   height: 2rem;
@@ -10198,6 +10330,16 @@ body.has-modal-scroll-lock {
 .rutas-detail-matrix__cell.is-aus {
   background: var(--danger-subtle, #fff1f2);
   color: var(--danger-text, #be123c);
+}
+.rutas-detail-matrix__cell.is-vol {
+  background: var(--success-subtle, #ecfdf5);
+  color: var(--success-text, #047857);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+.rutas-detail-matrix__cell.is-empty {
+  background: var(--surface);
+  color: var(--muted);
 }
 .rutas-detail-matrix__cell:disabled {
   cursor: not-allowed;
@@ -10226,10 +10368,19 @@ body.has-modal-scroll-lock {
   font-size: var(--text-xs);
   color: var(--fg);
 }
+.rutas-detail-matrix-legend--footer {
+  border-top: 0;
+  padding: 0;
+  width: 100%;
+}
 .rutas-detail-matrix-legend__item {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+.rutas-detail-matrix-legend__item--hint {
+  margin-left: auto;
+  color: var(--muted);
 }
 .rutas-detail-matrix-legend__swatch {
   width: 1rem;
@@ -10254,6 +10405,14 @@ body.has-modal-scroll-lock {
 .rutas-detail-matrix-legend__swatch--fer {
   background: var(--warning, #f59e0b);
   border-color: color-mix(in srgb, var(--warning, #f59e0b) 70%, #000);
+}
+.rutas-detail-matrix-legend__swatch--vol {
+  background: var(--success, #16a34a);
+  border-color: color-mix(in srgb, var(--success, #16a34a) 70%, #000);
+}
+.rutas-detail-matrix-legend__swatch--empty {
+  background: var(--surface);
+  border-color: var(--border);
 }
 
 .rutas-detail-bulk-layout {
