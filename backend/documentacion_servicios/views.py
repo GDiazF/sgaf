@@ -133,6 +133,7 @@ class RegistroServicioDocViewSet(viewsets.ModelViewSet):
             'retrieve',
             'meta',
             'descargar_zip',
+            'export_excel',
         ):
             return [permissions.IsAuthenticated(), CanViewRegistrosDoc()]
         if self.action in ('create', 'plantilla_masiva', 'bulk_preview', 'bulk_commit'):
@@ -268,6 +269,22 @@ class RegistroServicioDocViewSet(viewsets.ModelViewSet):
             else status.HTTP_400_BAD_REQUEST
         )
         return Response(result, status=status_code)
+
+    @action(detail=False, methods=['get'])
+    def export_excel(self, request):
+        """Excel de los registros filtrados (mismos filtros del listado, sin paginar)."""
+        from documentacion_servicios.export import build_export_response
+
+        qs = self.filter_queryset(self.get_queryset())
+        tipo = None
+        tipo_id = request.query_params.get('tipo')
+        if tipo_id:
+            tipo = (
+                TipoRegistroServicio.objects.prefetch_related('campos')
+                .filter(pk=tipo_id)
+                .first()
+            )
+        return build_export_response(qs, tipo)
 
     @action(detail=False, methods=['post'], url_path='descargar-zip')
     def descargar_zip(self, request):

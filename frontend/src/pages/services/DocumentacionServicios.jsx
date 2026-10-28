@@ -269,6 +269,7 @@ export default function DocumentacionServicios() {
   const [pageSize, setPageSize] = useState(50)
   const [selectedKeys, setSelectedKeys] = useState([])
   const [zipBusy, setZipBusy] = useState(false)
+  const [excelBusy, setExcelBusy] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkPreview, setBulkPreview] = useState(null)
@@ -462,6 +463,60 @@ export default function DocumentacionServicios() {
       notify({ variant: 'danger', text: msg })
     } finally {
       setZipBusy(false)
+    }
+  }
+
+  const downloadExcel = async () => {
+    if (!activeTipoId || excelBusy) return
+    setExcelBusy(true)
+    try {
+      const res = await api.get('doc-servicios/registros/export_excel/', {
+        params: {
+          tipo: activeTipoId,
+          q: filters.q || undefined,
+          proveedor: filters.proveedor || undefined,
+          establecimiento: filters.establecimiento || undefined,
+          fecha_desde: filters.fecha_desde || undefined,
+          fecha_hasta: filters.fecha_hasta || undefined,
+          ordering,
+        },
+        responseType: 'blob',
+      })
+      const ctype = res.headers['content-type'] || ''
+      if (ctype.includes('application/json')) {
+        const text = await res.data.text?.()
+        let msg = 'No se pudo generar el Excel'
+        try {
+          msg = JSON.parse(text)?.detail || msg
+        } catch {
+          /* ignore */
+        }
+        notify({ variant: 'danger', text: msg })
+        return
+      }
+      const code = (activeTipo?.codigo || 'registros').toLowerCase()
+      const date = new Date().toISOString().slice(0, 10)
+      triggerBlobDownload(res.data, `documentacion_${code}_${date}.xlsx`)
+      notify({
+        variant: totalCount ? 'success' : 'warning',
+        text: totalCount
+          ? `Excel con ${totalCount} registro(s) filtrado(s)`
+          : 'Excel generado sin registros para el filtro actual',
+      })
+    } catch (err) {
+      let msg = formatApiFormError(err) || 'No se pudo descargar el Excel'
+      const data = err?.response?.data
+      if (data instanceof Blob) {
+        try {
+          const parsed = JSON.parse(await data.text())
+          msg = parsed.detail || msg
+        } catch {
+          /* ignore */
+        }
+      }
+      notify({ variant: 'danger', text: msg })
+    } finally {
+      setExcelBusy(false)
     }
   }
 
@@ -956,6 +1011,17 @@ export default function DocumentacionServicios() {
         split
         actions={
           <>
+            {canView ? (
+              <Button
+                variant="secondary"
+                loading={excelBusy}
+                disabled={!activeTipo}
+                title="Descarga el listado con los filtros actuales (todos los registros, no solo esta página)"
+                onClick={downloadExcel}
+              >
+                <Icon name="download" size="sm" /> Excel
+              </Button>
+            ) : null}
             {selectedKeys.length > 0 && canView ? (
               <Button
                 variant="secondary"
