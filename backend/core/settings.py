@@ -48,11 +48,12 @@ def _merge_network_settings():
             csrf.add(origin)
 
     hosts.update({'localhost', '127.0.0.1'})
-    if DEBUG and not cors:
+    if DEBUG:
         cors.update({
             'http://localhost:5173',
             'http://127.0.0.1:5173',
             'http://localhost:5174',
+            'http://127.0.0.1:5174',
         })
         csrf.update(cors)
     return sorted(hosts), sorted(cors), sorted(csrf)
@@ -100,6 +101,7 @@ INSTALLED_APPS = [
     'arco',
     'documentos.apps.DocumentosConfig',
     'firma_digital',
+    'editor_pdf',
 ]
 
 MIDDLEWARE = [

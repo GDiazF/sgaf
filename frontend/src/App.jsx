@@ -73,6 +73,10 @@ import LegalPage from './pages/LegalPage';
 import FirmaPrueba from './pages/firma/FirmaPrueba';
 import ValidarDocumento from './pages/firma/ValidarDocumento';
 import BandejaFirmas from './pages/firma/BandejaFirmas';
+const EditorPdfCatalogo = React.lazy(() => import('./pages/editor-pdf/EditorPdfCatalogo'));
+const EditorPdfHerramienta = React.lazy(() => import('./pages/editor-pdf/EditorPdfHerramienta'));
+const EditorPdfAdmin = React.lazy(() => import('./pages/editor-pdf/EditorPdfAdmin'));
+const EditorPdfFirmaAdmin = React.lazy(() => import('./pages/editor-pdf/EditorPdfFirmaAdmin'));
 
 const PlantillasDocumentosPage = React.lazy(
   () => import('./pages/admin/documentos/PlantillasDocumentosPage'),
@@ -335,6 +339,14 @@ function App() {
                 </Route>
                 <Route element={<ProtectedRoute permission="firma_digital.can_probar_firma" />}>
                   <Route path="firma-prueba" element={<FirmaPrueba />} />
+                </Route>
+                <Route element={<ProtectedRoute permission={['editor_pdf.view_herramientapdf', 'editor_pdf.change_herramientapdf']} />}>
+                  <Route path="editor-pdf" element={<React.Suspense fallback={<PageFallback />}><EditorPdfCatalogo /></React.Suspense>} />
+                  <Route path="editor-pdf/:slug" element={<React.Suspense fallback={<PageFallback />}><EditorPdfHerramienta /></React.Suspense>} />
+                </Route>
+                <Route element={<ProtectedRoute permission="editor_pdf.change_herramientapdf" />}>
+                  <Route path="admin/editor-pdf" element={<React.Suspense fallback={<PageFallback />}><EditorPdfAdmin /></React.Suspense>} />
+                  <Route path="admin/editor-pdf/firma" element={<React.Suspense fallback={<PageFallback />}><EditorPdfFirmaAdmin /></React.Suspense>} />
                 </Route>
 
               </Route>

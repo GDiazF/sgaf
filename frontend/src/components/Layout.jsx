@@ -676,6 +676,9 @@ const Layout = () => {
               <NavItem to="/reservas" icon="reservas" label="Reservas" onClick={closeDrawer} />
             )}
             <NavItem to="/procedimientos" icon="procedimientos" label="Procedimientos" onClick={closeDrawer} />
+            {(can('editor_pdf.view_herramientapdf') || can('editor_pdf.change_herramientapdf')) && (
+              <NavItem to="/editor-pdf" icon="file" label="Editor PDF" onClick={closeDrawer} />
+            )}
             {user?.puede_firmar && (
               <NavItem to="/firma" icon="file-check" label="Bandeja de firmas" onClick={closeDrawer} />
             )}

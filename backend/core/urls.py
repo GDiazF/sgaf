@@ -80,6 +80,7 @@ urlpatterns = [
     path('api/', include('arco.urls')),
     path('api/documentos/', include('documentos.urls')),
     path('api/firma-digital/', include('firma_digital.urls')),
+    path('api/editor-pdf/', include('editor_pdf.urls')),
 ]
 
 from django.conf import settings

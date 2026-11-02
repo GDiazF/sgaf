@@ -8,6 +8,24 @@
   gap: var(--space-3);
 }
 
+.doc-editor__canvas {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  align-self: center;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+}
+
+.doc-editor__canvas canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
 .doc-ribbon {
   background: var(--surface);
   border: 1px solid var(--border);
