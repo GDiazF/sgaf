@@ -22,6 +22,8 @@ const emptyForm = () => ({
   departamento: '',
   unidad: '',
   cargo: '',
+  calidad_juridica: '',
+  grado: '',
   estado: true,
   grupos: [],
 })
@@ -31,6 +33,9 @@ const FuncionarioModal = ({ isOpen, onClose, funcionarioId = null }) => {
   const [subdirecciones, setSubdirecciones] = useState([])
   const [departamentos, setDepartamentos] = useState([])
   const [unidades, setUnidades] = useState([])
+  const [calidades, setCalidades] = useState([])
+  const [grados, setGrados] = useState([])
+  const [cargos, setCargos] = useState([])
   const [grupos, setGrupos] = useState([])
   const [formData, setFormData] = useState(emptyForm())
   const overlay = useFormOverlay()
@@ -39,6 +44,9 @@ const FuncionarioModal = ({ isOpen, onClose, funcionarioId = null }) => {
     if (!isOpen) return
     overlay.reset()
     fetchSubdirecciones()
+    fetchCalidades()
+    fetchGrados()
+    fetchCargos()
     fetchGrupos()
     if (funcionarioId) {
       fetchFuncionario()
@@ -71,12 +79,48 @@ const FuncionarioModal = ({ isOpen, onClose, funcionarioId = null }) => {
     }
   }
 
+  const fetchCalidades = async () => {
+    try {
+      const response = await api.get('calidades-juridicas/', {
+        params: { page_size: 1000, ordering: 'nombre' },
+      })
+      setCalidades(Array.isArray(response.data) ? response.data : response.data.results || [])
+    } catch (error) {
+      console.error('Error fetching calidades jurídicas:', error)
+    }
+  }
+
+  const fetchGrados = async () => {
+    try {
+      const response = await api.get('grados/', {
+        params: { page_size: 1000, ordering: 'orden,nombre' },
+      })
+      setGrados(Array.isArray(response.data) ? response.data : response.data.results || [])
+    } catch (error) {
+      console.error('Error fetching grados:', error)
+    }
+  }
+
+  const fetchCargos = async () => {
+    try {
+      const response = await api.get('cargos/', {
+        params: { page_size: 1000, ordering: 'orden,nombre' },
+      })
+      setCargos(Array.isArray(response.data) ? response.data : response.data.results || [])
+    } catch (error) {
+      console.error('Error fetching cargos:', error)
+    }
+  }
+
   const fetchFuncionario = async () => {
     try {
       const response = await api.get(`funcionarios/${funcionarioId}/`)
       setFormData({
         ...emptyForm(),
         ...response.data,
+        cargo: response.data.cargo || '',
+        calidad_juridica: response.data.calidad_juridica || '',
+        grado: response.data.grado || '',
         grupos: response.data.grupos || [],
       })
       if (response.data.subdireccion) {
@@ -177,6 +221,9 @@ const FuncionarioModal = ({ isOpen, onClose, funcionarioId = null }) => {
             subdireccion: formData.subdireccion || null,
             departamento: formData.departamento || null,
             unidad: formData.unidad || null,
+            cargo: formData.cargo || null,
+            calidad_juridica: formData.calidad_juridica || null,
+            grado: formData.grado || null,
             grupos: formData.grupos,
           }
           if (funcionarioId) {
@@ -319,14 +366,48 @@ const FuncionarioModal = ({ isOpen, onClose, funcionarioId = null }) => {
           </Field>
 
           <Field label="Cargo" htmlFor="func-cargo">
-            <Input
+            <Select
               id="func-cargo"
               value={formData.cargo || ''}
-              onChange={(e) =>
-                setFormData({ ...formData, cargo: e.target.value.toUpperCase() })
-              }
-              placeholder="EJ: PROFESIONAL"
-            />
+              onChange={(e) => setFormData({ ...formData, cargo: e.target.value })}
+            >
+              <option value="">Sin asignar</option>
+              {cargos.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="Calidad jurídica" htmlFor="func-calidad">
+            <Select
+              id="func-calidad"
+              value={formData.calidad_juridica || ''}
+              onChange={(e) => setFormData({ ...formData, calidad_juridica: e.target.value })}
+            >
+              <option value="">Sin asignar</option>
+              {calidades.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="Grado" htmlFor="func-grado">
+            <Select
+              id="func-grado"
+              value={formData.grado || ''}
+              onChange={(e) => setFormData({ ...formData, grado: e.target.value })}
+            >
+              <option value="">Sin asignar</option>
+              {grados.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.nombre}
+                </option>
+              ))}
+            </Select>
           </Field>
 
           <Field

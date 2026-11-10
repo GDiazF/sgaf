@@ -1,5 +1,12 @@
 from django.contrib import admin
-from .models import Vehiculo, RegistroMensual, VehiculoDocumento, VehiculoTipoDocumento, VehiculoTipoCombustible
+from .models import (
+    EmisionDocumentoVehiculo,
+    RegistroMensual,
+    Vehiculo,
+    VehiculoDocumento,
+    VehiculoTipoCombustible,
+    VehiculoTipoDocumento,
+)
 
 @admin.register(VehiculoTipoCombustible)
 class VehiculoTipoCombustibleAdmin(admin.ModelAdmin):
@@ -31,3 +38,18 @@ class RegistroMensualAdmin(admin.ModelAdmin):
     list_display = ('vehiculo', 'mes', 'anio', 'kilometros_recorridos', 'gasto_bencina', 'gasto_peajes', 'gasto_seguros')
     list_filter = ('anio', 'mes', 'vehiculo')
     search_fields = ('vehiculo__patente', 'vehiculo__marca', 'vehiculo__modelo')
+
+
+@admin.register(EmisionDocumentoVehiculo)
+class EmisionDocumentoVehiculoAdmin(admin.ModelAdmin):
+    list_display = (
+        'folio', 'vehiculo', 'tipo', 'solicitante_nombre',
+        'emitido_por', 'emitido_en', 'tiene_archivo',
+    )
+    list_filter = ('tipo', 'emitido_en')
+    search_fields = ('folio', 'vehiculo__patente', 'solicitante_nombre', 'solicitante_rut')
+    readonly_fields = ('emitido_en',)
+
+    @admin.display(boolean=True, description='PDF')
+    def tiene_archivo(self, obj):
+        return bool(obj.archivo)

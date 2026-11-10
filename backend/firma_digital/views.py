@@ -153,7 +153,7 @@ class FirmaGobConfigView(APIView):
                 'funcionario': (
                     {
                         'nombre': funcionario.nombre_funcionario,
-                        'cargo': funcionario.cargo,
+                        'cargo': funcionario.cargo_nombre,
                         'rut': funcionario.rut,
                     }
                     if funcionario
@@ -250,12 +250,12 @@ class FirmaGobProbarView(APIView):
                 (funcionario.nombre_funcionario if funcionario else '') or 'Firmante de prueba'
             )
             role = (request.data.get('signer_role') or '').strip() or (
-                (funcionario.cargo if funcionario else '') or ''
+                (funcionario.cargo_nombre if funcionario else '') or ''
             )
         elif funcionario and funcionario.rut:
             rut = funcionario.rut
             signer_name = (funcionario.nombre_funcionario or '').strip()
-            role = (funcionario.cargo or '').strip()
+            role = (funcionario.cargo_nombre or '').strip()
         else:
             rut = (getattr(settings, 'FIRMAGOB_RUN', '') or '').strip()
             signer_name = (request.data.get('signer_name') or '').strip() or 'Firmante de prueba'

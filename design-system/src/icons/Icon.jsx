@@ -55,6 +55,8 @@ const ICONS = {
     '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
   check:
     '<polyline points="20 6 9 17 4 12"/>',
+  checkbox:
+    '<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M8 12l3 3 5-6"/>',
   warning:
     '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
   info:
@@ -193,6 +195,14 @@ const ICONS = {
     '<rect x="3" y="4" width="18" height="12" rx="1"/><path d="M3 8h18M9 4v12M15 4v12"/><path d="M12 18v4M10 20h4"/>',
   'table-col-plus':
     '<rect x="4" y="3" width="12" height="18" rx="1"/><path d="M8 3v18M4 9h12M4 15h12"/><path d="M18 12h4M20 10v4"/>',
+  'table-merge-cells':
+    '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 12h18M12 4v16" opacity="0.35"/><path d="M8 12h8"/>',
+  'table-split-cell':
+    '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M12 4v16"/><path d="M3 12h18" opacity="0.35"/>',
+  'table-split-cols':
+    '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M12 4v16"/><path d="M9 10v4M15 10v4" opacity="0.55"/>',
+  'table-split-rows':
+    '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 12h18"/><path d="M10 9h4M10 15h4" opacity="0.55"/>',
   'table-borders':
     '<rect x="3" y="3" width="18" height="18" rx="1" stroke-width="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18" opacity="0.45"/>',
   'text-color':
@@ -329,9 +339,14 @@ const LABELS = {
   'align-bottom': 'Alinear abajo',
   list: 'Lista con viñetas',
   'list-ordered': 'Lista numerada',
+  checkbox: 'Casilla / checkbox',
   table: 'Tabla',
   'table-row-plus': 'Agregar fila',
   'table-col-plus': 'Agregar columna',
+  'table-merge-cells': 'Combinar celdas',
+  'table-split-cell': 'Dividir celda',
+  'table-split-cols': 'Dividir en columnas',
+  'table-split-rows': 'Dividir en filas',
   'table-borders': 'Bordes de tabla',
   'text-color': 'Color de texto',
   highlight: 'Color de fondo',

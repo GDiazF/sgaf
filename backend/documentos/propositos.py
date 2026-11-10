@@ -63,6 +63,31 @@ _GROUPS_RECEPCION_SERVICIO = [
     'sistema',
 ]
 
+_GROUPS_ACTA_ENTREGA_VEHICULO = [
+    'institucion',
+    'vehiculo',
+    'vehiculo_conductores',
+    'vehiculo_documentos',
+    'acta_entrega_vehiculo',
+    'firmante',
+    'sistema',
+    'libres',
+]
+
+_GROUPS_HOJA_VIDA_VEHICULO = [
+    'institucion',
+    'vehiculo',
+    'vehiculo_conductores',
+    'vehiculo_documentos',
+    'vehiculo_registros',
+    'vehiculo_mantenciones',
+    'vehiculo_incidentes',
+    'vehiculo_reparaciones',
+    'firmante',
+    'sistema',
+    'libres',
+]
+
 PROPOSITOS = [
     {
         'key': 'borrador',
@@ -124,6 +149,26 @@ PROPOSITOS = [
         'groups': _GROUPS_RECEPCION_SERVICIO,
         'asignable': True,
     },
+    {
+        'key': 'acta_entrega_vehiculo',
+        'label': 'Acta de entrega de vehículo',
+        'description': (
+            'Entrega / recepción de un vehículo de flota. '
+            'Incluye ficha, conductores, documentos y datos del acta.'
+        ),
+        'groups': _GROUPS_ACTA_ENTREGA_VEHICULO,
+        'asignable': True,
+    },
+    {
+        'key': 'hoja_vida_vehiculo',
+        'label': 'Hoja de vida del vehículo',
+        'description': (
+            'Historial operativo: combustible, mantenciones preventivas, '
+            'incidentes y reparaciones, además de la ficha.'
+        ),
+        'groups': _GROUPS_HOJA_VIDA_VEHICULO,
+        'asignable': True,
+    },
 ]
 
 # Alias legacy → propósito actual
@@ -150,6 +195,12 @@ PROPOSITOS_RLB = frozenset({
     'recepcion_rlb',
     'recepcion_rlb_unitario',
     'recepcion_rlb_junji',
+})
+
+# Plantillas de flota (filas repetibles de historial / conductores / documentos).
+PROPOSITOS_VEHICULO = frozenset({
+    'acta_entrega_vehiculo',
+    'hoja_vida_vehiculo',
 })
 
 
@@ -238,3 +289,11 @@ def proposito_from_establecimiento_servicio(establecimiento=None):
 def proposito_from_servicio_cobro(servicio=None):
     """Cobro por plantilla: no hay propósito asignable (solo RC de servicio)."""
     return None
+
+
+def proposito_from_vehiculo_acta(vehiculo=None):
+    return 'acta_entrega_vehiculo'
+
+
+def proposito_from_vehiculo_hoja_vida(vehiculo=None):
+    return 'hoja_vida_vehiculo'

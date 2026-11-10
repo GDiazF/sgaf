@@ -268,7 +268,7 @@ class SolicitudARCOAPITests(APITestCase):
         self.funcionario.refresh_from_db()
         self.assertIn("Funcionario Anonimizado", self.funcionario.nombre_funcionario)
         self.assertEqual(self.funcionario.anexo, "")
-        self.assertEqual(self.funcionario.cargo, "Suprimido (Derecho ARCO)")
+        self.assertEqual(self.funcionario.cargo_nombre, "Suprimido (Derecho ARCO)")
         self.assertFalse(self.funcionario.estado) # Desactivado
         
         # Verificar cuenta User asociada
@@ -314,11 +314,14 @@ class AuditLogTests(APITestCase):
         self.client.force_authenticate(user=self.user)
         AuditLog.objects.all().delete()
 
+        from funcionarios.models import Cargo
+        cargo_a = Cargo.objects.create(nombre='Tester')
+        cargo_b = Cargo.objects.create(nombre='Tester Senior')
         func = Funcionario.objects.create(
             rut='33333333-3',
             nombre_funcionario='Test Auditoria',
             anexo='333',
-            cargo='Tester'
+            cargo=cargo_a,
         )
 
         log_create = AuditLog.objects.filter(model_name='Funcionario', action='CREACION').first()
@@ -327,13 +330,13 @@ class AuditLogTests(APITestCase):
         self.assertIn('rut', log_create.changes)
         self.assertEqual(log_create.changes['rut'][1], '33333333-3')
 
-        func.cargo = 'Tester Senior'
+        func.cargo = cargo_b
         func.save()
 
         log_update = AuditLog.objects.filter(model_name='Funcionario', action='MODIFICACION').first()
         self.assertIsNotNone(log_update)
         self.assertIn('cargo', log_update.changes)
-        self.assertEqual(log_update.changes['cargo'], ['Tester', 'Tester Senior'])
+        self.assertEqual(log_update.changes['cargo'], [cargo_a.pk, cargo_b.pk])
 
         func_id = func.id
         func.delete()

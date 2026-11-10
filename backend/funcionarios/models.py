@@ -129,6 +129,67 @@ class Grupo(models.Model):
         return self.nombre
 
 
+class CalidadJuridica(models.Model):
+    """Catálogo de calidades jurídicas (ej. planta, contrata, honorarios)."""
+    nombre = models.CharField("Nombre", max_length=120, unique=True)
+    activo = models.BooleanField("Activo", default=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Calidad jurídica"
+        verbose_name_plural = "Calidades jurídicas"
+        ordering = ["nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+
+class Grado(models.Model):
+    """Catálogo de grados (escala de remuneraciones / grado)."""
+    nombre = models.CharField("Nombre", max_length=120, unique=True)
+    orden = models.PositiveSmallIntegerField(
+        "Orden",
+        default=0,
+        db_index=True,
+        help_text="Para listar 1…25 en orden numérico (no alfabético).",
+    )
+    activo = models.BooleanField("Activo", default=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Grado"
+        verbose_name_plural = "Grados"
+        ordering = ["orden", "nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+    def save(self, *args, **kwargs):
+        # Si el nombre es numérico y no hay orden, usarlo (ej. "12" → 12).
+        if not self.orden and str(self.nombre or '').strip().isdigit():
+            self.orden = int(str(self.nombre).strip())
+        super().save(*args, **kwargs)
+
+
+class Cargo(models.Model):
+    """Catálogo de cargos (opcional en funcionario)."""
+    nombre = models.CharField("Nombre", max_length=120, unique=True)
+    orden = models.PositiveSmallIntegerField("Orden", default=0, db_index=True)
+    activo = models.BooleanField("Activo", default=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Cargo"
+        verbose_name_plural = "Cargos"
+        ordering = ["orden", "nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+
 from django.contrib.auth.models import User
 
 class Funcionario(models.Model):
@@ -195,7 +256,30 @@ class Funcionario(models.Model):
     )
     
     # Información laboral
-    cargo = models.CharField("Cargo", max_length=120, blank=True, default="")
+    cargo = models.ForeignKey(
+        Cargo,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="funcionarios",
+        verbose_name="Cargo",
+    )
+    calidad_juridica = models.ForeignKey(
+        CalidadJuridica,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="funcionarios",
+        verbose_name="Calidad jurídica",
+    )
+    grado = models.ForeignKey(
+        Grado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="funcionarios",
+        verbose_name="Grado",
+    )
     estado = models.BooleanField("Activo", default=True)
     grupos = models.ManyToManyField(
         Grupo,
@@ -229,6 +313,11 @@ class Funcionario(models.Model):
 
     def __str__(self):
         return f"{self.nombre_funcionario} ({self.rut})"
+
+    @property
+    def cargo_nombre(self):
+        """Texto del cargo para plantillas / APIs que esperan string."""
+        return (self.cargo.nombre if self.cargo_id else '') or ''
 
     def clean(self):
         """Validaciones del modelo"""

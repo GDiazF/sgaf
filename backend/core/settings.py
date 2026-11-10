@@ -94,7 +94,7 @@ INSTALLED_APPS = [
     'servicios',
     'solicitudes_reservas',
     'tesoreria',
-    'vehiculos',
+    'vehiculos.apps.VehiculosConfig',
     'tickets',
     'ejecutivos',
     'personalizacion_sistema',

@@ -9,6 +9,7 @@ const emptyForm = {
   numero_servicio: '',
   tipo_documento: '',
   unidad_medida: '',
+  nombre_referencia: '',
 }
 
 const ServiceModal = ({
@@ -32,6 +33,7 @@ const ServiceModal = ({
       numero_servicio: initialData?.numero_servicio || '',
       tipo_documento: initialData?.tipo_documento || '',
       unidad_medida: initialData?.unidad_medida || '',
+      nombre_referencia: initialData?.nombre_referencia || '',
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset solo al abrir
   }, [open, initialData])
@@ -124,6 +126,21 @@ const ServiceModal = ({
               placeholder="Seleccione establecimiento…"
             />
           </div>
+          <Field
+            label="Nombre de referencia"
+            htmlFor="svc-nombre-ref"
+            className="field--full"
+            hint="Opcional. Ej.: Casa Central - Establecimientos 02"
+          >
+            <Input
+              id="svc-nombre-ref"
+              placeholder="Cómo quiere identificar este servicio…"
+              value={formData.nombre_referencia}
+              onChange={(e) =>
+                setFormData({ ...formData, nombre_referencia: e.target.value })
+              }
+            />
+          </Field>
         </div>
 
         <p className="contracts-section-title">2. Códigos de facturación</p>

@@ -195,7 +195,7 @@ const TransferModal = ({
               <option value="">Buscar / seleccionar funcionario…</option>
               {funcionarios.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.nombre_funcionario} ({f.cargo || 'Funcionario'})
+                  {f.nombre_funcionario} ({f.cargo_nombre || 'Funcionario'})
                 </option>
               ))}
             </Select>

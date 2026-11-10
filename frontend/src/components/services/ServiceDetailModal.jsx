@@ -188,6 +188,12 @@ const ServiceDetailModal = ({ open, onClose, service }) => {
       {service ? (
         <div className="crud-form svc-detail">
           <div className="svc-detail__stats">
+            {service.nombre_referencia?.trim() ? (
+              <div className="svc-detail__stat">
+                <span className="svc-detail__stat-label">Nombre de referencia</span>
+                <strong>{service.nombre_referencia}</strong>
+              </div>
+            ) : null}
             <div className="svc-detail__stat">
               <span className="svc-detail__stat-label">Establecimiento</span>
               <strong>{service.establecimiento_nombre || '—'}</strong>

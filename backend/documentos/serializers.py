@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from .models import PlantillaDocumento
@@ -8,6 +10,10 @@ from .propositos import (
     normalize_proposito,
     proposito_label,
 )
+
+# Alineado con renderer.plantilla_hf_band_mm
+_MIN_HF_BAND_MM = Decimal('8')
+_MAX_HF_BAND_MM = Decimal('80')
 
 
 def sync_plantilla_default(instance):
@@ -58,6 +64,7 @@ class PlantillaDocumentoSerializer(serializers.ModelSerializer):
             'ancho_efectivo_mm', 'alto_efectivo_mm',
             'margen_superior_mm', 'margen_inferior_mm',
             'margen_izquierdo_mm', 'margen_derecho_mm',
+            'altura_encabezado_mm', 'altura_pie_mm',
             'activa', 'es_default',
             'creado_por', 'creado_por_nombre',
             'actualizado_por', 'actualizado_por_nombre',
@@ -99,6 +106,22 @@ class PlantillaDocumentoSerializer(serializers.ModelSerializer):
 
     def validate_proposito(self, value):
         return normalize_proposito(value)
+
+    def _validate_hf_band(self, value, label):
+        if value is None:
+            return value
+        num = Decimal(value)
+        if num < _MIN_HF_BAND_MM or num > _MAX_HF_BAND_MM:
+            raise serializers.ValidationError(
+                f'{label} debe estar entre {_MIN_HF_BAND_MM:g} y {_MAX_HF_BAND_MM:g} mm.'
+            )
+        return num
+
+    def validate_altura_encabezado_mm(self, value):
+        return self._validate_hf_band(value, 'La altura del encabezado')
+
+    def validate_altura_pie_mm(self, value):
+        return self._validate_hf_band(value, 'La altura del pie')
 
     def validate(self, attrs):
         tamano = attrs.get(

@@ -47,7 +47,8 @@ const DirectoryModal = ({ isOpen, onClose, funcionarios = [] }) => {
       list = list.filter(
         (f) =>
           f.nombre_funcionario?.toLowerCase().includes(s) ||
-          f.cargo?.toLowerCase().includes(s) ||
+          f.cargo_nombre?.toLowerCase().includes(s) ||
+          (typeof f.cargo === 'string' ? f.cargo.toLowerCase().includes(s) : false) ||
           f.anexo?.includes(s),
       )
     }

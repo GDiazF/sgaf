@@ -23,7 +23,12 @@ import {
   formatApiFormError,
 } from '@slep/ui'
 import { pageCssVars } from '../../../components/documentos/pageMetrics.js'
-import { htmlHasContent } from '../../../components/documentos/hfMetrics.js'
+import {
+  htmlHasContent,
+  HF_BAND_MIN_MM,
+  HF_BAND_MAX_MM,
+  resolveHfBandMm,
+} from '../../../components/documentos/hfMetrics.js'
 import { layoutEditorPagination } from '../../../components/documentos/layoutPageBreaks.js'
 import { syncTableIndents } from '../../../components/documentos/tableLayout.js'
 
@@ -42,6 +47,8 @@ const emptyPlantilla = {
   margen_inferior_mm: 20,
   margen_izquierdo_mm: 20,
   margen_derecho_mm: 20,
+  altura_encabezado_mm: 15,
+  altura_pie_mm: 12,
   activa: true,
   es_default: false,
 }
@@ -112,6 +119,7 @@ const PlantillaDocumentoEditorPage = () => {
     try {
       const tplRes = await api.get(`documentos/plantillas/${id}/`)
       const data = { ...emptyPlantilla, ...tplRes.data }
+      data.nombre = data.nombre || ''
       if (data.proposito === 'general') data.proposito = 'borrador'
       if (data.proposito === 'recepcion_junji') data.proposito = 'recepcion_rlb_junji'
       if (
@@ -179,7 +187,7 @@ const PlantillaDocumentoEditorPage = () => {
   }
 
   const payloadFromState = () => ({
-    nombre: plantilla.nombre,
+    nombre: String(plantilla.nombre || '').trim(),
     descripcion: plantilla.descripcion,
     proposito: plantilla.proposito || 'borrador',
     cuerpo_html: editors.current.cuerpo?.getHTML?.() ?? plantilla.cuerpo_html,
@@ -193,14 +201,32 @@ const PlantillaDocumentoEditorPage = () => {
     margen_inferior_mm: plantilla.margen_inferior_mm,
     margen_izquierdo_mm: plantilla.margen_izquierdo_mm,
     margen_derecho_mm: plantilla.margen_derecho_mm,
+    altura_encabezado_mm: plantilla.altura_encabezado_mm,
+    altura_pie_mm: plantilla.altura_pie_mm,
     activa: plantilla.activa,
+    es_default: !!plantilla.es_default,
   })
 
   const handleSave = async () => {
+    const nombre = String(plantilla.nombre || '').trim()
+    if (!nombre) {
+      notify({
+        variant: 'danger',
+        text: 'Escriba un nombre para la plantilla antes de guardar.',
+      })
+      document.getElementById('doc-nombre')?.focus()
+      return
+    }
+    if (nombre !== plantilla.nombre) {
+      patch({ nombre })
+    }
     try {
       await overlay.run(
         async () => {
-          const res = await api.patch(`documentos/plantillas/${id}/`, payloadFromState())
+          const res = await api.patch(`documentos/plantillas/${id}/`, {
+            ...payloadFromState(),
+            nombre,
+          })
           setPlantilla((prev) => ({ ...prev, ...res.data }))
         },
         {
@@ -360,6 +386,25 @@ const PlantillaDocumentoEditorPage = () => {
         }
       />
 
+      {!loading ? (
+        <div className="doc-editor__name-bar card">
+          <Field
+            label="Nombre de la plantilla"
+            htmlFor="doc-nombre"
+            required
+            hint="Obligatorio para guardar. Aparece en el listado de plantillas."
+          >
+            <Input
+              id="doc-nombre"
+              value={plantilla.nombre || ''}
+              disabled={!canChange}
+              placeholder="Ej. Acta de entrega de vehículo"
+              onChange={(e) => patch({ nombre: e.target.value })}
+            />
+          </Field>
+        </div>
+      ) : null}
+
       {loading ? (
         <p>Cargando editor…</p>
       ) : (
@@ -424,7 +469,7 @@ const PlantillaDocumentoEditorPage = () => {
                   onFocus={() => activateSlot('encabezado')}
                   editable={canChange}
                   compact
-                  placeholder="Encabezado (18 mm, se repite en cada hoja del PDF). Logos de encabezado van aquí."
+                  placeholder={`Encabezado (${resolveHfBandMm(plantilla).header} mm, se repite en cada hoja del PDF). Logos de encabezado van aquí.`}
                 />
               </DocPageFrame>
               <DocPageFrame
@@ -440,23 +485,15 @@ const PlantillaDocumentoEditorPage = () => {
                   onFocus={() => activateSlot('pie')}
                   editable={canChange}
                   compact
-                  placeholder="Pie de página (12 mm). El PDF agrega el número de hoja."
+                  placeholder={`Pie de página (${resolveHfBandMm(plantilla).footer} mm). El PDF agrega el número de hoja.`}
                 />
               </DocPageFrame>
             </div>
 
             <aside className="doc-editor__sidebar">
               <Card>
-                <CardHeader title="Plantilla" subtitle="Nombre y estado" />
+                <CardHeader title="Plantilla" subtitle="Asignación y estado" />
                 <div className="doc-page-setup">
-                  <Field label="Nombre" htmlFor="doc-nombre">
-                    <Input
-                      id="doc-nombre"
-                      value={plantilla.nombre}
-                      disabled={!canChange}
-                      onChange={(e) => patch({ nombre: e.target.value })}
-                    />
-                  </Field>
                   <Field
                     label="Asignación / propósito"
                     htmlFor="doc-proposito"
@@ -493,6 +530,8 @@ const PlantillaDocumentoEditorPage = () => {
                           <option value="recepcion_rlb">RLB — Recepción conforme (1 o más pagos)</option>
                           <option value="recepcion_rlb_junji">RLB — Monto JUNJI</option>
                           <option value="recepcion_servicio">Recepción de servicio</option>
+                          <option value="acta_entrega_vehiculo">Acta de entrega de vehículo</option>
+                          <option value="hoja_vida_vehiculo">Hoja de vida del vehículo</option>
                         </>
                       ) : null}
                     </Select>
@@ -517,7 +556,7 @@ const PlantillaDocumentoEditorPage = () => {
               <Card>
                 <CardHeader
                   title="Encabezado y pie"
-                  subtitle="Zonas fijas que se repiten en cada hoja del PDF (18 mm / 12 mm)."
+                  subtitle={`Zonas fijas por hoja · ${resolveHfBandMm(plantilla).header} mm / ${resolveHfBandMm(plantilla).footer} mm.`}
                 />
                 <div className="doc-page-setup">
                   <Switch
@@ -526,10 +565,44 @@ const PlantillaDocumentoEditorPage = () => {
                     disabled={!headerInUse && !footerInUse}
                     onChange={(e) => setShowHfBands(e.target.checked)}
                   />
+                  <div className="doc-editor__page-margins" role="group" aria-label="Altura de franjas en milímetros">
+                    <label className="doc-editor__page-margin">
+                      <span>Encab.</span>
+                      <Input
+                        className="doc-editor__page-num"
+                        type="number"
+                        min={HF_BAND_MIN_MM}
+                        max={HF_BAND_MAX_MM}
+                        step="0.5"
+                        aria-label="Altura del encabezado (mm)"
+                        title="Altura de la franja de encabezado (mm)"
+                        value={plantilla.altura_encabezado_mm ?? 15}
+                        disabled={!canChange}
+                        onChange={(e) => patch({ altura_encabezado_mm: e.target.value })}
+                      />
+                    </label>
+                    <label className="doc-editor__page-margin">
+                      <span>Pie</span>
+                      <Input
+                        className="doc-editor__page-num"
+                        type="number"
+                        min={HF_BAND_MIN_MM}
+                        max={HF_BAND_MAX_MM}
+                        step="0.5"
+                        aria-label="Altura del pie (mm)"
+                        title="Altura de la franja de pie (mm)"
+                        value={plantilla.altura_pie_mm ?? 12}
+                        disabled={!canChange}
+                        onChange={(e) => patch({ altura_pie_mm: e.target.value })}
+                      />
+                    </label>
+                  </div>
                   <p className="doc-hf-status">
                     Encabezado: {headerInUse ? 'en uso' : 'vacío'}
                     {' · '}
                     Pie: {footerInUse ? 'en uso' : 'vacío'}
+                    {' · '}
+                    {HF_BAND_MIN_MM}–{HF_BAND_MAX_MM} mm
                   </p>
                   <div className="doc-hf-actions">
                     <Button

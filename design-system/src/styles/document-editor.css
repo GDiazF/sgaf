@@ -8,6 +8,16 @@
   gap: var(--space-3);
 }
 
+.page[data-od-id='plantilla-documento-editor-page'] .doc-editor__name-bar {
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.page[data-od-id='plantilla-documento-editor-page'] .doc-editor__name-bar .field {
+  max-width: 36rem;
+  margin: 0;
+}
+
 .doc-editor__canvas {
   position: relative;
   width: fit-content;
@@ -1031,6 +1041,40 @@
   white-space: nowrap;
   cursor: default;
   border: 1px solid var(--primary-border);
+}
+
+/* Casilla de formulario (inline) */
+.sgaf-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 0.95em;
+  height: 0.95em;
+  margin: 0 0.2em;
+  padding: 0;
+  border: 1.5px solid #222;
+  border-radius: 2px;
+  background: #fff;
+  color: #111;
+  font-size: 1em;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: -0.12em;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sgaf-checkbox.is-checked,
+.sgaf-checkbox[data-checked='true'] {
+  background: #fff;
+}
+
+.ProseMirror-selectednode.sgaf-checkbox,
+.ProseMirror-selectednode .sgaf-checkbox {
+  outline: 2px solid color-mix(in srgb, var(--accent, #2563eb) 70%, transparent);
+  outline-offset: 1px;
 }
 
 .doc-page td .sgaf-var,

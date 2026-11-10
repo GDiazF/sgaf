@@ -45,6 +45,18 @@ class PlantillaDocumento(models.Model):
     margen_inferior_mm = models.DecimalField(max_digits=6, decimal_places=2, default=20)
     margen_izquierdo_mm = models.DecimalField(max_digits=6, decimal_places=2, default=20)
     margen_derecho_mm = models.DecimalField(max_digits=6, decimal_places=2, default=20)
+    altura_encabezado_mm = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=15,
+        help_text='Altura de la franja de encabezado (mm). Ajuste si necesita logos más grandes.',
+    )
+    altura_pie_mm = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=12,
+        help_text='Altura de la franja de pie de página (mm).',
+    )
     activa = models.BooleanField(default=True)
     es_default = models.BooleanField(
         default=False,

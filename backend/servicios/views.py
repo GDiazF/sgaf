@@ -68,7 +68,12 @@ class ServicioViewSet(SgafPermissionMixin, viewsets.ModelViewSet):
     serializer_class = ServicioSerializer
     filterset_fields = ['proveedor', 'establecimiento', 'tipo_documento', 'numero_cliente']
     ordering_fields = ['establecimiento__nombre', 'proveedor__nombre', 'numero_cliente']
-    search_fields = ['numero_cliente', 'establecimiento__nombre', 'proveedor__nombre']
+    search_fields = [
+        'numero_cliente',
+        'establecimiento__nombre',
+        'proveedor__nombre',
+        'nombre_referencia',
+    ]
 
     @action(detail=False, methods=['get'])
     def download_template(self, request):

@@ -4,6 +4,7 @@ import TableRow from '@tiptap/extension-table-row'
 import { TableMap, CellSelection, deleteRow, deleteColumn, deleteTable } from '@tiptap/pm/tables'
 import Table, { TableView, createColGroup } from '@tiptap/extension-table'
 import { setCellBordersCommand, normalizeTableBorderWidth } from './cellBorders.js'
+import { splitCellIntoColumns, splitCellIntoRows } from './tableSplitCell.js'
 
 export const MIN_COL_WIDTH = 32
 const LEFT_HIT = 16
@@ -532,6 +533,32 @@ function tableIndentPlugin() {
   })
 }
 
+const REPEAT_PREFIXES = [
+  { prefix: 'pago_', marker: 'pagos' },
+  { prefix: 'cond_', marker: 'conductores' },
+  { prefix: 'vdoc_', marker: 'vdocumentos' },
+  { prefix: 'vreg_', marker: 'vregistros' },
+  { prefix: 'vmant_', marker: 'vmantenciones' },
+  { prefix: 'vinc_', marker: 'vincidentes' },
+  { prefix: 'vrep_', marker: 'vreparaciones' },
+]
+
+function detectRepeatMarkerFromRow(rowNode) {
+  if (!rowNode) return 'pagos'
+  let text = ''
+  const varKeys = []
+  rowNode.descendants((node) => {
+    if (node.isText && node.text) text += node.text
+    const key = node.attrs?.key || node.attrs?.['data-sgaf-var']
+    if (key) varKeys.push(String(key))
+  })
+  const haystack = `${text} ${varKeys.join(' ')}`
+  for (const item of REPEAT_PREFIXES) {
+    if (haystack.includes(item.prefix)) return item.marker
+  }
+  return 'pagos'
+}
+
 export const SgafTableRow = TableRow.extend({
   addAttributes() {
     return {
@@ -554,10 +581,13 @@ export const SgafTableRow = TableRow.extend({
           const { $from } = state.selection
           for (let depth = $from.depth; depth > 0; depth -= 1) {
             if ($from.node(depth).type.name === 'tableRow') {
-              const current = $from.node(depth).attrs.repeat
-              return commands.updateAttributes('tableRow', {
-                repeat: current === 'pagos' ? null : 'pagos',
-              })
+              const rowNode = $from.node(depth)
+              const current = rowNode.attrs.repeat
+              if (current) {
+                return commands.updateAttributes('tableRow', { repeat: null })
+              }
+              const marker = detectRepeatMarkerFromRow(rowNode)
+              return commands.updateAttributes('tableRow', { repeat: marker })
             }
           }
           return false
@@ -658,6 +688,14 @@ export const SgafTable = Table.extend({
           if (!editor.isActive('table')) return false
           return commands.setCellAttribute('borderWidth', normalizeTableBorderWidth(width))
         },
+      splitCellIntoColumns:
+        () =>
+        ({ state, dispatch }) =>
+          splitCellIntoColumns(state, dispatch),
+      splitCellIntoRows:
+        () =>
+        ({ state, dispatch }) =>
+          splitCellIntoRows(state, dispatch),
     }
   },
   addKeyboardShortcuts() {

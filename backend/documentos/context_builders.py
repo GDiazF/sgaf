@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from .variables import build_blank_context
+from .variables import build_blank_context, fecha_sistema_context
 
 MESES = {
     1: 'enero',
@@ -452,9 +452,9 @@ def context_from_factura_adq(factura, user=None):
         'rc_estado_pago': '',
         'firmante_nombre': (firmante.nombre_funcionario if firmante else '') or '',
         'firmante_rut': (firmante.rut if firmante else '') or '',
-        'firmante_cargo': (firmante.cargo if firmante else '') or '',
+        'firmante_cargo': (firmante.cargo_nombre if firmante else '') or '',
         'firmante_unidad': _firmante_unidad(firmante),
-        'hoy': date.today().strftime('%d-%m-%Y'),
+        **fecha_sistema_context(),
         'usuario_emite': usuario,
         'otros': '',
         'observaciones': '',
@@ -469,11 +469,14 @@ def _pago_row_context(pago):
     junji = monto - interes
     neto, iva = _neto_iva_desde_bruto(monto)
     est = pago.establecimiento
-    cliente = getattr(getattr(pago, 'servicio', None), 'numero_cliente', None) or ''
+    servicio = getattr(pago, 'servicio', None)
+    cliente = getattr(servicio, 'numero_cliente', None) or ''
+    nombre_ref = (getattr(servicio, 'nombre_referencia', None) or '').strip()
     return {
         'pago_nro_cliente': str(cliente),
         'pago_rbd': str(getattr(est, 'rbd', '') or '') if est else '',
         'pago_establecimiento': (getattr(est, 'nombre', '') or '') if est else '',
+        'pago_nombre_referencia': nombre_ref,
         'pago_nro_documento': pago.nro_documento or '',
         'pago_fecha_vencimiento': _fmt_date(pago.fecha_vencimiento),
         'pago_interes': _fmt_clp(interes),
@@ -491,9 +494,9 @@ def _attach_pagos_rows(ctx, registros):
         ctx.update(rows[0])
     else:
         for key in (
-            'pago_nro_cliente', 'pago_rbd', 'pago_establecimiento', 'pago_nro_documento',
-            'pago_fecha_vencimiento', 'pago_interes', 'pago_monto_junji', 'pago_monto_total',
-            'pago_iva', 'pago_neto',
+            'pago_nro_cliente', 'pago_rbd', 'pago_establecimiento', 'pago_nombre_referencia',
+            'pago_nro_documento', 'pago_fecha_vencimiento', 'pago_interes', 'pago_monto_junji',
+            'pago_monto_total', 'pago_iva', 'pago_neto',
         ):
             ctx.setdefault(key, '')
     return ctx
@@ -636,9 +639,9 @@ def context_from_recepcion_conforme(rc, user=None, tipo=None):
         'observaciones': rc.observaciones or '',
         'firmante_nombre': (firmante.nombre_funcionario if firmante else '') or '',
         'firmante_rut': (firmante.rut if firmante else '') or '',
-        'firmante_cargo': (firmante.cargo if firmante else '') or '',
+        'firmante_cargo': (firmante.cargo_nombre if firmante else '') or '',
         'firmante_unidad': _firmante_unidad(firmante),
-        'hoy': date.today().strftime('%d-%m-%Y'),
+        **fecha_sistema_context(),
         'usuario_emite': usuario,
     })
     return _attach_pagos_rows(ctx, registros)
@@ -711,9 +714,9 @@ def context_from_registro_pago(pago, user=None, tipo=None):
         'observaciones': (rc.observaciones if rc else '') or '',
         'firmante_nombre': (firmante.nombre_funcionario if firmante else '') or '',
         'firmante_rut': (firmante.rut if firmante else '') or '',
-        'firmante_cargo': (firmante.cargo if firmante else '') or '',
+        'firmante_cargo': (firmante.cargo_nombre if firmante else '') or '',
         'firmante_unidad': _firmante_unidad(firmante),
-        'hoy': date.today().strftime('%d-%m-%Y'),
+        **fecha_sistema_context(),
         'usuario_emite': usuario,
     })
     return _attach_pagos_rows(ctx, [pago])
@@ -803,7 +806,7 @@ def context_from_ruta_establecimiento(
         'monto_junji': _fmt_clp(junji),
         'rs_servicio_nombre': (servicio.nombre if servicio else '') or '',
         'rs_ruta_nombre': ruta.nombre or '',
-        'hoy': date.today().strftime('%d-%m-%Y'),
+        **fecha_sistema_context(),
         'usuario_emite': usuario,
     })
     return ctx
@@ -851,7 +854,499 @@ def context_from_periodo_cobro(periodo, user=None):
         'valor_mensual': _fmt_clp(ruta.valor_mensual or (servicio.monto_mensual if servicio else 0) or 0),
         'monto_fijo': _fmt_clp(int(periodo.monto_fijo or 0)),
         'monto_variable': _fmt_clp(int(periodo.monto_variable or 0)),
-        'hoy': date.today().strftime('%d-%m-%Y'),
+        **fecha_sistema_context(),
         'usuario_emite': usuario,
     })
     return ctx
+
+
+def _fmt_int(valor):
+    try:
+        return f'{int(valor):,}'.replace(',', '.')
+    except (TypeError, ValueError):
+        return str(valor or '')
+
+
+def _fmt_decimal(valor):
+    if valor is None or valor == '':
+        return ''
+    try:
+        from decimal import Decimal
+
+        num = Decimal(str(valor))
+        text = format(num.normalize(), 'f')
+        if '.' in text:
+            text = text.rstrip('0').rstrip('.')
+        return text.replace('.', ',')
+    except (TypeError, ValueError, ArithmeticError):
+        return str(valor)
+
+
+def _si_no(flag):
+    return 'Sí' if flag else 'No'
+
+
+def _fmt_time(value):
+    if not value:
+        return ''
+    if hasattr(value, 'strftime'):
+        return value.strftime('%H:%M')
+    return str(value)[:5]
+
+
+def _html_table(headers, rows):
+    head = ''.join(f'<th>{h}</th>' for h in headers)
+    body = []
+    for row in rows:
+        cells = ''.join(f'<td>{c or ""}</td>' for c in row)
+        body.append(f'<tr>{cells}</tr>')
+    return (
+        f'<table><thead><tr>{head}</tr></thead>'
+        f'<tbody>{"".join(body)}</tbody></table>'
+    )
+
+
+def _seed_first_row(ctx, rows, keys):
+    if not rows:
+        for key in keys:
+            ctx.setdefault(key, '')
+        return
+    first = rows[0]
+    for key in keys:
+        ctx[key] = first.get(key, '')
+
+
+def _typed_vehiculo_documentos_context(documentos):
+    """Rellena poliza_*, permiso_*, …, tarjeta_* desde tipos fijos de flota."""
+    from vehiculos.tipos_documento_sistema import TIPOS_DOCUMENTO_SISTEMA, empty_typed_doc_context
+
+    ctx = empty_typed_doc_context()
+    by_codigo = {}
+    for doc in documentos:
+        codigo = (getattr(doc.tipo, 'codigo', None) or '').strip().upper() if doc.tipo_id else ''
+        if not codigo:
+            continue
+        prev = by_codigo.get(codigo)
+        if prev is None:
+            by_codigo[codigo] = doc
+            continue
+        prev_vto = prev.fecha_vencimiento
+        doc_vto = doc.fecha_vencimiento
+        if doc_vto and (not prev_vto or doc_vto > prev_vto):
+            by_codigo[codigo] = doc
+        elif doc_vto == prev_vto and (doc.creado_en or doc.id) > (prev.creado_en or prev.id):
+            by_codigo[codigo] = doc
+
+    for spec in TIPOS_DOCUMENTO_SISTEMA:
+        doc = by_codigo.get(spec['codigo'])
+        if not doc:
+            continue
+        prefix = spec['var_prefix']
+        emision = _fmt_date(doc.fecha_documento)
+        ctx[f'{prefix}_numero'] = (doc.numero_referencia or '') or ''
+        ctx[f'{prefix}_institucion'] = (doc.institucion or '') or ''
+        ctx[f'{prefix}_emision'] = emision
+        ctx[f'{prefix}_fecha'] = emision  # alias legado
+        ctx[f'{prefix}_vencimiento'] = _fmt_date(doc.fecha_vencimiento)
+        ctx[f'{prefix}_observaciones'] = (doc.observaciones or '') or ''
+    return ctx
+
+
+def _vehiculo_base_context(vehiculo, user=None):
+    usuario = _usuario_emite(user)
+    ctx = build_blank_context(usuario_nombre=usuario)
+    asignaciones = list(
+        vehiculo.conductor_asignaciones.select_related(
+            'funcionario',
+            'funcionario__subdireccion',
+            'funcionario__cargo',
+        ).all()
+    )
+    conductores = [a.funcionario for a in asignaciones]
+    documentos = list(vehiculo.documentos.select_related('tipo').all())
+
+    cond_rows = [
+        {
+            'cond_nombre': (a.funcionario.nombre_funcionario or '').strip(),
+            'cond_rut': (a.funcionario.rut or '').strip(),
+            'cond_cargo': (getattr(a.funcionario, 'cargo_nombre', None) or '').strip(),
+            'cond_subdireccion': (
+                a.funcionario.subdireccion.nombre
+                if getattr(a.funcionario, 'subdireccion_id', None) and a.funcionario.subdireccion
+                else ''
+            ),
+            'cond_fecha_asignacion': _fmt_date(a.fecha_asignacion),
+        }
+        for a in asignaciones
+    ]
+    doc_rows = [
+        {
+            'vdoc_tipo': (doc.tipo.nombre if doc.tipo_id else '') or '',
+            'vdoc_numero': (doc.numero_referencia or '') or '',
+            'vdoc_institucion': (doc.institucion or '') or '',
+            'vdoc_fecha': _fmt_date(doc.fecha_documento),
+            'vdoc_vencimiento': _fmt_date(doc.fecha_vencimiento),
+            'vdoc_observaciones': (doc.observaciones or '') or '',
+        }
+        for doc in documentos
+    ]
+
+    primario = conductores[0] if conductores else None
+    ctx.update({
+        'institucion_nombre': 'Servicio Local de Educación Pública Iquique',
+        'vehiculo_nombre': str(vehiculo),
+        'vehiculo_marca': vehiculo.marca or '',
+        'vehiculo_modelo': vehiculo.modelo or '',
+        'vehiculo_anio': str(vehiculo.anio or ''),
+        'vehiculo_patente': vehiculo.patente or '',
+        'vehiculo_tipo': vehiculo.tipo_vehiculo or '',
+        'vehiculo_color': vehiculo.color or '',
+        'vehiculo_combustible': vehiculo.tipo_combustible or '',
+        'vehiculo_chasis': vehiculo.nro_chasis or '',
+        'vehiculo_motor': vehiculo.nro_motor or '',
+        'vehiculo_cilindrada': vehiculo.cilindrada or '',
+        'vehiculo_fecha_adquisicion': _fmt_date(vehiculo.fecha_adquisicion),
+        'vehiculo_fecha_inscripcion': _fmt_date(vehiculo.fecha_inscripcion),
+        'vehiculo_estacionamiento': vehiculo.lugar_estacionamiento or '',
+        'vehiculo_activo': 'Activo' if vehiculo.activo else 'Inactivo',
+        'vehiculo_cantidad_documentos': str(len(documentos)),
+        'vehiculo_cantidad_conductores': str(len(conductores)),
+        'conductor_nombre': (primario.nombre_funcionario if primario else '') or '',
+        'conductor_rut': (primario.rut if primario else '') or '',
+        'conductor_cargo': (getattr(primario, 'cargo_nombre', None) or '') if primario else '',
+        'conductor_subdireccion': (
+            primario.subdireccion.nombre
+            if primario and getattr(primario, 'subdireccion_id', None) and primario.subdireccion
+            else ''
+        ),
+        'conductor_fecha_asignacion': (
+            cond_rows[0]['cond_fecha_asignacion'] if cond_rows else ''
+        ),
+        'conductores_nombres': ', '.join(
+            (c.nombre_funcionario or '').strip() for c in conductores if c.nombre_funcionario
+        ),
+        'conductores_ruts': ', '.join((c.rut or '').strip() for c in conductores if c.rut),
+        'conductores_lista': ', '.join(
+            (
+                f'{(c.nombre_funcionario or "").strip()} ({(c.rut or "").strip()})'
+                if (c.rut or '').strip()
+                else (c.nombre_funcionario or '').strip()
+            )
+            for c in conductores
+            if (c.nombre_funcionario or '').strip()
+        ),
+        'conductores_listado_html': _html_table(
+            ['Nombre', 'RUT', 'Cargo', 'Subdirección', 'Asignación'],
+            [
+                [
+                    r['cond_nombre'],
+                    r['cond_rut'],
+                    r['cond_cargo'],
+                    r['cond_subdireccion'],
+                    r['cond_fecha_asignacion'],
+                ]
+                for r in cond_rows
+            ],
+        ) if cond_rows else '',
+        'documentos_cantidad': str(len(documentos)),
+        'documentos_listado_html': _html_table(
+            ['Tipo', 'Nº', 'Institución', 'Fecha', 'Vencimiento', 'Observaciones'],
+            [
+                [
+                    r['vdoc_tipo'],
+                    r['vdoc_numero'],
+                    r['vdoc_institucion'],
+                    r['vdoc_fecha'],
+                    r['vdoc_vencimiento'],
+                    r['vdoc_observaciones'],
+                ]
+                for r in doc_rows
+            ],
+        ) if doc_rows else '',
+        '_conductores_rows': cond_rows,
+        '_vdocumentos_rows': doc_rows,
+        **fecha_sistema_context(),
+        'usuario_emite': usuario,
+    })
+    ctx.update(_typed_vehiculo_documentos_context(documentos))
+    _seed_first_row(
+        ctx,
+        cond_rows,
+        [
+            'cond_nombre',
+            'cond_rut',
+            'cond_cargo',
+            'cond_subdireccion',
+            'cond_fecha_asignacion',
+        ],
+    )
+    _seed_first_row(
+        ctx,
+        doc_rows,
+        [
+            'vdoc_tipo',
+            'vdoc_numero',
+            'vdoc_institucion',
+            'vdoc_fecha',
+            'vdoc_vencimiento',
+            'vdoc_observaciones',
+        ],
+    )
+    return ctx
+
+
+def _attach_historial_vehiculo(ctx, vehiculo):
+    anio_curso = date.today().year
+    # Combustible / registros mensuales: solo año en curso.
+    registros = list(
+        vehiculo.registros.filter(anio=anio_curso).order_by('-mes')
+    )
+    mantenciones = list(vehiculo.mantenciones_preventivas.all())
+    incidentes = list(vehiculo.incidentes.select_related('funcionario').all())
+    reparaciones = list(vehiculo.reparaciones.all())
+
+    reg_rows = []
+    total_km = 0
+    total_litros = 0.0
+    total_bencina = 0
+    total_peajes = 0
+    total_seguros = 0
+    for reg in registros:
+        km = int(reg.kilometros_recorridos or 0)
+        if reg.km_inicial is not None and reg.km_final is not None:
+            km = max(0, int(reg.km_final) - int(reg.km_inicial))
+        litros = reg.litros
+        rendimiento = ''
+        try:
+            from decimal import Decimal
+
+            if litros is not None and Decimal(litros) > 0:
+                rendimiento = _fmt_decimal(Decimal(km) / Decimal(litros))
+                total_litros += float(Decimal(litros))
+        except Exception:
+            rendimiento = ''
+        bencina = int(reg.gasto_bencina or 0)
+        peajes = int(reg.gasto_peajes or 0)
+        seguros = int(reg.gasto_seguros or 0)
+        total_km += km
+        total_bencina += bencina
+        total_peajes += peajes
+        total_seguros += seguros
+        mes_nombre = MESES.get(reg.mes, str(reg.mes)).capitalize()
+        reg_rows.append({
+            'vreg_periodo': f'{mes_nombre} {reg.anio}',
+            'vreg_anio': str(reg.anio),
+            'vreg_mes': mes_nombre,
+            'vreg_mes_numero': str(reg.mes),
+            'vreg_km_inicial': _fmt_int(reg.km_inicial) if reg.km_inicial is not None else '',
+            'vreg_km_final': _fmt_int(reg.km_final) if reg.km_final is not None else '',
+            'vreg_km': _fmt_int(km),
+            'vreg_litros': _fmt_decimal(litros),
+            'vreg_rendimiento': rendimiento,
+            'vreg_gasto_bencina': _fmt_clp(bencina),
+            'vreg_gasto_peajes': _fmt_clp(peajes),
+            'vreg_gasto_seguros': _fmt_clp(seguros),
+            'vreg_gasto_total': _fmt_clp(bencina + peajes + seguros),
+        })
+
+    mant_rows = [
+        {
+            'vmant_fecha': _fmt_date(m.fecha),
+            'vmant_km': _fmt_int(m.kilometraje),
+            'vmant_aceite': _si_no(m.cambio_aceite),
+            'vmant_filtro_aceite': _si_no(m.cambio_filtro_aceite),
+            'vmant_liquido_frenos': _si_no(m.cambio_liquido_frenos),
+            'vmant_observaciones': m.observaciones or '',
+        }
+        for m in mantenciones
+    ]
+    inc_rows = [
+        {
+            'vinc_fecha': _fmt_date(i.fecha),
+            'vinc_hora': _fmt_time(i.hora),
+            'vinc_tipo': i.tipo_accidente or '',
+            'vinc_funcionario': (
+                i.funcionario.nombre_funcionario if i.funcionario_id else ''
+            ) or '',
+            'vinc_funcionario_rut': (i.funcionario.rut if i.funcionario_id else '') or '',
+            'vinc_costo': _fmt_clp(i.costo_reparacion),
+            'vinc_observaciones': i.observaciones or '',
+        }
+        for i in incidentes
+    ]
+    rep_rows = [
+        {
+            'vrep_fecha': _fmt_date(r.fecha),
+            'vrep_km': _fmt_int(r.kilometraje),
+            'vrep_tipo': r.get_tipo_mantenimiento_display(),
+            'vrep_descripcion': r.descripcion or '',
+            'vrep_costo': _fmt_clp(r.costo),
+            'vrep_observaciones': r.observaciones or '',
+        }
+        for r in reparaciones
+    ]
+
+    total_inc = sum(int(i.costo_reparacion or 0) for i in incidentes)
+    total_rep = sum(int(r.costo or 0) for r in reparaciones)
+
+    ctx.update({
+        'registros_anio': str(anio_curso),
+        'registros_cantidad': str(len(reg_rows)),
+        'registros_total_km': _fmt_int(total_km),
+        'registros_total_litros': _fmt_decimal(total_litros) if reg_rows else '',
+        'registros_total_bencina': _fmt_clp(total_bencina),
+        'registros_total_peajes': _fmt_clp(total_peajes),
+        'registros_total_seguros': _fmt_clp(total_seguros),
+        'registros_total_gastos': _fmt_clp(total_bencina + total_peajes + total_seguros),
+        'registros_listado_html': _html_table(
+            [
+                'Periodo', 'Km ini', 'Km fin', 'Km', 'Litros', 'Rend.',
+                'Bencina', 'Peajes', 'Seguros', 'Total',
+            ],
+            [
+                [
+                    r['vreg_periodo'], r['vreg_km_inicial'], r['vreg_km_final'],
+                    r['vreg_km'], r['vreg_litros'], r['vreg_rendimiento'],
+                    r['vreg_gasto_bencina'], r['vreg_gasto_peajes'],
+                    r['vreg_gasto_seguros'], r['vreg_gasto_total'],
+                ]
+                for r in reg_rows
+            ],
+        ) if reg_rows else '',
+        '_vregistros_rows': reg_rows,
+        'mantenciones_cantidad': str(len(mant_rows)),
+        'mantenciones_listado_html': _html_table(
+            ['Fecha', 'Km', 'Aceite', 'Filtro', 'Frenos', 'Obs.'],
+            [
+                [
+                    r['vmant_fecha'], r['vmant_km'], r['vmant_aceite'],
+                    r['vmant_filtro_aceite'], r['vmant_liquido_frenos'],
+                    r['vmant_observaciones'],
+                ]
+                for r in mant_rows
+            ],
+        ) if mant_rows else '',
+        '_vmantenciones_rows': mant_rows,
+        'incidentes_cantidad': str(len(inc_rows)),
+        'incidentes_total_costo': _fmt_clp(total_inc),
+        'incidentes_listado_html': _html_table(
+            ['Fecha', 'Hora', 'Tipo', 'Funcionario', 'RUT', 'Costo', 'Obs.'],
+            [
+                [
+                    r['vinc_fecha'], r['vinc_hora'], r['vinc_tipo'],
+                    r['vinc_funcionario'], r['vinc_funcionario_rut'],
+                    r['vinc_costo'], r['vinc_observaciones'],
+                ]
+                for r in inc_rows
+            ],
+        ) if inc_rows else '',
+        '_vincidentes_rows': inc_rows,
+        'reparaciones_cantidad': str(len(rep_rows)),
+        'reparaciones_total_costo': _fmt_clp(total_rep),
+        'reparaciones_listado_html': _html_table(
+            ['Fecha', 'Km', 'Tipo', 'Descripción', 'Costo', 'Obs.'],
+            [
+                [
+                    r['vrep_fecha'], r['vrep_km'], r['vrep_tipo'],
+                    r['vrep_descripcion'], r['vrep_costo'], r['vrep_observaciones'],
+                ]
+                for r in rep_rows
+            ],
+        ) if rep_rows else '',
+        '_vreparaciones_rows': rep_rows,
+    })
+    _seed_first_row(
+        ctx,
+        reg_rows,
+        [
+            'vreg_periodo', 'vreg_anio', 'vreg_mes', 'vreg_mes_numero',
+            'vreg_km_inicial', 'vreg_km_final', 'vreg_km', 'vreg_litros',
+            'vreg_rendimiento', 'vreg_gasto_bencina', 'vreg_gasto_peajes',
+            'vreg_gasto_seguros', 'vreg_gasto_total',
+        ],
+    )
+    _seed_first_row(
+        ctx,
+        mant_rows,
+        [
+            'vmant_fecha', 'vmant_km', 'vmant_aceite', 'vmant_filtro_aceite',
+            'vmant_liquido_frenos', 'vmant_observaciones',
+        ],
+    )
+    _seed_first_row(
+        ctx,
+        inc_rows,
+        [
+            'vinc_fecha', 'vinc_hora', 'vinc_tipo', 'vinc_funcionario',
+            'vinc_funcionario_rut', 'vinc_costo', 'vinc_observaciones',
+        ],
+    )
+    _seed_first_row(
+        ctx,
+        rep_rows,
+        [
+            'vrep_fecha', 'vrep_km', 'vrep_tipo', 'vrep_descripcion',
+            'vrep_costo', 'vrep_observaciones',
+        ],
+    )
+    return ctx
+
+
+def context_from_vehiculo(vehiculo, user=None):
+    """Ficha base del vehículo (identificación, conductores, documentos)."""
+    return _vehiculo_base_context(vehiculo, user=user)
+
+
+def context_from_acta_entrega_vehiculo(vehiculo, user=None, meta=None):
+    """Acta de entrega: ficha + solicitante + datos de entrega/receptor/entregador."""
+    ctx = _vehiculo_base_context(vehiculo, user=user)
+    meta = meta or {}
+    folio = (meta.get('solicitud_numero') or meta.get('solicitud_folio') or '').strip()
+
+    solicitante_nombre = (meta.get('solicitante_nombre') or '').strip()
+    solicitante_rut = (meta.get('solicitante_rut') or '').strip()
+    solicitante_cargo = (meta.get('solicitante_cargo') or '').strip()
+    solicitante_unidad = (meta.get('solicitante_unidad') or '').strip()
+    solicitante_departamento = (meta.get('solicitante_departamento') or '').strip()
+    solicitante_subdireccion = (meta.get('solicitante_subdireccion') or '').strip()
+    solicitante_anexo = (meta.get('solicitante_anexo') or '').strip()
+    solicitante_calidad = (meta.get('solicitante_calidad_juridica') or '').strip()
+    solicitante_grado = (meta.get('solicitante_grado') or '').strip()
+
+    # Compat: plantillas que usan receptor_* para el funcionario solicitante.
+    receptor_nombre = (meta.get('receptor_nombre') or '').strip() or solicitante_nombre
+    receptor_rut = (meta.get('receptor_rut') or '').strip() or solicitante_rut
+    receptor_cargo = (meta.get('receptor_cargo') or '').strip() or solicitante_cargo
+
+    ctx.update({
+        'solicitud_numero': folio,
+        'solicitud_folio': folio,
+        'solicitante_nombre': solicitante_nombre,
+        'solicitante_rut': solicitante_rut,
+        'solicitante_cargo': solicitante_cargo,
+        'solicitante_unidad': solicitante_unidad,
+        'solicitante_departamento': solicitante_departamento,
+        'solicitante_subdireccion': solicitante_subdireccion,
+        'solicitante_anexo': solicitante_anexo,
+        'solicitante_calidad_juridica': solicitante_calidad,
+        'solicitante_grado': solicitante_grado,
+        'entrega_fecha': meta.get('entrega_fecha') or date.today().strftime('%d-%m-%Y'),
+        'entrega_hora': meta.get('entrega_hora') or '',
+        'entrega_lugar': meta.get('entrega_lugar') or (vehiculo.lugar_estacionamiento or ''),
+        'entrega_kilometraje': meta.get('entrega_kilometraje') or '',
+        'entrega_observaciones': meta.get('entrega_observaciones') or '',
+        'entrega_estado': meta.get('entrega_estado') or '',
+        'receptor_nombre': receptor_nombre or ctx.get('conductor_nombre', ''),
+        'receptor_rut': receptor_rut or ctx.get('conductor_rut', ''),
+        'receptor_cargo': receptor_cargo or ctx.get('conductor_cargo', ''),
+        'entregador_nombre': meta.get('entregador_nombre') or ctx.get('usuario_emite', ''),
+        'entregador_rut': meta.get('entregador_rut') or '',
+        'entregador_cargo': meta.get('entregador_cargo') or '',
+    })
+    return ctx
+
+
+def context_from_hoja_vida_vehiculo(vehiculo, user=None):
+    """Hoja de vida: ficha + historial operativo completo."""
+    ctx = _vehiculo_base_context(vehiculo, user=user)
+    return _attach_historial_vehiculo(ctx, vehiculo)

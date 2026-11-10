@@ -114,13 +114,27 @@ const MultiSearchableSelect = ({
     onChange([])
   }
 
+  const handleRemoveOne = (optionValue, e) => {
+    e.stopPropagation()
+    if (disabled) return
+    onChange(value.filter((v) => String(v) !== String(optionValue)))
+  }
+
   const selectedCount = value?.length || 0
   const selectedWord = selectedCount === 1 ? 'seleccionado' : 'seleccionados'
+  const selectedItems = (value || [])
+    .map((v) => {
+      const opt = options.find((o) => String(o.value) === String(v))
+      return {
+        value: v,
+        label: opt?.label || String(v),
+      }
+    })
   const selectedSummary =
     selectedCount === 0
       ? placeholder
       : selectedCount === 1
-        ? options.find((o) => o.value === value[0])?.label || `1 ${selectedWord}`
+        ? selectedItems[0]?.label || `1 ${selectedWord}`
         : `${selectedCount} ${selectedWord}`
 
   const menu =
@@ -242,6 +256,27 @@ const MultiSearchableSelect = ({
           <Icon name="chevron" className="icon--chevron" size="sm" />
         </span>
       </div>
+      {selectedItems.length > 0 ? (
+        <ul className="combo__chips" aria-label="Selección actual">
+          {selectedItems.map((item) => (
+            <li key={String(item.value)} className="combo__chip">
+              <span className="combo__chip-label" title={item.label}>
+                {item.label}
+              </span>
+              {!disabled ? (
+                <button
+                  type="button"
+                  className="combo__chip-remove"
+                  aria-label={`Quitar ${item.label}`}
+                  onClick={(e) => handleRemoveOne(item.value, e)}
+                >
+                  <Icon name="close" size="sm" />
+                </button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {menu}
     </div>
   )

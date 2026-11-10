@@ -1,5 +1,42 @@
 from django.contrib import admin
-from .models import Subdireccion, Departamento, Unidad, Funcionario, Grupo
+from .models import (
+    Subdireccion,
+    Departamento,
+    Unidad,
+    Funcionario,
+    Grupo,
+    CalidadJuridica,
+    Grado,
+    Cargo,
+)
+
+
+@admin.register(CalidadJuridica)
+class CalidadJuridicaAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'activo', 'creado_en')
+    list_filter = ('activo',)
+    search_fields = ('nombre',)
+    ordering = ('nombre',)
+
+
+@admin.register(Grado)
+class GradoAdmin(admin.ModelAdmin):
+    list_display = ('orden', 'nombre', 'activo', 'creado_en')
+    list_display_links = ('nombre',)
+    list_editable = ('orden', 'activo')
+    list_filter = ('activo',)
+    search_fields = ('nombre',)
+    ordering = ('orden', 'nombre')
+
+
+@admin.register(Cargo)
+class CargoAdmin(admin.ModelAdmin):
+    list_display = ('orden', 'nombre', 'activo', 'creado_en')
+    list_display_links = ('nombre',)
+    list_editable = ('orden', 'activo')
+    list_filter = ('activo',)
+    search_fields = ('nombre',)
+    ordering = ('orden', 'nombre')
 
 @admin.register(Grupo)
 class GrupoAdmin(admin.ModelAdmin):
@@ -42,12 +79,15 @@ class FuncionarioAdmin(admin.ModelAdmin):
     list_display = (
         'nombre_funcionario', 'rut', 'anexo', 'numero_publico',
         'get_subdireccion', 'get_departamento', 'get_unidad',
-        'cargo', 'estado'
+        'cargo', 'calidad_juridica', 'grado', 'estado'
     )
-    list_filter = ('subdireccion', 'departamento', 'estado')
-    search_fields = ('nombre_funcionario', 'rut', 'anexo', 'numero_publico', 'cargo')
+    list_filter = ('subdireccion', 'departamento', 'estado', 'calidad_juridica', 'grado')
+    search_fields = (
+        'nombre_funcionario', 'rut', 'anexo', 'numero_publico', 'cargo__nombre',
+    )
     ordering = ('nombre_funcionario',)
     readonly_fields = ('numero_publico', 'creado_en', 'actualizado_en')
+    autocomplete_fields = ('cargo', 'calidad_juridica', 'grado')
     
     fieldsets = (
         ('Información Personal', {
@@ -60,7 +100,7 @@ class FuncionarioAdmin(admin.ModelAdmin):
             'fields': ('subdireccion', 'departamento', 'unidad')
         }),
         ('Información Laboral', {
-            'fields': ('cargo', 'estado', 'grupos')
+            'fields': ('cargo', 'calidad_juridica', 'grado', 'estado', 'grupos')
         }),
         ('Auditoría', {
             'fields': ('creado_en', 'actualizado_en'),

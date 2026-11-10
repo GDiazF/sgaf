@@ -488,6 +488,8 @@ const PlantillasDocumentosPage = () => {
                   <option value="recepcion_rlb">RLB — Recepción conforme (1 o más pagos)</option>
                   <option value="recepcion_rlb_junji">RLB — Monto JUNJI</option>
                   <option value="recepcion_servicio">Recepción de servicio</option>
+                  <option value="acta_entrega_vehiculo">Acta de entrega de vehículo</option>
+                  <option value="hoja_vida_vehiculo">Hoja de vida del vehículo</option>
                 </>
               ) : null}
             </Select>

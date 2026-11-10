@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import api from '../../api'
+import MultiSearchableSelect from '../../components/common/MultiSearchableSelect'
 import { useNotify } from '../../hooks/useNotify'
 import {
-  Drawer,
   Modal,
   ConfirmModal,
   Button,
@@ -12,24 +12,18 @@ import {
   Badge,
   Icon,
   FileInput,
+  DataTable,
+  Textarea,
   useFormOverlay,
   formatApiFormError,
 } from '@slep/ui'
-
-const ICON_MAP = {
-  FileText: 'file',
-  ShieldCheck: 'shield',
-  Calendar: 'reservas',
-  Wrench: 'procedimientos',
-  Info: 'info',
-  FileIcon: 'file',
-}
 
 const STATUS = {
   vencido: { label: 'Vencido', variant: 'danger' },
   por_vencer: { label: 'Por vencer', variant: 'warning' },
   vigente: { label: 'Vigente', variant: 'success' },
   sin_fecha: { label: 'Sin vigencia', variant: 'neutral' },
+  pendiente: { label: 'Pendiente', variant: 'neutral' },
 }
 
 function getStatusVencimiento(fecha) {
@@ -42,48 +36,112 @@ function getStatusVencimiento(fecha) {
   return STATUS.vigente
 }
 
+function formatDateCL(value) {
+  if (!value) return '—'
+  const raw = String(value).slice(0, 10)
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw)
+  if (!m) return String(value)
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).toLocaleDateString('es-CL')
+}
+
+const SKIP_FORM_KEYS = new Set([
+  'documentos',
+  'imagen',
+  'display_name',
+  'conductores',
+  'conductores_detalle',
+  'creado_en',
+])
+
+const DATE_FIELDS = new Set(['fecha_adquisicion', 'fecha_inscripcion'])
+
 const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
   const [activeTab, setActiveTab] = useState('info')
   const updateOverlay = useFormOverlay()
   const uploadOverlay = useFormOverlay()
   const { notify } = useNotify()
   const [editingVehiculo, setEditingVehiculo] = useState({ ...vehiculo })
+  const [conductorIds, setConductorIds] = useState(
+    (vehiculo.conductores || []).map((c) => (typeof c === 'object' ? c.id : c)),
+  )
   const [documentos, setDocumentos] = useState(vehiculo.documentos || [])
   const [tiposDoc, setTiposDoc] = useState([])
   const [tiposCombustible, setTiposCombustible] = useState([])
+  const [funcionarios, setFuncionarios] = useState([])
+  const [uploadOpen, setUploadOpen] = useState(false)
   const [selectedTipoForUpload, setSelectedTipoForUpload] = useState(null)
+  const [tipoLocked, setTipoLocked] = useState(false)
   const [newImage, setNewImage] = useState(null)
   const [imagePreview, setImagePreview] = useState(vehiculo.imagen || null)
   const [pendingDeleteDocId, setPendingDeleteDocId] = useState(null)
-  const [uploadData, setUploadData] = useState({
+  const emptyUploadData = {
     archivo: null,
+    numero_referencia: '',
+    institucion: '',
+    fecha_documento: '',
     fecha_vencimiento: '',
     observaciones: '',
     dias_aviso: '',
-  })
+  }
+  const [uploadData, setUploadData] = useState(emptyUploadData)
 
   useEffect(() => {
     setEditingVehiculo({ ...vehiculo })
     setDocumentos(vehiculo.documentos || [])
     setImagePreview(vehiculo.imagen || null)
     setNewImage(null)
+    const fromDetalle = (vehiculo.conductores_detalle || []).map((c) => c.id)
+    const fromIds = (vehiculo.conductores || []).map((c) =>
+      typeof c === 'object' ? c.id : c,
+    )
+    setConductorIds(fromDetalle.length ? fromDetalle : fromIds)
   }, [vehiculo])
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [docsRes, fuelRes] = await Promise.all([
+        const [docsRes, fuelRes, funcRes] = await Promise.all([
           api.get('vehiculos/tipos-documento/'),
           api.get('vehiculos/tipos-combustible/'),
+          api.get('funcionarios/', { params: { activos: true, page_size: 1000 } }),
         ])
-        setTiposDoc(docsRes.data.results || docsRes.data)
-        setTiposCombustible(fuelRes.data.results || fuelRes.data)
+        setTiposDoc(docsRes.data.results || docsRes.data || [])
+        setTiposCombustible(fuelRes.data.results || fuelRes.data || [])
+        setFuncionarios(funcRes.data.results || funcRes.data || [])
       } catch (error) {
         console.error(error)
       }
     }
     load()
   }, [])
+
+  const conductorOptions = useMemo(
+    () =>
+      funcionarios.map((f) => ({
+        value: f.id,
+        label: f.rut ? `${f.nombre_funcionario} (${f.rut})` : f.nombre_funcionario,
+      })),
+    [funcionarios],
+  )
+
+  const docRows = useMemo(
+    () =>
+      (documentos || []).map((doc) => {
+        const tipo =
+          tiposDoc.find((t) => t.id === doc.tipo) || {
+            id: doc.tipo,
+            nombre: doc.tipo_nombre || 'Documento',
+            dias_aviso_defecto: 15,
+          }
+        return {
+          id: doc.id,
+          tipo,
+          doc,
+          status: getStatusVencimiento(doc.fecha_vencimiento),
+        }
+      }),
+    [documentos, tiposDoc],
+  )
 
   const handleVehiculoChange = (e) => {
     const { name, value } = e.target
@@ -116,30 +174,43 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
   const closeUploadModal = () => {
     if (uploadOverlay.busy) return
     uploadOverlay.reset()
+    setUploadOpen(false)
     setSelectedTipoForUpload(null)
+    setTipoLocked(false)
   }
 
   const handleUploadOverlayDismiss = () => {
     if (uploadOverlay.status === 'success') {
       uploadOverlay.reset()
+      setUploadOpen(false)
       setSelectedTipoForUpload(null)
+      setTipoLocked(false)
       return
     }
     uploadOverlay.dismiss()
   }
 
+  const openUpload = (tipo = null) => {
+    uploadOverlay.reset()
+    setUploadData({ ...emptyUploadData })
+    setSelectedTipoForUpload(tipo)
+    setTipoLocked(Boolean(tipo))
+    setUploadOpen(true)
+  }
+
+  const tiposDisponiblesUpload = useMemo(() => tiposDoc || [], [tiposDoc])
+
   const handleUpdateVehiculo = async (e) => {
     e?.preventDefault?.()
     const formData = new FormData()
     Object.keys(editingVehiculo).forEach((key) => {
-      if (
-        editingVehiculo[key] !== null &&
-        key !== 'documentos' &&
-        key !== 'imagen'
-      ) {
-        formData.append(key, editingVehiculo[key])
-      }
+      if (SKIP_FORM_KEYS.has(key)) return
+      const val = editingVehiculo[key]
+      if (val === null || val === undefined) return
+      if (DATE_FIELDS.has(key) && String(val).trim() === '') return
+      formData.append(key, val)
     })
+    formData.append('conductores', JSON.stringify(conductorIds.map(Number)))
     if (newImage) formData.append('imagen', newImage)
 
     try {
@@ -172,6 +243,15 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
     formData.append('vehiculo', vehiculo.id)
     formData.append('tipo', selectedTipoForUpload.id)
     formData.append('archivo', uploadData.archivo)
+    if (uploadData.numero_referencia) {
+      formData.append('numero_referencia', uploadData.numero_referencia)
+    }
+    if (uploadData.institucion) {
+      formData.append('institucion', uploadData.institucion)
+    }
+    if (uploadData.fecha_documento) {
+      formData.append('fecha_documento', uploadData.fecha_documento)
+    }
     if (uploadData.fecha_vencimiento) {
       formData.append('fecha_vencimiento', uploadData.fecha_vencimiento)
     }
@@ -186,13 +266,10 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
           const response = await api.post('vehiculos/documentos/', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           })
-          setDocumentos((prev) => [...prev, response.data])
-          setUploadData({
-            archivo: null,
-            fecha_vencimiento: '',
-            observaciones: '',
-            dias_aviso: '',
-          })
+          const nextDocs = [...documentos, response.data]
+          setDocumentos(nextDocs)
+          onUpdate?.({ ...vehiculo, documentos: nextDocs })
+          setUploadData({ ...emptyUploadData })
         },
         {
           successDescription: 'Documento subido correctamente.',
@@ -208,7 +285,9 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
     if (!pendingDeleteDocId) return
     try {
       await api.delete(`vehiculos/documentos/${pendingDeleteDocId}/`)
-      setDocumentos((prev) => prev.filter((d) => d.id !== pendingDeleteDocId))
+      const nextDocs = documentos.filter((d) => d.id !== pendingDeleteDocId)
+      setDocumentos(nextDocs)
+      onUpdate?.({ ...vehiculo, documentos: nextDocs })
       setPendingDeleteDocId(null)
       notify({ variant: 'success', text: 'Documento eliminado.' })
     } catch (error) {
@@ -217,15 +296,93 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
     }
   }
 
+  const docColumns = useMemo(
+    () => [
+      {
+        key: 'tipo',
+        header: 'Tipo',
+        className: 'col--primary',
+        cardRole: 'title',
+        render: (row) => row.tipo?.nombre || row.doc?.tipo_nombre || '—',
+      },
+      {
+        key: 'numero',
+        header: 'Nº / póliza',
+        render: (row) => row.doc?.numero_referencia || '—',
+      },
+      {
+        key: 'institucion',
+        header: 'Institución',
+        tabletHide: true,
+        render: (row) => row.doc?.institucion || '—',
+      },
+      {
+        key: 'fecha_doc',
+        header: 'Fecha doc.',
+        tabletHide: true,
+        render: (row) => formatDateCL(row.doc?.fecha_documento),
+      },
+      {
+        key: 'estado',
+        header: 'Estado',
+        className: 'col--status',
+        cardRole: 'status',
+        render: (row) => (
+          <Badge variant={row.status.variant}>{row.status.label}</Badge>
+        ),
+      },
+      {
+        key: 'vencimiento',
+        header: 'Vencimiento',
+        render: (row) => formatDateCL(row.doc?.fecha_vencimiento),
+      },
+      {
+        key: 'observaciones',
+        header: 'Obs.',
+        tabletHide: true,
+        render: (row) => row.doc?.observaciones || '—',
+      },
+      {
+        key: 'acciones',
+        header: 'Acciones',
+        className: 'col--actions',
+        render: (row) => (
+          <div className="data-table__actions">
+            <Button
+              size="sm"
+              variant="ghost"
+              title="Ver"
+              onClick={() =>
+                window.open(row.doc.archivo, '_blank', 'noopener,noreferrer')
+              }
+            >
+              <Icon name="eye" size="sm" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              title="Eliminar"
+              onClick={() => setPendingDeleteDocId(row.doc.id)}
+            >
+              <Icon name="trash" size="sm" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [],
+  )
+
   const title = `${vehiculo.marca} ${vehiculo.modelo}`
 
   return (
     <>
-      <Drawer
+      <Modal
         open={!!vehiculo}
         onClose={handleClose}
         title={title}
-        wide
+        size="xl"
+        subheader={vehiculo?.patente || undefined}
         {...updateOverlay.modalProps}
         onOverlayDismiss={handleUpdateOverlayDismiss}
         footer={
@@ -340,7 +497,7 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
                       onChange={handleVehiculoChange}
                     />
                   </Field>
-                  <Field label="Patente" htmlFor="veh-patente">
+                  <Field label="PPU / Patente" htmlFor="veh-patente">
                     <Input
                       id="veh-patente"
                       name="patente"
@@ -348,7 +505,24 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
                       onChange={handleVehiculoChange}
                     />
                   </Field>
-                  <Field label="Tipo combustible" htmlFor="veh-fuel" className="field--full">
+                  <Field label="Tipo de vehículo" htmlFor="veh-tipo">
+                    <Input
+                      id="veh-tipo"
+                      name="tipo_vehiculo"
+                      value={editingVehiculo.tipo_vehiculo || ''}
+                      onChange={handleVehiculoChange}
+                      placeholder="Ej. Camioneta"
+                    />
+                  </Field>
+                  <Field label="Color" htmlFor="veh-color">
+                    <Input
+                      id="veh-color"
+                      name="color"
+                      value={editingVehiculo.color || ''}
+                      onChange={handleVehiculoChange}
+                    />
+                  </Field>
+                  <Field label="Tipo combustible" htmlFor="veh-fuel">
                     <Select
                       id="veh-fuel"
                       name="tipo_combustible"
@@ -363,7 +537,7 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
                       ))}
                     </Select>
                   </Field>
-                  <Field label="VIN / Chasis" htmlFor="veh-chasis">
+                  <Field label="Nº chasis" htmlFor="veh-chasis">
                     <Input
                       id="veh-chasis"
                       name="nro_chasis"
@@ -371,7 +545,7 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
                       onChange={handleVehiculoChange}
                     />
                   </Field>
-                  <Field label="Nro. motor" htmlFor="veh-motor">
+                  <Field label="Nº motor" htmlFor="veh-motor">
                     <Input
                       id="veh-motor"
                       name="nro_motor"
@@ -379,91 +553,104 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
                       onChange={handleVehiculoChange}
                     />
                   </Field>
+                  <Field label="Cilindrada" htmlFor="veh-cilindrada">
+                    <Input
+                      id="veh-cilindrada"
+                      name="cilindrada"
+                      value={editingVehiculo.cilindrada || ''}
+                      onChange={handleVehiculoChange}
+                      placeholder="Ej. 2478"
+                    />
+                  </Field>
+                  <Field label="Fecha de adquisición" htmlFor="veh-adq">
+                    <Input
+                      id="veh-adq"
+                      type="date"
+                      name="fecha_adquisicion"
+                      value={(editingVehiculo.fecha_adquisicion || '').slice(0, 10)}
+                      onChange={handleVehiculoChange}
+                    />
+                  </Field>
+                  <Field label="Fecha de inscripción" htmlFor="veh-insc">
+                    <Input
+                      id="veh-insc"
+                      type="date"
+                      name="fecha_inscripcion"
+                      value={(editingVehiculo.fecha_inscripcion || '').slice(0, 10)}
+                      onChange={handleVehiculoChange}
+                    />
+                  </Field>
+                  <Field
+                    label="Lugar de estacionamiento"
+                    htmlFor="veh-estacionamiento"
+                    className="field--full"
+                  >
+                    <Input
+                      id="veh-estacionamiento"
+                      name="lugar_estacionamiento"
+                      value={editingVehiculo.lugar_estacionamiento || ''}
+                      onChange={handleVehiculoChange}
+                      placeholder="Ej. Esmeralda 340"
+                    />
+                  </Field>
+                  <div className="field--full">
+                    <MultiSearchableSelect
+                      label="Conductores asignados"
+                      placeholder="Buscar funcionarios…"
+                      options={conductorOptions}
+                      value={conductorIds}
+                      onChange={setConductorIds}
+                    />
+                  </div>
                 </div>
               </form>
             </div>
           ) : (
-            <div className="vehiculos-docs-grid">
-              {tiposDoc.map((tipo) => {
-                const docCargado = documentos.find((d) => d.tipo === tipo.id)
-                const status = docCargado
-                  ? getStatusVencimiento(docCargado.fecha_vencimiento)
-                  : null
-                return (
-                  <article key={tipo.id} className="vehiculos-doc-card">
-                    <div className="vehiculos-doc-card__head">
-                      <Icon name={ICON_MAP[tipo.icono] || 'file'} size={18} />
-                      {docCargado ? (
-                        <Badge variant={status.variant}>{status.label}</Badge>
-                      ) : (
-                        <Badge variant="neutral">Pendiente</Badge>
-                      )}
-                    </div>
-                    <h4>{tipo.nombre}</h4>
-                    {docCargado ? (
-                      <p>
-                        Vence: {docCargado.fecha_vencimiento || 'No expira'}
-                      </p>
-                    ) : (
-                      <p>Documento aún no cargado.</p>
-                    )}
-                    <div className="vehiculos-doc-card__actions">
-                      {docCargado ? (
-                        <>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() =>
-                            window.open(docCargado.archivo, '_blank', 'noopener,noreferrer')
-                          }
-                        >
-                          <Icon name="download" size="sm" /> Ver
-                        </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setPendingDeleteDocId(docCargado.id)}
-                          >
-                            <Icon name="trash" size="sm" />
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => {
-                            uploadOverlay.reset()
-                            setUploadData({
-                              archivo: null,
-                              fecha_vencimiento: '',
-                              observaciones: '',
-                              dias_aviso: '',
-                            })
-                            setSelectedTipoForUpload(tipo)
-                          }}
-                        >
-                          <Icon name="plus" size="sm" /> Cargar
-                        </Button>
-                      )}
-                    </div>
-                  </article>
-                )
-              })}
-              {tiposDoc.length === 0 ? (
-                <p className="vehiculos-flota-empty">
-                  No hay tipos de documento configurados.
-                </p>
-              ) : null}
-            </div>
+            <DataTable
+              columns={docColumns}
+              rows={docRows}
+              emptyTitle="Sin documentos"
+              emptyDescription="Aún no hay documentos cargados para este vehículo."
+              emptyAction={
+                tiposDisponiblesUpload.length > 0 ? (
+                  <Button variant="primary" onClick={() => openUpload()}>
+                    <Icon name="plus" size="sm" /> Nuevo documento
+                  </Button>
+                ) : null
+              }
+              toolbar={
+                <>
+                  <div className="table-toolbar__left">
+                    <span className="table-toolbar__title">Documentos</span>
+                    <Badge variant="neutral">{documentos.length}</Badge>
+                  </div>
+                  <div className="table-toolbar__right">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => openUpload()}
+                      disabled={tiposDisponiblesUpload.length === 0}
+                      title={
+                        tiposDisponiblesUpload.length === 0
+                          ? 'Configure tipos de documento primero'
+                          : 'Agregar documento'
+                      }
+                    >
+                      <Icon name="plus" size="sm" /> Nuevo documento
+                    </Button>
+                  </div>
+                </>
+              }
+            />
           )}
         </div>
-      </Drawer>
+      </Modal>
 
       <Modal
-        open={!!selectedTipoForUpload}
+        open={uploadOpen}
         onClose={closeUploadModal}
-        title="Cargar documento"
-        subheader={selectedTipoForUpload?.nombre}
+        title="Nuevo documento"
+        subheader={tipoLocked ? selectedTipoForUpload?.nombre : undefined}
         {...uploadOverlay.modalProps}
         onOverlayDismiss={handleUploadOverlayDismiss}
         footer={
@@ -479,15 +666,78 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
               variant="primary"
               onClick={handleFileUpload}
               loading={uploadOverlay.busy}
-              disabled={uploadOverlay.busy || uploadOverlay.active}
+              disabled={
+                uploadOverlay.busy ||
+                uploadOverlay.active ||
+                !selectedTipoForUpload ||
+                !uploadData.archivo
+              }
             >
-              Vincular documento
+              Guardar
             </Button>
           </>
         }
       >
         <div className="form-grid">
-          <Field label="Fecha de vencimiento" htmlFor="doc-venc">
+          <Field
+            label="Tipo de documento"
+            htmlFor="doc-tipo"
+            required
+            className="field--full"
+          >
+            <Select
+              id="doc-tipo"
+              value={selectedTipoForUpload?.id || ''}
+              disabled={tipoLocked}
+              onChange={(e) => {
+                const tipo = tiposDisponiblesUpload.find(
+                  (t) => String(t.id) === String(e.target.value),
+                )
+                setSelectedTipoForUpload(tipo || null)
+              }}
+            >
+              <option value="">Seleccionar…</option>
+              {(tipoLocked && selectedTipoForUpload
+                ? [selectedTipoForUpload]
+                : tiposDisponiblesUpload
+              ).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Nº documento / póliza" htmlFor="doc-num">
+            <Input
+              id="doc-num"
+              value={uploadData.numero_referencia}
+              onChange={(e) =>
+                setUploadData({ ...uploadData, numero_referencia: e.target.value })
+              }
+              placeholder="Ej. número de póliza"
+            />
+          </Field>
+          <Field label="Institución / emisor" htmlFor="doc-inst">
+            <Input
+              id="doc-inst"
+              value={uploadData.institucion}
+              onChange={(e) =>
+                setUploadData({ ...uploadData, institucion: e.target.value })
+              }
+              placeholder="Ej. aseguradora"
+            />
+          </Field>
+          <Field label="Emisión" htmlFor="doc-fecha">
+            <Input
+              id="doc-fecha"
+              type="date"
+              value={uploadData.fecha_documento}
+              onChange={(e) =>
+                setUploadData({ ...uploadData, fecha_documento: e.target.value })
+              }
+            />
+          </Field>
+          <Field label="Vencimiento" htmlFor="doc-venc">
             <Input
               id="doc-venc"
               type="date"
@@ -508,7 +758,18 @@ const VehiculoDetalle = ({ vehiculo, onClose, onUpdate }) => {
               }
             />
           </Field>
-          <Field label="Archivo" htmlFor="doc-file" className="field--full">
+          <Field label="Observaciones" htmlFor="doc-obs" className="field--full">
+            <Textarea
+              id="doc-obs"
+              rows={2}
+              value={uploadData.observaciones}
+              onChange={(e) =>
+                setUploadData({ ...uploadData, observaciones: e.target.value })
+              }
+              placeholder="Notas opcionales del documento"
+            />
+          </Field>
+          <Field label="Archivo" htmlFor="doc-file" className="field--full" required>
             <FileInput
               id="doc-file"
               label={

@@ -72,7 +72,7 @@ def valores_de(user):
     valores = {
         'rut': funcionario.rut or '',
         'nombre': funcionario.nombre_funcionario or '',
-        'cargo': funcionario.cargo or '',
+        'cargo': funcionario.cargo_nombre,
         'email': getattr(usuario, 'email', '') or '',
         'usuario': getattr(usuario, 'username', '') or '',
         'anexo': funcionario.anexo or '',

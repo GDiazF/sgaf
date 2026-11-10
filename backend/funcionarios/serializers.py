@@ -1,5 +1,32 @@
 from rest_framework import serializers
-from .models import Subdireccion, Departamento, Unidad, Funcionario, Grupo
+from .models import (
+    Subdireccion,
+    Departamento,
+    Unidad,
+    Funcionario,
+    Grupo,
+    CalidadJuridica,
+    Grado,
+    Cargo,
+)
+
+
+class CalidadJuridicaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CalidadJuridica
+        fields = '__all__'
+
+
+class GradoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Grado
+        fields = '__all__'
+
+
+class CargoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Cargo
+        fields = '__all__'
 
 
 class SubdireccionSerializer(serializers.ModelSerializer):
@@ -37,8 +64,8 @@ class GrupoSerializer(serializers.ModelSerializer):
             {
                 'id': f.id,
                 'nombre': f.nombre_funcionario,
-                'cargo': f.cargo
-            } for f in obj.funcionarios.filter(estado=True)
+                'cargo': f.cargo.nombre if f.cargo_id else '',
+            } for f in obj.funcionarios.filter(estado=True).select_related('cargo')
         ]
     
     def get_total_miembros(self, obj):
@@ -83,6 +110,9 @@ class FuncionarioSerializer(serializers.ModelSerializer):
     subdireccion_nombre = serializers.ReadOnlyField(source='subdireccion.nombre')
     departamento_nombre = serializers.ReadOnlyField(source='departamento.nombre')
     unidad_nombre = serializers.ReadOnlyField(source='unidad.nombre')
+    cargo_nombre = serializers.ReadOnlyField(source='cargo.nombre')
+    calidad_juridica_nombre = serializers.ReadOnlyField(source='calidad_juridica.nombre')
+    grado_nombre = serializers.ReadOnlyField(source='grado.nombre')
     
     # Objetos completos para lectura detallada
     subdireccion_obj = SubdireccionSerializer(source='subdireccion', read_only=True)
@@ -146,12 +176,18 @@ class FuncionarioListSerializer(serializers.ModelSerializer):
     subdireccion_nombre = serializers.ReadOnlyField(source='subdireccion.nombre')
     departamento_nombre = serializers.ReadOnlyField(source='departamento.nombre')
     unidad_nombre = serializers.ReadOnlyField(source='unidad.nombre')
+    cargo_nombre = serializers.ReadOnlyField(source='cargo.nombre')
+    calidad_juridica_nombre = serializers.ReadOnlyField(source='calidad_juridica.nombre')
+    grado_nombre = serializers.ReadOnlyField(source='grado.nombre')
     
     class Meta:
         model = Funcionario
         fields = [
             'id', 'rut', 'nombre_funcionario', 'anexo', 'numero_publico',
-            'cargo', 'estado', 'subdireccion', 'subdireccion_nombre',
+            'cargo', 'cargo_nombre', 'estado',
+            'subdireccion', 'subdireccion_nombre',
             'departamento', 'departamento_nombre', 'unidad', 'unidad_nombre',
+            'calidad_juridica', 'calidad_juridica_nombre',
+            'grado', 'grado_nombre',
             'grupos'
         ]

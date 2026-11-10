@@ -20,7 +20,7 @@ class SolicitanteSerializer(serializers.ModelSerializer):
             return {
                 'id': obj.funcionario.id,
                 'nombre': obj.funcionario.nombre_funcionario,
-                'cargo': obj.funcionario.cargo,
+                'cargo': obj.funcionario.cargo_nombre,
                 'subdireccion': obj.funcionario.subdireccion.nombre if obj.funcionario.subdireccion else None,
                 'departamento': obj.funcionario.departamento.nombre if obj.funcionario.departamento else None,
             }

@@ -37,6 +37,7 @@ import SellosFirma from './pages/funcionarios/SellosFirma';
 import AnexosDashboard from './pages/telecomunicaciones/AnexosDashboard';
 // Vehiculos
 import VehiculosDashboard from './pages/vehiculos/VehiculosDashboard';
+import VehiculoFichaPage from './pages/vehiculos/VehiculoFichaPage';
 import RemuneracionesDashboard from './pages/tesoreria/Remuneraciones';
 import MercadoPublicoDashboard from './pages/mercado_publico/MercadoPublicoDashboard';
 import ReservasDashboard from './pages/reservas/ReservasDashboard';
@@ -242,6 +243,7 @@ function App() {
                 <Route element={<ProtectedRoute permission="vehiculos.view_registromensual" />}>
                   <Route path="vehiculos" element={<VehiculosDashboard />} />
                   <Route path="vehiculos/flota" element={<VehiculosDashboard />} />
+                  <Route path="vehiculos/flota/:id" element={<VehiculoFichaPage />} />
                 </Route>
                 {/* Tesorería */}
                 <Route element={<ProtectedRoute permission="remuneraciones.view_remuneracion" />}>

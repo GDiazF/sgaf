@@ -162,6 +162,7 @@ class PlantillaDocumentoViewSet(viewsets.ModelViewSet):
             'cuerpo_html', 'encabezado_html', 'pie_html', 'tamano_pagina', 'orientacion',
             'ancho_mm', 'alto_mm', 'margen_superior_mm', 'margen_inferior_mm',
             'margen_izquierdo_mm', 'margen_derecho_mm',
+            'altura_encabezado_mm', 'altura_pie_mm',
         ]}
         for field, value in draft.items():
             setattr(plantilla, field, value if value is not None else getattr(plantilla, field))
@@ -206,6 +207,7 @@ class PlantillaDocumentoViewSet(viewsets.ModelViewSet):
             'cuerpo_html', 'encabezado_html', 'pie_html', 'tamano_pagina', 'orientacion',
             'ancho_mm', 'alto_mm', 'margen_superior_mm', 'margen_inferior_mm',
             'margen_izquierdo_mm', 'margen_derecho_mm',
+            'altura_encabezado_mm', 'altura_pie_mm',
         ]:
             if field in payload and payload[field] is not None:
                 setattr(plantilla, field, payload[field])

@@ -4,16 +4,60 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from establecimientos.pagination import LargeResultsSetPagination
 
-from .models import Subdireccion, Departamento, Unidad, Funcionario, Grupo
+from .models import (
+    Subdireccion,
+    Departamento,
+    Unidad,
+    Funcionario,
+    Grupo,
+    CalidadJuridica,
+    Grado,
+    Cargo,
+)
 from .serializers import (
     SubdireccionSerializer,
     DepartamentoSerializer,
     UnidadSerializer,
     FuncionarioSerializer,
     FuncionarioListSerializer,
-    GrupoSerializer
+    GrupoSerializer,
+    CalidadJuridicaSerializer,
+    GradoSerializer,
+    CargoSerializer,
 )
 
+
+class CalidadJuridicaViewSet(viewsets.ModelViewSet):
+    queryset = CalidadJuridica.objects.all()
+    serializer_class = CalidadJuridicaSerializer
+    pagination_class = LargeResultsSetPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['activo']
+    search_fields = ['nombre']
+    ordering_fields = ['nombre']
+    ordering = ['nombre']
+
+
+class GradoViewSet(viewsets.ModelViewSet):
+    queryset = Grado.objects.all()
+    serializer_class = GradoSerializer
+    pagination_class = LargeResultsSetPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['activo']
+    search_fields = ['nombre']
+    ordering_fields = ['orden', 'nombre']
+    ordering = ['orden', 'nombre']
+
+
+class CargoViewSet(viewsets.ModelViewSet):
+    queryset = Cargo.objects.all()
+    serializer_class = CargoSerializer
+    pagination_class = LargeResultsSetPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['activo']
+    search_fields = ['nombre']
+    ordering_fields = ['orden', 'nombre']
+    ordering = ['orden', 'nombre']
 
 
 class GrupoViewSet(viewsets.ModelViewSet):
@@ -64,13 +108,19 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
     """ViewSet para Funcionarios con búsqueda y filtros avanzados"""
     queryset = Funcionario.objects.select_related(
         'subdireccion', 'departamento', 'unidad',
-        'departamento__subdireccion', 'unidad__departamento'
+        'departamento__subdireccion', 'unidad__departamento',
+        'cargo', 'calidad_juridica', 'grado',
     ).all()
     pagination_class = LargeResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['subdireccion', 'departamento', 'unidad', 'estado']
-    search_fields = ['nombre_funcionario', 'rut', 'anexo', 'numero_publico', 'cargo']
-    ordering_fields = ['nombre_funcionario', 'rut', 'cargo', 'creado_en']
+    filterset_fields = [
+        'subdireccion', 'departamento', 'unidad', 'estado',
+        'cargo', 'calidad_juridica', 'grado',
+    ]
+    search_fields = [
+        'nombre_funcionario', 'rut', 'anexo', 'numero_publico', 'cargo__nombre',
+    ]
+    ordering_fields = ['nombre_funcionario', 'rut', 'cargo__nombre', 'creado_en']
     ordering = ['nombre_funcionario']
 
     def get_serializer_class(self):
@@ -174,7 +224,7 @@ class ControlAnexosViewSet(viewsets.ViewSet):
                             'id': func.id,
                             'nombre': func.nombre_funcionario,
                             'rut': func.rut,
-                            'cargo': func.cargo or '',
+                            'cargo': func.cargo.nombre if func.cargo_id else '',
                             'subdireccion': func.subdireccion.nombre if func.subdireccion else '',
                             'departamento': func.departamento.nombre if func.departamento else ''
                         }

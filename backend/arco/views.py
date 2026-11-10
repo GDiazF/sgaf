@@ -118,7 +118,12 @@ class SolicitudARCOViewSet(viewsets.ModelViewSet):
                     funcionario.nombre_funcionario = f"Funcionario Anonimizado (ARCO #{solicitud.id})"
                     funcionario.rut = f"{base_num}-{dv}"
                     funcionario.anexo = ""
-                    funcionario.cargo = "Suprimido (Derecho ARCO)"
+                    from funcionarios.models import Cargo
+                    cargo_arco, _ = Cargo.objects.get_or_create(
+                        nombre='Suprimido (Derecho ARCO)',
+                        defaults={'orden': 0, 'activo': True},
+                    )
+                    funcionario.cargo = cargo_arco
                     funcionario.estado = False
                     funcionario.save()
                 

@@ -105,7 +105,7 @@ class CertificadoEditorView(APIView):
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=400)
         payload['nombre'] = getattr(funcionario, 'nombre_funcionario', '') or ''
-        payload['cargo'] = getattr(funcionario, 'cargo', '') or ''
+        payload['cargo'] = getattr(funcionario, 'cargo_nombre', '') or ''
         payload['texto_firma'] = texto_para(request.user)
         imagen, imagen_tipo = imagen_de(obtener_plantilla())
         if imagen:

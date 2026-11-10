@@ -26,6 +26,7 @@ const emptyForm = {
   numero_servicio: '',
   tipo_documento: '',
   unidad_medida: '',
+  nombre_referencia: '',
 }
 
 const ServicesDashboard = () => {
@@ -122,6 +123,7 @@ const ServicesDashboard = () => {
       numero_servicio: item.numero_servicio || '',
       tipo_documento: item.tipo_documento || '',
       unidad_medida: item.unidad_medida || '',
+      nombre_referencia: item.nombre_referencia || '',
     })
     setEditingId(item.id)
     setShowForm(true)
@@ -243,12 +245,16 @@ const ServicesDashboard = () => {
         cardRole: 'title',
         priority: 1,
         sortable: true,
-        render: (item) => (
-          <div className="contracts-cat">
-            <strong>{item.establecimiento_nombre || '—'}</strong>
-            {item.establecimiento_rbd ? <span>RBD {item.establecimiento_rbd}</span> : null}
-          </div>
-        ),
+        render: (item) => {
+          const ref = item.nombre_referencia?.trim()
+          return (
+            <div className="contracts-cat">
+              <strong>{ref || item.establecimiento_nombre || '—'}</strong>
+              {ref ? <span>{item.establecimiento_nombre || '—'}</span> : null}
+              {item.establecimiento_rbd ? <span>RBD {item.establecimiento_rbd}</span> : null}
+            </div>
+          )
+        },
       },
       {
         key: 'proveedor',

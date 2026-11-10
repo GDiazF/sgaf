@@ -300,18 +300,23 @@ const TipoDocumentoMantenedor = ({ isOpen, onClose, onUpdate }) => {
                   tipos.map((t) => {
                     const iconName =
                       DOC_ICONS.find((i) => i.id === t.icono)?.icon || 'file'
+                    const isFixed = !!t.es_sistema || !!(t.codigo || '').trim()
                     return (
                       <div key={t.id} className="vehiculos-config__item">
                         <div className="vehiculos-config__item-main">
                           <Icon name={iconName} size={16} />
                           <span>{t.nombre}</span>
-                          <Badge variant="neutral">{t.color}</Badge>
+                          {isFixed ? (
+                            <Badge variant="accent">Fijo</Badge>
+                          ) : (
+                            <Badge variant="neutral">{t.color}</Badge>
+                          )}
                         </div>
                         <Button
                           variant="ghost"
                           size="sm"
-                          title="Eliminar"
-                          disabled={overlay.busy}
+                          title={isFixed ? 'Tipo fijo del sistema' : 'Eliminar'}
+                          disabled={overlay.busy || isFixed}
                           onClick={() =>
                             setPendingDelete({
                               type: 'tipo',

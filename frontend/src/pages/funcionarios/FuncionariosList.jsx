@@ -259,7 +259,7 @@ const FuncionariosList = () => {
         header: 'Cargo',
         cardRole: 'field',
         priority: 2,
-        render: (item) => item.cargo || '—',
+        render: (item) => item.cargo_nombre || '—',
       },
       {
         key: 'actions',

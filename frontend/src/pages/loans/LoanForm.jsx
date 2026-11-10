@@ -501,7 +501,7 @@ const LoanForm = () => {
                   placeholder="Nombre o cargo…"
                   options={funcionarios.map((f) => ({
                     value: f.id,
-                    label: `${f.nombre_funcionario} (${f.cargo || 'Funcionario'})`,
+                    label: `${f.nombre_funcionario} (${f.cargo_nombre || 'Funcionario'})`,
                   }))}
                   value={selectedFuncionarioId}
                   onChange={setSelectedFuncionarioId}

@@ -253,7 +253,7 @@ def firmar_pendiente(
         raise ValueError('No se pudo determinar el RUT del firmante.')
 
     signer_name = (funcionario.nombre_funcionario or '').strip() if funcionario else 'Firmante'
-    role = (funcionario.cargo or '').strip() if funcionario else ''
+    role = (funcionario.cargo_nombre or '').strip() if funcionario else ''
     entity = getattr(settings, 'FIRMAGOB_ENTITY', '') or None
 
     # Reservar SGAF-… antes de FirmaGob (footer/QR). Si falla la firma, liberar.

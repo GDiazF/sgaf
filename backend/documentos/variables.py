@@ -2,7 +2,39 @@
 
 from datetime import date
 
-from .propositos import PROPOSITOS_RLB
+from vehiculos.tipos_documento_sistema import typed_variable_specs
+
+from .propositos import PROPOSITOS_RLB, PROPOSITOS_VEHICULO
+
+_MESES_ES = {
+    1: 'enero',
+    2: 'febrero',
+    3: 'marzo',
+    4: 'abril',
+    5: 'mayo',
+    6: 'junio',
+    7: 'julio',
+    8: 'agosto',
+    9: 'septiembre',
+    10: 'octubre',
+    11: 'noviembre',
+    12: 'diciembre',
+}
+
+
+def fecha_sistema_context(when=None):
+    """Variables de fecha de emisión para plantillas."""
+    d = when or date.today()
+    mes_nombre = _MESES_ES.get(d.month, str(d.month))
+    return {
+        'hoy': d.strftime('%d-%m-%Y'),
+        'hoy_slash': d.strftime('%d/%m/%Y'),
+        'hoy_largo': f'{d.day} de {mes_nombre} de {d.year}',
+        'hoy_dia': str(d.day),
+        'hoy_mes': str(d.month),
+        'hoy_mes_nombre': mes_nombre,
+        'hoy_anio': str(d.year),
+    }
 
 VARIABLE_GROUPS = [
     {
@@ -219,6 +251,15 @@ VARIABLE_GROUPS = [
                 'hint': 'Va en la fila modelo de la tabla (se repite por cada boleta).',
             },
             {
+                'key': 'pago_nombre_referencia',
+                'label': 'Fila · Nombre de referencia',
+                'type': 'text',
+                'hint': (
+                    'Nombre de referencia del servicio (opcional). '
+                    'Ej.: «Casa Central - Establecimientos 02». Vacío si no se definió.'
+                ),
+            },
+            {
                 'key': 'pago_director',
                 'label': 'Fila · Director/a',
                 'type': 'text',
@@ -409,6 +450,480 @@ VARIABLE_GROUPS = [
         ],
     },
     {
+        'key': 'vehiculo',
+        'label': 'Vehículo (ficha)',
+        'variables': [
+            {'key': 'vehiculo_nombre', 'label': 'Nombre completo (marca modelo patente)', 'type': 'text'},
+            {'key': 'vehiculo_marca', 'label': 'Marca', 'type': 'text'},
+            {'key': 'vehiculo_modelo', 'label': 'Modelo', 'type': 'text'},
+            {'key': 'vehiculo_anio', 'label': 'Año', 'type': 'text'},
+            {'key': 'vehiculo_patente', 'label': 'PPU / Patente', 'type': 'text'},
+            {'key': 'vehiculo_tipo', 'label': 'Tipo de vehículo', 'type': 'text'},
+            {'key': 'vehiculo_color', 'label': 'Color', 'type': 'text'},
+            {'key': 'vehiculo_combustible', 'label': 'Tipo de combustible', 'type': 'text'},
+            {'key': 'vehiculo_chasis', 'label': 'Nº chasis', 'type': 'text'},
+            {'key': 'vehiculo_motor', 'label': 'Nº motor', 'type': 'text'},
+            {'key': 'vehiculo_cilindrada', 'label': 'Cilindrada', 'type': 'text'},
+            {'key': 'vehiculo_fecha_adquisicion', 'label': 'Fecha de adquisición', 'type': 'text'},
+            {'key': 'vehiculo_fecha_inscripcion', 'label': 'Fecha de inscripción', 'type': 'text'},
+            {'key': 'vehiculo_estacionamiento', 'label': 'Lugar de estacionamiento', 'type': 'text'},
+            {'key': 'vehiculo_activo', 'label': 'Estado (Activo/Inactivo)', 'type': 'text'},
+            {'key': 'vehiculo_cantidad_documentos', 'label': 'Cantidad de documentos', 'type': 'text'},
+            {'key': 'vehiculo_cantidad_conductores', 'label': 'Cantidad de conductores', 'type': 'text'},
+        ],
+    },
+    {
+        'key': 'vehiculo_conductores',
+        'label': 'Conductores del vehículo',
+        'variables': [
+            {
+                'key': 'conductor_nombre',
+                'label': 'Conductor principal · Nombre',
+                'type': 'text',
+                'hint': 'Primer conductor asignado.',
+            },
+            {'key': 'conductor_rut', 'label': 'Conductor principal · RUT', 'type': 'text'},
+            {'key': 'conductor_cargo', 'label': 'Conductor principal · Cargo', 'type': 'text'},
+            {
+                'key': 'conductor_subdireccion',
+                'label': 'Conductor principal · Subdirección',
+                'type': 'text',
+            },
+            {
+                'key': 'conductor_fecha_asignacion',
+                'label': 'Conductor principal · Fecha de asignación',
+                'type': 'text',
+                'hint': 'Fecha en que se asignó al vehículo.',
+            },
+            {
+                'key': 'conductores_nombres',
+                'label': 'Conductores · Nombres (lista)',
+                'type': 'text',
+                'hint': 'Todos los conductores unidos por coma.',
+            },
+            {'key': 'conductores_ruts', 'label': 'Conductores · RUTs (lista)', 'type': 'text'},
+            {
+                'key': 'conductores_lista',
+                'label': 'Conductores · Nombre (RUT)',
+                'type': 'text',
+                'hint': 'Ej. Ana Pérez (11.111.111-1), …',
+            },
+            {
+                'key': 'conductores_listado_html',
+                'label': 'Conductores · Listado HTML',
+                'type': 'text',
+                'hint': 'Tabla HTML lista para insertar.',
+            },
+            {
+                'key': 'cond_nombre',
+                'label': 'Fila conductor · Nombre',
+                'type': 'text',
+                'hint': (
+                    'Poné esta variable en UNA sola fila de tabla (junto a otras cond_*). '
+                    'Al generar el PDF se clona automáticamente por cada conductor.'
+                ),
+            },
+            {
+                'key': 'cond_rut',
+                'label': 'Fila conductor · RUT',
+                'type': 'text',
+                'hint': 'Misma fila repetible que cond_nombre.',
+            },
+            {
+                'key': 'cond_cargo',
+                'label': 'Fila conductor · Cargo',
+                'type': 'text',
+                'hint': 'Misma fila repetible que cond_nombre.',
+            },
+            {
+                'key': 'cond_subdireccion',
+                'label': 'Fila conductor · Subdirección',
+                'type': 'text',
+                'hint': 'Misma fila repetible que cond_nombre.',
+            },
+            {
+                'key': 'cond_fecha_asignacion',
+                'label': 'Fila conductor · Fecha de asignación',
+                'type': 'text',
+                'hint': 'Misma fila repetible que cond_nombre.',
+            },
+        ],
+    },
+    {
+        'key': 'vehiculo_documentos',
+        'label': 'Documentos del vehículo',
+        'variables': [
+            {'key': 'documentos_cantidad', 'label': 'Cantidad de documentos', 'type': 'text'},
+            {
+                'key': 'documentos_listado_html',
+                'label': 'Documentos · Listado HTML',
+                'type': 'text',
+                'hint': 'Tabla HTML con tipo, nº, institución, fechas y observaciones.',
+            },
+            {
+                'key': 'vdoc_tipo',
+                'label': 'Fila documento · Tipo',
+                'type': 'text',
+                'hint': (
+                    'UNA fila de tabla con variables vdoc_*; se repite por cada documento al PDF.'
+                ),
+            },
+            {
+                'key': 'vdoc_numero',
+                'label': 'Fila documento · Nº referencia',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vdoc_tipo.',
+            },
+            {
+                'key': 'vdoc_institucion',
+                'label': 'Fila documento · Institución',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vdoc_tipo.',
+            },
+            {
+                'key': 'vdoc_fecha',
+                'label': 'Fila documento · Fecha',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vdoc_tipo.',
+            },
+            {
+                'key': 'vdoc_vencimiento',
+                'label': 'Fila documento · Vencimiento',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vdoc_tipo.',
+            },
+            {
+                'key': 'vdoc_observaciones',
+                'label': 'Fila documento · Observaciones',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vdoc_tipo.',
+            },
+            # Tipos fijos de flota (póliza, permiso, RT, SOAP, padrón, tarjeta, …).
+            *typed_variable_specs(),
+        ],
+    },
+    {
+        'key': 'vehiculo_registros',
+        'label': 'Combustible / registros mensuales (año en curso)',
+        'variables': [
+            {
+                'key': 'registros_anio',
+                'label': 'Año de los registros',
+                'type': 'text',
+                'hint': 'Año calendario en curso al emitir el documento.',
+            },
+            {'key': 'registros_cantidad', 'label': 'Cantidad de registros (año en curso)', 'type': 'text'},
+            {'key': 'registros_total_km', 'label': 'Total kilómetros (año en curso)', 'type': 'text'},
+            {'key': 'registros_total_litros', 'label': 'Total litros (año en curso)', 'type': 'text'},
+            {'key': 'registros_total_bencina', 'label': 'Total gasto bencina (año en curso)', 'type': 'text'},
+            {'key': 'registros_total_peajes', 'label': 'Total gasto peajes (año en curso)', 'type': 'text'},
+            {'key': 'registros_total_seguros', 'label': 'Total gasto seguros (año en curso)', 'type': 'text'},
+            {'key': 'registros_total_gastos', 'label': 'Total gastos (año en curso)', 'type': 'text'},
+            {
+                'key': 'registros_listado_html',
+                'label': 'Registros · Listado HTML (año en curso)',
+                'type': 'text',
+            },
+            {
+                'key': 'vreg_periodo',
+                'label': 'Fila registro · Periodo',
+                'type': 'text',
+                'hint': (
+                    'UNA fila con variables vreg_* (como pago_* en RLB); '
+                    'se clona por cada registro mensual del año en curso.'
+                ),
+            },
+            {
+                'key': 'vreg_anio',
+                'label': 'Fila registro · Año',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vreg_periodo.',
+            },
+            {
+                'key': 'vreg_mes',
+                'label': 'Fila registro · Mes (nombre)',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vreg_periodo.',
+            },
+            {
+                'key': 'vreg_mes_numero',
+                'label': 'Fila registro · Mes (nº)',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vreg_periodo.',
+            },
+            {
+                'key': 'vreg_km_inicial',
+                'label': 'Fila registro · Km inicial',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vreg_periodo.',
+            },
+            {
+                'key': 'vreg_km_final',
+                'label': 'Fila registro · Km final',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vreg_periodo.',
+            },
+            {
+                'key': 'vreg_km',
+                'label': 'Fila registro · Km recorridos',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vreg_periodo.',
+            },
+            {
+                'key': 'vreg_litros',
+                'label': 'Fila registro · Litros',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vreg_periodo.',
+            },
+            {
+                'key': 'vreg_rendimiento',
+                'label': 'Fila registro · Rendimiento (km/l)',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vreg_periodo.',
+            },
+            {
+                'key': 'vreg_gasto_bencina',
+                'label': 'Fila registro · Gasto bencina',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vreg_periodo.',
+            },
+            {
+                'key': 'vreg_gasto_peajes',
+                'label': 'Fila registro · Gasto peajes',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vreg_periodo.',
+            },
+            {
+                'key': 'vreg_gasto_seguros',
+                'label': 'Fila registro · Gasto seguros',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vreg_periodo.',
+            },
+            {
+                'key': 'vreg_gasto_total',
+                'label': 'Fila registro · Gasto total',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vreg_periodo.',
+            },
+        ],
+    },
+    {
+        'key': 'vehiculo_mantenciones',
+        'label': 'Mantenciones preventivas',
+        'variables': [
+            {'key': 'mantenciones_cantidad', 'label': 'Cantidad de mantenciones', 'type': 'text'},
+            {
+                'key': 'mantenciones_listado_html',
+                'label': 'Mantenciones · Listado HTML',
+                'type': 'text',
+            },
+            {
+                'key': 'vmant_fecha',
+                'label': 'Fila mantención · Fecha',
+                'type': 'text',
+                'hint': 'UNA fila con vmant_*; se repite por cada mantención.',
+            },
+            {
+                'key': 'vmant_km',
+                'label': 'Fila mantención · Kilometraje',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vmant_fecha.',
+            },
+            {
+                'key': 'vmant_aceite',
+                'label': 'Fila mantención · Cambio aceite (Sí/No)',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vmant_fecha.',
+            },
+            {
+                'key': 'vmant_filtro_aceite',
+                'label': 'Fila mantención · Filtro aceite (Sí/No)',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vmant_fecha.',
+            },
+            {
+                'key': 'vmant_liquido_frenos',
+                'label': 'Fila mantención · Líquido frenos (Sí/No)',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vmant_fecha.',
+            },
+            {
+                'key': 'vmant_observaciones',
+                'label': 'Fila mantención · Observaciones',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vmant_fecha.',
+            },
+        ],
+    },
+    {
+        'key': 'vehiculo_incidentes',
+        'label': 'Incidentes / accidentes',
+        'variables': [
+            {'key': 'incidentes_cantidad', 'label': 'Cantidad de incidentes', 'type': 'text'},
+            {'key': 'incidentes_total_costo', 'label': 'Total costo reparaciones (incidentes)', 'type': 'text'},
+            {
+                'key': 'incidentes_listado_html',
+                'label': 'Incidentes · Listado HTML',
+                'type': 'text',
+            },
+            {
+                'key': 'vinc_fecha',
+                'label': 'Fila incidente · Fecha',
+                'type': 'text',
+                'hint': 'UNA fila con vinc_*; se repite por cada incidente.',
+            },
+            {
+                'key': 'vinc_hora',
+                'label': 'Fila incidente · Hora',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vinc_fecha.',
+            },
+            {
+                'key': 'vinc_tipo',
+                'label': 'Fila incidente · Tipo de accidente',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vinc_fecha.',
+            },
+            {
+                'key': 'vinc_funcionario',
+                'label': 'Fila incidente · Funcionario',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vinc_fecha.',
+            },
+            {
+                'key': 'vinc_funcionario_rut',
+                'label': 'Fila incidente · RUT funcionario',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vinc_fecha.',
+            },
+            {
+                'key': 'vinc_costo',
+                'label': 'Fila incidente · Costo reparación',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vinc_fecha.',
+            },
+            {
+                'key': 'vinc_observaciones',
+                'label': 'Fila incidente · Observaciones',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vinc_fecha.',
+            },
+        ],
+    },
+    {
+        'key': 'vehiculo_reparaciones',
+        'label': 'Reparaciones / mantenimientos',
+        'variables': [
+            {'key': 'reparaciones_cantidad', 'label': 'Cantidad de reparaciones', 'type': 'text'},
+            {'key': 'reparaciones_total_costo', 'label': 'Total costo reparaciones', 'type': 'text'},
+            {
+                'key': 'reparaciones_listado_html',
+                'label': 'Reparaciones · Listado HTML',
+                'type': 'text',
+            },
+            {
+                'key': 'vrep_fecha',
+                'label': 'Fila reparación · Fecha',
+                'type': 'text',
+                'hint': 'UNA fila con vrep_*; se repite por cada reparación.',
+            },
+            {
+                'key': 'vrep_km',
+                'label': 'Fila reparación · Kilometraje',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vrep_fecha.',
+            },
+            {
+                'key': 'vrep_tipo',
+                'label': 'Fila reparación · Tipo (Preventivo/Correctivo)',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vrep_fecha.',
+            },
+            {
+                'key': 'vrep_descripcion',
+                'label': 'Fila reparación · Descripción',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vrep_fecha.',
+            },
+            {
+                'key': 'vrep_costo',
+                'label': 'Fila reparación · Costo',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vrep_fecha.',
+            },
+            {
+                'key': 'vrep_observaciones',
+                'label': 'Fila reparación · Observaciones',
+                'type': 'text',
+                'hint': 'Misma fila repetible que vrep_fecha.',
+            },
+        ],
+    },
+    {
+        'key': 'acta_entrega_vehiculo',
+        'label': 'Acta de entrega',
+        'variables': [
+            {
+                'key': 'solicitud_numero',
+                'label': 'Nº de solicitud',
+                'type': 'text',
+                'hint': (
+                    'Solo se asigna al «Emitir acta» (ej. SOL-2026-0001). '
+                    'En vista previa queda vacío.'
+                ),
+            },
+            {
+                'key': 'solicitud_folio',
+                'label': 'Folio de solicitud',
+                'type': 'text',
+                'hint': 'Igual que solicitud_numero (alias).',
+            },
+            {
+                'key': 'solicitante_nombre',
+                'label': 'Solicitante · Nombre',
+                'type': 'text',
+                'hint': 'Funcionario que pide el documento (se elige al generar el acta).',
+            },
+            {'key': 'solicitante_rut', 'label': 'Solicitante · RUT', 'type': 'text'},
+            {'key': 'solicitante_cargo', 'label': 'Solicitante · Cargo', 'type': 'text'},
+            {'key': 'solicitante_unidad', 'label': 'Solicitante · Unidad', 'type': 'text'},
+            {
+                'key': 'solicitante_departamento',
+                'label': 'Solicitante · Departamento',
+                'type': 'text',
+            },
+            {
+                'key': 'solicitante_subdireccion',
+                'label': 'Solicitante · Subdirección',
+                'type': 'text',
+            },
+            {'key': 'solicitante_anexo', 'label': 'Solicitante · Anexo', 'type': 'text'},
+            {
+                'key': 'solicitante_calidad_juridica',
+                'label': 'Solicitante · Calidad jurídica',
+                'type': 'text',
+            },
+            {'key': 'solicitante_grado', 'label': 'Solicitante · Grado', 'type': 'text'},
+            {'key': 'entrega_fecha', 'label': 'Fecha de entrega', 'type': 'text'},
+            {'key': 'entrega_hora', 'label': 'Hora de entrega', 'type': 'text'},
+            {'key': 'entrega_lugar', 'label': 'Lugar de entrega', 'type': 'text'},
+            {'key': 'entrega_kilometraje', 'label': 'Kilometraje al entregar', 'type': 'text'},
+            {'key': 'entrega_observaciones', 'label': 'Observaciones de entrega', 'type': 'text'},
+            {'key': 'entrega_estado', 'label': 'Estado del vehículo al entregar', 'type': 'text'},
+            {
+                'key': 'receptor_nombre',
+                'label': 'Receptor · Nombre',
+                'type': 'text',
+                'hint': 'Si no se indica, usa el solicitante elegido al generar.',
+            },
+            {'key': 'receptor_rut', 'label': 'Receptor · RUT', 'type': 'text'},
+            {'key': 'receptor_cargo', 'label': 'Receptor · Cargo', 'type': 'text'},
+            {'key': 'entregador_nombre', 'label': 'Quien entrega · Nombre', 'type': 'text'},
+            {'key': 'entregador_rut', 'label': 'Quien entrega · RUT', 'type': 'text'},
+            {'key': 'entregador_cargo', 'label': 'Quien entrega · Cargo', 'type': 'text'},
+        ],
+    },
+    {
         'key': 'firmante',
         'label': 'Firmante',
         'variables': [
@@ -424,9 +939,45 @@ VARIABLE_GROUPS = [
         'variables': [
             {
                 'key': 'hoy',
-                'label': 'Fecha de hoy',
+                'label': 'Fecha de hoy (dd-mm-aaaa)',
                 'type': 'text',
-                'hint': 'Fecha del día en que se genera el PDF.',
+                'hint': 'Ej. 20-03-2026. Compatibilidad con plantillas existentes.',
+            },
+            {
+                'key': 'hoy_slash',
+                'label': 'Fecha de hoy (dd/mm/aaaa)',
+                'type': 'text',
+                'hint': 'Ej. 20/03/2026.',
+            },
+            {
+                'key': 'hoy_largo',
+                'label': 'Fecha de hoy (texto largo)',
+                'type': 'text',
+                'hint': 'Ej. 20 de marzo de 2026.',
+            },
+            {
+                'key': 'hoy_dia',
+                'label': 'Día actual (número)',
+                'type': 'text',
+                'hint': 'Solo el día, ej. 20.',
+            },
+            {
+                'key': 'hoy_mes',
+                'label': 'Mes actual (número)',
+                'type': 'text',
+                'hint': 'Solo el mes, ej. 3.',
+            },
+            {
+                'key': 'hoy_mes_nombre',
+                'label': 'Mes actual (nombre)',
+                'type': 'text',
+                'hint': 'Ej. marzo.',
+            },
+            {
+                'key': 'hoy_anio',
+                'label': 'Año actual',
+                'type': 'text',
+                'hint': 'Ej. 2026.',
             },
             {
                 'key': 'usuario_emite',
@@ -499,6 +1050,7 @@ SAMPLE_CONTEXT = {
     'pago_nro_cliente': '1001',
     'pago_rbd': '12345-6',
     'pago_establecimiento': 'Escuela Ejemplo',
+    'pago_nombre_referencia': 'Casa Central - Establecimientos 02',
     'pago_director': 'María González Pérez',
     'pago_nro_documento': 'B-100',
     'pago_fecha_vencimiento': '10-03-2026',
@@ -512,6 +1064,7 @@ SAMPLE_CONTEXT = {
             'pago_nro_cliente': '1001',
             'pago_rbd': '12345-6',
             'pago_establecimiento': 'Escuela Ejemplo',
+            'pago_nombre_referencia': 'Casa Central - Establecimientos 02',
             'pago_director': 'María González Pérez',
             'pago_nro_documento': 'B-100',
             'pago_fecha_vencimiento': '10-03-2026',
@@ -525,6 +1078,7 @@ SAMPLE_CONTEXT = {
             'pago_nro_cliente': '1002',
             'pago_rbd': '23456-7',
             'pago_establecimiento': 'Liceo Ejemplo',
+            'pago_nombre_referencia': '',
             'pago_director': 'Juan Soto Rojas',
             'pago_nro_documento': 'B-101',
             'pago_fecha_vencimiento': '12-03-2026',
@@ -538,6 +1092,7 @@ SAMPLE_CONTEXT = {
             'pago_nro_cliente': '1003',
             'pago_rbd': '34567-8',
             'pago_establecimiento': 'Jardín Ejemplo',
+            'pago_nombre_referencia': 'Jardín Ejemplo - Sector Norte',
             'pago_director': 'Ana Pérez López',
             'pago_nro_documento': 'B-102',
             'pago_fecha_vencimiento': '15-03-2026',
@@ -579,12 +1134,271 @@ SAMPLE_CONTEXT = {
     'monto_variable': '$100.000',
     'establecimientos_nombres': 'Escuela Ejemplo, Liceo Ejemplo',
     'establecimientos_directores': 'María González Pérez, Juan Soto Rojas',
-    'hoy': date.today().strftime('%d-%m-%Y'),
     'usuario_emite': 'Usuario de prueba',
     'otros': '',
     'observaciones': '',
     'lugar_recepcion': 'Iquique',
+    # Flota / vehículos
+    'solicitud_numero': 'SOL-2026-0001',
+    'solicitud_folio': 'SOL-2026-0001',
+    'vehiculo_nombre': 'JMC Vigus Work (SLGF-29)',
+    'vehiculo_marca': 'JMC',
+    'vehiculo_modelo': 'Vigus Work',
+    'vehiculo_anio': '2023',
+    'vehiculo_patente': 'SLGF-29',
+    'vehiculo_tipo': 'Camioneta',
+    'vehiculo_color': 'Blanco',
+    'vehiculo_combustible': 'DIESEL',
+    'vehiculo_chasis': 'LJ11KBBDXN8123456',
+    'vehiculo_motor': '4JB1-123456',
+    'vehiculo_cilindrada': '2.8',
+    'vehiculo_fecha_adquisicion': '15-01-2023',
+    'vehiculo_fecha_inscripcion': '20-01-2023',
+    'vehiculo_estacionamiento': 'Estacionamiento SLEP Central',
+    'vehiculo_activo': 'Activo',
+    'vehiculo_cantidad_documentos': '2',
+    'vehiculo_cantidad_conductores': '2',
+    'conductor_nombre': 'Ana Pérez López',
+    'conductor_rut': '11.111.111-1',
+    'conductor_cargo': 'Chofer',
+    'conductor_subdireccion': 'Subdirección de Administración y Finanzas',
+    'conductor_fecha_asignacion': '15-01-2026',
+    'conductores_nombres': 'Ana Pérez López, Juan Soto Rojas',
+    'conductores_ruts': '11.111.111-1, 12.345.678-9',
+    'conductores_lista': 'Ana Pérez López (11.111.111-1), Juan Soto Rojas (12.345.678-9)',
+    'conductores_listado_html': (
+        '<table><thead><tr><th>Nombre</th><th>RUT</th><th>Cargo</th>'
+        '<th>Subdirección</th><th>Asignación</th></tr></thead>'
+        '<tbody><tr><td>Ana Pérez López</td><td>11.111.111-1</td><td>Chofer</td>'
+        '<td>Subdirección de Administración y Finanzas</td><td>15-01-2026</td></tr>'
+        '<tr><td>Juan Soto Rojas</td><td>12.345.678-9</td><td>Chofer</td>'
+        '<td>Subdirección de Infraestructura</td><td>01-03-2026</td></tr></tbody></table>'
+    ),
+    'cond_nombre': 'Ana Pérez López',
+    'cond_rut': '11.111.111-1',
+    'cond_cargo': 'Chofer',
+    'cond_subdireccion': 'Subdirección de Administración y Finanzas',
+    'cond_fecha_asignacion': '15-01-2026',
+    '_conductores_rows': [
+        {
+            'cond_nombre': 'Ana Pérez López',
+            'cond_rut': '11.111.111-1',
+            'cond_cargo': 'Chofer',
+            'cond_subdireccion': 'Subdirección de Administración y Finanzas',
+            'cond_fecha_asignacion': '15-01-2026',
+        },
+        {
+            'cond_nombre': 'Juan Soto Rojas',
+            'cond_rut': '12.345.678-9',
+            'cond_cargo': 'Chofer',
+            'cond_subdireccion': 'Subdirección de Infraestructura',
+            'cond_fecha_asignacion': '01-03-2026',
+        },
+    ],
+    'documentos_cantidad': '2',
+    'documentos_listado_html': (
+        '<table><thead><tr><th>Tipo</th><th>Nº</th><th>Institución</th>'
+        '<th>Fecha</th><th>Vencimiento</th></tr></thead><tbody>'
+        '<tr><td>Permiso de circulación</td><td>PC-2026-001</td><td>Municipalidad</td>'
+        '<td>01-03-2026</td><td>31-03-2027</td></tr>'
+        '<tr><td>SOAP</td><td>SOAP-7788</td><td>Seguros Demo</td>'
+        '<td>01-03-2026</td><td>01-03-2027</td></tr></tbody></table>'
+    ),
+    'vdoc_tipo': 'Permiso de circulación',
+    'vdoc_numero': 'PC-2026-001',
+    'vdoc_institucion': 'Municipalidad',
+    'vdoc_fecha': '01-03-2026',
+    'vdoc_vencimiento': '31-03-2027',
+    'vdoc_observaciones': '',
+    'poliza_numero': 'POL-998877',
+    'poliza_institucion': 'Seguros Demo',
+    'poliza_emision': '01-03-2026',
+    'poliza_fecha': '01-03-2026',
+    'poliza_vencimiento': '01-03-2027',
+    'poliza_observaciones': '',
+    'permiso_numero': 'PC-2026-001',
+    'permiso_institucion': 'Municipalidad',
+    'permiso_emision': '01-03-2026',
+    'permiso_fecha': '01-03-2026',
+    'permiso_vencimiento': '31-03-2027',
+    'permiso_observaciones': '',
+    'revision_numero': 'RT-445566',
+    'revision_institucion': 'Planta RT Demo',
+    'revision_emision': '15-01-2026',
+    'revision_fecha': '15-01-2026',
+    'revision_vencimiento': '15-01-2027',
+    'revision_observaciones': '',
+    'soap_numero': 'SOAP-7788',
+    'soap_institucion': 'Seguros Demo',
+    'soap_emision': '01-03-2026',
+    'soap_fecha': '01-03-2026',
+    'soap_vencimiento': '01-03-2027',
+    'soap_observaciones': '',
+    'padron_numero': 'PAD-123',
+    'padron_institucion': 'Registro Civil',
+    'padron_emision': '10-06-2020',
+    'padron_fecha': '10-06-2020',
+    'padron_vencimiento': '',
+    'padron_observaciones': '',
+    'tarjeta_numero': 'TC-554433',
+    'tarjeta_institucion': 'Copec',
+    'tarjeta_emision': '01-01-2026',
+    'tarjeta_fecha': '01-01-2026',
+    'tarjeta_vencimiento': '31-12-2027',
+    'tarjeta_observaciones': '',
+    '_vdocumentos_rows': [
+        {
+            'vdoc_tipo': 'Permiso de circulación',
+            'vdoc_numero': 'PC-2026-001',
+            'vdoc_institucion': 'Municipalidad',
+            'vdoc_fecha': '01-03-2026',
+            'vdoc_vencimiento': '31-03-2027',
+            'vdoc_observaciones': '',
+        },
+        {
+            'vdoc_tipo': 'SOAP',
+            'vdoc_numero': 'SOAP-7788',
+            'vdoc_institucion': 'Seguros Demo',
+            'vdoc_fecha': '01-03-2026',
+            'vdoc_vencimiento': '01-03-2027',
+            'vdoc_observaciones': '',
+        },
+    ],
+    'registros_anio': '2026',
+    'registros_cantidad': '2',
+    'registros_total_km': '1.250',
+    'registros_total_litros': '145,50',
+    'registros_total_bencina': '$ 180.000',
+    'registros_total_peajes': '$ 12.000',
+    'registros_total_seguros': '$ 45.000',
+    'registros_total_gastos': '$ 237.000',
+    'registros_listado_html': '<p>Registros de ejemplo (año en curso)</p>',
+    'vreg_periodo': 'Marzo 2026',
+    'vreg_anio': '2026',
+    'vreg_mes': 'Marzo',
+    'vreg_mes_numero': '3',
+    'vreg_km_inicial': '10.000',
+    'vreg_km_final': '10.650',
+    'vreg_km': '650',
+    'vreg_litros': '72,30',
+    'vreg_rendimiento': '9,0',
+    'vreg_gasto_bencina': '$ 95.000',
+    'vreg_gasto_peajes': '$ 6.000',
+    'vreg_gasto_seguros': '$ 45.000',
+    'vreg_gasto_total': '$ 146.000',
+    '_vregistros_rows': [
+        {
+            'vreg_periodo': 'Marzo 2026',
+            'vreg_anio': '2026',
+            'vreg_mes': 'Marzo',
+            'vreg_mes_numero': '3',
+            'vreg_km_inicial': '10.000',
+            'vreg_km_final': '10.650',
+            'vreg_km': '650',
+            'vreg_litros': '72,30',
+            'vreg_rendimiento': '9,0',
+            'vreg_gasto_bencina': '$ 95.000',
+            'vreg_gasto_peajes': '$ 6.000',
+            'vreg_gasto_seguros': '$ 45.000',
+            'vreg_gasto_total': '$ 146.000',
+        },
+        {
+            'vreg_periodo': 'Abril 2026',
+            'vreg_anio': '2026',
+            'vreg_mes': 'Abril',
+            'vreg_mes_numero': '4',
+            'vreg_km_inicial': '10.650',
+            'vreg_km_final': '11.250',
+            'vreg_km': '600',
+            'vreg_litros': '73,20',
+            'vreg_rendimiento': '8,2',
+            'vreg_gasto_bencina': '$ 85.000',
+            'vreg_gasto_peajes': '$ 6.000',
+            'vreg_gasto_seguros': '$ 0',
+            'vreg_gasto_total': '$ 91.000',
+        },
+    ],
+    'mantenciones_cantidad': '1',
+    'mantenciones_listado_html': '<p>Mantenciones de ejemplo</p>',
+    'vmant_fecha': '10-02-2026',
+    'vmant_km': '9.800',
+    'vmant_aceite': 'Sí',
+    'vmant_filtro_aceite': 'Sí',
+    'vmant_liquido_frenos': 'No',
+    'vmant_observaciones': 'Servicio programado',
+    '_vmantenciones_rows': [
+        {
+            'vmant_fecha': '10-02-2026',
+            'vmant_km': '9.800',
+            'vmant_aceite': 'Sí',
+            'vmant_filtro_aceite': 'Sí',
+            'vmant_liquido_frenos': 'No',
+            'vmant_observaciones': 'Servicio programado',
+        },
+    ],
+    'incidentes_cantidad': '1',
+    'incidentes_total_costo': '$ 250.000',
+    'incidentes_listado_html': '<p>Incidentes de ejemplo</p>',
+    'vinc_fecha': '05-01-2026',
+    'vinc_hora': '14:30',
+    'vinc_tipo': 'Choque leve',
+    'vinc_funcionario': 'Ana Pérez López',
+    'vinc_funcionario_rut': '11.111.111-1',
+    'vinc_costo': '$ 250.000',
+    'vinc_observaciones': 'Sin lesionados',
+    '_vincidentes_rows': [
+        {
+            'vinc_fecha': '05-01-2026',
+            'vinc_hora': '14:30',
+            'vinc_tipo': 'Choque leve',
+            'vinc_funcionario': 'Ana Pérez López',
+            'vinc_funcionario_rut': '11.111.111-1',
+            'vinc_costo': '$ 250.000',
+            'vinc_observaciones': 'Sin lesionados',
+        },
+    ],
+    'reparaciones_cantidad': '1',
+    'reparaciones_total_costo': '$ 180.000',
+    'reparaciones_listado_html': '<p>Reparaciones de ejemplo</p>',
+    'vrep_fecha': '12-01-2026',
+    'vrep_km': '9.900',
+    'vrep_tipo': 'Correctivo',
+    'vrep_descripcion': 'Cambio de farol delantero',
+    'vrep_costo': '$ 180.000',
+    'vrep_observaciones': '',
+    '_vreparaciones_rows': [
+        {
+            'vrep_fecha': '12-01-2026',
+            'vrep_km': '9.900',
+            'vrep_tipo': 'Correctivo',
+            'vrep_descripcion': 'Cambio de farol delantero',
+            'vrep_costo': '$ 180.000',
+            'vrep_observaciones': '',
+        },
+    ],
+    'solicitante_nombre': 'Ana Pérez López',
+    'solicitante_rut': '11.111.111-1',
+    'solicitante_cargo': 'Profesional',
+    'solicitante_unidad': 'Unidad de Flota',
+    'solicitante_departamento': 'Administración',
+    'solicitante_subdireccion': 'Subdirección de Administración',
+    'solicitante_anexo': '2145',
+    'solicitante_calidad_juridica': 'Contrata',
+    'solicitante_grado': '12',
+    'entrega_fecha': '09-11-2026',
+    'entrega_hora': '10:00',
+    'entrega_lugar': 'Estacionamiento SLEP Central',
+    'entrega_kilometraje': '11.250',
+    'entrega_observaciones': 'Vehículo en buen estado',
+    'entrega_estado': 'Operativo',
+    'receptor_nombre': 'Ana Pérez López',
+    'receptor_rut': '11.111.111-1',
+    'receptor_cargo': 'Profesional',
+    'entregador_nombre': 'Juan Soto',
+    'entregador_rut': '12.345.678-9',
+    'entregador_cargo': 'Encargado de flota',
 }
+SAMPLE_CONTEXT.update(fecha_sistema_context())
 
 
 def _document_asset_variables():
@@ -659,21 +1473,35 @@ def known_variable_keys():
     return keys
 
 
+_VEHICULO_ROW_KEYS = (
+    '_conductores_rows',
+    '_vdocumentos_rows',
+    '_vregistros_rows',
+    '_vmantenciones_rows',
+    '_vincidentes_rows',
+    '_vreparaciones_rows',
+)
+
+
 def build_sample_context(usuario_nombre='', proposito=None):
     ctx = dict(SAMPLE_CONTEXT)
-    ctx['hoy'] = date.today().strftime('%d-%m-%Y')
+    ctx.update(fecha_sistema_context())
     if usuario_nombre:
         ctx['usuario_emite'] = usuario_nombre
     prop = (proposito or '').strip()
     # ROC/RCF/RCA/etc.: no simular filas de boletas en vista previa.
     if prop and prop not in PROPOSITOS_RLB and prop != 'borrador':
         ctx.pop('_pagos_rows', None)
+    # Fuera de flota / borrador: no simular filas de vehículos.
+    if prop and prop not in PROPOSITOS_VEHICULO and prop != 'borrador':
+        for key in _VEHICULO_ROW_KEYS:
+            ctx.pop(key, None)
     return ctx
 
 
 def build_blank_context(usuario_nombre=''):
     """Contexto vacío tipado: sin valores de demo (para render real desde módulos)."""
     ctx = {key: '' for key in known_variable_keys() if not str(key).startswith('logo_')}
-    ctx['hoy'] = date.today().strftime('%d-%m-%Y')
+    ctx.update(fecha_sistema_context())
     ctx['usuario_emite'] = usuario_nombre or ''
     return ctx

@@ -289,6 +289,108 @@ export const TemplateVariable = Node.create({
   },
 })
 
+/** Casilla cuadrada inline (formularios / actas). Clic para marcar. */
+export const DocumentCheckbox = Node.create({
+  name: 'documentCheckbox',
+  group: 'inline',
+  inline: true,
+  atom: true,
+  selectable: true,
+  addAttributes() {
+    return {
+      checked: {
+        default: false,
+        parseHTML: (element) =>
+          element.getAttribute('data-checked') === 'true'
+          || element.getAttribute('aria-checked') === 'true'
+          || element.classList?.contains('is-checked'),
+        renderHTML: (attributes) => ({
+          'data-checked': attributes.checked ? 'true' : 'false',
+        }),
+      },
+    }
+  },
+  parseHTML() {
+    return [{ tag: 'span[data-sgaf-checkbox]' }]
+  },
+  renderHTML({ node, HTMLAttributes }) {
+    const checked = !!node.attrs.checked
+    return [
+      'span',
+      mergeAttributes(HTMLAttributes, {
+        'data-sgaf-checkbox': '',
+        'data-checked': checked ? 'true' : 'false',
+        class: `sgaf-checkbox${checked ? ' is-checked' : ''}`,
+        contenteditable: 'false',
+        role: 'checkbox',
+        'aria-checked': checked ? 'true' : 'false',
+      }),
+      checked ? '✓' : '\u00a0',
+    ]
+  },
+  addNodeView() {
+    return ({ node, getPos, editor }) => {
+      const dom = document.createElement('span')
+      dom.setAttribute('data-sgaf-checkbox', '')
+      dom.setAttribute('contenteditable', 'false')
+      dom.setAttribute('role', 'checkbox')
+      dom.tabIndex = -1
+
+      const sync = (n) => {
+        const on = !!n.attrs.checked
+        dom.className = `sgaf-checkbox${on ? ' is-checked' : ''}`
+        dom.setAttribute('data-checked', on ? 'true' : 'false')
+        dom.setAttribute('aria-checked', on ? 'true' : 'false')
+        dom.title = on ? 'Marcado (clic para desmarcar)' : 'Sin marcar (clic para marcar)'
+        dom.textContent = on ? '✓' : '\u00a0'
+      }
+      sync(node)
+
+      dom.addEventListener('mousedown', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        if (!editor.isEditable) return
+        const pos = typeof getPos === 'function' ? getPos() : null
+        if (pos == null) return
+        const current = editor.state.doc.nodeAt(pos)
+        if (!current || current.type.name !== 'documentCheckbox') return
+        editor.view.dispatch(
+          editor.state.tr.setNodeMarkup(pos, undefined, {
+            ...current.attrs,
+            checked: !current.attrs.checked,
+          }),
+        )
+      })
+
+      return {
+        dom,
+        update: (updated) => {
+          if (updated.type.name !== 'documentCheckbox') return false
+          sync(updated)
+          return true
+        },
+        ignoreMutation: () => true,
+      }
+    }
+  },
+  addCommands() {
+    return {
+      insertDocumentCheckbox:
+        (attrs = {}) =>
+        ({ commands }) =>
+          commands.insertContent({
+            type: this.name,
+            attrs: { checked: false, ...attrs },
+          }),
+    }
+  },
+  addKeyboardShortcuts() {
+    return {
+      'Mod-Shift-x': () => this.editor.commands.insertDocumentCheckbox(),
+    }
+  },
+})
+
 function parsePercent(value) {
   if (value == null || value === '') return null
   const num = Number.parseFloat(String(value).replace('%', ''))

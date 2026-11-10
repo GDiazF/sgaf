@@ -1,4 +1,4 @@
-import { HF_BAND_MM } from './hfMetrics.js'
+import { HF_BAND_MM, resolveHfBandMm } from './hfMetrics.js'
 
 /** Misma lógica que backend/documentos/page_sizes.resolve_page_mm */
 export const DEFAULT_PAGE_SIZE_KEY = 'carta'
@@ -29,6 +29,7 @@ export function resolvePageMm(plantilla, pageSizes = []) {
 /** Variables CSS para .doc-page (ancho/alto según tipo de hoja + márgenes). */
 export function pageCssVars(plantilla, pageSizes = []) {
   const { widthMm, heightMm } = resolvePageMm(plantilla, pageSizes)
+  const bands = resolveHfBandMm(plantilla)
   return {
     '--doc-page-w': `${widthMm}mm`,
     '--doc-page-h': `${heightMm}mm`,
@@ -36,8 +37,8 @@ export function pageCssVars(plantilla, pageSizes = []) {
     '--doc-margin-right': `${plantilla?.margen_derecho_mm ?? 20}mm`,
     '--doc-margin-bottom': `${plantilla?.margen_inferior_mm ?? 20}mm`,
     '--doc-margin-left': `${plantilla?.margen_izquierdo_mm ?? 20}mm`,
-    '--doc-hf-header-h': `${HF_BAND_MM.header}mm`,
-    '--doc-hf-footer-h': `${HF_BAND_MM.footer}mm`,
+    '--doc-hf-header-h': `${bands.header}mm`,
+    '--doc-hf-footer-h': `${bands.footer}mm`,
   }
 }
 

@@ -41,7 +41,7 @@ def get_full_user_data(user):
         funcionario_data = {
             'rut': funcionario.rut,
             'nombre_funcionario': funcionario.nombre_funcionario,
-            'cargo': funcionario.cargo,
+            'cargo': funcionario.cargo_nombre,
             'unidad': funcionario.unidad.nombre if funcionario.unidad else None,
             'unidad_id': funcionario.unidad_id,
             'departamento': funcionario.departamento.nombre if funcionario.departamento else None,

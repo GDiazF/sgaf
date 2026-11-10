@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import api from '../../api'
-import VehiculoDetalle from './VehiculoDetalle'
 import TipoDocumentoMantenedor from './TipoDocumentoMantenedor'
 import { usePermission } from '../../hooks/usePermission'
 import { useNotify } from '../../hooks/useNotify'
@@ -90,7 +89,6 @@ const VehiculosDashboard = () => {
   const [editingRecord, setEditingRecord] = useState(null)
   const [isTipoMantenedorOpen, setIsTipoMantenedorOpen] = useState(false)
   const [isFlotaModalOpen, setFlotaModalOpen] = useState(false)
-  const [selectedVehiculoForDetail, setSelectedVehiculoForDetail] = useState(null)
 
   const [formData, setFormData] = useState({
     anio: new Date().getFullYear(),
@@ -99,6 +97,7 @@ const VehiculosDashboard = () => {
     kilometros_recorridos: '',
     km_inicial: '',
     km_final: '',
+    litros: '',
     gasto_bencina: '',
     gasto_peajes: '',
     gasto_seguros: '',
@@ -258,6 +257,7 @@ const VehiculosDashboard = () => {
       kilometros_recorridos: '',
       km_inicial: '',
       km_final: '',
+      litros: '',
       gasto_bencina: '',
       gasto_peajes: '',
       gasto_seguros: '',
@@ -274,8 +274,9 @@ const VehiculosDashboard = () => {
       mes: registro.mes,
       vehiculo: registro.vehiculo,
       kilometros_recorridos: registro.kilometros_recorridos,
-      km_inicial: '',
-      km_final: '',
+      km_inicial: registro.km_inicial ?? '',
+      km_final: registro.km_final ?? '',
+      litros: registro.litros ?? '',
       gasto_bencina: registro.gasto_bencina,
       gasto_peajes: registro.gasto_peajes,
       gasto_seguros: registro.gasto_seguros,
@@ -291,16 +292,24 @@ const VehiculosDashboard = () => {
   const handleSubmit = async (e) => {
     e?.preventDefault?.()
     const restData = { ...formData }
+    const kmIni = formData.km_inicial === '' ? null : Number(formData.km_inicial)
+    const kmFin = formData.km_final === '' ? null : Number(formData.km_final)
+    const litros = formData.litros === '' ? null : formData.litros
     delete restData.km_inicial
     delete restData.km_final
+    delete restData.litros
+    delete restData.numero_vehiculos
+    let km = formData.kilometros_recorridos === '' ? 0 : Number(formData.kilometros_recorridos)
+    if (kmIni != null && kmFin != null) km = Math.max(0, kmFin - kmIni)
     const payload = {
       ...restData,
-      kilometros_recorridos:
-        formData.kilometros_recorridos === '' ? 0 : formData.kilometros_recorridos,
+      km_inicial: kmIni,
+      km_final: kmFin,
+      litros,
+      kilometros_recorridos: km,
       gasto_bencina: formData.gasto_bencina === '' ? 0 : formData.gasto_bencina,
       gasto_peajes: formData.gasto_peajes === '' ? 0 : formData.gasto_peajes,
       gasto_seguros: formData.gasto_seguros === '' ? 0 : formData.gasto_seguros,
-      numero_vehiculos: formData.numero_vehiculos || 0,
     }
     try {
       await registroOverlay.run(
@@ -368,12 +377,6 @@ const VehiculosDashboard = () => {
     }
   }
 
-  const handleUpdateVehiculoInList = (updatedVehiculo) => {
-    setFlota((prev) =>
-      prev.map((v) => (v.id === updatedVehiculo.id ? updatedVehiculo : v)),
-    )
-    setSelectedVehiculoForDetail(updatedVehiculo)
-  }
 
   const handleExportExcel = async (shouldSum = false) => {
     try {
@@ -921,9 +924,9 @@ const VehiculosDashboard = () => {
                 <article
                   key={v.id}
                   className="vehiculos-flota-card"
-                  onClick={() => setSelectedVehiculoForDetail(v)}
+                  onClick={() => navigate(`/vehiculos/flota/${v.id}`)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') setSelectedVehiculoForDetail(v)
+                    if (e.key === 'Enter') navigate(`/vehiculos/flota/${v.id}`)
                   }}
                   role="button"
                   tabIndex={0}
@@ -1149,6 +1152,18 @@ const VehiculosDashboard = () => {
                 readOnly
               />
             </Field>
+            <Field label="Litros cargados" htmlFor="reg-litros">
+              <Input
+                id="reg-litros"
+                name="litros"
+                inputMode="decimal"
+                value={formData.litros === '' ? '' : String(formData.litros)}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, litros: e.target.value }))
+                }
+                placeholder="Opcional"
+              />
+            </Field>
           </div>
 
           <div className="form-grid">
@@ -1294,14 +1309,6 @@ const VehiculosDashboard = () => {
         confirmLabel="Eliminar"
         danger
       />
-
-      {selectedVehiculoForDetail ? (
-        <VehiculoDetalle
-          vehiculo={selectedVehiculoForDetail}
-          onClose={() => setSelectedVehiculoForDetail(null)}
-          onUpdate={handleUpdateVehiculoInList}
-        />
-      ) : null}
 
       <TipoDocumentoMantenedor
         isOpen={isTipoMantenedorOpen}

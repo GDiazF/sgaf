@@ -47,12 +47,23 @@ class Servicio(models.Model):
     numero_cliente = models.CharField(max_length=100, unique=True) # Required and unique globally
     tipo_documento = models.ForeignKey(TipoDocumento, on_delete=models.SET_NULL, null=True)
     unidad_medida = models.CharField(max_length=50, blank=True, null=True, verbose_name="Unidad de Medida de Consumo")
+    nombre_referencia = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+        verbose_name='Nombre de referencia',
+        help_text=(
+            'Opcional. Etiqueta interna para distinguir el servicio '
+            '(ej. «Casa Central - Establecimientos 02»).'
+        ),
+    )
     
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.proveedor.nombre} - {self.establecimiento.nombre} ({self.numero_cliente})"
+        label = (self.nombre_referencia or '').strip() or self.establecimiento.nombre
+        return f"{self.proveedor.nombre} - {label} ({self.numero_cliente})"
 
     class Meta:
         verbose_name = "Servicio"

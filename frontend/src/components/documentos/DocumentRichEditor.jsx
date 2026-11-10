@@ -25,6 +25,7 @@ import {
   BackgroundColor,
   LineHeight,
   TemplateVariable,
+  DocumentCheckbox,
   LogoVariable,
   ColoredTableCell,
   ColoredTableHeader,
@@ -84,6 +85,7 @@ function buildExtensions(placeholder, { paginate = true } = {}) {
     ColoredTableCell,
     TableRowResize,
     TemplateVariable,
+    DocumentCheckbox,
     LogoVariable,
     PageBreak,
     DocumentShape,
@@ -146,9 +148,23 @@ function isSelectionInTable(editor) {
   return editor.isActive('table')
 }
 
+function getTableRowRepeat(editor) {
+  if (!editor) return null
+  return editor.getAttributes('tableRow').repeat || null
+}
+
 function isPagosRepeatRow(editor) {
-  if (!editor) return false
-  return editor.getAttributes('tableRow').repeat === 'pagos'
+  return Boolean(getTableRowRepeat(editor))
+}
+
+const REPEAT_LABELS = {
+  pagos: 'pagos/boletas',
+  conductores: 'conductores',
+  vdocumentos: 'documentos del vehículo',
+  vregistros: 'registros de combustible',
+  vmantenciones: 'mantenciones',
+  vincidentes: 'incidentes',
+  vreparaciones: 'reparaciones',
 }
 
 function toggleInlineMark(editor, markName) {
@@ -521,6 +537,40 @@ function PageSetupGroup({ pageSetup }) {
           ))}
         </div>
       </ToolbarGroup>
+      <ToolbarGroup label="Franjas">
+        <div className="doc-editor__page-margins" role="group" aria-label="Altura de encabezado y pie en milímetros">
+          <label className="doc-editor__page-margin">
+            <span>Encab.</span>
+            <Input
+              className="doc-editor__page-num"
+              type="number"
+              min="8"
+              max="80"
+              step="0.5"
+              aria-label="Altura del encabezado (mm)"
+              title="Altura de la franja de encabezado (mm)"
+              value={plantilla.altura_encabezado_mm ?? 15}
+              disabled={!canChange}
+              onChange={(e) => patch({ altura_encabezado_mm: e.target.value })}
+            />
+          </label>
+          <label className="doc-editor__page-margin">
+            <span>Pie</span>
+            <Input
+              className="doc-editor__page-num"
+              type="number"
+              min="8"
+              max="80"
+              step="0.5"
+              aria-label="Altura del pie (mm)"
+              title="Altura de la franja de pie (mm)"
+              value={plantilla.altura_pie_mm ?? 12}
+              disabled={!canChange}
+              onChange={(e) => patch({ altura_pie_mm: e.target.value })}
+            />
+          </label>
+        </div>
+      </ToolbarGroup>
     </>
   )
 }
@@ -552,6 +602,8 @@ export function DocumentToolbar({ editor, pageSetup }) {
   const currentSize = editor.getAttributes('textStyle').fontSize || '11pt'
   const inTable = isSelectionInTable(editor)
   const pagosRepeatRow = inTable && isPagosRepeatRow(editor)
+  const rowRepeat = inTable ? getTableRowRepeat(editor) : null
+  const rowRepeatLabel = rowRepeat ? (REPEAT_LABELS[rowRepeat] || rowRepeat) : ''
   const tableBorderStyle = inTable
     ? borderSidesToPreset(
       editor.getAttributes('tableCell').borderSides
@@ -737,6 +789,13 @@ export function DocumentToolbar({ editor, pageSetup }) {
               >
                 <Icon name="list-ordered" size={16} />
               </IconButton>
+              <IconButton
+                aria-label="Insertar casilla"
+                title="Insertar casilla (checkbox). Clic en la casilla para marcar/desmarcar"
+                {...toolbarButtonProps(() => editor.chain().focus().insertDocumentCheckbox().run())}
+              >
+                <Icon name="checkbox" size={16} />
+              </IconButton>
               <Select
                 className="doc-editor__leading-select"
                 aria-label="Interlineado"
@@ -809,8 +868,16 @@ export function DocumentToolbar({ editor, pageSetup }) {
                 <Icon name="table-row-plus" size={16} />
               </IconButton>
               <IconButton
-                aria-label={pagosRepeatRow ? 'Quitar repetición de fila de pagos' : 'Fila se repite por cada pago'}
-                title={pagosRepeatRow ? 'Esta fila se repite por cada boleta (clic para quitar)' : 'Marcar fila: se repite por cada boleta/pago'}
+                aria-label={
+                  pagosRepeatRow
+                    ? `Quitar repetición de fila (${rowRepeatLabel})`
+                    : 'Fila se repite por cada registro'
+                }
+                title={
+                  pagosRepeatRow
+                    ? `Esta fila se repite por cada ${rowRepeatLabel} (clic para quitar)`
+                    : 'Marcar fila: se repite automáticamente (detecta pago_*, cond_*, vreg_*, etc.)'
+                }
                 disabled={!inTable}
                 className={pagosRepeatRow ? 'is-active' : ''}
                 {...toolbarButtonProps(() => editor.chain().focus().togglePagosRepeatRow().run())}
@@ -823,6 +890,30 @@ export function DocumentToolbar({ editor, pageSetup }) {
                 {...toolbarButtonProps(() => editor.chain().focus().addColumnAfter().run())}
               >
                 <Icon name="table-col-plus" size={16} />
+              </IconButton>
+              <IconButton
+                aria-label="Combinar celdas"
+                title="Seleccione 2 o más celdas (Shift+clic) y combínelas"
+                disabled={!inTable || !editor.can().mergeCells()}
+                {...toolbarButtonProps(() => editor.chain().focus().mergeCells().run())}
+              >
+                <Icon name="table-merge-cells" size={16} />
+              </IconButton>
+              <IconButton
+                aria-label="Dividir en columnas"
+                title="Partir celda en dos columnas (borde vertical | )"
+                disabled={!inTable || !editor.can().splitCellIntoColumns()}
+                {...toolbarButtonProps(() => editor.chain().focus().splitCellIntoColumns().run())}
+              >
+                <Icon name="table-split-cols" size={16} />
+              </IconButton>
+              <IconButton
+                aria-label="Dividir en filas"
+                title="Partir celda en dos filas (borde horizontal ─ )"
+                disabled={!inTable || !editor.can().splitCellIntoRows()}
+                {...toolbarButtonProps(() => editor.chain().focus().splitCellIntoRows().run())}
+              >
+                <Icon name="table-split-rows" size={16} />
               </IconButton>
               <IconButton
                 aria-label="Eliminar tabla"

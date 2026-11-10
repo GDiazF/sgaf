@@ -21,6 +21,29 @@ DOCUMENT_SANS_STACK = 'Arial, "Liberation Sans", "DejaVu Sans", Helvetica, sans-
 DOCUMENT_SERIF_STACK = '"Times New Roman", "Liberation Serif", "DejaVu Serif", Times, serif'
 DOCUMENT_MONO_STACK = '"Courier New", "Liberation Mono", "DejaVu Sans Mono", monospace'
 
+# Alturas por defecto de las franjas de encabezado/pie (mm).
+DEFAULT_HEADER_BAND_MM = 15.0
+DEFAULT_FOOTER_BAND_MM = 12.0
+HEADER_SPACING_MM = 4.0
+FOOTER_SPACING_MM = 4.0
+MIN_HF_BAND_MM = 8.0
+MAX_HF_BAND_MM = 80.0
+
+
+def plantilla_hf_band_mm(plantilla):
+    """Altura (mm) de franja encabezado/pie según plantilla, acotada."""
+    try:
+        header = float(getattr(plantilla, 'altura_encabezado_mm', None) or DEFAULT_HEADER_BAND_MM)
+    except (TypeError, ValueError):
+        header = DEFAULT_HEADER_BAND_MM
+    try:
+        footer = float(getattr(plantilla, 'altura_pie_mm', None) or DEFAULT_FOOTER_BAND_MM)
+    except (TypeError, ValueError):
+        footer = DEFAULT_FOOTER_BAND_MM
+    header = max(MIN_HF_BAND_MM, min(MAX_HF_BAND_MM, header))
+    footer = max(MIN_HF_BAND_MM, min(MAX_HF_BAND_MM, footer))
+    return header, footer
+
 # Familias típicas de plantillas Windows-only → stack compartido al generar PDF.
 _PDF_FONT_FAMILY_REWRITES = (
     (re.compile(r'(?i)(["\']?)Calibri\1(?:\s*,\s*sans-serif)?'), DOCUMENT_SANS_STACK),
@@ -366,13 +389,29 @@ def _apply_logos(html, context, *, header_footer=False, page_metrics=None, hf_ba
     return root.decode_contents()
 
 
-def _row_has_pago_var_keys(tr):
+# Filas de tabla repetibles: context[_*_rows] + prefijo de variables.
+REPEATABLE_ROW_SPECS = (
+    {'context_key': '_pagos_rows', 'prefix': 'pago_', 'marker': 'pagos'},
+    {'context_key': '_conductores_rows', 'prefix': 'cond_', 'marker': 'conductores'},
+    {'context_key': '_vdocumentos_rows', 'prefix': 'vdoc_', 'marker': 'vdocumentos'},
+    {'context_key': '_vregistros_rows', 'prefix': 'vreg_', 'marker': 'vregistros'},
+    {'context_key': '_vmantenciones_rows', 'prefix': 'vmant_', 'marker': 'vmantenciones'},
+    {'context_key': '_vincidentes_rows', 'prefix': 'vinc_', 'marker': 'vincidentes'},
+    {'context_key': '_vreparaciones_rows', 'prefix': 'vrep_', 'marker': 'vreparaciones'},
+)
+
+
+def _row_has_prefix_var_keys(tr, prefix):
     for el in tr.select('[data-sgaf-var]'):
         key = el.get('data-sgaf-var') or ''
-        if key.startswith('pago_'):
+        if key.startswith(prefix):
             return True
     text = tr.get_text() or ''
-    return '{{' in text and 'pago_' in text
+    return '{{' in text and prefix in text
+
+
+def _row_has_pago_var_keys(tr):
+    return _row_has_prefix_var_keys(tr, 'pago_')
 
 
 def _row_mentions_pago_vars(tr):
@@ -380,18 +419,23 @@ def _row_mentions_pago_vars(tr):
     return _row_has_pago_var_keys(tr)
 
 
-def _strip_orphan_pago_repeat_markers(html):
-    """Quita data-sgaf-repeat=pagos en filas sin variables pago_* (restos del editor)."""
+def _strip_orphan_repeat_markers(html, marker, prefix):
+    """Quita data-sgaf-repeat huérfanos en filas sin variables del prefijo."""
     soup, root = _fragment_soup(html)
     if root is None:
         return html or ''
     for tr in root.find_all('tr'):
-        if (tr.get('data-sgaf-repeat') or '') != 'pagos':
+        if (tr.get('data-sgaf-repeat') or '') != marker:
             continue
-        if _row_has_pago_var_keys(tr):
+        if _row_has_prefix_var_keys(tr, prefix):
             continue
         del tr['data-sgaf-repeat']
     return root.decode_contents()
+
+
+def _strip_orphan_pago_repeat_markers(html):
+    """Quita data-sgaf-repeat=pagos en filas sin variables pago_* (restos del editor)."""
+    return _strip_orphan_repeat_markers(html, 'pagos', 'pago_')
 
 
 def _apply_sgaf_var_spans(root, context):
@@ -446,14 +490,14 @@ def _fill_fragment_with_context(fragment_html, context):
     return soup
 
 
-def _expand_repeating_pago_rows(html, pagos_rows):
+def _expand_repeating_rows(html, rows_data, prefix):
     """
-    Si una fila de tabla usa variables pago_* (o data-sgaf-repeat=pagos),
-    se clona una vez por cada boleta y se rellenan esas variables.
+    Si una fila de tabla usa variables con el prefijo dado, se clona una vez
+    por cada registro y se rellenan esas variables.
     """
-    rows_data = list(pagos_rows or [])
-    if not rows_data:
-        rows_data = [{}]
+    data = list(rows_data or [])
+    if not data:
+        data = [{}]
 
     soup, root = _fragment_soup(html)
     if root is None:
@@ -461,12 +505,11 @@ def _expand_repeating_pago_rows(html, pagos_rows):
 
     for table in root.find_all('table'):
         for tr in list(table.find_all('tr')):
-            if not _row_mentions_pago_vars(tr):
+            if not _row_has_prefix_var_keys(tr, prefix):
                 continue
-            parent = tr.parent
-            if parent is None:
+            if tr.parent is None:
                 continue
-            for reg in rows_data:
+            for reg in data:
                 clone_soup = _fill_fragment_with_context(str(tr), reg)
                 new_tr = clone_soup.find('tr')
                 if new_tr is None:
@@ -479,34 +522,49 @@ def _expand_repeating_pago_rows(html, pagos_rows):
     return root.decode_contents()
 
 
-def _count_pago_template_rows(html):
+def _expand_repeating_pago_rows(html, pagos_rows):
+    """Compat: filas pago_* (boletas RLB)."""
+    return _expand_repeating_rows(html, pagos_rows, 'pago_')
+
+
+def _count_prefix_template_rows(html, prefix):
     soup, root = _fragment_soup(html)
     if root is None:
         return 0
-    return sum(1 for tr in root.find_all('tr') if _row_mentions_pago_vars(tr))
+    return sum(1 for tr in root.find_all('tr') if _row_has_prefix_var_keys(tr, prefix))
 
 
-def _context_for_global_fill(context, *, omit_pago_row_keys=False):
+def _count_pago_template_rows(html):
+    return _count_prefix_template_rows(html, 'pago_')
+
+
+def _context_for_global_fill(context, *, omit_prefixes=None):
     if not isinstance(context, dict):
         return context
-    if not omit_pago_row_keys:
+    prefixes = tuple(omit_prefixes or ())
+    if not prefixes:
         return context
-    return {k: v for k, v in context.items() if not str(k).startswith('pago_')}
+    return {
+        k: v
+        for k, v in context.items()
+        if not any(str(k).startswith(p) for p in prefixes)
+    }
 
 
 def fill_html(html, context, *, header_footer=False, page_metrics=None, hf_band_mm=18, pdf_print=False):
-    pagos_rows = context.get('_pagos_rows') if isinstance(context, dict) else None
     body = html or ''
-    expanded_pago_rows = 0
-    if pagos_rows is not None and not header_footer:
-        body = _strip_orphan_pago_repeat_markers(body)
-        expanded_pago_rows = _count_pago_template_rows(body)
-        body = _expand_repeating_pago_rows(body, pagos_rows)
-    # Tras expandir filas pago_*, no volver a aplicar pago_* globales (siempre son del 1.er registro).
-    global_ctx = _context_for_global_fill(
-        context,
-        omit_pago_row_keys=expanded_pago_rows > 0,
-    )
+    omit_prefixes = []
+    if isinstance(context, dict) and not header_footer:
+        for spec in REPEATABLE_ROW_SPECS:
+            rows = context.get(spec['context_key'])
+            if rows is None:
+                continue
+            body = _strip_orphan_repeat_markers(body, spec['marker'], spec['prefix'])
+            if _count_prefix_template_rows(body, spec['prefix']) > 0:
+                omit_prefixes.append(spec['prefix'])
+            body = _expand_repeating_rows(body, rows, spec['prefix'])
+    # Tras expandir filas repetibles, no volver a aplicar esas keys globales.
+    global_ctx = _context_for_global_fill(context, omit_prefixes=omit_prefixes)
     filled = _substitute_text(body, global_ctx)
     filled = _fill_sgaf_var_spans(filled, global_ctx)
     filled = _apply_logos(
@@ -521,24 +579,31 @@ def fill_html(html, context, *, header_footer=False, page_metrics=None, hf_band_
     return filled
 
 
-def _page_css(width_mm, height_mm, margins, pdf_page_margins=None, has_header=False, has_footer=False):
+def _page_css(
+    width_mm,
+    height_mm,
+    margins,
+    pdf_page_margins=None,
+    has_header=False,
+    has_footer=False,
+    header_band_mm=None,
+    footer_band_mm=None,
+):
     top, right, bottom, left = margins
     
     # Ajustar padding para incluir espacio del header/footer
-    header_height = 15.0  # mm
-    footer_height = 12.0  # mm
-    header_spacing = 4.0  # mm
-    footer_spacing = 4.0  # mm
+    header_height = float(header_band_mm if header_band_mm is not None else DEFAULT_HEADER_BAND_MM)
+    footer_height = float(footer_band_mm if footer_band_mm is not None else DEFAULT_FOOTER_BAND_MM)
     
     # El padding top debe incluir el espacio del header + spacing
     # para que el contenido empiece después del header
     top_padding = float(top)
     if has_header:
-        top_padding = max(float(top), header_height + header_spacing)
+        top_padding = max(float(top), header_height + HEADER_SPACING_MM)
     
     bottom_padding = float(bottom)
     if has_footer:
-        bottom_padding = max(float(bottom), footer_height + footer_spacing)
+        bottom_padding = max(float(bottom), footer_height + FOOTER_SPACING_MM)
     
     return f"""
       html, body {{
@@ -573,6 +638,24 @@ def _page_css(width_mm, height_mm, margins, pdf_page_margins=None, has_header=Fa
         white-space: normal;
         overflow-wrap: anywhere;
         word-break: break-word;
+      }}
+      .sgaf-checkbox,
+      span[data-sgaf-checkbox] {{
+        display: inline-block;
+        box-sizing: border-box;
+        width: 11pt;
+        height: 11pt;
+        margin: 0 2pt;
+        padding: 0;
+        border: 1.2pt solid #222;
+        border-radius: 1pt;
+        background: #fff;
+        color: #111;
+        font-size: 9pt;
+        font-weight: 700;
+        line-height: 9pt;
+        text-align: center;
+        vertical-align: -1pt;
       }}
       p {{
         margin: 0 0 0.4em;
@@ -1110,8 +1193,20 @@ def wrap_document_html(
     preview_footer='',
     has_header=False,
     has_footer=False,
+    header_band_mm=None,
+    footer_band_mm=None,
 ):
-    css = _page_css(width_mm, height_mm, margins, has_header=has_header, has_footer=has_footer) + (extra_css or '')
+    header_h = float(header_band_mm if header_band_mm is not None else DEFAULT_HEADER_BAND_MM)
+    footer_h = float(footer_band_mm if footer_band_mm is not None else DEFAULT_FOOTER_BAND_MM)
+    css = _page_css(
+        width_mm,
+        height_mm,
+        margins,
+        has_header=has_header,
+        has_footer=has_footer,
+        header_band_mm=header_h,
+        footer_band_mm=footer_h,
+    ) + (extra_css or '')
     top, right, bottom, left = margins
     stage_open = '<div class="doc-preview-stage">' if fit_preview else ''
     stage_close = '</div>' if fit_preview else ''
@@ -1160,11 +1255,11 @@ def wrap_document_html(
       }}
       .doc-preview-hf-band--header {{
         top: {top}mm;
-        height: 15mm;
+        height: {header_h}mm;
       }}
       .doc-preview-hf-band--footer {{
         bottom: {bottom}mm;
-        height: 12mm;
+        height: {footer_h}mm;
       }}
       .doc-preview-hf-band p {{ margin: 0; }}
       .doc-preview-hf-band .sgaf-logo-slot {{
@@ -1235,6 +1330,7 @@ def plantilla_page_metrics(plantilla):
 def build_preview_html(plantilla, context):
     width_mm, height_mm, margins = plantilla_page_metrics(plantilla)
     metrics = (width_mm, height_mm, margins)
+    header_band, footer_band = plantilla_hf_band_mm(plantilla)
     cuerpo = fill_html(plantilla.cuerpo_html, context, page_metrics=metrics)
     preview_header = ''
     preview_footer = ''
@@ -1247,7 +1343,7 @@ def build_preview_html(plantilla, context):
             context,
             header_footer=True,
             page_metrics=metrics,
-            hf_band_mm=15,
+            hf_band_mm=header_band,
         )
     if has_footer:
         preview_footer = fill_html(
@@ -1255,7 +1351,7 @@ def build_preview_html(plantilla, context):
             context,
             header_footer=True,
             page_metrics=metrics,
-            hf_band_mm=12,
+            hf_band_mm=footer_band,
         )
     return wrap_document_html(
         cuerpo,
@@ -1268,16 +1364,25 @@ def build_preview_html(plantilla, context):
         # NO pasamos has_header/has_footer para que use los mismos márgenes que el PDF
         has_header=False,
         has_footer=False,
+        header_band_mm=header_band,
+        footer_band_mm=footer_band,
     )
 
 
-def _pdf_playwright_margins(margins, *, has_header=False, has_footer=False):
+def _pdf_playwright_margins(
+    margins,
+    *,
+    has_header=False,
+    has_footer=False,
+    header_band_mm=None,
+    footer_band_mm=None,
+):
     """Márgenes Playwright: solo para reservar espacio del header/footer.
     Los márgenes del contenido se manejan con padding en .doc-body"""
-    # Playwright necesita espacio para renderizar el header/footer
-    # pero los márgenes del contenido ya están en el CSS
-    extra_top = 18.0 if has_header else 0.0
-    extra_bottom = 14.0 if has_footer else 0.0
+    header_h = float(header_band_mm if header_band_mm is not None else DEFAULT_HEADER_BAND_MM)
+    footer_h = float(footer_band_mm if footer_band_mm is not None else DEFAULT_FOOTER_BAND_MM)
+    extra_top = (header_h + HEADER_SPACING_MM) if has_header else 0.0
+    extra_bottom = (footer_h + FOOTER_SPACING_MM) if has_footer else 0.0
     return {
         'top': f'{extra_top}mm',
         'right': '0mm',
@@ -1289,7 +1394,7 @@ def _pdf_playwright_margins(margins, *, has_header=False, has_footer=False):
 def _header_footer_template(html, context, kind, page_metrics=None, pdf_print=False, band_height=None):
     # Usar altura por defecto o personalizada
     if band_height is None:
-        band = 15 if kind == 'header' else 12
+        band = DEFAULT_HEADER_BAND_MM if kind == 'header' else DEFAULT_FOOTER_BAND_MM
     else:
         band = band_height
     
@@ -1514,6 +1619,7 @@ def _render_pdf_on_worker(
 def render_pdf_bytes(plantilla, context):
     width_mm, height_mm, margins = plantilla_page_metrics(plantilla)
     metrics = (width_mm, height_mm, margins)
+    header_height, footer_height = plantilla_hf_band_mm(plantilla)
     
     header_html = plantilla.encabezado_html or ''
     footer_html = plantilla.pie_html or ''
@@ -1522,27 +1628,21 @@ def render_pdf_bytes(plantilla, context):
     has_footer = bool(footer_html.strip())
     
     # Calcular márgenes de @page para PDF
-    # Según el diagrama del usuario:
     # 1. Primero va el margen configurado (espacio vacío)
-    # 2. Luego va el header (15mm para header, 12mm para footer)
-    # 3. Luego va el spacing (3mm para header, 2mm para footer)
+    # 2. Luego va el header/footer (altura configurable por plantilla)
+    # 3. Luego va el spacing
     # 4. Luego empieza el contenido del body
     top_m, right_m, bottom_m, left_m = margins
-    
-    header_height = 15.0  # Altura del header
-    footer_height = 12.0  # Altura del footer
-    header_spacing = 4.0  # Spacing después del header
-    footer_spacing = 4.0  # Spacing antes del footer
     
     if has_header:
         # El margen de @page debe incluir: margen vacío + header + spacing
         # para que Playwright deje espacio para todo
-        page_margin_top = float(top_m) + header_height + header_spacing
+        page_margin_top = float(top_m) + header_height + HEADER_SPACING_MM
     else:
         page_margin_top = float(top_m)
     
     if has_footer:
-        page_margin_bottom = float(bottom_m) + footer_height + footer_spacing
+        page_margin_bottom = float(bottom_m) + footer_height + FOOTER_SPACING_MM
     else:
         page_margin_bottom = float(bottom_m)
     
@@ -1586,16 +1686,18 @@ def render_pdf_bytes(plantilla, context):
     
     if has_header:
         header_template = _header_footer_template(
-            header_html, context, 'header', 
-            page_metrics=metrics, 
-            pdf_print=True
+            header_html, context, 'header',
+            page_metrics=metrics,
+            pdf_print=True,
+            band_height=header_height,
         )
     
     if has_footer:
         footer_template = _header_footer_template(
-            footer_html, context, 'footer', 
-            page_metrics=metrics, 
-            pdf_print=True
+            footer_html, context, 'footer',
+            page_metrics=metrics,
+            pdf_print=True,
+            band_height=footer_height,
         )
 
     future = _pdf_executor.submit(

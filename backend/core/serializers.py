@@ -63,7 +63,7 @@ class UserManagementSerializer(serializers.ModelSerializer):
             return {
                 'rut': funcionario.rut,
                 'nombre_funcionario': funcionario.nombre_funcionario,
-                'cargo': funcionario.cargo
+                'cargo': funcionario.cargo_nombre
             }
         except:
             return None

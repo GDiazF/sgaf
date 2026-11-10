@@ -34,6 +34,9 @@ El panel **Variables** depende del propósito de la plantilla:
 - **RCA** → compras + contrato (compra ágil).
 - **RLB** (unitario / recepción / JUNJI) → mismos grupos de pagos (`recepcion_pagos` con `pago_*`). Las 3 RLB comparten variables; cambia *quién* llama al PDF y con qué contexto.
 - **Recepción de servicio** → una sola plantilla; `monto_junji` = 0 en colegio y valor en jardín (misma maqueta).
+- **Acta de entrega de vehículo** (`acta_entrega_vehiculo`) → ficha, conductores, documentos y datos del acta.
+- **Hoja de vida del vehículo** (`hoja_vida_vehiculo`) → ficha + combustible, preventivos, incidentes y reparaciones.
+- Filas repetibles de flota: `cond_*`, `vdoc_*`, `vreg_*`, `vmant_*`, `vinc_*`, `vrep_*` (además de `pago_*` en RLB). También hay `*_listado_html`.
 
 ## Archivos clave
 
@@ -42,9 +45,10 @@ El panel **Variables** depende del propósito de la plantilla:
 | `backend/documentos/propositos.py` | Lista de propósitos, grupos por propósito, resolvers (`proposito_from_*`). |
 | `backend/documentos/variables.py` | Catálogo `VARIABLE_GROUPS` + muestras. |
 | `backend/documentos/context_builders.py` | Objeto de negocio → dict de variables. |
-| `backend/documentos/renderer.py` | Sustitución, filas `pago_*`, Playwright. |
+| `backend/documentos/renderer.py` | Sustitución, filas `pago_*` / flota, Playwright. |
 | `backend/servicios/pdf/rc_adq.py` / `rc_rlb.py` | Puente “descargar” → plantilla + contexto (adquisiciones / RLB). |
 | `backend/contratos/pdf_gestion.py` | Puente recepción de servicio (gestión operativa). |
+| `backend/vehiculos/pdf.py` | Puente acta de entrega / hoja de vida de flota. |
 | `backend/documentos/migrations/` | Alterar `choices` del campo `proposito` si agregás claves. |
 
 ---

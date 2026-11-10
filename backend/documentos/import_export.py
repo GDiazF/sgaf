@@ -26,6 +26,8 @@ EXPORTABLE_FIELDS = (
     'margen_inferior_mm',
     'margen_izquierdo_mm',
     'margen_derecho_mm',
+    'altura_encabezado_mm',
+    'altura_pie_mm',
 )
 
 HTML_FIELDS = ('cuerpo_html', 'encabezado_html', 'pie_html')
@@ -36,6 +38,8 @@ DECIMAL_FIELDS = (
     'margen_inferior_mm',
     'margen_izquierdo_mm',
     'margen_derecho_mm',
+    'altura_encabezado_mm',
+    'altura_pie_mm',
 )
 
 
